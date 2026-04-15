@@ -15,7 +15,6 @@ import { loginChallenges, sessions, users } from "../db/schema";
 import { sendLoginCode } from "../mail/mailer";
 
 const requestCodeSchema = z.object({
-  phoneNumber: z.string().trim().min(3).max(40),
   username: z.string().trim().min(1).max(80)
 });
 
@@ -42,12 +41,7 @@ export function createAuthRouter(context: DatabaseContext) {
     const user = context.db
       .select()
       .from(users)
-      .where(
-        and(
-          eq(users.phoneNumber, parsed.data.phoneNumber),
-          eq(users.username, parsed.data.username)
-        )
-      )
+      .where(eq(users.username, parsed.data.username))
       .get();
 
     if (!user) {
@@ -105,7 +99,6 @@ export function createAuthRouter(context: DatabaseContext) {
       .from(loginChallenges)
       .where(
         and(
-          eq(loginChallenges.phoneNumber, parsed.data.phoneNumber),
           eq(loginChallenges.username, parsed.data.username),
           isNull(loginChallenges.consumedAt),
           gt(loginChallenges.expiresAt, timestamp)
@@ -122,12 +115,7 @@ export function createAuthRouter(context: DatabaseContext) {
     const user = context.db
       .select()
       .from(users)
-      .where(
-        and(
-          eq(users.phoneNumber, parsed.data.phoneNumber),
-          eq(users.username, parsed.data.username)
-        )
-      )
+      .where(eq(users.username, parsed.data.username))
       .get();
 
     if (!user) {

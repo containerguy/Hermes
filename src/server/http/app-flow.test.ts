@@ -12,11 +12,11 @@ type StartedApp = Awaited<ReturnType<typeof createHermesApp>>;
 let started: StartedApp | undefined;
 let databasePath: string;
 
-async function login(agent: ReturnType<typeof request.agent>, phoneNumber: string, username: string) {
-  await agent.post("/api/auth/request-code").send({ phoneNumber, username }).expect(202);
+async function login(agent: ReturnType<typeof request.agent>, username: string) {
+  await agent.post("/api/auth/request-code").send({ username }).expect(202);
   const response = await agent
     .post("/api/auth/verify-code")
-    .send({ phoneNumber, username, code: "123456", deviceName: "test" })
+    .send({ username, code: "123456", deviceName: "test" })
     .expect(200);
 
   return response.body.user as { id: string; role: string };
@@ -49,7 +49,7 @@ describe("app flow", () => {
 
   it("logs in, manages roles, creates events and enforces participation capacity", async () => {
     const adminAgent = request.agent(started!.app);
-    await login(adminAgent, "+491701234567", "hauptadmin");
+    await login(adminAgent, "hauptadmin");
 
     const manager = await adminAgent
       .post("/api/admin/users")
@@ -96,13 +96,13 @@ describe("app flow", () => {
       .expect(200);
 
     const managerAgent = request.agent(started!.app);
-    await login(managerAgent, "+491702222222", "manager");
+    await login(managerAgent, "manager");
 
     const userOneAgent = request.agent(started!.app);
-    await login(userOneAgent, "+491703333333", "spieler1");
+    await login(userOneAgent, "spieler1");
 
     const userTwoAgent = request.agent(started!.app);
-    await login(userTwoAgent, "+491704444444", "spieler2");
+    await login(userTwoAgent, "spieler2");
 
     await userOneAgent
       .post("/api/events")

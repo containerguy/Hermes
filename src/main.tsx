@@ -54,7 +54,7 @@ const routes: Route[] = [
     path: "#login",
     label: "Login",
     eyebrow: "Einmalcode",
-    title: "Telefonnummer, Username, Mailcode.",
+    title: "Username und Mailcode.",
     description:
       "Der Login ist fuer mehrere Geraete vorbereitet, damit Smartphone und PC parallel aktiv bleiben koennen."
   },
@@ -526,7 +526,6 @@ function LoginPanel({
   onLoggedOut: () => void;
   onUserUpdated: (user: User) => void;
 }) {
-  const [phoneNumber, setPhoneNumber] = useState("");
   const [username, setUsername] = useState("");
   const [code, setCode] = useState("");
   const [deviceName, setDeviceName] = useState("");
@@ -544,7 +543,7 @@ function LoginPanel({
     try {
       await requestJson("/api/auth/request-code", {
         method: "POST",
-        body: JSON.stringify({ phoneNumber, username })
+        body: JSON.stringify({ username })
       });
       setStep("verify");
       setMessage("Code wurde per E-Mail versendet.");
@@ -564,7 +563,7 @@ function LoginPanel({
     try {
       const result = await requestJson<{ user: User }>("/api/auth/verify-code", {
         method: "POST",
-        body: JSON.stringify({ phoneNumber, username, code, deviceName })
+        body: JSON.stringify({ username, code, deviceName })
       });
       onLoggedIn(result.user);
       setCode("");
@@ -685,15 +684,6 @@ function LoginPanel({
       <p className="eyebrow">Login</p>
       <h2>{step === "request" ? "Einmalcode anfordern." : "Code eingeben."}</h2>
       <form onSubmit={step === "request" ? requestCode : verifyCode}>
-        <label>
-          Telefonnummer
-          <input
-            autoComplete="tel"
-            value={phoneNumber}
-            onChange={(event) => setPhoneNumber(event.target.value)}
-            required
-          />
-        </label>
         <label>
           Username
           <input

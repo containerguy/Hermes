@@ -12,8 +12,7 @@ let closeApp: () => Promise<void>;
 let baseUrl: string;
 let databasePath: string;
 
-async function login(page: Page, phoneNumber: string, username: string) {
-  await page.getByLabel("Telefonnummer").fill(phoneNumber);
+async function login(page: Page, username: string) {
   await page.getByLabel("Username").fill(username);
   await page.getByRole("button", { name: "Code senden" }).click();
   await expect(page.getByText("Code wurde per E-Mail versendet.")).toBeVisible();
@@ -60,7 +59,7 @@ test.afterAll(async () => {
 
 test("admin creates users, manager creates an event, user joins", async ({ page }) => {
   await page.goto(baseUrl);
-  await login(page, "+491701234567", "hauptadmin");
+  await login(page, "hauptadmin");
 
   const adminPanel = page.getByLabel("Adminbereich");
   await adminPanel.getByLabel("Telefonnummer").fill("+491702222222");
@@ -78,7 +77,7 @@ test("admin creates users, manager creates an event, user joins", async ({ page 
   await expect(adminPanel.getByText("spieler@example.test")).toBeVisible();
 
   await page.getByRole("button", { name: "Logout" }).click();
-  await login(page, "+491702222222", "manager");
+  await login(page, "manager");
 
   await page.getByLabel("Spiel").fill("Browser Game");
   await page.getByLabel("Start").selectOption("scheduled");
@@ -89,7 +88,7 @@ test("admin creates users, manager creates an event, user joins", async ({ page 
   await expect(page.getByRole("heading", { name: "Browser Game" })).toBeVisible();
 
   await page.getByRole("button", { name: "Logout" }).click();
-  await login(page, "+491703333333", "spieler");
+  await login(page, "spieler");
   await page.getByRole("button", { name: "Dabei" }).click();
   await expect(page.getByText("1 / 2")).toBeVisible();
 });

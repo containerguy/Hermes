@@ -10,7 +10,7 @@ Der Fokus liegt auf einfacher Bedienung waehrend der LAN-Party, nicht auf einer 
 
 ## Kernfunktionen
 
-- Login per Telefonnummer, Username und Einmalcode pro Login.
+- Login per Username und Einmalcode pro Login.
 - Der Einmalcode wird per E-Mail an die beim User gespeicherte Adresse gesendet.
 - WebApp, responsive nutzbar auf Smartphone und PC.
 - User koennen gleichzeitig auf mehreren Geraeten aktiv sein.
@@ -53,7 +53,7 @@ Der Fokus liegt auf einfacher Bedienung waehrend der LAN-Party, nicht auf einer 
 ## Annahmen
 
 - Teilnehmerzahl ist klein, daher ist ein einfaches Rollen- und Datenmodell ausreichend.
-- Telefonnummern dienen primaer zur Identifikation.
+- Telefonnummern koennen am Userprofil bleiben, sind aber fuer den Login nicht relevant.
 - E-Mail-Adressen werden fuer Login-Codes benoetigt und muessen pro User gespeichert werden.
 - Der Haupt-Admin wird beim ersten Start oder per Bootstrap-Konfiguration angelegt.
 - Mailversand erfolgt ueber SMTP-Konfiguration. Ein lokaler Mailserver oder ein kostenloser SMTP-Anbieter kann genutzt werden.
@@ -295,7 +295,7 @@ Paketpruefung:
 
 Status: abgeschlossen.
 
-### AP 3 - Login mit Telefonnummer, Username und E-Mail-Einmalcode
+### AP 3 - Login mit Username und E-Mail-Einmalcode
 
 Ziel: Einfacher, sicherer Login fuer mehrere Geraete pro User.
 
@@ -312,7 +312,7 @@ Aufgaben:
 
 Akzeptanzkriterien:
 
-- User kann mit Telefonnummer, Username und per E-Mail erhaltenem gueltigem Code einloggen.
+- User kann mit Username und per E-Mail erhaltenem gueltigem Code einloggen.
 - Derselbe User kann parallel am Smartphone und PC eingeloggt sein.
 - Verbrauchte oder abgelaufene Codes funktionieren nicht mehr.
 - Ohne funktionierende SMTP-Konfiguration ist der Fehler fuer Admins klar erkennbar.
@@ -320,7 +320,7 @@ Akzeptanzkriterien:
 Paketpruefung:
 
 - Funktional: HTTP-Flow fuer Code-Anforderung, Code-Verifikation, Session-Cookie, `/me` und Logout ist lauffaehig.
-- Produktziel: Login nutzt Telefonnummer und Username, sendet den Code ueber Mail-Adapter und erlaubt parallele Sessions.
+- Produktziel: Login nutzt den Username, sendet den Code ueber Mail-Adapter und erlaubt parallele Sessions.
 - Release-Relevanz: Der Flow funktioniert mit SMTP-Konfiguration und besitzt einen Console-Modus fuer lokale Tests und Docker-Diagnose.
 
 Status: abgeschlossen.

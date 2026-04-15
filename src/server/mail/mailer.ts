@@ -10,6 +10,38 @@ function readBoolean(value: string | undefined) {
   return value === "true" || value === "1";
 }
 
+function resolveSmtpSecurity(port: number) {
+  const mode = process.env.HERMES_SMTP_SECURITY?.trim().toLowerCase();
+  const legacySecure = process.env.HERMES_SMTP_SECURE;
+
+  if (mode === "tls") {
+    return { secure: true, requireTLS: false };
+  }
+
+  if (mode === "starttls") {
+    return { secure: false, requireTLS: true };
+  }
+
+  if (mode === "none") {
+    return { secure: false, requireTLS: false };
+  }
+
+  if (legacySecure !== undefined) {
+    const secure = readBoolean(legacySecure);
+
+    if (secure && port !== 465) {
+      console.warn(
+        "[Hermes] HERMES_SMTP_SECURE=true on a non-465 port is interpreted as STARTTLS. Use HERMES_SMTP_SECURITY=tls for implicit TLS or HERMES_SMTP_SECURITY=starttls for port 587."
+      );
+      return { secure: false, requireTLS: true };
+    }
+
+    return { secure, requireTLS: false };
+  }
+
+  return port === 465 ? { secure: true, requireTLS: false } : { secure: false, requireTLS: false };
+}
+
 export async function sendLoginCode(input: SendLoginCodeInput) {
   const mode = process.env.HERMES_MAIL_MODE ?? "console";
   const from = process.env.HERMES_MAIL_FROM ?? "Hermes <no-reply@hermes.local>";
@@ -28,10 +60,12 @@ export async function sendLoginCode(input: SendLoginCodeInput) {
 
   const user = process.env.HERMES_SMTP_USER;
   const pass = process.env.HERMES_SMTP_PASSWORD;
+  const security = resolveSmtpSecurity(port);
   const transporter = nodemailer.createTransport({
     host,
     port,
-    secure: readBoolean(process.env.HERMES_SMTP_SECURE),
+    secure: security.secure,
+    requireTLS: security.requireTLS,
     auth: user && pass ? { user, pass } : undefined
   });
 

@@ -1,6 +1,6 @@
 # Hermes
 
-Hermes ist eine responsive WebApp fuer LAN-Party-Spielrunden. User melden sich mit Telefonnummer, Username und E-Mail-Einmalcode an, Manager legen Events an, und Teilnehmer stimmen mit `dabei` oder `nicht dabei` ab.
+Hermes ist eine responsive WebApp fuer LAN-Party-Spielrunden. User melden sich mit Username und E-Mail-Einmalcode an, Manager legen Events an, und Teilnehmer stimmen mit `dabei` oder `nicht dabei` ab.
 
 ## Wo Werden Einstellungen Gespeichert?
 
@@ -107,9 +107,12 @@ HERMES_MAIL_FROM=Hermes <hermes@example.test>
 HERMES_SMTP_HOST=smtp.example.test
 HERMES_SMTP_PORT=587
 HERMES_SMTP_SECURE=false
+HERMES_SMTP_SECURITY=starttls
 HERMES_SMTP_USER=
 HERMES_SMTP_PASSWORD=
 ```
+
+Hinweis: Fuer Port `587` ist normalerweise STARTTLS korrekt (`HERMES_SMTP_SECURITY=starttls`). Fuer Port `465` ist implizites TLS korrekt (`HERMES_SMTP_SECURITY=tls`). Der Fehler `wrong version number` bedeutet fast immer, dass implizites TLS gegen einen STARTTLS-Port gesprochen wurde.
 
 ## Push Notifications
 

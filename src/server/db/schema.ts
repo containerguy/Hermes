@@ -18,6 +18,7 @@ export const users = sqliteTable(
   },
   (table) => [
     uniqueIndex("users_phone_number_unique").on(table.phoneNumber),
+    uniqueIndex("users_username_unique").on(table.username),
     uniqueIndex("users_email_unique").on(table.email)
   ]
 );
