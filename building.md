@@ -72,6 +72,49 @@ Das benoetigt auf vielen Systemen sudo-Rechte.
 docker build -t hermes:local .
 ```
 
+## GitHub Actions Image Pipeline
+
+Die Pipeline liegt unter:
+
+```text
+.github/workflows/docker-image.yml
+```
+
+Sie fuehrt bei Pull Requests aus:
+
+- `npm ci`
+- `npm test`
+- `npm run build`
+- `npm audit --omit=dev`
+- Docker Build ohne Push
+
+Sie fuehrt bei Push auf `main`, Tags `v*` und manuellem Start aus:
+
+- dieselben Pruefungen
+- Docker Build
+- Push nach GitHub Container Registry
+
+Image:
+
+```text
+ghcr.io/containerguy/hermes
+```
+
+Tags:
+
+- `latest` fuer `main`
+- Branch-Tag fuer Branch-Builds
+- Git-Tag fuer Releases wie `v0.1.0`
+- `sha-<commit>` fuer jeden gepushten Commit
+
+Das Repository muss fuer GitHub Packages Schreibzugriff ueber `GITHUB_TOKEN` erlauben. Die Workflow-Datei setzt dafuer:
+
+```yaml
+permissions:
+  contents: read
+  packages: write
+```
+
 ## Docker Compose Starten
 
 ```bash
