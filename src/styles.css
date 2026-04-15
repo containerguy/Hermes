@@ -45,7 +45,8 @@ button:disabled {
   opacity: 0.7;
 }
 
-input {
+input,
+select {
   width: 100%;
   min-height: 44px;
   border: 1px solid #c8d2dc;
@@ -174,7 +175,8 @@ h2 {
 
 .event-preview,
 .route-card,
-.login-panel {
+.login-panel,
+.admin-panel {
   border: 1px solid #d4dee8;
   border-radius: 8px;
   background: #ffffff;
@@ -245,11 +247,13 @@ dd {
 }
 
 .route-card,
-.login-panel {
+.login-panel,
+.admin-panel {
   padding: 22px;
 }
 
-.login-panel form {
+.login-panel form,
+.admin-form {
   display: grid;
   gap: 14px;
   margin-top: 18px;
@@ -285,6 +289,46 @@ dd {
   color: #8f1f17;
 }
 
+.admin-panel {
+  display: grid;
+  gap: 18px;
+}
+
+.admin-list {
+  display: grid;
+  gap: 10px;
+}
+
+.admin-list-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 132px;
+  gap: 12px;
+  align-items: center;
+  border-radius: 8px;
+  padding: 12px;
+  background: #eef3f7;
+}
+
+.admin-list-row div {
+  display: grid;
+  gap: 4px;
+}
+
+.admin-list-row span {
+  color: #657487;
+  font-size: 0.88rem;
+  overflow-wrap: anywhere;
+}
+
+.checkbox-label {
+  grid-template-columns: 20px 1fr;
+  align-items: center;
+}
+
+.checkbox-label input {
+  min-height: 20px;
+}
+
 @media (max-width: 860px) {
   .topbar {
     align-items: flex-start;
@@ -310,5 +354,9 @@ dd {
 
   .action-row {
     flex-direction: column;
+  }
+
+  .admin-list-row {
+    grid-template-columns: 1fr;
   }
 }

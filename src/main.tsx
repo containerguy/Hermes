@@ -11,6 +11,12 @@ type User = {
   notificationsEnabled: boolean;
 };
 
+type AppSettings = {
+  appName: string;
+  defaultNotificationsEnabled: boolean;
+  eventAutoArchiveHours: number;
+};
+
 type Route = {
   path: string;
   label: string;
@@ -231,6 +237,214 @@ function LoginPanel({
   );
 }
 
+function AdminPanel({ currentUser }: { currentUser: User | null }) {
+  const [users, setUsers] = useState<User[]>([]);
+  const [settings, setSettings] = useState<AppSettings>({
+    appName: "Hermes",
+    defaultNotificationsEnabled: true,
+    eventAutoArchiveHours: 8
+  });
+  const [newUser, setNewUser] = useState({
+    phoneNumber: "",
+    username: "",
+    email: "",
+    role: "user" as User["role"]
+  });
+  const [message, setMessage] = useState("");
+  const [error, setError] = useState("");
+
+  const isAdmin = currentUser?.role === "admin";
+
+  async function loadAdminData() {
+    if (!isAdmin) {
+      return;
+    }
+
+    const [userResult, settingsResult] = await Promise.all([
+      requestJson<{ users: User[] }>("/api/admin/users"),
+      requestJson<{ settings: AppSettings }>("/api/admin/settings")
+    ]);
+    setUsers(userResult.users);
+    setSettings(settingsResult.settings);
+  }
+
+  useEffect(() => {
+    loadAdminData().catch(() => undefined);
+  }, [isAdmin]);
+
+  async function createUser(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    setError("");
+    setMessage("");
+
+    try {
+      await requestJson<{ user: User }>("/api/admin/users", {
+        method: "POST",
+        body: JSON.stringify(newUser)
+      });
+      setNewUser({ phoneNumber: "", username: "", email: "", role: "user" });
+      await loadAdminData();
+      setMessage("User gespeichert.");
+    } catch (caught) {
+      setError(caught instanceof Error ? caught.message : "request_failed");
+    }
+  }
+
+  async function updateRole(userId: string, role: User["role"]) {
+    setError("");
+    setMessage("");
+
+    try {
+      await requestJson<{ user: User }>(`/api/admin/users/${userId}`, {
+        method: "PATCH",
+        body: JSON.stringify({ role })
+      });
+      await loadAdminData();
+      setMessage("Rolle gespeichert.");
+    } catch (caught) {
+      setError(caught instanceof Error ? caught.message : "request_failed");
+    }
+  }
+
+  async function saveSettings(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    setError("");
+    setMessage("");
+
+    try {
+      const result = await requestJson<{ settings: AppSettings }>("/api/admin/settings", {
+        method: "PUT",
+        body: JSON.stringify(settings)
+      });
+      setSettings(result.settings);
+      setMessage("Einstellungen gespeichert.");
+    } catch (caught) {
+      setError(caught instanceof Error ? caught.message : "request_failed");
+    }
+  }
+
+  if (!isAdmin) {
+    return (
+      <article id="admin" className="route-card">
+        <p className="eyebrow">Admin</p>
+        <h2>User, Manager und Einstellungen.</h2>
+        <p>Der Adminbereich ist nach Admin-Login verfuegbar.</p>
+      </article>
+    );
+  }
+
+  return (
+    <section id="admin" className="admin-panel" aria-label="Adminbereich">
+      <p className="eyebrow">Admin</p>
+      <h2>User, Manager und Einstellungen.</h2>
+
+      <form onSubmit={createUser} className="admin-form">
+        <label>
+          Telefonnummer
+          <input
+            value={newUser.phoneNumber}
+            onChange={(event) => setNewUser({ ...newUser, phoneNumber: event.target.value })}
+            required
+          />
+        </label>
+        <label>
+          Username
+          <input
+            value={newUser.username}
+            onChange={(event) => setNewUser({ ...newUser, username: event.target.value })}
+            required
+          />
+        </label>
+        <label>
+          E-Mail
+          <input
+            type="email"
+            value={newUser.email}
+            onChange={(event) => setNewUser({ ...newUser, email: event.target.value })}
+            required
+          />
+        </label>
+        <label>
+          Rolle
+          <select
+            value={newUser.role}
+            onChange={(event) =>
+              setNewUser({ ...newUser, role: event.target.value as User["role"] })
+            }
+          >
+            <option value="user">User</option>
+            <option value="manager">Manager</option>
+            <option value="admin">Admin</option>
+          </select>
+        </label>
+        <button type="submit">User anlegen</button>
+      </form>
+
+      <div className="admin-list" aria-label="Userliste">
+        {users.map((user) => (
+          <div className="admin-list-row" key={user.id}>
+            <div>
+              <strong>{user.username}</strong>
+              <span>{user.email}</span>
+            </div>
+            <select
+              value={user.role}
+              onChange={(event) => updateRole(user.id, event.target.value as User["role"])}
+            >
+              <option value="user">User</option>
+              <option value="manager">Manager</option>
+              <option value="admin">Admin</option>
+            </select>
+          </div>
+        ))}
+      </div>
+
+      <form onSubmit={saveSettings} className="admin-form">
+        <label>
+          App-Name
+          <input
+            value={settings.appName}
+            onChange={(event) => setSettings({ ...settings, appName: event.target.value })}
+            required
+          />
+        </label>
+        <label>
+          Auto-Archiv nach Stunden
+          <input
+            type="number"
+            min={1}
+            max={72}
+            value={settings.eventAutoArchiveHours}
+            onChange={(event) =>
+              setSettings({
+                ...settings,
+                eventAutoArchiveHours: Number(event.target.value)
+              })
+            }
+            required
+          />
+        </label>
+        <label className="checkbox-label">
+          <input
+            type="checkbox"
+            checked={settings.defaultNotificationsEnabled}
+            onChange={(event) =>
+              setSettings({
+                ...settings,
+                defaultNotificationsEnabled: event.target.checked
+              })
+            }
+          />
+          Notifications standardmaessig aktiv
+        </label>
+        {message ? <p className="notice">{message}</p> : null}
+        {error ? <p className="error">{error}</p> : null}
+        <button type="submit">Einstellungen speichern</button>
+      </form>
+    </section>
+  );
+}
+
 function App() {
   const [currentUser, setCurrentUser] = useState<User | null>(null);
 
@@ -304,13 +518,15 @@ function App() {
           onLoggedIn={setCurrentUser}
           onLoggedOut={() => setCurrentUser(null)}
         />
-        {routes.slice(2).map((route) => (
-          <article id={route.path.slice(1)} className="route-card" key={route.path}>
-            <p className="eyebrow">{route.eyebrow}</p>
-            <h2>{route.title}</h2>
-            <p>{route.description}</p>
-          </article>
-        ))}
+        <article id="manager" className="route-card">
+          <p className="eyebrow">Eventsteuerung</p>
+          <h2>Neue Runden ohne Umwege anlegen.</h2>
+          <p>
+            Manager koennen Spiel, Startzeit, min/max Spieler und optionale
+            Verbindungsdaten vorbereiten.
+          </p>
+        </article>
+        <AdminPanel currentUser={currentUser} />
       </section>
     </main>
   );

@@ -2,7 +2,13 @@ import { and, desc, eq, gt, isNull } from "drizzle-orm";
 import { Router } from "express";
 import { randomUUID } from "node:crypto";
 import { z } from "zod";
-import { createSessionToken, clearSessionCookie, SESSION_COOKIE, setSessionCookie } from "../auth/sessions";
+import { getCurrentSession, publicUser } from "../auth/current-user";
+import {
+  createSessionToken,
+  clearSessionCookie,
+  SESSION_COOKIE,
+  setSessionCookie
+} from "../auth/sessions";
 import { generateOtp, hashOtp, verifyOtp } from "../auth/otp";
 import type { DatabaseContext } from "../db/client";
 import { loginChallenges, sessions, users } from "../db/schema";
@@ -20,42 +26,6 @@ const verifyCodeSchema = requestCodeSchema.extend({
 
 function nowIso() {
   return new Date().toISOString();
-}
-
-function publicUser(user: typeof users.$inferSelect) {
-  return {
-    id: user.id,
-    phoneNumber: user.phoneNumber,
-    username: user.username,
-    email: user.email,
-    role: user.role,
-    notificationsEnabled: user.notificationsEnabled
-  };
-}
-
-function getCurrentSession(context: DatabaseContext, token: string | undefined) {
-  if (!token) {
-    return undefined;
-  }
-
-  const result = context.db
-    .select({ session: sessions, user: users })
-    .from(sessions)
-    .innerJoin(users, eq(sessions.userId, users.id))
-    .where(and(eq(sessions.id, token), isNull(sessions.revokedAt)))
-    .get();
-
-  if (!result) {
-    return undefined;
-  }
-
-  context.db
-    .update(sessions)
-    .set({ lastSeenAt: nowIso() })
-    .where(eq(sessions.id, result.session.id))
-    .run();
-
-  return result;
 }
 
 export function createAuthRouter(context: DatabaseContext) {
@@ -193,7 +163,7 @@ export function createAuthRouter(context: DatabaseContext) {
   });
 
   router.get("/me", (request, response) => {
-    const current = getCurrentSession(context, request.cookies?.[SESSION_COOKIE]);
+    const current = getCurrentSession(context, request);
 
     if (!current) {
       response.status(401).json({ error: "nicht_angemeldet" });
