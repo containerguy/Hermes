@@ -6,6 +6,8 @@ node_modules/
 dist/
 build/
 coverage/
+test-results/
+playwright-report/
 
 # Local config and secrets
 .env

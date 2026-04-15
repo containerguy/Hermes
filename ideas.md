@@ -512,7 +512,13 @@ Akzeptanzkriterien:
 - Kernflow laeuft in einem Browser-Test.
 - Tests koennen lokal reproduzierbar gestartet werden.
 
-Status: offen.
+Paketpruefung:
+
+- Funktional: Vitest prueft Domainlogik, OTP und den API-Kernflow fuer Login, Admin, Eventanlage und Teilnahme.
+- Produktziel: Die risikoreichsten Backend- und Produktregeln sind automatisiert abgesichert.
+- Release-Relevanz: Browser-E2E ist als Playwright-Test vorhanden, laeuft in dieser Umgebung aber noch nicht, weil Chromium die Systembibliothek `libnspr4.so` benoetigt und `playwright install-deps` sudo-Rechte verlangt.
+
+Status: blockiert fuer Browser-E2E; Vitest/API-Teil abgeschlossen.
 
 ### AP 11 - Deployment und Betrieb
 
@@ -571,6 +577,7 @@ Status: offen.
 - 2026-04-15: AP 7 implementiert Server-Sent Events mit Polling-Fallback und Status-Refresh.
 - 2026-04-15: AP 8 implementiert Web Push mit VAPID, geraetebezogenen Subscriptions und User-Praeferenz.
 - 2026-04-15: AP 9 schaerft LAN-UX mit klaren Statuslabels, leeren Zustaenden und Bestaetigungen fuer kritische Aktionen.
+- 2026-04-15: AP 10 ergaenzt Vitest/API-Tests und einen Playwright-Kernflow; lokaler Browserlauf ist durch fehlende OS-Abhaengigkeiten blockiert.
 - 2026-04-15: Hermes wird als Docker Image ausgeliefert; SSL/TLS, Reverse Proxy und Domain-Handling sind out of scope.
 - 2026-04-15: Manager werden durch den Haupt-Admin definiert; globale Einstellungen werden persistent gespeichert.
 - 2026-04-15: Login-Einmalcodes werden per E-Mail versendet.
