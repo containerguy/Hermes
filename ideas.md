@@ -11,10 +11,13 @@ Der Fokus liegt auf einfacher Bedienung waehrend der LAN-Party, nicht auf einer 
 ## Kernfunktionen
 
 - Login per Telefonnummer, Username und Einmalcode pro Login.
+- Der Einmalcode wird per E-Mail an die beim User gespeicherte Adresse gesendet.
 - WebApp, responsive nutzbar auf Smartphone und PC.
 - User koennen gleichzeitig auf mehreren Geraeten aktiv sein.
 - Alle User koennen bei Spiel-Events abstimmen bzw. Teilnahme signalisieren.
 - Manager koennen neue Events anlegen und verwalten.
+- Der Haupt-Admin verwaltet User, Manager und globale Einstellungen.
+- Einstellungen muessen dauerhaft gespeichert werden.
 - Ein Event enthaelt:
   - Spiel
   - gewuenschte Startzeit oder `sofort`
@@ -22,6 +25,8 @@ Der Fokus liegt auf einfacher Bedienung waehrend der LAN-Party, nicht auf einer 
   - maximale Spieleranzahl
   - optional: Server-Host
   - optional: Verbindungsinformationen
+- Die Startzeit eines Events kann nachtraeglich angepasst werden.
+- Alte Events wechseln nach Start automatisch in `laeuft bereits` und werden 8 Stunden nach Start automatisch archiviert.
 - Notifications sind pro User aktivierbar/deaktivierbar.
 - Standard: Push-Benachrichtigungen auf allen angemeldeten Geraeten.
 
@@ -32,32 +37,54 @@ Der Fokus liegt auf einfacher Bedienung waehrend der LAN-Party, nicht auf einer 
   - eigene Geraete verwalten
   - Notifications aktivieren/deaktivieren
   - Events sehen
-  - Teilnahme setzen, aendern oder zurueckziehen
+  - Teilnahme auf `dabei` oder `nicht dabei` setzen
 - Manager:
   - alle User-Rechte
   - Events anlegen
   - Events bearbeiten
-  - Events absagen oder abschliessen
-  - optional spaeter: User zu Managern machen
+  - eigene Events archivieren oder stornieren
+  - fremde Events archivieren oder stornieren
+- Admin:
+  - alle Manager-Rechte
+  - User verwalten
+  - Manager festlegen oder entziehen
+  - globale Einstellungen speichern
 
 ## Annahmen
 
 - Teilnehmerzahl ist klein, daher ist ein einfaches Rollen- und Datenmodell ausreichend.
-- Telefonnummern dienen primaer zur Identifikation, nicht zwingend zur SMS-Zustellung.
-- Der Einmalcode kann in der ersten Version durch einen Manager oder ueber einen lokalen Admin-Screen erzeugt und ausserhalb der App geteilt werden.
-- Echte SMS-Zustellung kann spaeter als Adapter nachgeruestet werden.
-- Push Notifications benoetigen HTTPS oder eine passende lokale Entwicklungs-/LAN-Loesung. Fuer den LAN-Betrieb muss frueh entschieden werden, ob Hermes lokal mit HTTPS, ueber eine Domain, ueber Tailscale/Cloudflare Tunnel oder nur als In-App-Realtime-Ansicht laufen soll.
+- Telefonnummern dienen primaer zur Identifikation.
+- E-Mail-Adressen werden fuer Login-Codes benoetigt und muessen pro User gespeichert werden.
+- Der Haupt-Admin wird beim ersten Start oder per Bootstrap-Konfiguration angelegt.
+- Mailversand erfolgt ueber SMTP-Konfiguration. Ein lokaler Mailserver oder ein kostenloser SMTP-Anbieter kann genutzt werden.
+- Hermes wird als fertiges Docker Image bereitgestellt. Docker Compose kann fuer lokale Persistenz und Konfiguration ergaenzt werden.
+- SSL/TLS, Reverse Proxy, Domain-Handling und Zertifikatsverwaltung sind out of scope.
+- Push Notifications benoetigen browserseitig trotzdem eine passende Secure-Context-Umgebung. Hermes liefert die App-Funktionalitaet, aber kein SSL-Setup.
 - Die App soll eine PWA werden, damit Smartphone und Desktop dieselbe Oberflaeche nutzen koennen.
+- Es gibt keine Warteliste.
+- Teilnahmeoptionen sind nur `dabei` und `nicht dabei`.
 
-## Offene Fragen
+## Beantwortete Produktentscheidungen
 
-- Soll die App nur im LAN laufen oder auch ueber das Internet erreichbar sein?
-- Wie werden Manager initial festgelegt: Seed-Datei, Admin-Setup beim ersten Start oder manuell in der Datenbank?
-- Soll der Einmalcode per SMS gesendet werden oder reicht fuer die LAN-Party ein manuell geteilter Code?
-- Sollen Events nur Teilnahmeoptionen `dabei` und `nicht dabei` haben oder zusaetzlich `vielleicht`?
-- Soll es eine Warteliste geben, wenn `maxPlayers` erreicht ist?
-- Soll die Startzeit automatisch angepasst werden koennen, wenn zu wenige Spieler zugesagt haben?
-- Wie lange bleiben alte Events sichtbar?
+- Auslieferung: Docker Image ist Pflicht. Mehrere Images sind erlaubt, falls technisch sinnvoll.
+- SSL Handling ist out of scope.
+- Manager werden durch den Haupt-Admin definiert.
+- Einstellungen muessen in der Anwendung gespeichert werden koennen.
+- Einmalcodes werden per E-Mail versendet.
+- Teilnahmeoptionen: nur `dabei` und `nicht dabei`.
+- Keine Warteliste.
+- Startzeiten koennen angepasst werden.
+- Events wechseln nach Start in `laeuft bereits`.
+- Events werden 8 Stunden nach Start automatisch archiviert.
+- Event-Ersteller, Manager und Admin koennen Events manuell archivieren oder stornieren.
+
+## Noch technische Entscheidungen
+
+- Next.js oder Remix final auswaehlen.
+- ORM final auswaehlen: Prisma oder Drizzle.
+- SMTP-Provider und konkrete Mail-Absenderadresse fuer den Betrieb festlegen.
+- Bootstrap-Mechanismus fuer den ersten Admin festlegen: Umgebungsvariablen oder Initial-Setup im UI.
+- Entscheiden, ob Realtime per Server-Sent Events oder WebSocket umgesetzt wird.
 
 ## Vorgeschlagener Tech-Stack
 
@@ -67,12 +94,13 @@ Der Fokus liegt auf einfacher Bedienung waehrend der LAN-Party, nicht auf einer 
 - Datenbank: SQLite fuer lokale LAN-Nutzung, spaeter leicht auf Postgres migrierbar
 - ORM: Prisma oder Drizzle
 - Auth: eigene Session-Logik mit OTP-Challenges und sicheren Cookies
+- Mail: SMTP-Adapter fuer Einmalcodes
 - Realtime: Server-Sent Events oder WebSocket
 - Push: Web Push mit VAPID, pro Geraet gespeicherte Subscriptions
 - Tests: Vitest fuer Logik, Playwright fuer Kernflows
-- Deployment: Docker Compose fuer den LAN-Host
+- Deployment: fertiges Docker Image, optional Docker Compose fuer Persistenz und Konfiguration
 
-Begruendung: Fuer 25 Personen ist SQLite plus eine einzelne WebApp-Instanz pragmatisch. Die App bleibt einfach zu betreiben, laesst sich aber spaeter sauber erweitern.
+Begruendung: Fuer 25 Personen ist SQLite plus eine einzelne WebApp-Instanz pragmatisch. Die App bleibt einfach zu betreiben, laesst sich aber spaeter sauber erweitern. Ein einzelnes Docker Image ist voraussichtlich ausreichend; ein zusaetzlicher Container ist nur noetig, wenn ein eigener Mail-Relay oder eine separate Datenbank gewuenscht wird.
 
 ## Grobes Datenmodell
 
@@ -81,8 +109,10 @@ Begruendung: Fuer 25 Personen ist SQLite plus eine einzelne WebApp-Instanz pragm
 - `id`
 - `phoneNumber`
 - `username`
-- `role` (`user`, `manager`)
+- `email`
+- `role` (`user`, `manager`, `admin`)
 - `notificationsEnabled`
+- `createdByUserId`
 - `createdAt`
 - `updatedAt`
 
@@ -91,9 +121,11 @@ Begruendung: Fuer 25 Personen ist SQLite plus eine einzelne WebApp-Instanz pragm
 - `id`
 - `phoneNumber`
 - `username`
+- `email`
 - `codeHash`
 - `expiresAt`
 - `consumedAt`
+- `sentAt`
 - `createdAt`
 
 ### Session
@@ -127,8 +159,12 @@ Begruendung: Fuer 25 Personen ist SQLite plus eine einzelne WebApp-Instanz pragm
 - `maxPlayers`
 - `serverHost`
 - `connectionInfo`
-- `status` (`open`, `ready`, `started`, `cancelled`, `completed`)
+- `status` (`open`, `ready`, `running`, `cancelled`, `archived`)
 - `createdByUserId`
+- `cancelledByUserId`
+- `archivedByUserId`
+- `cancelledAt`
+- `archivedAt`
 - `createdAt`
 - `updatedAt`
 
@@ -137,26 +173,41 @@ Begruendung: Fuer 25 Personen ist SQLite plus eine einzelne WebApp-Instanz pragm
 - `id`
 - `eventId`
 - `userId`
-- `status` (`joined`, `declined`, `maybe`)
+- `status` (`joined`, `declined`)
 - `createdAt`
 - `updatedAt`
 
-In Version 1 kann `maybe` weggelassen werden, falls die Abstimmung bewusst binaer bleiben soll.
+### AppSetting
+
+- `key`
+- `value`
+- `updatedByUserId`
+- `updatedAt`
+
+Settings koennen SMTP-Konfiguration, App-Name, Default-Notification-Verhalten und spaeter weitere Betriebsoptionen abbilden. Secrets sollten bevorzugt ueber Umgebungsvariablen kommen; in der Datenbank gespeicherte Einstellungen duerfen keine unnoetigen Klartext-Secrets enthalten.
 
 ## Event-Statuslogik
 
 - `open`: Event ist sichtbar und sammelt Teilnahmen.
 - `ready`: `minPlayers` ist erreicht.
-- `started`: Event wurde gestartet oder liegt in der Vergangenheit und wurde gestartet markiert.
+- `running`: Die Startzeit ist erreicht oder ueberschritten. In der UI heisst dieser Status `laeuft bereits`.
 - `cancelled`: Event wurde abgesagt.
-- `completed`: Event ist erledigt.
+- `archived`: Event ist nicht mehr aktiv sichtbar.
 
 Abgeleitete Anzeige:
 
 - Zu wenige Spieler: `joinedCount < minPlayers`
 - Startbereit: `joinedCount >= minPlayers`
 - Voll: `joinedCount >= maxPlayers`
-- Warteliste optional spaeter, falls mehr Zusagen als Plaetze erlaubt werden sollen.
+- Keine Warteliste: Wenn `maxPlayers` erreicht ist, koennen keine weiteren User auf `dabei` wechseln.
+- Automatische Archivierung: `startsAt + 8 Stunden`, sofern das Event nicht vorher storniert oder manuell archiviert wurde.
+
+Manuelle Aktionen:
+
+- Event-Ersteller koennen eigene Events archivieren oder stornieren.
+- Manager koennen alle Events archivieren oder stornieren.
+- Admins koennen alle Events archivieren oder stornieren.
+- Startzeiten koennen von berechtigten Usern angepasst werden, solange das Event nicht archiviert oder storniert ist.
 
 ## Benachrichtigungen
 
@@ -166,6 +217,8 @@ Standardverhalten:
 - Bei `startMode = now` wird die Notification als dringender markiert.
 - Wenn ein Event `ready` wird, erhalten Teilnehmer und Manager eine Benachrichtigung.
 - Jede aktive Session bzw. jedes registrierte Geraet kann eine eigene Push-Subscription haben.
+- Login-Codes werden per E-Mail versendet.
+- Mailversand-Fehler werden sichtbar protokolliert und im Adminbereich diagnostizierbar gemacht.
 
 Fallback:
 
@@ -200,14 +253,14 @@ Aufgaben:
 
 - Framework auswaehlen und initialisieren.
 - Basislayout fuer Smartphone und Desktop erstellen.
-- Navigation fuer Login, Eventliste, Eventdetails und Managerbereich vorbereiten.
+- Navigation fuer Login, Eventliste, Eventdetails, Managerbereich und Adminbereich vorbereiten.
 - PWA-Grundlagen vorbereiten: Manifest, Icons, Service Worker Platzhalter.
 
 Akzeptanzkriterien:
 
 - App startet lokal.
 - Layout funktioniert auf Smartphone- und Desktop-Breiten.
-- Erste leere Seiten sind erreichbar.
+- Erste leere Seiten fuer User, Manager und Admin sind erreichbar.
 
 Status: offen.
 
@@ -218,52 +271,63 @@ Ziel: Persistente Grundlage fuer User, Sessions, Events und Teilnahmen.
 Aufgaben:
 
 - ORM und SQLite einrichten.
-- Migrationen fuer User, LoginChallenge, Session, PushSubscription, GameEvent und Participation erstellen.
-- Seed-Mechanismus fuer initiale Manager definieren.
-- Validierungsregeln fuer min/max Spieler und Startzeit implementieren.
+- Migrationen fuer User, LoginChallenge, Session, PushSubscription, GameEvent, Participation und AppSetting erstellen.
+- Bootstrap-Mechanismus fuer den ersten Admin definieren.
+- Validierungsregeln fuer min/max Spieler, Startzeit und Startzeit-Aenderungen implementieren.
+- Eventstatus `running`, `cancelled` und `archived` abbilden.
 
 Akzeptanzkriterien:
 
 - Migrationen laufen reproduzierbar.
-- Ein initialer Manager kann angelegt werden.
+- Ein initialer Admin kann angelegt werden.
 - Datenmodell verhindert offensichtliche ungueltige Events.
+- Teilnahme kennt nur `joined` und `declined`.
+- Settings koennen persistent gespeichert werden.
 
 Status: offen.
 
-### AP 3 - Login mit Telefonnummer, Username und Einmalcode
+### AP 3 - Login mit Telefonnummer, Username und E-Mail-Einmalcode
 
 Ziel: Einfacher, sicherer Login fuer mehrere Geraete pro User.
 
 Aufgaben:
 
 - LoginChallenge erzeugen.
+- Einmalcode per SMTP an die gespeicherte E-Mail-Adresse senden.
 - Code nur gehasht speichern.
 - Ablaufzeit und einmalige Nutzung durchsetzen.
+- Mailversand-Fehler behandeln und protokollieren.
 - Session-Cookie erstellen.
 - Mehrere parallele Sessions pro User erlauben.
 - Logout fuer aktuelles Geraet implementieren.
 
 Akzeptanzkriterien:
 
-- User kann sich mit Telefonnummer, Username und gueltigem Code einloggen.
+- User kann mit Telefonnummer, Username und per E-Mail erhaltenem gueltigem Code einloggen.
 - Derselbe User kann parallel am Smartphone und PC eingeloggt sein.
 - Verbrauchte oder abgelaufene Codes funktionieren nicht mehr.
+- Ohne funktionierende SMTP-Konfiguration ist der Fehler fuer Admins klar erkennbar.
 
 Status: offen.
 
-### AP 4 - Rollen und Manager-Rechte
+### AP 4 - Admin, Einstellungen und Rollen
 
-Ziel: Manager koennen Events verwalten, User nur teilnehmen.
+Ziel: Admin verwaltet Manager und Einstellungen; Manager koennen Events verwalten, User nur teilnehmen.
 
 Aufgaben:
 
-- Role Guard fuer Manageraktionen einbauen.
+- Role Guard fuer User-, Manager- und Adminaktionen einbauen.
+- Adminbereich fuer Userverwaltung und Managerzuweisung bauen.
+- Settingsbereich fuer globale Einstellungen bauen.
 - Managerbereich fuer Event-Erstellung vorbereiten.
 - Serverseitige Rechtepruefungen fuer alle Schreibaktionen implementieren.
 
 Akzeptanzkriterien:
 
 - Nicht-Manager koennen keine Events erstellen oder bearbeiten.
+- Manager koennen keine Admin-Einstellungen veraendern und keine Rollen vergeben.
+- Admin kann User zu Managern machen oder Managerrechte entziehen.
+- Einstellungen bleiben nach Neustart erhalten.
 - Manager koennen Eventformulare oeffnen und absenden.
 - Rechte werden serverseitig erzwungen, nicht nur im UI versteckt.
 
@@ -278,12 +342,17 @@ Aufgaben:
 - Eventformular mit Spiel, Startzeit/sofort, min/max Spieler, Server-Host und Verbindungsinfo bauen.
 - Eventliste mit Status, Spielerzahl und Startzeit bauen.
 - Eventdetailseite mit Teilnehmern und Verbindungsinfo bauen.
-- Bearbeiten, Absagen und Abschliessen fuer Manager ergaenzen.
+- Startzeit-Aenderung fuer berechtigte User ergaenzen.
+- Archivieren und Stornieren fuer Event-Ersteller, Manager und Admin ergaenzen.
+- Statusanzeige `laeuft bereits` fuer gestartete Events ergaenzen.
 
 Akzeptanzkriterien:
 
 - Manager kann ein gueltiges Event erstellen.
 - Alle User sehen neue Events.
+- Berechtigte User koennen die Startzeit anpassen.
+- Events zeigen nach erreichter Startzeit `laeuft bereits`.
+- Event-Ersteller, Manager und Admin koennen Events archivieren oder stornieren.
 - Ungueltige Angaben werden klar abgewiesen.
 
 Status: offen.
@@ -294,16 +363,16 @@ Ziel: User koennen schnell signalisieren, ob sie teilnehmen.
 
 Aufgaben:
 
-- Teilnahme setzen, aendern und entfernen.
+- Teilnahme auf `dabei` oder `nicht dabei` setzen und aendern.
 - Spielerzaehlung aus Teilnahmen ableiten.
 - Maximalspieler-Regel behandeln.
-- Optional: `maybe` und Warteliste entscheiden und implementieren.
+- Keine Warteliste implementieren.
 
 Akzeptanzkriterien:
 
-- User kann fuer jedes offene Event seinen Status setzen.
+- User kann fuer jedes offene Event `dabei` oder `nicht dabei` setzen.
 - Spielerzahlen aktualisieren sich korrekt.
-- Bei voller Runde ist das Verhalten eindeutig.
+- Wenn `maxPlayers` erreicht ist, koennen keine weiteren User auf `dabei` wechseln.
 
 Status: offen.
 
@@ -315,12 +384,14 @@ Aufgaben:
 
 - Realtime-Kanal per SSE oder WebSocket einrichten.
 - Eventliste bei neuen Events und Teilnahmen aktualisieren.
+- Eventstatus bei Startzeit-Aenderungen, `laeuft bereits`, Archivierung und Stornierung aktualisieren.
 - Verbindungsstatus im UI anzeigen.
 - Fallback auf Polling definieren, falls Realtime getrennt ist.
 
 Akzeptanzkriterien:
 
 - Zwei Browser sehen Teilnahmeaenderungen zeitnah.
+- Zwei Browser sehen Status- und Startzeit-Aenderungen zeitnah.
 - Verbindungsabbrueche fuehren nicht zu kaputtem UI.
 
 Status: offen.
@@ -336,6 +407,7 @@ Aufgaben:
 - User-Toggle fuer Notifications bauen.
 - Default-Verhalten bei erstem Login definieren.
 - Push bei neuen Events und Statuswechseln versenden.
+- Secure-Context-Einschraenkung dokumentieren, ohne SSL in Hermes selbst einzubauen.
 - Fehlerhafte Subscriptions automatisch deaktivieren.
 
 Akzeptanzkriterien:
@@ -343,6 +415,7 @@ Akzeptanzkriterien:
 - Ein User mit zwei Geraeten kann auf beiden Push erhalten.
 - Deaktiviert der User Notifications, werden keine Pushes mehr gesendet.
 - Ohne Browser-Permission bleibt die App nutzbar.
+- Docker Image enthaelt keine eigene SSL-/Reverse-Proxy-Logik.
 
 Status: offen.
 
@@ -353,9 +426,10 @@ Ziel: Die App ist waehrend der LAN-Party schnell und robust nutzbar.
 Aufgaben:
 
 - Mobile-first Eventliste optimieren.
-- Klare Hervorhebung fuer `sofort`, `ready` und `voll`.
+- Klare Hervorhebung fuer `sofort`, `ready`, `laeuft bereits`, `voll`, `archiviert` und `storniert`.
 - Schnelle Teilnahmebuttons auf Listen- und Detailansicht.
 - Manageraktionen kompakt, aber nicht versehentlich ausloesbar gestalten.
+- Admin- und Settingsseiten schlicht und eindeutig gestalten.
 - Leere Zustaende und Fehlermeldungen formulieren.
 
 Akzeptanzkriterien:
@@ -375,6 +449,10 @@ Aufgaben:
 - Unit-Tests fuer Eventvalidierung, Statuslogik und OTP-Logik.
 - Integrationstests fuer Login, Eventanlage und Teilnahme.
 - Playwright-Tests fuer Manager erstellt Event und User tritt bei.
+- Tests fuer Admin verwaltet Manager und speichert Settings.
+- Tests fuer automatische Umstellung auf `running` und Archivierung nach 8 Stunden.
+- Tests fuer manuelle Archivierung/Stornierung durch Ersteller, Manager und Admin.
+- Tests fuer Mail-OTP-Versand mit mockbarem SMTP-Adapter.
 - Security-Checks fuer Sessions, Rollen und OTP-Verbrauch.
 
 Akzeptanzkriterien:
@@ -391,27 +469,33 @@ Ziel: Hermes kann auf einem LAN-Host verlaesslich gestartet werden.
 
 Aufgaben:
 
-- Dockerfile und Docker Compose erstellen.
+- Produktionsfaehiges Dockerfile erstellen.
+- Docker Compose fuer lokale Persistenz und einfache Konfiguration erstellen.
 - Persistenten Datenbankpfad konfigurieren.
-- `.env.example` fuer Secrets und VAPID Keys anlegen.
+- `.env.example` fuer Session-Secrets, Admin-Bootstrap, SMTP und VAPID Keys anlegen.
 - Backup- und Reset-Anleitung dokumentieren.
-- HTTPS-/Domain-Variante fuer Push Notifications klaeren.
+- Image-Build dokumentieren.
+- SSL/TLS und Reverse Proxy explizit als out of scope dokumentieren.
+- Optional: Healthcheck fuer Container bereitstellen.
 
 Akzeptanzkriterien:
 
+- Docker Image kann reproduzierbar gebaut werden.
 - App startet per Docker Compose.
 - Daten bleiben nach Neustart erhalten.
 - Betriebsanleitung beschreibt Start, Stop, Backup und Reset.
+- Betriebsanleitung beschreibt benoetigte SMTP- und Push-Konfiguration.
+- Keine Produktanforderung haengt von einem mitgelieferten SSL-Container ab.
 
 Status: offen.
 
 ## Vorgeschlagene Reihenfolge
 
-1. AP 0 abschliessen.
+1. AP 0 ist abgeschlossen.
 2. AP 1 App-Grundgeruest.
 3. AP 2 Datenbank und Domainmodell.
-4. AP 3 Login und Sessions.
-5. AP 4 Rollen.
+4. AP 3 Login mit E-Mail-Einmalcode und Sessions.
+5. AP 4 Admin, Einstellungen und Rollen.
 6. AP 5 Events.
 7. AP 6 Teilnahme.
 8. AP 7 Realtime.
@@ -426,7 +510,14 @@ Status: offen.
 - 2026-04-15: Planung wird in `ideas.md` gepflegt.
 - 2026-04-15: Repository wird als eigenes Git-Repo unter `/home/eluminare/Hermes` initialisiert.
 - 2026-04-15: Erste Architekturannahme ist eine TypeScript WebApp mit SQLite, PWA und Web Push.
+- 2026-04-15: Hermes wird als Docker Image ausgeliefert; SSL/TLS, Reverse Proxy und Domain-Handling sind out of scope.
+- 2026-04-15: Manager werden durch den Haupt-Admin definiert; globale Einstellungen werden persistent gespeichert.
+- 2026-04-15: Login-Einmalcodes werden per E-Mail versendet.
+- 2026-04-15: Teilnahmeoptionen sind nur `dabei` und `nicht dabei`; es gibt keine Warteliste.
+- 2026-04-15: Startzeiten koennen angepasst werden.
+- 2026-04-15: Events gehen nach Start in `laeuft bereits` und werden 8 Stunden nach Start automatisch archiviert.
+- 2026-04-15: Event-Ersteller, Manager und Admin koennen Events manuell archivieren oder stornieren.
 
 ## Naechster sinnvoller Schritt
 
-AP 1 starten: Framework final auswaehlen und ein lauffaehiges App-Grundgeruest erzeugen. Vorher sollten die offenen Fragen zu SMS-Zustellung, LAN/Internet-Erreichbarkeit und initialen Managern beantwortet werden, weil sie Auth, Push und Deployment beeinflussen.
+AP 1 starten: Framework final auswaehlen und ein lauffaehiges App-Grundgeruest erzeugen. Danach sollten AP 2 und AP 3 frueh die Admin-Bootstrap-, Settings- und SMTP-Grundlagen schaffen, weil diese Auth, Rollen und Betrieb beeinflussen.
