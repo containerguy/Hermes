@@ -456,7 +456,13 @@ Akzeptanzkriterien:
 - Ohne Browser-Permission bleibt die App nutzbar.
 - Docker Image enthaelt keine eigene SSL-/Reverse-Proxy-Logik.
 
-Status: offen.
+Paketpruefung:
+
+- Funktional: VAPID Public Key, Subscription-Speicherung pro Session und User-Toggle funktionieren per API.
+- Produktziel: Push ist pro User deaktivierbar; Subscriptions sind geraetebezogen und neue Events/Statuswechsel triggern Versandversuche.
+- Release-Relevanz: Fehlende VAPID-Konfiguration fuehrt zu sichtbarem Skip statt kaputtem Eventflow; SSL bleibt out of scope.
+
+Status: abgeschlossen.
 
 ### AP 9 - UX fuer LAN-Betrieb
 
@@ -557,6 +563,7 @@ Status: offen.
 - 2026-04-15: AP 5 implementiert Eventanlage, Eventliste, Startzeit-Aenderung, Stornieren, Archivieren und Auto-Archivierung.
 - 2026-04-15: AP 6 implementiert Teilnahme mit `dabei`/`nicht dabei` und serverseitiger Maximalspieler-Regel.
 - 2026-04-15: AP 7 implementiert Server-Sent Events mit Polling-Fallback und Status-Refresh.
+- 2026-04-15: AP 8 implementiert Web Push mit VAPID, geraetebezogenen Subscriptions und User-Praeferenz.
 - 2026-04-15: Hermes wird als Docker Image ausgeliefert; SSL/TLS, Reverse Proxy und Domain-Handling sind out of scope.
 - 2026-04-15: Manager werden durch den Haupt-Admin definiert; globale Einstellungen werden persistent gespeichert.
 - 2026-04-15: Login-Einmalcodes werden per E-Mail versendet.

@@ -108,6 +108,19 @@ function fromDatetimeLocal(value: string) {
   return new Date(value).toISOString();
 }
 
+function urlBase64ToUint8Array(base64String: string) {
+  const padding = "=".repeat((4 - (base64String.length % 4)) % 4);
+  const base64 = (base64String + padding).replace(/-/g, "+").replace(/_/g, "/");
+  const rawData = window.atob(base64);
+  const outputArray = new Uint8Array(rawData.length);
+
+  for (let index = 0; index < rawData.length; index += 1) {
+    outputArray[index] = rawData.charCodeAt(index);
+  }
+
+  return outputArray;
+}
+
 function EventBoard({ currentUser }: { currentUser: User | null }) {
   const [events, setEvents] = useState<GameEvent[]>([]);
   const [eventDraft, setEventDraft] = useState({
@@ -452,11 +465,13 @@ function EventBoard({ currentUser }: { currentUser: User | null }) {
 function LoginPanel({
   currentUser,
   onLoggedIn,
-  onLoggedOut
+  onLoggedOut,
+  onUserUpdated
 }: {
   currentUser: User | null;
   onLoggedIn: (user: User) => void;
   onLoggedOut: () => void;
+  onUserUpdated: (user: User) => void;
 }) {
   const [phoneNumber, setPhoneNumber] = useState("");
   const [username, setUsername] = useState("");
@@ -518,6 +533,68 @@ function LoginPanel({
     setBusy(false);
   }
 
+  async function enableNotifications() {
+    setBusy(true);
+    setError("");
+    setMessage("");
+
+    try {
+      if (!("serviceWorker" in navigator) || !("PushManager" in window)) {
+        throw new Error("push_nicht_unterstuetzt");
+      }
+
+      if (!window.isSecureContext) {
+        throw new Error("secure_context_erforderlich");
+      }
+
+      const { publicKey } = await requestJson<{ publicKey: string }>("/api/push/public-key");
+      const registration = await navigator.serviceWorker.register("/sw.js");
+      const permission = await Notification.requestPermission();
+
+      if (permission !== "granted") {
+        throw new Error("permission_abgelehnt");
+      }
+
+      const subscription = await registration.pushManager.subscribe({
+        userVisibleOnly: true,
+        applicationServerKey: urlBase64ToUint8Array(publicKey)
+      });
+      await requestJson("/api/push/subscriptions", {
+        method: "POST",
+        body: JSON.stringify(subscription.toJSON())
+      });
+      const result = await requestJson<{ user: User }>("/api/push/preferences", {
+        method: "PATCH",
+        body: JSON.stringify({ enabled: true })
+      });
+      onUserUpdated(result.user);
+      setMessage("Notifications aktiv.");
+    } catch (caught) {
+      setError(caught instanceof Error ? caught.message : "request_failed");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function disableNotifications() {
+    setBusy(true);
+    setError("");
+    setMessage("");
+
+    try {
+      const result = await requestJson<{ user: User }>("/api/push/preferences", {
+        method: "PATCH",
+        body: JSON.stringify({ enabled: false })
+      });
+      onUserUpdated(result.user);
+      setMessage("Notifications deaktiviert.");
+    } catch (caught) {
+      setError(caught instanceof Error ? caught.message : "request_failed");
+    } finally {
+      setBusy(false);
+    }
+  }
+
   if (currentUser) {
     return (
       <section className="login-panel" id="login" aria-label="Aktuelle Anmeldung">
@@ -533,6 +610,16 @@ function LoginPanel({
             <dd>{currentUser.email}</dd>
           </div>
         </dl>
+        {message ? <p className="notice">{message}</p> : null}
+        {error ? <p className="error">{error}</p> : null}
+        <div className="action-row">
+          <button type="button" onClick={enableNotifications} disabled={busy}>
+            Notifications aktivieren
+          </button>
+          <button type="button" className="secondary" onClick={disableNotifications} disabled={busy}>
+            Deaktivieren
+          </button>
+        </div>
         <button type="button" className="secondary" onClick={logout} disabled={busy}>
           Logout
         </button>
@@ -856,6 +943,7 @@ function App() {
           currentUser={currentUser}
           onLoggedIn={setCurrentUser}
           onLoggedOut={() => setCurrentUser(null)}
+          onUserUpdated={setCurrentUser}
         />
         <article id="manager" className="route-card">
           <p className="eyebrow">Eventsteuerung</p>

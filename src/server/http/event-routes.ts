@@ -7,6 +7,7 @@ import type { DatabaseContext } from "../db/client";
 import { appSettings, gameEvents, participations, users } from "../db/schema";
 import { deriveEventStatus, eventInputSchema, shouldAutoArchive } from "../domain/events";
 import { canCreateEvent, canManageEvent } from "../domain/users";
+import { sendPushToEnabledUsers } from "../push/push-service";
 import { broadcastEventsChanged } from "../realtime/event-bus";
 
 const updateEventSchema = z.object({
@@ -221,6 +222,11 @@ export function createEventRouter(context: DatabaseContext) {
 
     const created = context.db.select().from(gameEvents).where(eq(gameEvents.id, id)).get();
     broadcastEventsChanged("event_created");
+    void sendPushToEnabledUsers(context, {
+      title: "Neue Runde",
+      body: `${actor.username}: ${parsed.data.gameTitle}`,
+      url: "/#events"
+    });
     response.status(201).json({
       event: created ? serializeEvent(context, created, actor.id) : undefined
     });
@@ -344,10 +350,21 @@ export function createEventRouter(context: DatabaseContext) {
       })
       .run();
 
-    recalculateEventStatus(context, event);
+    const previousStatus = event.status;
+    const nextStatus = recalculateEventStatus(context, event);
 
     const updated = context.db.select().from(gameEvents).where(eq(gameEvents.id, event.id)).get();
     broadcastEventsChanged("participation_updated");
+    if (previousStatus !== nextStatus && updated) {
+      void sendPushToEnabledUsers(context, {
+        title: "Runde aktualisiert",
+        body:
+          nextStatus === "ready"
+            ? `${updated.gameTitle} ist startbereit.`
+            : `${updated.gameTitle}: ${nextStatus}`,
+        url: "/#events"
+      });
+    }
     response.json({ event: updated ? serializeEvent(context, updated, actor.id) : undefined });
   });
 
@@ -378,6 +395,11 @@ export function createEventRouter(context: DatabaseContext) {
 
     const updated = context.db.select().from(gameEvents).where(eq(gameEvents.id, event.id)).get();
     broadcastEventsChanged("event_cancelled");
+    void sendPushToEnabledUsers(context, {
+      title: "Runde storniert",
+      body: `${event.gameTitle} wurde storniert.`,
+      url: "/#events"
+    });
     response.json({ event: updated ? serializeEvent(context, updated, actor.id) : undefined });
   });
 
@@ -408,6 +430,11 @@ export function createEventRouter(context: DatabaseContext) {
 
     const updated = context.db.select().from(gameEvents).where(eq(gameEvents.id, event.id)).get();
     broadcastEventsChanged("event_archived");
+    void sendPushToEnabledUsers(context, {
+      title: "Runde archiviert",
+      body: `${event.gameTitle} wurde archiviert.`,
+      url: "/#events"
+    });
     response.json({ event: updated ? serializeEvent(context, updated, actor.id) : undefined });
   });
 

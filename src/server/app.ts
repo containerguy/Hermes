@@ -5,6 +5,7 @@ import path from "node:path";
 import { createAdminRouter } from "./http/admin-routes";
 import { createAuthRouter } from "./http/auth-routes";
 import { createEventRouter, refreshEventStatuses } from "./http/event-routes";
+import { createPushRouter } from "./http/push-routes";
 import { createRealtimeRouter } from "./http/realtime-routes";
 import { createDb } from "./db/client";
 import { runMigrations } from "./db/migrate";
@@ -26,6 +27,7 @@ export function createHermesApp() {
   app.use("/api/auth", createAuthRouter(context));
   app.use("/api/admin", createAdminRouter(context));
   app.use("/api/events", createEventRouter(context));
+  app.use("/api/push", createPushRouter(context));
   app.use("/api/realtime", createRealtimeRouter(context));
 
   const statusInterval = setInterval(() => {
