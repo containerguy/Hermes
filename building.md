@@ -62,6 +62,15 @@ Der Build erzeugt:
 - `dist/` fuer die WebApp
 - `dist-server/` fuer den Node-Server
 
+Die WebApp nutzt Hash-Seiten, die im gebauten Bundle direkt erreichbar sind:
+
+- `/#events`
+- `/#login`
+- `/#manager`
+- `/#admin`
+
+Bei UI-Aenderungen sollte mindestens `npm run build` ausgefuehrt werden, damit TypeScript und Vite die React-Seiten pruefen.
+
 ## Tests
 
 ```bash
@@ -74,6 +83,8 @@ Browser-E2E:
 ```bash
 npm run test:e2e
 ```
+
+Der E2E-Kernflow navigiert explizit durch `#login`, `#admin`, `#manager` und `#events`, damit die getrennten Arbeitsbereiche geprueft werden.
 
 Falls Playwright Systembibliotheken fehlen:
 

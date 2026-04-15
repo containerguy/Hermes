@@ -2,6 +2,17 @@
 
 Hermes ist eine responsive WebApp fuer LAN-Party-Spielrunden. User melden sich mit Username und E-Mail-Einmalcode an, Manager legen Events an, und Teilnehmer stimmen mit `dabei` oder `nicht dabei` ab.
 
+## Oberflaeche
+
+Die WebApp ist in getrennte Arbeitsbereiche aufgeteilt:
+
+- `#events`: Eventuebersicht fuer Abstimmung, Status, Startzeit und Serverdaten.
+- `#login`: Login, Kontoansicht, Logout und Notification-Einstellungen.
+- `#manager`: Eventanlage und Eventsteuerung fuer Manager und Admins.
+- `#admin`: Userverwaltung, Rollenzuweisung und globale Einstellungen.
+
+Das Managerformular wird bewusst nur im Managerbereich angezeigt. Die Eventuebersicht bleibt damit fuer Teilnehmer auf Abstimmung und Status fokussiert.
+
 ## Wo Werden Einstellungen Gespeichert?
 
 Hermes speichert Einstellungen in SQLite in der Tabelle `app_settings`.
@@ -80,6 +91,15 @@ Die App laeuft danach auf:
 
 ```text
 http://localhost:3000
+```
+
+Direkte Einstiege:
+
+```text
+http://localhost:3000/#events
+http://localhost:3000/#login
+http://localhost:3000/#manager
+http://localhost:3000/#admin
 ```
 
 ## Docker
