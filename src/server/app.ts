@@ -4,6 +4,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { createAdminRouter } from "./http/admin-routes";
 import { createAuthRouter } from "./http/auth-routes";
+import { createEventRouter } from "./http/event-routes";
 import { createDb } from "./db/client";
 import { runMigrations } from "./db/migrate";
 
@@ -22,6 +23,7 @@ export function createHermesApp() {
 
   app.use("/api/auth", createAuthRouter(context));
   app.use("/api/admin", createAdminRouter(context));
+  app.use("/api/events", createEventRouter(context));
 
   const staticDirectory = path.join(process.cwd(), "dist");
   if (fs.existsSync(staticDirectory)) {

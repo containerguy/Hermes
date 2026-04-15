@@ -11,6 +11,10 @@ export function canManageEvent(
   return actor.role === "admin" || actor.role === "manager" || actor.id === event.createdByUserId;
 }
 
+export function canCreateEvent(actor: { role: UserRole }) {
+  return actor.role === "admin" || actor.role === "manager";
+}
+
 export function canAssignRoles(actor: { role: UserRole }) {
   return actor.role === "admin";
 }

@@ -376,7 +376,13 @@ Akzeptanzkriterien:
 - Event-Ersteller, Manager und Admin koennen Events archivieren oder stornieren.
 - Ungueltige Angaben werden klar abgewiesen.
 
-Status: offen.
+Paketpruefung:
+
+- Funktional: Manager koennen Events anlegen, listen, Startzeiten aendern, stornieren und archivieren; normale User koennen keine Events anlegen.
+- Produktziel: Spiel, Startzeit/sofort, min/max Spieler, Server und Verbindung sind abgebildet und fuer eingeloggte User sichtbar.
+- Release-Relevanz: `laeuft bereits` und automatische Archivierung nach 8 Stunden sind serverseitig verankert.
+
+Status: abgeschlossen.
 
 ### AP 6 - Teilnahme-Abstimmung
 
@@ -536,6 +542,7 @@ Status: offen.
 - 2026-04-15: Der erste Admin wird per Bootstrap-Umgebungsvariablen erzeugt oder aktualisiert.
 - 2026-04-15: AP 3 implementiert E-Mail-Einmalcodes, Session-Cookies, Logout und parallele Sessions.
 - 2026-04-15: AP 4 implementiert Admin-Userverwaltung, Rollenpflege und persistente Settings.
+- 2026-04-15: AP 5 implementiert Eventanlage, Eventliste, Startzeit-Aenderung, Stornieren, Archivieren und Auto-Archivierung.
 - 2026-04-15: Hermes wird als Docker Image ausgeliefert; SSL/TLS, Reverse Proxy und Domain-Handling sind out of scope.
 - 2026-04-15: Manager werden durch den Haupt-Admin definiert; globale Einstellungen werden persistent gespeichert.
 - 2026-04-15: Login-Einmalcodes werden per E-Mail versendet.

@@ -174,6 +174,7 @@ h2 {
 }
 
 .event-preview,
+.event-card,
 .route-card,
 .login-panel,
 .admin-panel {
@@ -185,6 +186,35 @@ h2 {
 
 .event-preview {
   padding: clamp(18px, 4vw, 28px);
+}
+
+.event-board {
+  display: grid;
+  gap: 16px;
+}
+
+.event-form,
+.event-card {
+  padding: clamp(18px, 4vw, 24px);
+}
+
+.event-form {
+  display: grid;
+  gap: 14px;
+  border: 1px solid #d4dee8;
+  border-radius: 8px;
+  background: #ffffff;
+}
+
+.form-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.event-list {
+  display: grid;
+  gap: 14px;
 }
 
 .event-header {
@@ -201,6 +231,21 @@ h2 {
   color: #0d6048;
   font-size: 0.8rem;
   font-weight: 900;
+}
+
+.status-running {
+  background: #fff2c6;
+  color: #765600;
+}
+
+.status-cancelled {
+  background: #ffe0df;
+  color: #8f1f17;
+}
+
+.status-archived {
+  background: #e4e8ec;
+  color: #435364;
 }
 
 .event-stats {
@@ -237,6 +282,18 @@ dd {
 
 .action-row button {
   flex: 1;
+}
+
+.manage-row {
+  display: grid;
+  grid-template-columns: minmax(180px, 1fr) repeat(3, minmax(110px, auto));
+  gap: 10px;
+  margin-top: 16px;
+}
+
+.muted {
+  color: #657487;
+  line-height: 1.5;
 }
 
 .route-grid {
@@ -349,6 +406,12 @@ dd {
   }
 
   .event-stats {
+    grid-template-columns: 1fr;
+  }
+
+  .action-row,
+  .form-grid,
+  .manage-row {
     grid-template-columns: 1fr;
   }
 

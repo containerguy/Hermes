@@ -17,6 +17,21 @@ type AppSettings = {
   eventAutoArchiveHours: number;
 };
 
+type GameEvent = {
+  id: string;
+  gameTitle: string;
+  startMode: "now" | "scheduled";
+  startsAt: string;
+  minPlayers: number;
+  maxPlayers: number;
+  serverHost: string | null;
+  connectionInfo: string | null;
+  status: "open" | "ready" | "running" | "cancelled" | "archived";
+  createdByUserId: string;
+  createdByUsername: string;
+  joinedCount: number;
+};
+
 type Route = {
   path: string;
   label: string;
@@ -80,6 +95,287 @@ async function requestJson<T>(url: string, options?: RequestInit): Promise<T> {
   }
 
   return response.json() as Promise<T>;
+}
+
+function toDatetimeLocal(value: string) {
+  const date = new Date(value);
+  const local = new Date(date.getTime() - date.getTimezoneOffset() * 60_000);
+  return local.toISOString().slice(0, 16);
+}
+
+function fromDatetimeLocal(value: string) {
+  return new Date(value).toISOString();
+}
+
+function EventBoard({ currentUser }: { currentUser: User | null }) {
+  const [events, setEvents] = useState<GameEvent[]>([]);
+  const [eventDraft, setEventDraft] = useState({
+    gameTitle: "",
+    startMode: "scheduled" as "now" | "scheduled",
+    startsAt: toDatetimeLocal(new Date(Date.now() + 30 * 60 * 1000).toISOString()),
+    minPlayers: 2,
+    maxPlayers: 8,
+    serverHost: "",
+    connectionInfo: ""
+  });
+  const [editedStartsAt, setEditedStartsAt] = useState<Record<string, string>>({});
+  const [message, setMessage] = useState("");
+  const [error, setError] = useState("");
+
+  const canCreate = currentUser?.role === "manager" || currentUser?.role === "admin";
+
+  async function loadEvents() {
+    if (!currentUser) {
+      setEvents([]);
+      return;
+    }
+
+    const result = await requestJson<{ events: GameEvent[] }>("/api/events");
+    setEvents(result.events);
+    setEditedStartsAt(
+      Object.fromEntries(result.events.map((event) => [event.id, toDatetimeLocal(event.startsAt)]))
+    );
+  }
+
+  useEffect(() => {
+    loadEvents().catch(() => undefined);
+  }, [currentUser?.id]);
+
+  async function createEvent(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    setError("");
+    setMessage("");
+
+    try {
+      await requestJson<{ event: GameEvent }>("/api/events", {
+        method: "POST",
+        body: JSON.stringify({
+          ...eventDraft,
+          startsAt:
+            eventDraft.startMode === "scheduled"
+              ? fromDatetimeLocal(eventDraft.startsAt)
+              : undefined,
+          serverHost: eventDraft.serverHost || undefined,
+          connectionInfo: eventDraft.connectionInfo || undefined
+        })
+      });
+      setEventDraft({
+        ...eventDraft,
+        gameTitle: "",
+        serverHost: "",
+        connectionInfo: ""
+      });
+      await loadEvents();
+      setMessage("Event gespeichert.");
+    } catch (caught) {
+      setError(caught instanceof Error ? caught.message : "request_failed");
+    }
+  }
+
+  async function updateStart(eventId: string) {
+    setError("");
+    setMessage("");
+
+    try {
+      await requestJson<{ event: GameEvent }>(`/api/events/${eventId}`, {
+        method: "PATCH",
+        body: JSON.stringify({
+          startMode: "scheduled",
+          startsAt: fromDatetimeLocal(editedStartsAt[eventId])
+        })
+      });
+      await loadEvents();
+      setMessage("Startzeit gespeichert.");
+    } catch (caught) {
+      setError(caught instanceof Error ? caught.message : "request_failed");
+    }
+  }
+
+  async function changeEventStatus(eventId: string, action: "archive" | "cancel") {
+    setError("");
+    setMessage("");
+
+    try {
+      await requestJson<{ event: GameEvent }>(`/api/events/${eventId}/${action}`, {
+        method: "POST"
+      });
+      await loadEvents();
+      setMessage(action === "archive" ? "Event archiviert." : "Event storniert.");
+    } catch (caught) {
+      setError(caught instanceof Error ? caught.message : "request_failed");
+    }
+  }
+
+  function canManage(event: GameEvent) {
+    return (
+      currentUser?.role === "admin" ||
+      currentUser?.role === "manager" ||
+      currentUser?.id === event.createdByUserId
+    );
+  }
+
+  if (!currentUser) {
+    return (
+      <div className="event-preview" aria-label="Login Hinweis">
+        <p className="eyebrow">Login</p>
+        <h2>Einloggen und Runden sehen.</h2>
+        <p className="muted">Events, Serverdaten und Startzeiten sind nach dem Login verfuegbar.</p>
+      </div>
+    );
+  }
+
+  return (
+    <section className="event-board" aria-label="Events">
+      {canCreate ? (
+        <form onSubmit={createEvent} className="event-form">
+          <label>
+            Spiel
+            <input
+              value={eventDraft.gameTitle}
+              onChange={(event) =>
+                setEventDraft({ ...eventDraft, gameTitle: event.target.value })
+              }
+              required
+            />
+          </label>
+          <div className="form-grid">
+            <label>
+              Start
+              <select
+                value={eventDraft.startMode}
+                onChange={(event) =>
+                  setEventDraft({
+                    ...eventDraft,
+                    startMode: event.target.value as "now" | "scheduled"
+                  })
+                }
+              >
+                <option value="scheduled">Geplant</option>
+                <option value="now">Sofort</option>
+              </select>
+            </label>
+            <label>
+              Startzeit
+              <input
+                type="datetime-local"
+                disabled={eventDraft.startMode === "now"}
+                value={eventDraft.startsAt}
+                onChange={(event) =>
+                  setEventDraft({ ...eventDraft, startsAt: event.target.value })
+                }
+              />
+            </label>
+          </div>
+          <div className="form-grid">
+            <label>
+              Min
+              <input
+                type="number"
+                min={1}
+                value={eventDraft.minPlayers}
+                onChange={(event) =>
+                  setEventDraft({ ...eventDraft, minPlayers: Number(event.target.value) })
+                }
+                required
+              />
+            </label>
+            <label>
+              Max
+              <input
+                type="number"
+                min={1}
+                value={eventDraft.maxPlayers}
+                onChange={(event) =>
+                  setEventDraft({ ...eventDraft, maxPlayers: Number(event.target.value) })
+                }
+                required
+              />
+            </label>
+          </div>
+          <label>
+            Server
+            <input
+              value={eventDraft.serverHost}
+              onChange={(event) => setEventDraft({ ...eventDraft, serverHost: event.target.value })}
+            />
+          </label>
+          <label>
+            Verbindung
+            <input
+              value={eventDraft.connectionInfo}
+              onChange={(event) =>
+                setEventDraft({ ...eventDraft, connectionInfo: event.target.value })
+              }
+            />
+          </label>
+          <button type="submit">Event anlegen</button>
+        </form>
+      ) : null}
+
+      {message ? <p className="notice">{message}</p> : null}
+      {error ? <p className="error">{error}</p> : null}
+
+      <div className="event-list">
+        {events.map((event) => (
+          <article className="event-card" key={event.id}>
+            <div className="event-header">
+              <div>
+                <p className="eyebrow">{event.startMode === "now" ? "Sofort" : "Geplant"}</p>
+                <h2>{event.gameTitle}</h2>
+              </div>
+              <span className={`status-pill status-${event.status}`}>
+                {event.status === "running" ? "laeuft bereits" : event.status}
+              </span>
+            </div>
+            <dl className="event-stats">
+              <div>
+                <dt>Dabei</dt>
+                <dd>
+                  {event.joinedCount} / {event.maxPlayers}
+                </dd>
+              </div>
+              <div>
+                <dt>Minimum</dt>
+                <dd>{event.minPlayers}</dd>
+              </div>
+              <div>
+                <dt>Start</dt>
+                <dd>{new Date(event.startsAt).toLocaleString("de-DE")}</dd>
+              </div>
+            </dl>
+            {event.serverHost || event.connectionInfo ? (
+              <p className="muted">
+                {[event.serverHost, event.connectionInfo].filter(Boolean).join(" | ")}
+              </p>
+            ) : null}
+            {canManage(event) && event.status !== "archived" && event.status !== "cancelled" ? (
+              <div className="manage-row">
+                <input
+                  type="datetime-local"
+                  value={editedStartsAt[event.id] ?? toDatetimeLocal(event.startsAt)}
+                  onChange={(change) =>
+                    setEditedStartsAt({
+                      ...editedStartsAt,
+                      [event.id]: change.target.value
+                    })
+                  }
+                />
+                <button type="button" className="secondary" onClick={() => updateStart(event.id)}>
+                  Start speichern
+                </button>
+                <button type="button" className="secondary" onClick={() => changeEventStatus(event.id, "archive")}>
+                  Archivieren
+                </button>
+                <button type="button" className="secondary" onClick={() => changeEventStatus(event.id, "cancel")}>
+                  Stornieren
+                </button>
+              </div>
+            ) : null}
+          </article>
+        ))}
+      </div>
+    </section>
+  );
 }
 
 function LoginPanel({
@@ -481,35 +777,7 @@ function App() {
           </p>
         </div>
 
-        <div className="event-preview" aria-label="Beispiel Event">
-          <div className="event-header">
-            <div>
-              <p className="eyebrow">Sofort</p>
-              <h2>Counter-Strike 2</h2>
-            </div>
-            <span className="status-pill">startbereit</span>
-          </div>
-          <dl className="event-stats">
-            <div>
-              <dt>Dabei</dt>
-              <dd>7 / 10</dd>
-            </div>
-            <div>
-              <dt>Minimum</dt>
-              <dd>5</dd>
-            </div>
-            <div>
-              <dt>Server</dt>
-              <dd>lan-host:27015</dd>
-            </div>
-          </dl>
-          <div className="action-row">
-            <button type="button">Dabei</button>
-            <button type="button" className="secondary">
-              Nicht dabei
-            </button>
-          </div>
-        </div>
+        <EventBoard currentUser={currentUser} />
       </section>
 
       <section className="route-grid" aria-label="Vorbereitete Bereiche">
