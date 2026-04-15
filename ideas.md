@@ -552,6 +552,35 @@ Paketpruefung:
 
 Status: blockiert fuer lokalen Docker-Build; Produktionsbundle abgeschlossen.
 
+### AP 12 - Seitenidentitaet und modernes UI
+
+Ziel: Login, Manager, Admin und Eventuebersicht sind als eigenstaendige Arbeitsbereiche erkennbar und fuehlen sich nicht wie dieselbe Karte mit anderem Text an.
+
+Aufgaben:
+
+- Hash-basierte Seitenzustaende fuer `#events`, `#login`, `#manager` und `#admin` einfuehren.
+- Eventuebersicht ohne Manager-Erstellformular darstellen.
+- Managerbereich als Event-Erstell- und Steuerungsbereich auspraegen.
+- Loginbereich als Konto- und Einmalcode-Arbeitsbereich gestalten.
+- Adminbereich als Verwaltungsbereich fuer User, Rollen und Einstellungen gestalten.
+- Responsive Layouts fuer Smartphone und Desktop pruefen.
+
+Akzeptanzkriterien:
+
+- Navigation zeigt die aktive Seite klar an.
+- Login-, Manager- und Adminseiten haben unterschiedliche Layouts und visuelle Akzente.
+- Managerformular erscheint nur im Managerbereich fuer Manager/Admins.
+- Eventuebersicht bleibt fuer normale Teilnehmer auf Abstimmung und Status fokussiert.
+- Bestehende API- und Build-Funktionalitaet bleibt intakt.
+
+Paketpruefung:
+
+- Funktional: Produktionsbuild erzeugt Client- und Server-Bundle; Healthcheck liefert lokal `{"ok":true}`.
+- Produktziel: Die zentralen Nutzerrollen haben klar getrennte Arbeitsbereiche fuer Teilnahme, Login/Konto, Eventsteuerung und Admin.
+- Release-Relevanz: UI ist buildfaehig und auslieferbar; Browser-E2E ist weiterhin durch fehlende Host-Library `libnspr4.so` blockiert.
+
+Status: abgeschlossen mit Browser-E2E-Umgebungsblocker.
+
 ## Vorgeschlagene Reihenfolge
 
 1. AP 0 ist abgeschlossen.
@@ -593,7 +622,8 @@ Status: blockiert fuer lokalen Docker-Build; Produktionsbundle abgeschlossen.
 - 2026-04-15: Startzeiten koennen angepasst werden.
 - 2026-04-15: Events gehen nach Start in `laeuft bereits` und werden 8 Stunden nach Start automatisch archiviert.
 - 2026-04-15: Event-Ersteller, Manager und Admin koennen Events manuell archivieren oder stornieren.
+- 2026-04-15: UI wurde in getrennte Hash-Seiten fuer Events, Login, Manager und Admin umgebaut; Managerformular laeuft nicht mehr in der Eventuebersicht mit.
 
 ## Naechster sinnvoller Schritt
 
-AP 1 starten: Framework final auswaehlen und ein lauffaehiges App-Grundgeruest erzeugen. Danach sollten AP 2 und AP 3 frueh die Admin-Bootstrap-, Settings- und SMTP-Grundlagen schaffen, weil diese Auth, Rollen und Betrieb beeinflussen.
+Naechster Schritt: Browser-E2E auf einem Host mit Playwright-Systemabhaengigkeiten ausfuehren oder `libnspr4.so` nachinstallieren; danach kann der aktuelle UI-Stand im Browser final abgenommen werden.

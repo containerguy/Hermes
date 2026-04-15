@@ -13,6 +13,7 @@ let baseUrl: string;
 let databasePath: string;
 
 async function login(page: Page, username: string) {
+  await page.goto(`${baseUrl}/#login`);
   await page.getByLabel("Username").fill(username);
   await page.getByRole("button", { name: "Code senden" }).click();
   await expect(page.getByText("Code wurde per E-Mail versendet.")).toBeVisible();
@@ -60,6 +61,7 @@ test.afterAll(async () => {
 test("admin creates users, manager creates an event, user joins", async ({ page }) => {
   await page.goto(baseUrl);
   await login(page, "hauptadmin");
+  await page.goto(`${baseUrl}/#admin`);
 
   const adminPanel = page.getByLabel("Adminbereich");
   await adminPanel.getByLabel("Telefonnummer").fill("+491702222222");
@@ -76,8 +78,10 @@ test("admin creates users, manager creates an event, user joins", async ({ page 
   await adminPanel.getByRole("button", { name: "User anlegen" }).click();
   await expect(adminPanel.getByText("spieler@example.test")).toBeVisible();
 
+  await page.goto(`${baseUrl}/#login`);
   await page.getByRole("button", { name: "Logout" }).click();
   await login(page, "manager");
+  await page.goto(`${baseUrl}/#manager`);
 
   await page.getByLabel("Spiel").fill("Browser Game");
   await page.getByLabel("Start").selectOption("scheduled");
@@ -87,8 +91,10 @@ test("admin creates users, manager creates an event, user joins", async ({ page 
   await page.getByRole("button", { name: "Event anlegen" }).click();
   await expect(page.getByRole("heading", { name: "Browser Game" })).toBeVisible();
 
+  await page.goto(`${baseUrl}/#login`);
   await page.getByRole("button", { name: "Logout" }).click();
   await login(page, "spieler");
+  await page.goto(`${baseUrl}/#events`);
   await page.getByRole("button", { name: "Dabei" }).click();
   await expect(page.getByText("1 / 2")).toBeVisible();
 });

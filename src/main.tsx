@@ -34,6 +34,7 @@ type GameEvent = {
 };
 
 type Route = {
+  id: PageId;
   path: string;
   label: string;
   eyebrow: string;
@@ -41,8 +42,11 @@ type Route = {
   description: string;
 };
 
+type PageId = "events" | "login" | "manager" | "admin";
+
 const routes: Route[] = [
   {
+    id: "events",
     path: "#events",
     label: "Events",
     eyebrow: "LAN-Abstimmung",
@@ -51,6 +55,7 @@ const routes: Route[] = [
       "Spielrunden sammeln Zusagen, zeigen sofort die Spielerzahl und halten Startzeit sowie Serverdaten an einem Ort."
   },
   {
+    id: "login",
     path: "#login",
     label: "Login",
     eyebrow: "Einmalcode",
@@ -59,6 +64,7 @@ const routes: Route[] = [
       "Der Login ist fuer mehrere Geraete vorbereitet, damit Smartphone und PC parallel aktiv bleiben koennen."
   },
   {
+    id: "manager",
     path: "#manager",
     label: "Manager",
     eyebrow: "Eventsteuerung",
@@ -67,6 +73,7 @@ const routes: Route[] = [
       "Manager koennen Spiel, Startzeit, min/max Spieler und optionale Verbindungsdaten vorbereiten."
   },
   {
+    id: "admin",
     path: "#admin",
     label: "Admin",
     eyebrow: "Betrieb",
@@ -75,6 +82,11 @@ const routes: Route[] = [
       "Der Haupt-Admin verwaltet Rollen und persistente Einstellungen fuer Mail, Benachrichtigungen und Betrieb."
   }
 ];
+
+function getPageFromHash(): PageId {
+  const route = routes.find((item) => item.path === window.location.hash);
+  return route?.id ?? "events";
+}
 
 async function requestJson<T>(url: string, options?: RequestInit): Promise<T> {
   const response = await fetch(url, {
@@ -153,7 +165,13 @@ function urlBase64ToUint8Array(base64String: string) {
   return outputArray;
 }
 
-function EventBoard({ currentUser }: { currentUser: User | null }) {
+function EventBoard({
+  currentUser,
+  mode = "events"
+}: {
+  currentUser: User | null;
+  mode?: "events" | "manager";
+}) {
   const [events, setEvents] = useState<GameEvent[]>([]);
   const [eventDraft, setEventDraft] = useState({
     gameTitle: "",
@@ -172,6 +190,7 @@ function EventBoard({ currentUser }: { currentUser: User | null }) {
   );
 
   const canCreate = currentUser?.role === "manager" || currentUser?.role === "admin";
+  const showCreateForm = canCreate && mode === "manager";
 
   async function loadEvents() {
     if (!currentUser) {
@@ -319,26 +338,46 @@ function EventBoard({ currentUser }: { currentUser: User | null }) {
 
   if (!currentUser) {
     return (
-      <div className="event-preview" aria-label="Login Hinweis">
+      <div className="access-panel" aria-label="Login Hinweis">
+        <img src="/icon.svg" alt="" />
         <p className="eyebrow">Login</p>
         <h2>Einloggen und Runden sehen.</h2>
         <p className="muted">Events, Serverdaten und Startzeiten sind nach dem Login verfuegbar.</p>
+        <a className="text-link" href="#login">
+          Zum Login
+        </a>
       </div>
     );
   }
 
   return (
-    <section className="event-board" aria-label="Events">
-      <div className="live-row">
-        <span className={`live-state live-${liveState}`}>
-          {liveState === "live" ? "Live verbunden" : "Polling aktiv"}
-        </span>
+    <section className={`event-board ${mode === "manager" ? "manager-board" : "events-board"}`} aria-label="Events">
+      <div className="board-toolbar">
+        <div>
+          <span className={`live-state live-${liveState}`}>
+            {liveState === "live" ? "Live verbunden" : "Polling aktiv"}
+          </span>
+          <span className="toolbar-hint">
+            {events.length === 1 ? "1 Runde" : `${events.length} Runden`}
+          </span>
+        </div>
         <button type="button" className="secondary" onClick={() => loadEvents()}>
           Aktualisieren
         </button>
       </div>
-      {canCreate ? (
+      {mode === "manager" && !canCreate ? (
+        <div className="access-panel compact" aria-label="Manager Hinweis">
+          <p className="eyebrow">Manager</p>
+          <h2>Keine Managerrechte.</h2>
+          <p className="muted">Neue Runden koennen Manager und Admins anlegen.</p>
+        </div>
+      ) : null}
+      {showCreateForm ? (
         <form onSubmit={createEvent} className="event-form">
+          <div className="form-title">
+            <p className="eyebrow">Neue Runde</p>
+            <h2>Spielrunde vorbereiten.</h2>
+          </div>
           <label>
             Spiel
             <input
@@ -822,10 +861,14 @@ function AdminPanel({ currentUser }: { currentUser: User | null }) {
 
   if (!isAdmin) {
     return (
-      <article id="admin" className="route-card">
+      <article id="admin" className="access-panel admin-access">
+        <img src="/icon.svg" alt="" />
         <p className="eyebrow">Admin</p>
         <h2>User, Manager und Einstellungen.</h2>
         <p>Der Adminbereich ist nach Admin-Login verfuegbar.</p>
+        <a className="text-link" href="#login">
+          Admin-Login oeffnen
+        </a>
       </article>
     );
   }
@@ -942,8 +985,82 @@ function AdminPanel({ currentUser }: { currentUser: User | null }) {
   );
 }
 
+function PageHeader({ route, currentUser }: { route: Route; currentUser: User | null }) {
+  return (
+    <section className={`page-hero hero-${route.id}`} aria-labelledby={`${route.id}-title`}>
+      <div className="hero-copy">
+        <p className="eyebrow">{route.eyebrow}</p>
+        <h1 id={`${route.id}-title`}>{route.title}</h1>
+        <p>{route.description}</p>
+      </div>
+      <aside className="hero-status" aria-label="Status">
+        <img src="/icon.svg" alt="" />
+        <div>
+          <span>Session</span>
+          <strong>{currentUser ? currentUser.username : "Gast"}</strong>
+        </div>
+        <div>
+          <span>Rolle</span>
+          <strong>{currentUser?.role ?? "Login offen"}</strong>
+        </div>
+      </aside>
+    </section>
+  );
+}
+
+function LoginPage({
+  currentUser,
+  onLoggedIn,
+  onLoggedOut,
+  onUserUpdated
+}: {
+  currentUser: User | null;
+  onLoggedIn: (user: User) => void;
+  onLoggedOut: () => void;
+  onUserUpdated: (user: User) => void;
+}) {
+  return (
+    <section className="auth-layout" aria-label="Login Arbeitsbereich">
+      <LoginPanel
+        currentUser={currentUser}
+        onLoggedIn={onLoggedIn}
+        onLoggedOut={onLoggedOut}
+        onUserUpdated={onUserUpdated}
+      />
+      <aside className="auth-visual" aria-label="Login Hinweise">
+        <img src="/icon.svg" alt="" />
+        <p className="eyebrow">Mailcode</p>
+        <h2>Ein Login, mehrere Geraete.</h2>
+        <p>
+          Username eingeben, Code aus der E-Mail nutzen und Smartphone sowie PC parallel
+          angemeldet lassen.
+        </p>
+        <dl className="signal-list">
+          <div>
+            <dt>Default</dt>
+            <dd>Push aktiv</dd>
+          </div>
+          <div>
+            <dt>Code</dt>
+            <dd>6 Stellen</dd>
+          </div>
+        </dl>
+      </aside>
+    </section>
+  );
+}
+
+function ManagerPage({ currentUser }: { currentUser: User | null }) {
+  return (
+    <section className="manager-layout" aria-label="Manager Arbeitsbereich">
+      <EventBoard currentUser={currentUser} mode="manager" />
+    </section>
+  );
+}
+
 function App() {
   const [currentUser, setCurrentUser] = useState<User | null>(null);
+  const [activePage, setActivePage] = useState<PageId>(() => getPageFromHash());
 
   useEffect(() => {
     requestJson<{ user: User }>("/api/auth/me")
@@ -951,53 +1068,69 @@ function App() {
       .catch(() => setCurrentUser(null));
   }, []);
 
-  return (
-    <main className="app-shell">
-      <header className="topbar" aria-label="Hauptnavigation">
-        <a className="brand" href="#events" aria-label="Hermes Start">
-          <span className="brand-mark">H</span>
-          <span>Hermes</span>
-        </a>
-        <nav className="nav-links">
-          {routes.map((route) => (
-            <a href={route.path} key={route.path}>
-              {route.label}
-            </a>
-          ))}
-        </nav>
-      </header>
+  useEffect(() => {
+    function syncHash() {
+      setActivePage(getPageFromHash());
+    }
 
-      <section className="workbench" id="events">
-        <div className="intro">
-          <p className="eyebrow">Hermes</p>
-          <h1>Spielrunden fuer die LAN-Party koordinieren.</h1>
-          <p>
-            Eine schnelle WebApp fuer 25 Personen: abstimmen, Startzeit sehen,
-            Serverdaten finden und Benachrichtigungen auf allen angemeldeten
-            Geraeten erhalten.
-          </p>
-        </div>
+    window.addEventListener("hashchange", syncHash);
+    syncHash();
+    return () => window.removeEventListener("hashchange", syncHash);
+  }, []);
 
-        <EventBoard currentUser={currentUser} />
-      </section>
+  const activeRoute = routes.find((route) => route.id === activePage) ?? routes[0];
 
-      <section className="route-grid" aria-label="Vorbereitete Bereiche">
-        <LoginPanel
+  function renderActivePage() {
+    if (activePage === "login") {
+      return (
+        <LoginPage
           currentUser={currentUser}
           onLoggedIn={setCurrentUser}
           onLoggedOut={() => setCurrentUser(null)}
           onUserUpdated={setCurrentUser}
         />
-        <article id="manager" className="route-card">
-          <p className="eyebrow">Eventsteuerung</p>
-          <h2>Neue Runden ohne Umwege anlegen.</h2>
-          <p>
-            Manager koennen Spiel, Startzeit, min/max Spieler und optionale
-            Verbindungsdaten vorbereiten.
-          </p>
-        </article>
-        <AdminPanel currentUser={currentUser} />
-      </section>
+      );
+    }
+
+    if (activePage === "manager") {
+      return <ManagerPage currentUser={currentUser} />;
+    }
+
+    if (activePage === "admin") {
+      return (
+        <section className="admin-stage" aria-label="Admin Arbeitsbereich">
+          <AdminPanel currentUser={currentUser} />
+        </section>
+      );
+    }
+
+    return <EventBoard currentUser={currentUser} mode="events" />;
+  }
+
+  return (
+    <main className={`app-shell page-${activePage}`}>
+      <header className="topbar" aria-label="Hauptnavigation">
+        <a className="brand" href="#events" aria-label="Hermes Start">
+          <img className="brand-mark" src="/icon.svg" alt="" />
+          <span>Hermes</span>
+        </a>
+        <nav className="nav-links">
+          {routes.map((route) => (
+            <a
+              href={route.path}
+              key={route.path}
+              className={activePage === route.id ? "active" : undefined}
+              aria-current={activePage === route.id ? "page" : undefined}
+            >
+              {route.label}
+            </a>
+          ))}
+        </nav>
+      </header>
+      <div className="page-shell">
+        <PageHeader route={activeRoute} currentUser={currentUser} />
+        {renderActivePage()}
+      </div>
     </main>
   );
 }
