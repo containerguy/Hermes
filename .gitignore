@@ -4,6 +4,7 @@ node_modules/
 # Build output
 .next/
 dist/
+dist-server/
 build/
 coverage/
 test-results/

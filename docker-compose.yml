@@ -1,0 +1,19 @@
+services:
+  hermes:
+    build:
+      context: .
+    image: hermes:local
+    env_file:
+      - .env
+    environment:
+      HERMES_HOST: 0.0.0.0
+      HERMES_PORT: 3000
+      HERMES_DB_PATH: /data/hermes.sqlite
+    ports:
+      - "3000:3000"
+    volumes:
+      - hermes-data:/data
+    restart: unless-stopped
+
+volumes:
+  hermes-data:

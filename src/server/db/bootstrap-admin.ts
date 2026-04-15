@@ -1,5 +1,6 @@
 import { eq } from "drizzle-orm";
 import { randomUUID } from "node:crypto";
+import path from "node:path";
 import { readRequiredEnv } from "../env";
 import { createDb } from "./client";
 import { runMigrations } from "./migrate";
@@ -81,7 +82,9 @@ export function bootstrapAdmin() {
   };
 }
 
-if (import.meta.url === `file://${process.argv[1]}`) {
+const entrypoint = process.argv[1] ? path.basename(process.argv[1]) : "";
+
+if (entrypoint === "bootstrap-admin.ts" || entrypoint === "bootstrap-admin.js") {
   const admin = bootstrapAdmin();
   console.log(`Admin ensured: ${admin.username} <${admin.email}>`);
 }

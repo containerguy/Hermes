@@ -44,7 +44,9 @@ export function runMigrations(sqlite: Database.Database = createSqliteClient()) 
   }
 }
 
-if (import.meta.url === `file://${process.argv[1]}`) {
+const entrypoint = process.argv[1] ? path.basename(process.argv[1]) : "";
+
+if (entrypoint === "migrate.ts" || entrypoint === "migrate.js") {
   const sqlite = createSqliteClient();
   runMigrations(sqlite);
   sqlite.close();

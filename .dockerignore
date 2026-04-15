@@ -1,0 +1,15 @@
+.git
+.gitignore
+data
+dist
+dist-server
+node_modules
+npm-debug.log*
+playwright-report
+test-results
+*.sqlite
+*.sqlite3
+*.db
+.env
+.env.*
+!.env.example

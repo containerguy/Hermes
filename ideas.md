@@ -544,7 +544,13 @@ Akzeptanzkriterien:
 - Betriebsanleitung beschreibt benoetigte SMTP- und Push-Konfiguration.
 - Keine Produktanforderung haengt von einem mitgelieferten SSL-Container ab.
 
-Status: offen.
+Paketpruefung:
+
+- Funktional: Produktionsbuild erzeugt Client- und Server-Bundle; `npm start` liefert Healthcheck und WebApp aus.
+- Produktziel: Dockerfile, Compose, persistenter Datenpfad, Env-Beispiel und Betriebsanleitung sind vorhanden.
+- Release-Relevanz: Das Docker-Image ist definierbar, aber in dieser Umgebung nicht baubar, weil `docker` nicht installiert ist.
+
+Status: blockiert fuer lokalen Docker-Build; Produktionsbundle abgeschlossen.
 
 ## Vorgeschlagene Reihenfolge
 
@@ -578,6 +584,7 @@ Status: offen.
 - 2026-04-15: AP 8 implementiert Web Push mit VAPID, geraetebezogenen Subscriptions und User-Praeferenz.
 - 2026-04-15: AP 9 schaerft LAN-UX mit klaren Statuslabels, leeren Zustaenden und Bestaetigungen fuer kritische Aktionen.
 - 2026-04-15: AP 10 ergaenzt Vitest/API-Tests und einen Playwright-Kernflow; lokaler Browserlauf ist durch fehlende OS-Abhaengigkeiten blockiert.
+- 2026-04-15: AP 11 ergaenzt Dockerfile, Docker Compose, Produktionsbundle und Betriebsdokumentation; lokaler Docker-Build ist mangels Docker-CLI blockiert.
 - 2026-04-15: Hermes wird als Docker Image ausgeliefert; SSL/TLS, Reverse Proxy und Domain-Handling sind out of scope.
 - 2026-04-15: Manager werden durch den Haupt-Admin definiert; globale Einstellungen werden persistent gespeichert.
 - 2026-04-15: Login-Einmalcodes werden per E-Mail versendet.

@@ -5,11 +5,14 @@
   "type": "module",
   "scripts": {
     "dev": "vite --host 0.0.0.0",
-    "build": "tsc --noEmit && vite build",
+    "build": "tsc --noEmit && vite build && npm run build:server",
+    "build:server": "esbuild src/server/index.ts src/server/db/bootstrap-admin.ts --bundle --platform=node --format=esm --packages=external --outdir=dist-server && mkdir -p dist-server/migrations dist-server/db/migrations && cp src/server/db/migrations/*.sql dist-server/migrations/ && cp src/server/db/migrations/*.sql dist-server/db/migrations/",
     "db:bootstrap-admin": "tsx src/server/db/bootstrap-admin.ts",
     "db:migrate": "tsx src/server/db/migrate.ts",
     "preview": "vite preview --host 0.0.0.0",
     "server": "tsx src/server/index.ts",
+    "start": "node dist-server/index.js",
+    "start:bootstrap-admin": "node dist-server/db/bootstrap-admin.js",
     "test": "vitest run src",
     "test:e2e": "npm run build && playwright test"
   },
@@ -36,6 +39,7 @@
     "@types/supertest": "^7.2.0",
     "@types/web-push": "^3.6.4",
     "@vitejs/plugin-react": "^5.1.1",
+    "esbuild": "^0.28.0",
     "supertest": "^7.2.2",
     "tsx": "^4.21.0",
     "typescript": "^5.9.3",
