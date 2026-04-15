@@ -30,6 +30,7 @@ type GameEvent = {
   createdByUserId: string;
   createdByUsername: string;
   joinedCount: number;
+  myParticipation: "joined" | "declined" | null;
 };
 
 type Route = {
@@ -206,6 +207,22 @@ function EventBoard({ currentUser }: { currentUser: User | null }) {
     }
   }
 
+  async function setParticipation(eventId: string, status: "joined" | "declined") {
+    setError("");
+    setMessage("");
+
+    try {
+      await requestJson<{ event: GameEvent }>(`/api/events/${eventId}/participation`, {
+        method: "POST",
+        body: JSON.stringify({ status })
+      });
+      await loadEvents();
+      setMessage(status === "joined" ? "Teilnahme gespeichert." : "Absage gespeichert.");
+    } catch (caught) {
+      setError(caught instanceof Error ? caught.message : "request_failed");
+    }
+  }
+
   function canManage(event: GameEvent) {
     return (
       currentUser?.role === "admin" ||
@@ -347,6 +364,25 @@ function EventBoard({ currentUser }: { currentUser: User | null }) {
               <p className="muted">
                 {[event.serverHost, event.connectionInfo].filter(Boolean).join(" | ")}
               </p>
+            ) : null}
+            {event.status !== "archived" && event.status !== "cancelled" ? (
+              <div className="action-row">
+                <button
+                  type="button"
+                  onClick={() => setParticipation(event.id, "joined")}
+                  disabled={event.myParticipation === "joined"}
+                >
+                  Dabei
+                </button>
+                <button
+                  type="button"
+                  className="secondary"
+                  onClick={() => setParticipation(event.id, "declined")}
+                  disabled={event.myParticipation === "declined"}
+                >
+                  Nicht dabei
+                </button>
+              </div>
             ) : null}
             {canManage(event) && event.status !== "archived" && event.status !== "cancelled" ? (
               <div className="manage-row">

@@ -401,7 +401,13 @@ Akzeptanzkriterien:
 - Spielerzahlen aktualisieren sich korrekt.
 - Wenn `maxPlayers` erreicht ist, koennen keine weiteren User auf `dabei` wechseln.
 
-Status: offen.
+Paketpruefung:
+
+- Funktional: User koennen `dabei` und `nicht dabei` setzen; Zaehler und Eventstatus wechseln korrekt.
+- Produktziel: Die Abstimmung ist bewusst binaer und verzichtet auf Warteliste.
+- Release-Relevanz: Die Maximalspieler-Regel wird serverseitig erzwungen und verhindert ueberfuellte Runden.
+
+Status: abgeschlossen.
 
 ### AP 7 - Realtime-Aktualisierung
 
@@ -543,6 +549,7 @@ Status: offen.
 - 2026-04-15: AP 3 implementiert E-Mail-Einmalcodes, Session-Cookies, Logout und parallele Sessions.
 - 2026-04-15: AP 4 implementiert Admin-Userverwaltung, Rollenpflege und persistente Settings.
 - 2026-04-15: AP 5 implementiert Eventanlage, Eventliste, Startzeit-Aenderung, Stornieren, Archivieren und Auto-Archivierung.
+- 2026-04-15: AP 6 implementiert Teilnahme mit `dabei`/`nicht dabei` und serverseitiger Maximalspieler-Regel.
 - 2026-04-15: Hermes wird als Docker Image ausgeliefert; SSL/TLS, Reverse Proxy und Domain-Handling sind out of scope.
 - 2026-04-15: Manager werden durch den Haupt-Admin definiert; globale Einstellungen werden persistent gespeichert.
 - 2026-04-15: Login-Einmalcodes werden per E-Mail versendet.

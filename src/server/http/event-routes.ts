@@ -45,6 +45,30 @@ function countJoined(context: DatabaseContext, eventId: string) {
   return row.count;
 }
 
+function recalculateEventStatus(context: DatabaseContext, event: typeof gameEvents.$inferSelect) {
+  if (event.status === "cancelled" || event.status === "archived") {
+    return event.status;
+  }
+
+  const status = deriveEventStatus({
+    status: event.status,
+    startsAt: new Date(event.startsAt),
+    joinedCount: countJoined(context, event.id),
+    minPlayers: event.minPlayers
+  });
+
+  context.db
+    .update(gameEvents)
+    .set({
+      status,
+      updatedAt: nowIso()
+    })
+    .where(eq(gameEvents.id, event.id))
+    .run();
+
+  return status;
+}
+
 function refreshEventStatuses(context: DatabaseContext) {
   const now = new Date();
   const archiveAfterHours = readAutoArchiveHours(context);
@@ -81,9 +105,20 @@ function refreshEventStatuses(context: DatabaseContext) {
   }
 }
 
-function serializeEvent(context: DatabaseContext, event: typeof gameEvents.$inferSelect) {
+function serializeEvent(
+  context: DatabaseContext,
+  event: typeof gameEvents.$inferSelect,
+  currentUserId?: string
+) {
   const creator = context.db.select().from(users).where(eq(users.id, event.createdByUserId)).get();
   const joinedCount = countJoined(context, event.id);
+  const myParticipation = currentUserId
+    ? context.db
+        .select()
+        .from(participations)
+        .where(and(eq(participations.eventId, event.id), eq(participations.userId, currentUserId)))
+        .get()
+    : undefined;
 
   return {
     id: event.id,
@@ -98,6 +133,7 @@ function serializeEvent(context: DatabaseContext, event: typeof gameEvents.$infe
     createdByUserId: event.createdByUserId,
     createdByUsername: creator?.username ?? "unbekannt",
     joinedCount,
+    myParticipation: myParticipation?.status ?? null,
     cancelledAt: event.cancelledAt,
     archivedAt: event.archivedAt,
     createdAt: event.createdAt,
@@ -120,6 +156,7 @@ export function createEventRouter(context: DatabaseContext) {
   });
 
   router.get("/", (_request, response) => {
+    const actor = requireUser(context, _request);
     refreshEventStatuses(context);
     const events = context.db
       .select()
@@ -127,7 +164,7 @@ export function createEventRouter(context: DatabaseContext) {
       .orderBy(sql`datetime(${gameEvents.startsAt}) ASC`)
       .all();
 
-    response.json({ events: events.map((event) => serializeEvent(context, event)) });
+    response.json({ events: events.map((event) => serializeEvent(context, event, actor?.id)) });
   });
 
   router.post("/", (request, response) => {
@@ -178,7 +215,9 @@ export function createEventRouter(context: DatabaseContext) {
       .run();
 
     const created = context.db.select().from(gameEvents).where(eq(gameEvents.id, id)).get();
-    response.status(201).json({ event: created ? serializeEvent(context, created) : undefined });
+    response.status(201).json({
+      event: created ? serializeEvent(context, created, actor.id) : undefined
+    });
   });
 
   router.patch("/:id", (request, response) => {
@@ -242,7 +281,66 @@ export function createEventRouter(context: DatabaseContext) {
       .run();
 
     const updated = context.db.select().from(gameEvents).where(eq(gameEvents.id, event.id)).get();
-    response.json({ event: updated ? serializeEvent(context, updated) : undefined });
+    response.json({ event: updated ? serializeEvent(context, updated, actor.id) : undefined });
+  });
+
+  router.post("/:id/participation", (request, response) => {
+    const actor = requireUser(context, request);
+    const event = context.db.select().from(gameEvents).where(eq(gameEvents.id, request.params.id)).get();
+    const parsed = z.object({ status: z.enum(["joined", "declined"]) }).safeParse(request.body);
+
+    if (!actor || !event) {
+      response.status(event ? 403 : 404).json({ error: event ? "verboten" : "event_nicht_gefunden" });
+      return;
+    }
+
+    if (!parsed.success) {
+      response.status(400).json({ error: "ungueltige_teilnahme" });
+      return;
+    }
+
+    if (event.status === "archived" || event.status === "cancelled") {
+      response.status(409).json({ error: "event_abgeschlossen" });
+      return;
+    }
+
+    const existing = context.db
+      .select()
+      .from(participations)
+      .where(and(eq(participations.eventId, event.id), eq(participations.userId, actor.id)))
+      .get();
+    const alreadyJoined = existing?.status === "joined";
+
+    if (parsed.data.status === "joined" && !alreadyJoined && countJoined(context, event.id) >= event.maxPlayers) {
+      response.status(409).json({ error: "event_voll" });
+      return;
+    }
+
+    const timestamp = nowIso();
+
+    context.db
+      .insert(participations)
+      .values({
+        id: existing?.id ?? randomUUID(),
+        eventId: event.id,
+        userId: actor.id,
+        status: parsed.data.status,
+        createdAt: existing?.createdAt ?? timestamp,
+        updatedAt: timestamp
+      })
+      .onConflictDoUpdate({
+        target: [participations.eventId, participations.userId],
+        set: {
+          status: parsed.data.status,
+          updatedAt: timestamp
+        }
+      })
+      .run();
+
+    recalculateEventStatus(context, event);
+
+    const updated = context.db.select().from(gameEvents).where(eq(gameEvents.id, event.id)).get();
+    response.json({ event: updated ? serializeEvent(context, updated, actor.id) : undefined });
   });
 
   router.post("/:id/cancel", (request, response) => {
@@ -271,7 +369,7 @@ export function createEventRouter(context: DatabaseContext) {
       .run();
 
     const updated = context.db.select().from(gameEvents).where(eq(gameEvents.id, event.id)).get();
-    response.json({ event: updated ? serializeEvent(context, updated) : undefined });
+    response.json({ event: updated ? serializeEvent(context, updated, actor.id) : undefined });
   });
 
   router.post("/:id/archive", (request, response) => {
@@ -300,7 +398,7 @@ export function createEventRouter(context: DatabaseContext) {
       .run();
 
     const updated = context.db.select().from(gameEvents).where(eq(gameEvents.id, event.id)).get();
-    response.json({ event: updated ? serializeEvent(context, updated) : undefined });
+    response.json({ event: updated ? serializeEvent(context, updated, actor.id) : undefined });
   });
 
   return router;
