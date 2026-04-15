@@ -10,6 +10,7 @@ import { createRealtimeRouter } from "./http/realtime-routes";
 import { createDb } from "./db/client";
 import { runMigrations } from "./db/migrate";
 import { broadcastEventsChanged } from "./realtime/event-bus";
+import { readSettings } from "./settings";
 import {
   flushDatabaseSnapshot,
   restoreDatabaseFromStorageIfNeeded,
@@ -37,6 +38,10 @@ export async function createHermesApp() {
 
   app.get("/api/health", (_request, response) => {
     response.json({ ok: true });
+  });
+
+  app.get("/api/settings", (_request, response) => {
+    response.json({ settings: readSettings(context) });
   });
 
   app.use("/api/auth", createAuthRouter(context));

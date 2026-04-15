@@ -15,6 +15,11 @@ type AppSettings = {
   appName: string;
   defaultNotificationsEnabled: boolean;
   eventAutoArchiveHours: number;
+  themePrimaryColor: string;
+  themeLoginColor: string;
+  themeManagerColor: string;
+  themeAdminColor: string;
+  themeSurfaceColor: string;
 };
 
 type GameEvent = {
@@ -50,7 +55,7 @@ const routes: Route[] = [
     path: "#events",
     label: "Events",
     eyebrow: "LAN-Abstimmung",
-    title: "Was startet als Naechstes?",
+    title: "Was startet als Nächstes?",
     description:
       "Spielrunden sammeln Zusagen, zeigen sofort die Spielerzahl und halten Startzeit sowie Serverdaten an einem Ort."
   },
@@ -61,7 +66,7 @@ const routes: Route[] = [
     eyebrow: "Einmalcode",
     title: "Username und Mailcode.",
     description:
-      "Der Login ist fuer mehrere Geraete vorbereitet, damit Smartphone und PC parallel aktiv bleiben koennen."
+      "Der Login ist für mehrere Geräte vorbereitet, damit Smartphone und PC parallel aktiv bleiben können."
   },
   {
     id: "manager",
@@ -70,7 +75,7 @@ const routes: Route[] = [
     eyebrow: "Eventsteuerung",
     title: "Neue Runden ohne Umwege anlegen.",
     description:
-      "Manager koennen Spiel, Startzeit, min/max Spieler und optionale Verbindungsdaten vorbereiten."
+      "Manager können Spiel, Startzeit, min/max Spieler und optionale Verbindungsdaten vorbereiten."
   },
   {
     id: "admin",
@@ -79,9 +84,51 @@ const routes: Route[] = [
     eyebrow: "Betrieb",
     title: "User, Manager und Einstellungen.",
     description:
-      "Der Haupt-Admin verwaltet Rollen und persistente Einstellungen fuer Mail, Benachrichtigungen und Betrieb."
+      "Der Haupt-Admin verwaltet Rollen und persistente Einstellungen für Mail, Benachrichtigungen und Betrieb."
   }
 ];
+
+const defaultSettings: AppSettings = {
+  appName: "Hermes",
+  defaultNotificationsEnabled: true,
+  eventAutoArchiveHours: 8,
+  themePrimaryColor: "#0f766e",
+  themeLoginColor: "#be123c",
+  themeManagerColor: "#b7791f",
+  themeAdminColor: "#2563eb",
+  themeSurfaceColor: "#f6f8f4"
+};
+
+const errorMessages: Record<string, string> = {
+  admin_erforderlich: "Adminrechte erforderlich.",
+  backup_fehlgeschlagen: "Backup konnte nicht erstellt werden. Prüfe S3-Konfiguration und Logs.",
+  permission_abgelehnt: "Benachrichtigung wurde vom Browser abgelehnt.",
+  push_nicht_konfiguriert: "Push ist serverseitig noch nicht konfiguriert. VAPID Keys fehlen.",
+  push_nicht_unterstuetzt:
+    "Push wird in diesem Browser oder Kontext nicht unterstützt. Auf LAN-HTTP-Adressen braucht Web Push normalerweise HTTPS; localhost ist die Ausnahme.",
+  request_failed: "Anfrage fehlgeschlagen.",
+  restore_fehlgeschlagen: "Restore konnte nicht ausgeführt werden. Prüfe S3-Konfiguration und Logs.",
+  secure_context_erforderlich:
+    "Push benötigt HTTPS oder localhost. Über eine normale HTTP-LAN-Adresse deaktivieren Browser Web Push.",
+  ungueltige_settings: "Einstellungen sind ungültig.",
+  ungueltiger_user: "Userdaten sind ungültig.",
+  user_existiert_bereits: "Username oder E-Mail existiert bereits.",
+  user_update_konflikt: "User konnte wegen eines Konflikts nicht gespeichert werden."
+};
+
+function getErrorMessage(caught: unknown) {
+  const code = caught instanceof Error ? caught.message : "request_failed";
+  return errorMessages[code] ?? code;
+}
+
+function applyTheme(settings: AppSettings) {
+  const root = document.documentElement;
+  root.style.setProperty("--teal", settings.themePrimaryColor);
+  root.style.setProperty("--rose", settings.themeLoginColor);
+  root.style.setProperty("--amber", settings.themeManagerColor);
+  root.style.setProperty("--blue", settings.themeAdminColor);
+  root.style.setProperty("--surface", settings.themeSurfaceColor);
+}
 
 function getPageFromHash(): PageId {
   const route = routes.find((item) => item.path === window.location.hash);
@@ -132,7 +179,7 @@ function getEventStatusLabel(event: GameEvent) {
   const labels: Record<GameEvent["status"], string> = {
     open: "offen",
     ready: "startbereit",
-    running: "laeuft bereits",
+    running: "läuft bereits",
     cancelled: "storniert",
     archived: "archiviert"
   };
@@ -260,7 +307,7 @@ function EventBoard({
       await loadEvents();
       setMessage("Event gespeichert.");
     } catch (caught) {
-      setError(caught instanceof Error ? caught.message : "request_failed");
+      setError(getErrorMessage(caught));
     }
   }
 
@@ -279,7 +326,7 @@ function EventBoard({
       await loadEvents();
       setMessage("Startzeit gespeichert.");
     } catch (caught) {
-      setError(caught instanceof Error ? caught.message : "request_failed");
+      setError(getErrorMessage(caught));
     }
   }
 
@@ -302,7 +349,7 @@ function EventBoard({
       await loadEvents();
       setMessage(action === "archive" ? "Event archiviert." : "Event storniert.");
     } catch (caught) {
-      setError(caught instanceof Error ? caught.message : "request_failed");
+      setError(getErrorMessage(caught));
     }
   }
 
@@ -318,7 +365,7 @@ function EventBoard({
       await loadEvents();
       setMessage(status === "joined" ? "Teilnahme gespeichert." : "Absage gespeichert.");
     } catch (caught) {
-      setError(caught instanceof Error ? caught.message : "request_failed");
+      setError(getErrorMessage(caught));
     }
   }
 
@@ -342,7 +389,7 @@ function EventBoard({
         <img src="/icon.svg" alt="" />
         <p className="eyebrow">Login</p>
         <h2>Einloggen und Runden sehen.</h2>
-        <p className="muted">Events, Serverdaten und Startzeiten sind nach dem Login verfuegbar.</p>
+        <p className="muted">Events, Serverdaten und Startzeiten sind nach dem Login verfügbar.</p>
         <a className="text-link" href="#login">
           Zum Login
         </a>
@@ -369,7 +416,7 @@ function EventBoard({
         <div className="access-panel compact" aria-label="Manager Hinweis">
           <p className="eyebrow">Manager</p>
           <h2>Keine Managerrechte.</h2>
-          <p className="muted">Neue Runden koennen Manager und Admins anlegen.</p>
+          <p className="muted">Neue Runden können Manager und Admins anlegen.</p>
         </div>
       ) : null}
       {showCreateForm ? (
@@ -587,7 +634,7 @@ function LoginPanel({
       setStep("verify");
       setMessage("Code wurde per E-Mail versendet.");
     } catch (caught) {
-      setError(caught instanceof Error ? caught.message : "request_failed");
+      setError(getErrorMessage(caught));
     } finally {
       setBusy(false);
     }
@@ -608,7 +655,7 @@ function LoginPanel({
       setCode("");
       setMessage("Angemeldet.");
     } catch (caught) {
-      setError(caught instanceof Error ? caught.message : "request_failed");
+      setError(getErrorMessage(caught));
     } finally {
       setBusy(false);
     }
@@ -630,12 +677,12 @@ function LoginPanel({
     setMessage("");
 
     try {
-      if (!("serviceWorker" in navigator) || !("PushManager" in window)) {
-        throw new Error("push_nicht_unterstuetzt");
-      }
-
       if (!window.isSecureContext) {
         throw new Error("secure_context_erforderlich");
+      }
+
+      if (!("serviceWorker" in navigator) || !("PushManager" in window) || !("Notification" in window)) {
+        throw new Error("push_nicht_unterstuetzt");
       }
 
       const { publicKey } = await requestJson<{ publicKey: string }>("/api/push/public-key");
@@ -661,7 +708,7 @@ function LoginPanel({
       onUserUpdated(result.user);
       setMessage("Notifications aktiv.");
     } catch (caught) {
-      setError(caught instanceof Error ? caught.message : "request_failed");
+      setError(getErrorMessage(caught));
     } finally {
       setBusy(false);
     }
@@ -680,7 +727,7 @@ function LoginPanel({
       onUserUpdated(result.user);
       setMessage("Notifications deaktiviert.");
     } catch (caught) {
-      setError(caught instanceof Error ? caught.message : "request_failed");
+      setError(getErrorMessage(caught));
     } finally {
       setBusy(false);
     }
@@ -747,7 +794,7 @@ function LoginPanel({
               />
             </label>
             <label>
-              Geraetename
+              Gerätename
               <input
                 placeholder="PC, Smartphone, Laptop"
                 value={deviceName}
@@ -761,7 +808,7 @@ function LoginPanel({
         <div className="action-row">
           {step === "verify" ? (
             <button type="button" className="secondary" onClick={() => setStep("request")}>
-              Zurueck
+              Zurück
             </button>
           ) : null}
           <button type="submit" disabled={busy}>
@@ -773,21 +820,23 @@ function LoginPanel({
   );
 }
 
-function AdminPanel({ currentUser }: { currentUser: User | null }) {
+function AdminPanel({
+  currentUser,
+  onSettingsChanged
+}: {
+  currentUser: User | null;
+  onSettingsChanged: (settings: AppSettings) => void;
+}) {
   const [users, setUsers] = useState<User[]>([]);
-  const [settings, setSettings] = useState<AppSettings>({
-    appName: "Hermes",
-    defaultNotificationsEnabled: true,
-    eventAutoArchiveHours: 8
-  });
+  const [settings, setSettings] = useState<AppSettings>(defaultSettings);
   const [newUser, setNewUser] = useState({
-    phoneNumber: "",
     username: "",
     email: "",
     role: "user" as User["role"]
   });
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
+  const [opsBusy, setOpsBusy] = useState(false);
 
   const isAdmin = currentUser?.role === "admin";
 
@@ -818,11 +867,11 @@ function AdminPanel({ currentUser }: { currentUser: User | null }) {
         method: "POST",
         body: JSON.stringify(newUser)
       });
-      setNewUser({ phoneNumber: "", username: "", email: "", role: "user" });
+      setNewUser({ username: "", email: "", role: "user" });
       await loadAdminData();
       setMessage("User gespeichert.");
     } catch (caught) {
-      setError(caught instanceof Error ? caught.message : "request_failed");
+      setError(getErrorMessage(caught));
     }
   }
 
@@ -838,7 +887,7 @@ function AdminPanel({ currentUser }: { currentUser: User | null }) {
       await loadAdminData();
       setMessage("Rolle gespeichert.");
     } catch (caught) {
-      setError(caught instanceof Error ? caught.message : "request_failed");
+      setError(getErrorMessage(caught));
     }
   }
 
@@ -853,9 +902,49 @@ function AdminPanel({ currentUser }: { currentUser: User | null }) {
         body: JSON.stringify(settings)
       });
       setSettings(result.settings);
+      onSettingsChanged(result.settings);
       setMessage("Einstellungen gespeichert.");
     } catch (caught) {
-      setError(caught instanceof Error ? caught.message : "request_failed");
+      setError(getErrorMessage(caught));
+    }
+  }
+
+  async function runBackup() {
+    setOpsBusy(true);
+    setError("");
+    setMessage("");
+
+    try {
+      await requestJson<{ ok: boolean }>("/api/admin/backup", { method: "POST" });
+      setMessage("Backup wurde nach S3 geschrieben.");
+    } catch (caught) {
+      setError(getErrorMessage(caught));
+    } finally {
+      setOpsBusy(false);
+    }
+  }
+
+  async function runRestore() {
+    const confirmed = window.confirm(
+      "Restore wirklich starten? Der aktuelle Datenstand wird durch den S3-Snapshot ersetzt."
+    );
+
+    if (!confirmed) {
+      return;
+    }
+
+    setOpsBusy(true);
+    setError("");
+    setMessage("");
+
+    try {
+      await requestJson<{ ok: boolean }>("/api/admin/restore", { method: "POST" });
+      await loadAdminData();
+      setMessage("Restore abgeschlossen. Bitte prüfe User, Events und deine aktuelle Session.");
+    } catch (caught) {
+      setError(getErrorMessage(caught));
+    } finally {
+      setOpsBusy(false);
     }
   }
 
@@ -865,9 +954,9 @@ function AdminPanel({ currentUser }: { currentUser: User | null }) {
         <img src="/icon.svg" alt="" />
         <p className="eyebrow">Admin</p>
         <h2>User, Manager und Einstellungen.</h2>
-        <p>Der Adminbereich ist nach Admin-Login verfuegbar.</p>
+        <p>Der Adminbereich ist nach Admin-Login verfügbar.</p>
         <a className="text-link" href="#login">
-          Admin-Login oeffnen
+          Admin-Login öffnen
         </a>
       </article>
     );
@@ -879,14 +968,6 @@ function AdminPanel({ currentUser }: { currentUser: User | null }) {
       <h2>User, Manager und Einstellungen.</h2>
 
       <form onSubmit={createUser} className="admin-form">
-        <label>
-          Telefonnummer
-          <input
-            value={newUser.phoneNumber}
-            onChange={(event) => setNewUser({ ...newUser, phoneNumber: event.target.value })}
-            required
-          />
-        </label>
         <label>
           Username
           <input
@@ -975,12 +1056,77 @@ function AdminPanel({ currentUser }: { currentUser: User | null }) {
               })
             }
           />
-          Notifications standardmaessig aktiv
+          Notifications standardmäßig aktiv
         </label>
+        <div className="color-grid" aria-label="Designfarben">
+          <label>
+            Primärfarbe
+            <input
+              type="color"
+              value={settings.themePrimaryColor}
+              onChange={(event) =>
+                setSettings({ ...settings, themePrimaryColor: event.target.value })
+              }
+            />
+          </label>
+          <label>
+            Loginfarbe
+            <input
+              type="color"
+              value={settings.themeLoginColor}
+              onChange={(event) => setSettings({ ...settings, themeLoginColor: event.target.value })}
+            />
+          </label>
+          <label>
+            Managerfarbe
+            <input
+              type="color"
+              value={settings.themeManagerColor}
+              onChange={(event) =>
+                setSettings({ ...settings, themeManagerColor: event.target.value })
+              }
+            />
+          </label>
+          <label>
+            Adminfarbe
+            <input
+              type="color"
+              value={settings.themeAdminColor}
+              onChange={(event) => setSettings({ ...settings, themeAdminColor: event.target.value })}
+            />
+          </label>
+          <label>
+            Hintergrund
+            <input
+              type="color"
+              value={settings.themeSurfaceColor}
+              onChange={(event) =>
+                setSettings({ ...settings, themeSurfaceColor: event.target.value })
+              }
+            />
+          </label>
+        </div>
         {message ? <p className="notice">{message}</p> : null}
         {error ? <p className="error">{error}</p> : null}
         <button type="submit">Einstellungen speichern</button>
       </form>
+
+      <section className="admin-ops" aria-label="Backup und Restore">
+        <p className="eyebrow">Storage</p>
+        <h2>Backup und Restore.</h2>
+        <p className="muted">
+          Backup schreibt den aktuellen SQLite-Snapshot nach S3. Restore ersetzt die aktiven Daten
+          durch den Snapshot aus S3.
+        </p>
+        <div className="action-row">
+          <button type="button" onClick={runBackup} disabled={opsBusy}>
+            Backup starten
+          </button>
+          <button type="button" className="secondary" onClick={runRestore} disabled={opsBusy}>
+            Restore starten
+          </button>
+        </div>
+      </section>
     </section>
   );
 }
@@ -1030,7 +1176,7 @@ function LoginPage({
       <aside className="auth-visual" aria-label="Login Hinweise">
         <img src="/icon.svg" alt="" />
         <p className="eyebrow">Mailcode</p>
-        <h2>Ein Login, mehrere Geraete.</h2>
+        <h2>Ein Login, mehrere Geräte.</h2>
         <p>
           Username eingeben, Code aus der E-Mail nutzen und Smartphone sowie PC parallel
           angemeldet lassen.
@@ -1061,11 +1207,21 @@ function ManagerPage({ currentUser }: { currentUser: User | null }) {
 function App() {
   const [currentUser, setCurrentUser] = useState<User | null>(null);
   const [activePage, setActivePage] = useState<PageId>(() => getPageFromHash());
+  const [appSettings, setAppSettings] = useState<AppSettings>(defaultSettings);
 
   useEffect(() => {
     requestJson<{ user: User }>("/api/auth/me")
       .then((result) => setCurrentUser(result.user))
       .catch(() => setCurrentUser(null));
+  }, []);
+
+  useEffect(() => {
+    requestJson<{ settings: AppSettings }>("/api/settings")
+      .then((result) => {
+        setAppSettings(result.settings);
+        applyTheme(result.settings);
+      })
+      .catch(() => applyTheme(defaultSettings));
   }, []);
 
   useEffect(() => {
@@ -1099,7 +1255,13 @@ function App() {
     if (activePage === "admin") {
       return (
         <section className="admin-stage" aria-label="Admin Arbeitsbereich">
-          <AdminPanel currentUser={currentUser} />
+          <AdminPanel
+            currentUser={currentUser}
+            onSettingsChanged={(settings) => {
+              setAppSettings(settings);
+              applyTheme(settings);
+            }}
+          />
         </section>
       );
     }
@@ -1112,7 +1274,7 @@ function App() {
       <header className="topbar" aria-label="Hauptnavigation">
         <a className="brand" href="#events" aria-label="Hermes Start">
           <img className="brand-mark" src="/icon.svg" alt="" />
-          <span>Hermes</span>
+          <span>{appSettings.appName}</span>
         </a>
         <nav className="nav-links">
           {routes.map((route) => (

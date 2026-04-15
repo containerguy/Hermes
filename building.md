@@ -4,11 +4,11 @@
 
 - Node.js 22
 - npm
-- Docker fuer Container-Builds
+- Docker für Container-Builds
 - Zugriff auf den Wasabi Bucket `hermes-storage`
 - lokale Datei `s3.creds` mit Access Key und Secret Key
 
-## Abhaengigkeiten Installieren
+## Abhängigkeiten Installieren
 
 ```bash
 npm install
@@ -34,7 +34,7 @@ HERMES_S3_RESTORE_MODE=if-missing
 
 `s3.creds` bleibt lokal und wird nicht committed.
 
-Unterstuetzte Credential-Datei-Formate:
+Unterstützte Credential-Datei-Formate:
 
 ```env
 AWS_ACCESS_KEY_ID=...
@@ -59,8 +59,8 @@ npm run build
 
 Der Build erzeugt:
 
-- `dist/` fuer die WebApp
-- `dist-server/` fuer den Node-Server
+- `dist/` für die WebApp
+- `dist-server/` für den Node-Server
 
 Die WebApp nutzt Hash-Seiten, die im gebauten Bundle direkt erreichbar sind:
 
@@ -69,7 +69,7 @@ Die WebApp nutzt Hash-Seiten, die im gebauten Bundle direkt erreichbar sind:
 - `/#manager`
 - `/#admin`
 
-Bei UI-Aenderungen sollte mindestens `npm run build` ausgefuehrt werden, damit TypeScript und Vite die React-Seiten pruefen.
+Bei UI-Änderungen sollte mindestens `npm run build` ausgeführt werden, damit TypeScript und Vite die React-Seiten prüfen.
 
 ## Tests
 
@@ -84,7 +84,7 @@ Browser-E2E:
 npm run test:e2e
 ```
 
-Der E2E-Kernflow navigiert explizit durch `#login`, `#admin`, `#manager` und `#events`, damit die getrennten Arbeitsbereiche geprueft werden.
+Der E2E-Kernflow navigiert explizit durch `#login`, `#admin`, `#manager` und `#events`, damit die getrennten Arbeitsbereiche geprüft werden.
 
 Falls Playwright Systembibliotheken fehlen:
 
@@ -92,7 +92,7 @@ Falls Playwright Systembibliotheken fehlen:
 npx playwright install-deps chromium
 ```
 
-Das benoetigt auf vielen Systemen sudo-Rechte.
+Das benötigt auf vielen Systemen sudo-Rechte.
 
 ## Docker Image Bauen
 
@@ -108,7 +108,7 @@ Die Pipeline liegt unter:
 .github/workflows/docker-image.yml
 ```
 
-Sie fuehrt bei Pull Requests aus:
+Sie führt bei Pull Requests aus:
 
 - `npm ci`
 - `npm test`
@@ -116,9 +116,9 @@ Sie fuehrt bei Pull Requests aus:
 - `npm audit --omit=dev`
 - Docker Build ohne Push
 
-Sie fuehrt bei Push auf `main`, Tags `v*` und manuellem Start aus:
+Sie führt bei Push auf `main`, Tags `v*` und manuellem Start aus:
 
-- dieselben Pruefungen
+- dieselben Prüfungen
 - Docker Build
 - Push nach GitHub Container Registry
 
@@ -130,12 +130,12 @@ ghcr.io/containerguy/hermes
 
 Tags:
 
-- `latest` fuer `main`
-- Branch-Tag fuer Branch-Builds
-- Git-Tag fuer Releases wie `v0.1.0`
-- `sha-<commit>` fuer jeden gepushten Commit
+- `latest` für `main`
+- Branch-Tag für Branch-Builds
+- Git-Tag für Releases wie `v0.1.0`
+- `sha-<commit>` für jeden gepushten Commit
 
-Das Repository muss fuer GitHub Packages Schreibzugriff ueber `GITHUB_TOKEN` erlauben. Die Workflow-Datei setzt dafuer:
+Das Repository muss für GitHub Packages Schreibzugriff über `GITHUB_TOKEN` erlauben. Die Workflow-Datei setzt dafür:
 
 ```yaml
 permissions:
@@ -184,4 +184,9 @@ Beim Shutdown:
 
 - Hermes versucht erneut, den aktuellen Snapshot nach S3 zu schreiben.
 
-Wichtig: S3 ist Snapshot-Storage, kein Locking-Backend fuer mehrere gleichzeitig schreibende Hermes-Instanzen.
+Admin-Aktionen:
+
+- `POST /api/admin/backup` schreibt den aktuellen SQLite-Stand nach S3.
+- `POST /api/admin/restore` lädt den S3-Snapshot und ersetzt die aktiven SQLite-Tabellen.
+
+Wichtig: S3 ist Snapshot-Storage, kein Locking-Backend für mehrere gleichzeitig schreibende Hermes-Instanzen.

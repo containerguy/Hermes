@@ -586,9 +586,28 @@ dd {
 .admin-list {
   display: grid;
   grid-column: 2;
-  grid-row: 3 / span 2;
+  grid-row: 3 / span 3;
   gap: 10px;
   align-content: start;
+}
+
+.admin-ops {
+  display: grid;
+  grid-column: 1;
+  gap: 12px;
+  margin-top: 8px;
+  border-top: 1px solid var(--line);
+  padding-top: 18px;
+}
+
+.color-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.color-grid input {
+  padding: 4px;
 }
 
 .admin-list-row {
@@ -662,7 +681,8 @@ dd {
   .manager-board .event-list,
   .admin-panel .admin-form:first-of-type,
   .admin-panel .admin-form:last-of-type,
-  .admin-list {
+  .admin-list,
+  .admin-ops {
     grid-column: 1;
   }
 
@@ -703,6 +723,7 @@ dd {
   .form-grid,
   .manage-row,
   .signal-list,
+  .color-grid,
   .admin-list-row,
   .hero-status {
     grid-template-columns: 1fr;

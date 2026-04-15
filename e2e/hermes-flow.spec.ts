@@ -18,7 +18,7 @@ async function login(page: Page, username: string) {
   await page.getByRole("button", { name: "Code senden" }).click();
   await expect(page.getByText("Code wurde per E-Mail versendet.")).toBeVisible();
   await page.getByLabel("Einmalcode").fill("123456");
-  await page.getByLabel("Geraetename").fill("Browser");
+  await page.getByLabel("Gerätename").fill("Browser");
   await page.getByRole("button", { name: "Einloggen" }).click();
   await expect(page.getByText(username, { exact: true })).toBeVisible();
 }
@@ -64,14 +64,12 @@ test("admin creates users, manager creates an event, user joins", async ({ page 
   await page.goto(`${baseUrl}/#admin`);
 
   const adminPanel = page.getByLabel("Adminbereich");
-  await adminPanel.getByLabel("Telefonnummer").fill("+491702222222");
   await adminPanel.getByLabel("Username").fill("manager");
   await adminPanel.getByLabel("E-Mail").fill("manager@example.test");
   await adminPanel.getByLabel("Rolle").first().selectOption("manager");
   await adminPanel.getByRole("button", { name: "User anlegen" }).click();
   await expect(adminPanel.getByText("manager@example.test")).toBeVisible();
 
-  await adminPanel.getByLabel("Telefonnummer").fill("+491703333333");
   await adminPanel.getByLabel("Username").fill("spieler");
   await adminPanel.getByLabel("E-Mail").fill("spieler@example.test");
   await adminPanel.getByLabel("Rolle").first().selectOption("user");

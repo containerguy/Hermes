@@ -4,11 +4,13 @@ import { randomUUID } from "node:crypto";
 import { z } from "zod";
 import { publicUser, requireAdmin, requireUser } from "../auth/current-user";
 import type { DatabaseContext } from "../db/client";
-import { appSettings, users } from "../db/schema";
+import { users } from "../db/schema";
 import { userRoleSchema } from "../domain/users";
+import { persistDatabaseSnapshot, restoreDatabaseSnapshotIntoLive } from "../storage/s3-storage";
+import { readSettings, settingsSchema, writeSettings } from "../settings";
 
 const createUserSchema = z.object({
-  phoneNumber: z.string().trim().min(3).max(40),
+  phoneNumber: z.string().trim().min(3).max(40).optional(),
   username: z.string().trim().min(1).max(80),
   email: z.string().trim().email().max(160),
   role: userRoleSchema.default("user")
@@ -22,57 +24,12 @@ const updateUserSchema = z.object({
   notificationsEnabled: z.boolean().optional()
 });
 
-const settingsSchema = z.object({
-  appName: z.string().trim().min(1).max(80),
-  defaultNotificationsEnabled: z.boolean(),
-  eventAutoArchiveHours: z.number().int().min(1).max(72)
-});
-
 function nowIso() {
   return new Date().toISOString();
 }
 
-function readSettings(context: DatabaseContext) {
-  const rows = context.db.select().from(appSettings).all();
-  const values = Object.fromEntries(
-    rows.map((row) => {
-      return [row.key, JSON.parse(row.value) as unknown];
-    })
-  );
-
-  return settingsSchema.parse({
-    appName: values.appName ?? "Hermes",
-    defaultNotificationsEnabled: values.defaultNotificationsEnabled ?? true,
-    eventAutoArchiveHours: values.eventAutoArchiveHours ?? 8
-  });
-}
-
-function writeSettings(
-  context: DatabaseContext,
-  settings: z.infer<typeof settingsSchema>,
-  updatedByUserId: string
-) {
-  const timestamp = nowIso();
-
-  for (const [key, value] of Object.entries(settings)) {
-    context.db
-      .insert(appSettings)
-      .values({
-        key,
-        value: JSON.stringify(value),
-        updatedByUserId,
-        updatedAt: timestamp
-      })
-      .onConflictDoUpdate({
-        target: appSettings.key,
-        set: {
-          value: JSON.stringify(value),
-          updatedByUserId,
-          updatedAt: timestamp
-        }
-      })
-      .run();
-  }
+function fallbackPhoneNumber(userId: string) {
+  return `user:${userId}`;
 }
 
 export function createAdminRouter(context: DatabaseContext) {
@@ -121,11 +78,11 @@ export function createAdminRouter(context: DatabaseContext) {
         .insert(users)
         .values({
           id,
-          phoneNumber: parsed.data.phoneNumber,
+          phoneNumber: parsed.data.phoneNumber ?? fallbackPhoneNumber(id),
           username: parsed.data.username,
           email: parsed.data.email,
           role: parsed.data.role,
-          notificationsEnabled: true,
+          notificationsEnabled: readSettings(context).defaultNotificationsEnabled,
           createdByUserId: admin.id,
           createdAt: timestamp,
           updatedAt: timestamp
@@ -181,7 +138,7 @@ export function createAdminRouter(context: DatabaseContext) {
 
   router.put("/settings", (request, response) => {
     const admin = requireAdmin(context, request);
-    const parsed = settingsSchema.safeParse(request.body);
+    const parsed = settingsSchema.partial().safeParse(request.body);
 
     if (!admin) {
       response.status(403).json({ error: "admin_erforderlich" });
@@ -193,8 +150,28 @@ export function createAdminRouter(context: DatabaseContext) {
       return;
     }
 
-    writeSettings(context, parsed.data, admin.id);
+    writeSettings(context, settingsSchema.parse({ ...readSettings(context), ...parsed.data }), admin.id);
     response.json({ settings: readSettings(context) });
+  });
+
+  router.post("/backup", async (_request, response) => {
+    try {
+      await persistDatabaseSnapshot(context.sqlite);
+      response.json({ ok: true, message: "backup_erstellt" });
+    } catch (error) {
+      console.error("[Hermes] Failed to create admin backup", error);
+      response.status(500).json({ error: "backup_fehlgeschlagen" });
+    }
+  });
+
+  router.post("/restore", async (_request, response) => {
+    try {
+      await restoreDatabaseSnapshotIntoLive(context.sqlite);
+      response.json({ ok: true, message: "restore_abgeschlossen" });
+    } catch (error) {
+      console.error("[Hermes] Failed to restore admin backup", error);
+      response.status(500).json({ error: "restore_fehlgeschlagen" });
+    }
   });
 
   return router;

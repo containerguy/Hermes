@@ -6,12 +6,7 @@ import { createDb } from "./client";
 import { runMigrations } from "./migrate";
 import { appSettings, users } from "./schema";
 import { persistDatabaseSnapshot, restoreDatabaseFromStorageIfNeeded } from "../storage/s3-storage";
-
-const DEFAULT_SETTINGS = {
-  appName: "Hermes",
-  defaultNotificationsEnabled: true,
-  eventAutoArchiveHours: 8
-};
+import { defaultSettings } from "../settings";
 
 function nowIso() {
   return new Date().toISOString();
@@ -62,7 +57,7 @@ export async function bootstrapAdmin() {
       .run();
   }
 
-  for (const [key, value] of Object.entries(DEFAULT_SETTINGS)) {
+  for (const [key, value] of Object.entries(defaultSettings)) {
     db.insert(appSettings)
       .values({
         key,

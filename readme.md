@@ -1,17 +1,19 @@
 # Hermes
 
-Hermes ist eine responsive WebApp fuer LAN-Party-Spielrunden. User melden sich mit Username und E-Mail-Einmalcode an, Manager legen Events an, und Teilnehmer stimmen mit `dabei` oder `nicht dabei` ab.
+Hermes ist eine responsive WebApp für LAN-Party-Spielrunden. User melden sich mit Username und E-Mail-Einmalcode an, Manager legen Events an, und Teilnehmer stimmen mit `dabei` oder `nicht dabei` ab.
 
-## Oberflaeche
+## Oberfläche
 
 Die WebApp ist in getrennte Arbeitsbereiche aufgeteilt:
 
-- `#events`: Eventuebersicht fuer Abstimmung, Status, Startzeit und Serverdaten.
+- `#events`: Eventübersicht für Abstimmung, Status, Startzeit und Serverdaten.
 - `#login`: Login, Kontoansicht, Logout und Notification-Einstellungen.
-- `#manager`: Eventanlage und Eventsteuerung fuer Manager und Admins.
+- `#manager`: Eventanlage und Eventsteuerung für Manager und Admins.
 - `#admin`: Userverwaltung, Rollenzuweisung und globale Einstellungen.
 
-Das Managerformular wird bewusst nur im Managerbereich angezeigt. Die Eventuebersicht bleibt damit fuer Teilnehmer auf Abstimmung und Status fokussiert.
+Das Managerformular wird bewusst nur im Managerbereich angezeigt. Die Eventübersicht bleibt damit für Teilnehmer auf Abstimmung und Status fokussiert.
+
+Im Adminbereich können zusätzlich die Designfarben gespeichert werden. Diese Werte liegen wie die übrigen App-Einstellungen in `app_settings` und werden beim Laden der WebApp angewendet.
 
 ## Wo Werden Einstellungen Gespeichert?
 
@@ -31,7 +33,7 @@ Im Docker-Setup ist das:
 
 Mit S3-Backend bleibt SQLite die lokale Arbeitsdatenbank. S3 wird als persistentes Snapshot-Backend verwendet: Beim Start wird die Datenbank aus S3 wiederhergestellt, falls lokal keine Datenbank existiert, und nach Schreiboperationen wird ein Snapshot nach S3 hochgeladen.
 
-Das ist absichtlich kein verteiltes Live-Dateisystem. Hermes ist fuer eine einzelne laufende Instanz gedacht.
+Das ist absichtlich kein verteiltes Live-Dateisystem. Hermes ist für eine einzelne laufende Instanz gedacht.
 
 ## Wasabi S3
 
@@ -49,7 +51,7 @@ HERMES_S3_RESTORE_MODE=if-missing
 
 `s3.creds` wird nicht versioniert. Unter Docker wird die Datei readonly nach `/run/secrets/s3.creds` gemountet.
 
-Unterstuetzte Formate fuer `s3.creds`:
+Unterstützte Formate für `s3.creds`:
 
 ```env
 AWS_ACCESS_KEY_ID=...
@@ -70,7 +72,7 @@ access-key=...
 secret-key=...
 ```
 
-Oder zwei Zeilen ohne Schluesselname:
+Oder zwei Zeilen ohne Schlüsselname:
 
 ```text
 ACCESS_KEY
@@ -87,7 +89,7 @@ npm run build
 npm start
 ```
 
-Die App laeuft danach auf:
+Die App läuft danach auf:
 
 ```text
 http://localhost:3000
@@ -119,7 +121,7 @@ Das Compose-Setup nutzt:
 
 ## Mail
 
-Login-Codes werden per SMTP versendet. Fuer lokale Tests kann `HERMES_MAIL_MODE=console` genutzt werden.
+Login-Codes werden per SMTP versendet. Für lokale Tests kann `HERMES_MAIL_MODE=console` genutzt werden.
 
 ```env
 HERMES_MAIL_MODE=smtp
@@ -132,11 +134,11 @@ HERMES_SMTP_USER=
 HERMES_SMTP_PASSWORD=
 ```
 
-Hinweis: Fuer Port `587` ist normalerweise STARTTLS korrekt (`HERMES_SMTP_SECURITY=starttls`). Fuer Port `465` ist implizites TLS korrekt (`HERMES_SMTP_SECURITY=tls`). Der Fehler `wrong version number` bedeutet fast immer, dass implizites TLS gegen einen STARTTLS-Port gesprochen wurde.
+Hinweis: Für Port `587` ist normalerweise STARTTLS korrekt (`HERMES_SMTP_SECURITY=starttls`). Für Port `465` ist implizites TLS korrekt (`HERMES_SMTP_SECURITY=tls`). Der Fehler `wrong version number` bedeutet fast immer, dass implizites TLS gegen einen STARTTLS-Port gesprochen wurde.
 
 ## Push Notifications
 
-Web Push benoetigt VAPID Keys:
+Web Push benötigt VAPID Keys:
 
 ```bash
 npx web-push generate-vapid-keys
@@ -150,11 +152,15 @@ HERMES_VAPID_PUBLIC_KEY=
 HERMES_VAPID_PRIVATE_KEY=
 ```
 
-Browser erlauben Push Notifications nur in einem Secure Context. Hermes liefert kein SSL/TLS, keinen Reverse Proxy und kein Zertifikatsmanagement mit.
+Browser erlauben Push Notifications nur in einem Secure Context. `http://localhost` funktioniert für lokale Tests, normale HTTP-LAN-Adressen wie `http://192.168.x.x` gelten aber nicht als Secure Context. Hermes liefert kein SSL/TLS, keinen Reverse Proxy und kein Zertifikatsmanagement mit.
 
-## Backup Und Reset
+## Backup, Restore Und Reset
 
-S3 ist das primaere persistente Snapshot-Backend. Fuer lokale manuelle Backups kann zusaetzlich die SQLite-Datei gesichert werden.
+S3 ist das primäre persistente Snapshot-Backend. Admins können im Adminbereich aktiv ein Backup nach S3 starten oder den aktuellen Datenstand aus dem S3-Snapshot wiederherstellen.
+
+Restore ersetzt die aktiven SQLite-Daten durch den S3-Snapshot. Danach sollten User, Events und die aktuelle Session geprüft werden.
+
+Für lokale manuelle Backups kann zusätzlich die SQLite-Datei gesichert werden.
 
 Backup aus Docker Volume:
 
@@ -170,9 +176,9 @@ Reset lokaler Docker-Daten:
 docker compose down -v
 ```
 
-Wenn `HERMES_S3_RESTORE_MODE=if-missing` gesetzt ist, wird beim naechsten Start wieder aus S3 geladen, sofern dort ein Snapshot existiert.
+Wenn `HERMES_S3_RESTORE_MODE=if-missing` gesetzt ist, wird beim nächsten Start wieder aus S3 geladen, sofern dort ein Snapshot existiert.
 
-## Pruefung
+## Prüfung
 
 ```bash
 npm test
@@ -186,4 +192,4 @@ Der Playwright-Test ist vorbereitet:
 npm run test:e2e
 ```
 
-Falls Chromium wegen fehlender Systembibliotheken nicht startet, muessen die Playwright OS-Abhaengigkeiten auf dem Host installiert werden.
+Falls Chromium wegen fehlender Systembibliotheken nicht startet, müssen die Playwright OS-Abhängigkeiten auf dem Host installiert werden.

@@ -54,17 +54,17 @@ describe("app flow", () => {
     const manager = await adminAgent
       .post("/api/admin/users")
       .send({
-        phoneNumber: "+491702222222",
         username: "manager",
         email: "manager@example.test",
         role: "manager"
       })
       .expect(201);
 
+    expect(manager.body.user.phoneNumber).toMatch(/^user:/);
+
     await adminAgent
       .post("/api/admin/users")
       .send({
-        phoneNumber: "+491703333333",
         username: "spieler1",
         email: "spieler1@example.test",
         role: "user"
@@ -74,7 +74,6 @@ describe("app flow", () => {
     await adminAgent
       .post("/api/admin/users")
       .send({
-        phoneNumber: "+491704444444",
         username: "spieler2",
         email: "spieler2@example.test",
         role: "user"
@@ -91,9 +90,24 @@ describe("app flow", () => {
       .send({
         appName: "Hermes Test",
         defaultNotificationsEnabled: true,
-        eventAutoArchiveHours: 8
+        eventAutoArchiveHours: 8,
+        themePrimaryColor: "#0f766e",
+        themeLoginColor: "#be123c",
+        themeManagerColor: "#b7791f",
+        themeAdminColor: "#2563eb",
+        themeSurfaceColor: "#f6f8f4"
       })
       .expect(200);
+
+    await request(started!.app)
+      .get("/api/settings")
+      .expect(200)
+      .expect((response) => {
+        expect(response.body.settings.appName).toBe("Hermes Test");
+        expect(response.body.settings.themeAdminColor).toBe("#2563eb");
+      });
+
+    await adminAgent.post("/api/admin/backup").expect(200);
 
     const managerAgent = request.agent(started!.app);
     await login(managerAgent, "manager");

@@ -581,6 +581,34 @@ Paketpruefung:
 
 Status: abgeschlossen mit Browser-E2E-Umgebungsblocker.
 
+### AP 13 - Admin-Betrieb, Theme und Login-Feinschliff
+
+Ziel: Admins können Hermes im LAN-Betrieb ohne Dateizugriff besser steuern; Login und UI-Texte sind für deutsche Nutzer sauber.
+
+Aufgaben:
+
+- Push-Fehler für unsichere HTTP-LAN-Adressen verständlich anzeigen.
+- Useranlage im Adminbereich ohne Telefonnummer ermöglichen.
+- Designfarben als persistente Settings speichern und in der WebApp anwenden.
+- Admin-Aktionen für S3-Backup und S3-Restore ergänzen.
+- Deutsche Umlaute in sichtbaren UI-Texten korrekt verwenden.
+
+Akzeptanzkriterien:
+
+- Admin kann User nur mit Username, E-Mail und Rolle anlegen.
+- Admin kann Primär-, Login-, Manager-, Admin- und Hintergrundfarbe speichern.
+- WebApp lädt öffentliche Settings und wendet Designfarben ohne Admin-Login an.
+- Admin kann Backup und Restore aktiv auslösen.
+- Push-Aktivierung unterscheidet zwischen fehlender Browserunterstützung und fehlendem Secure Context.
+
+Paketprüfung:
+
+- Funktional: Build und API-Tests prüfen Settings, Useranlage ohne Telefonnummer und Backup-Endpunkt.
+- Produktziel: Admin-Betrieb wird ohne Shell-Zugriff verbessert und die LAN-UX zeigt verständlichere Fehler.
+- Release-Relevanz: Änderungen betreffen direkt Admin-Onboarding, UI-Anpassung und Datenrettung vor der LAN-Party.
+
+Status: abgeschlossen mit Browser-E2E-Umgebungsblocker.
+
 ## Vorgeschlagene Reihenfolge
 
 1. AP 0 ist abgeschlossen.
@@ -623,6 +651,7 @@ Status: abgeschlossen mit Browser-E2E-Umgebungsblocker.
 - 2026-04-15: Events gehen nach Start in `laeuft bereits` und werden 8 Stunden nach Start automatisch archiviert.
 - 2026-04-15: Event-Ersteller, Manager und Admin koennen Events manuell archivieren oder stornieren.
 - 2026-04-15: UI wurde in getrennte Hash-Seiten fuer Events, Login, Manager und Admin umgebaut; Managerformular laeuft nicht mehr in der Eventuebersicht mit.
+- 2026-04-15: Admin-Settings wurden um Designfarben erweitert; Useranlage braucht keine Telefonnummer mehr; Backup/Restore sind als Admin-Aktionen umgesetzt.
 
 ## Naechster sinnvoller Schritt
 

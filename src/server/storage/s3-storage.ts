@@ -1,4 +1,5 @@
 import fs from "node:fs";
+import os from "node:os";
 import path from "node:path";
 import type Database from "better-sqlite3";
 import { GetObjectCommand, PutObjectCommand, S3Client } from "@aws-sdk/client-s3";
@@ -10,6 +11,17 @@ type S3Credentials = {
 };
 
 let snapshotTimer: NodeJS.Timeout | undefined;
+
+const restorableTables = [
+  "users",
+  "login_challenges",
+  "sessions",
+  "push_subscriptions",
+  "game_events",
+  "participations",
+  "app_settings",
+  "schema_migrations"
+];
 
 function isS3StorageEnabled() {
   return process.env.HERMES_STORAGE_BACKEND === "s3";
@@ -134,6 +146,23 @@ function createS3Client() {
   };
 }
 
+function quoteIdentifier(identifier: string) {
+  return `"${identifier.replace(/"/g, '""')}"`;
+}
+
+async function downloadSnapshotToFile(targetPath: string) {
+  const { bucket, key, client } = createS3Client();
+  const result = await client.send(new GetObjectCommand({ Bucket: bucket, Key: key }));
+  const bytes = await result.Body?.transformToByteArray();
+
+  if (!bytes) {
+    throw new Error(`S3 snapshot at s3://${bucket}/${key} is empty.`);
+  }
+
+  fs.writeFileSync(targetPath, Buffer.from(bytes));
+  return { bucket, key };
+}
+
 export async function restoreDatabaseFromStorageIfNeeded(databasePath = getDatabasePath()) {
   if (!isS3StorageEnabled()) {
     return;
@@ -149,18 +178,11 @@ export async function restoreDatabaseFromStorageIfNeeded(databasePath = getDatab
     return;
   }
 
-  const { bucket, key, client } = createS3Client();
+  const { bucket, key } = readS3Config();
 
   try {
-    const result = await client.send(new GetObjectCommand({ Bucket: bucket, Key: key }));
-    const bytes = await result.Body?.transformToByteArray();
-
-    if (!bytes) {
-      return;
-    }
-
     fs.mkdirSync(path.dirname(databasePath), { recursive: true });
-    fs.writeFileSync(databasePath, Buffer.from(bytes));
+    await downloadSnapshotToFile(databasePath);
     console.log(`[Hermes] Restored SQLite snapshot from s3://${bucket}/${key}`);
   } catch (error) {
     const name = error instanceof Error ? error.name : "";
@@ -171,6 +193,51 @@ export async function restoreDatabaseFromStorageIfNeeded(databasePath = getDatab
     }
 
     throw error;
+  }
+}
+
+export async function restoreDatabaseSnapshotIntoLive(sqlite: Database.Database) {
+  if (!isS3StorageEnabled()) {
+    throw new Error("S3 storage is not enabled.");
+  }
+
+  const tempDirectory = fs.mkdtempSync(path.join(os.tmpdir(), "hermes-restore-"));
+  const tempPath = path.join(tempDirectory, "snapshot.sqlite");
+
+  try {
+    const { bucket, key } = await downloadSnapshotToFile(tempPath);
+    const attachedName = "restore_snapshot";
+    sqlite.prepare(`ATTACH DATABASE ? AS ${quoteIdentifier(attachedName)}`).run(tempPath);
+
+    try {
+      sqlite.pragma("foreign_keys = OFF");
+      sqlite.transaction(() => {
+        for (const table of restorableTables) {
+          const quotedTable = quoteIdentifier(table);
+          const sourceTable = `${quoteIdentifier(attachedName)}.${quotedTable}`;
+          const exists = sqlite
+            .prepare(
+              `SELECT name FROM ${quoteIdentifier(attachedName)}.sqlite_master WHERE type = 'table' AND name = ?`
+            )
+            .get(table);
+
+          if (!exists) {
+            continue;
+          }
+
+          sqlite.exec(`DELETE FROM ${quotedTable};`);
+          sqlite.exec(`INSERT INTO ${quotedTable} SELECT * FROM ${sourceTable};`);
+        }
+      })();
+      sqlite.pragma("foreign_keys = ON");
+      sqlite.exec("PRAGMA foreign_key_check;");
+      console.log(`[Hermes] Restored live SQLite data from s3://${bucket}/${key}`);
+    } finally {
+      sqlite.prepare(`DETACH DATABASE ${quoteIdentifier(attachedName)}`).run();
+      sqlite.pragma("foreign_keys = ON");
+    }
+  } finally {
+    fs.rmSync(tempDirectory, { recursive: true, force: true });
   }
 }
 
