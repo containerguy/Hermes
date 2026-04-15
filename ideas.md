@@ -317,7 +317,13 @@ Akzeptanzkriterien:
 - Verbrauchte oder abgelaufene Codes funktionieren nicht mehr.
 - Ohne funktionierende SMTP-Konfiguration ist der Fehler fuer Admins klar erkennbar.
 
-Status: offen.
+Paketpruefung:
+
+- Funktional: HTTP-Flow fuer Code-Anforderung, Code-Verifikation, Session-Cookie, `/me` und Logout ist lauffaehig.
+- Produktziel: Login nutzt Telefonnummer und Username, sendet den Code ueber Mail-Adapter und erlaubt parallele Sessions.
+- Release-Relevanz: Der Flow funktioniert mit SMTP-Konfiguration und besitzt einen Console-Modus fuer lokale Tests und Docker-Diagnose.
+
+Status: abgeschlossen.
 
 ### AP 4 - Admin, Einstellungen und Rollen
 
@@ -522,6 +528,7 @@ Status: offen.
 - 2026-04-15: AP 1 legt React/Vite als Frontend-Grundlage fest; das Backend soll spaeter als Express-Server im selben Image laufen.
 - 2026-04-15: AP 2 legt Drizzle mit expliziten SQL-Migrationen als Datenzugriff fest.
 - 2026-04-15: Der erste Admin wird per Bootstrap-Umgebungsvariablen erzeugt oder aktualisiert.
+- 2026-04-15: AP 3 implementiert E-Mail-Einmalcodes, Session-Cookies, Logout und parallele Sessions.
 - 2026-04-15: Hermes wird als Docker Image ausgeliefert; SSL/TLS, Reverse Proxy und Domain-Handling sind out of scope.
 - 2026-04-15: Manager werden durch den Haupt-Admin definiert; globale Einstellungen werden persistent gespeichert.
 - 2026-04-15: Login-Einmalcodes werden per E-Mail versendet.

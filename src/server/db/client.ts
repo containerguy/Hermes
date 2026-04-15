@@ -24,3 +24,5 @@ export function createDb(databasePath = getDatabasePath()) {
     db: drizzle(sqlite, { schema })
   };
 }
+
+export type DatabaseContext = ReturnType<typeof createDb>;

@@ -1,6 +1,15 @@
-import React from "react";
+import React, { FormEvent, useEffect, useState } from "react";
 import { createRoot } from "react-dom/client";
 import "./styles.css";
+
+type User = {
+  id: string;
+  phoneNumber: string;
+  username: string;
+  email: string;
+  role: "user" | "manager" | "admin";
+  notificationsEnabled: boolean;
+};
 
 type Route = {
   path: string;
@@ -45,7 +54,192 @@ const routes: Route[] = [
   }
 ];
 
+async function requestJson<T>(url: string, options?: RequestInit): Promise<T> {
+  const response = await fetch(url, {
+    credentials: "include",
+    headers: {
+      "Content-Type": "application/json",
+      ...(options?.headers ?? {})
+    },
+    ...options
+  });
+
+  if (!response.ok) {
+    const body = (await response.json().catch(() => ({}))) as { error?: string };
+    throw new Error(body.error ?? "request_failed");
+  }
+
+  if (response.status === 204) {
+    return undefined as T;
+  }
+
+  return response.json() as Promise<T>;
+}
+
+function LoginPanel({
+  currentUser,
+  onLoggedIn,
+  onLoggedOut
+}: {
+  currentUser: User | null;
+  onLoggedIn: (user: User) => void;
+  onLoggedOut: () => void;
+}) {
+  const [phoneNumber, setPhoneNumber] = useState("");
+  const [username, setUsername] = useState("");
+  const [code, setCode] = useState("");
+  const [deviceName, setDeviceName] = useState("");
+  const [step, setStep] = useState<"request" | "verify">("request");
+  const [message, setMessage] = useState("");
+  const [error, setError] = useState("");
+  const [busy, setBusy] = useState(false);
+
+  async function requestCode(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    setBusy(true);
+    setError("");
+    setMessage("");
+
+    try {
+      await requestJson("/api/auth/request-code", {
+        method: "POST",
+        body: JSON.stringify({ phoneNumber, username })
+      });
+      setStep("verify");
+      setMessage("Code wurde per E-Mail versendet.");
+    } catch (caught) {
+      setError(caught instanceof Error ? caught.message : "request_failed");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function verifyCode(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    setBusy(true);
+    setError("");
+    setMessage("");
+
+    try {
+      const result = await requestJson<{ user: User }>("/api/auth/verify-code", {
+        method: "POST",
+        body: JSON.stringify({ phoneNumber, username, code, deviceName })
+      });
+      onLoggedIn(result.user);
+      setCode("");
+      setMessage("Angemeldet.");
+    } catch (caught) {
+      setError(caught instanceof Error ? caught.message : "request_failed");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function logout() {
+    setBusy(true);
+    setError("");
+    await requestJson<void>("/api/auth/logout", { method: "POST" }).catch(() => undefined);
+    onLoggedOut();
+    setStep("request");
+    setMessage("Abgemeldet.");
+    setBusy(false);
+  }
+
+  if (currentUser) {
+    return (
+      <section className="login-panel" id="login" aria-label="Aktuelle Anmeldung">
+        <p className="eyebrow">Angemeldet</p>
+        <h2>{currentUser.username}</h2>
+        <dl className="account-list">
+          <div>
+            <dt>Rolle</dt>
+            <dd>{currentUser.role}</dd>
+          </div>
+          <div>
+            <dt>E-Mail</dt>
+            <dd>{currentUser.email}</dd>
+          </div>
+        </dl>
+        <button type="button" className="secondary" onClick={logout} disabled={busy}>
+          Logout
+        </button>
+      </section>
+    );
+  }
+
+  return (
+    <section className="login-panel" id="login" aria-label="Login">
+      <p className="eyebrow">Login</p>
+      <h2>{step === "request" ? "Einmalcode anfordern." : "Code eingeben."}</h2>
+      <form onSubmit={step === "request" ? requestCode : verifyCode}>
+        <label>
+          Telefonnummer
+          <input
+            autoComplete="tel"
+            value={phoneNumber}
+            onChange={(event) => setPhoneNumber(event.target.value)}
+            required
+          />
+        </label>
+        <label>
+          Username
+          <input
+            autoComplete="username"
+            value={username}
+            onChange={(event) => setUsername(event.target.value)}
+            required
+          />
+        </label>
+        {step === "verify" ? (
+          <>
+            <label>
+              Einmalcode
+              <input
+                autoComplete="one-time-code"
+                inputMode="numeric"
+                maxLength={6}
+                pattern="[0-9]{6}"
+                value={code}
+                onChange={(event) => setCode(event.target.value)}
+                required
+              />
+            </label>
+            <label>
+              Geraetename
+              <input
+                placeholder="PC, Smartphone, Laptop"
+                value={deviceName}
+                onChange={(event) => setDeviceName(event.target.value)}
+              />
+            </label>
+          </>
+        ) : null}
+        {message ? <p className="notice">{message}</p> : null}
+        {error ? <p className="error">{error}</p> : null}
+        <div className="action-row">
+          {step === "verify" ? (
+            <button type="button" className="secondary" onClick={() => setStep("request")}>
+              Zurueck
+            </button>
+          ) : null}
+          <button type="submit" disabled={busy}>
+            {step === "request" ? "Code senden" : "Einloggen"}
+          </button>
+        </div>
+      </form>
+    </section>
+  );
+}
+
 function App() {
+  const [currentUser, setCurrentUser] = useState<User | null>(null);
+
+  useEffect(() => {
+    requestJson<{ user: User }>("/api/auth/me")
+      .then((result) => setCurrentUser(result.user))
+      .catch(() => setCurrentUser(null));
+  }, []);
+
   return (
     <main className="app-shell">
       <header className="topbar" aria-label="Hauptnavigation">
@@ -105,7 +299,12 @@ function App() {
       </section>
 
       <section className="route-grid" aria-label="Vorbereitete Bereiche">
-        {routes.slice(1).map((route) => (
+        <LoginPanel
+          currentUser={currentUser}
+          onLoggedIn={setCurrentUser}
+          onLoggedOut={() => setCurrentUser(null)}
+        />
+        {routes.slice(2).map((route) => (
           <article id={route.path.slice(1)} className="route-card" key={route.path}>
             <p className="eyebrow">{route.eyebrow}</p>
             <h2>{route.title}</h2>
