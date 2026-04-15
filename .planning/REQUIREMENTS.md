@@ -101,60 +101,60 @@ Deferred until the LAN-party release hardening is complete.
 
 ## Traceability
 
-Traceability is populated during roadmap creation. Until then every v1 requirement is intentionally unmapped.
+Every v1 requirement maps to exactly one roadmap phase and remains pending until that phase is completed.
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| AUTH-01 | TBD | Pending |
-| AUTH-02 | TBD | Pending |
-| AUTH-03 | TBD | Pending |
-| AUTH-04 | TBD | Pending |
-| AUTH-05 | TBD | Pending |
-| AUTH-06 | TBD | Pending |
-| AUTH-07 | TBD | Pending |
-| PROF-01 | TBD | Pending |
-| PROF-02 | TBD | Pending |
-| PROF-03 | TBD | Pending |
-| INV-01 | TBD | Pending |
-| INV-02 | TBD | Pending |
-| INV-03 | TBD | Pending |
-| INV-04 | TBD | Pending |
-| INV-05 | TBD | Pending |
-| INV-06 | TBD | Pending |
-| INV-07 | TBD | Pending |
-| EVT-01 | TBD | Pending |
-| EVT-02 | TBD | Pending |
-| EVT-03 | TBD | Pending |
-| BKP-01 | TBD | Pending |
-| BKP-02 | TBD | Pending |
-| BKP-03 | TBD | Pending |
-| BKP-04 | TBD | Pending |
-| BKP-05 | TBD | Pending |
-| BKP-06 | TBD | Pending |
-| PWA-01 | TBD | Pending |
-| PWA-02 | TBD | Pending |
-| PWA-03 | TBD | Pending |
-| PWA-04 | TBD | Pending |
-| UI-01 | TBD | Pending |
-| UI-02 | TBD | Pending |
-| UI-03 | TBD | Pending |
-| UI-04 | TBD | Pending |
-| UI-05 | TBD | Pending |
-| UI-06 | TBD | Pending |
-| UI-07 | TBD | Pending |
-| UI-08 | TBD | Pending |
-| REL-01 | TBD | Pending |
-| REL-02 | TBD | Pending |
-| REL-03 | TBD | Pending |
-| REL-04 | TBD | Pending |
-| REL-05 | TBD | Pending |
-| REL-06 | TBD | Pending |
+| AUTH-01 | Phase 1: Auth, Profile, And Invite Hardening | Pending |
+| AUTH-02 | Phase 1: Auth, Profile, And Invite Hardening | Pending |
+| AUTH-03 | Phase 1: Auth, Profile, And Invite Hardening | Pending |
+| AUTH-04 | Phase 1: Auth, Profile, And Invite Hardening | Pending |
+| AUTH-05 | Phase 1: Auth, Profile, And Invite Hardening | Pending |
+| AUTH-06 | Phase 1: Auth, Profile, And Invite Hardening | Pending |
+| AUTH-07 | Phase 1: Auth, Profile, And Invite Hardening | Pending |
+| PROF-01 | Phase 1: Auth, Profile, And Invite Hardening | Pending |
+| PROF-02 | Phase 1: Auth, Profile, And Invite Hardening | Pending |
+| PROF-03 | Phase 1: Auth, Profile, And Invite Hardening | Pending |
+| INV-01 | Phase 1: Auth, Profile, And Invite Hardening | Pending |
+| INV-02 | Phase 1: Auth, Profile, And Invite Hardening | Pending |
+| INV-03 | Phase 2: Event And Invite Consistency | Pending |
+| INV-04 | Phase 1: Auth, Profile, And Invite Hardening | Pending |
+| INV-05 | Phase 1: Auth, Profile, And Invite Hardening | Pending |
+| INV-06 | Phase 1: Auth, Profile, And Invite Hardening | Pending |
+| INV-07 | Phase 1: Auth, Profile, And Invite Hardening | Pending |
+| EVT-01 | Phase 2: Event And Invite Consistency | Pending |
+| EVT-02 | Phase 2: Event And Invite Consistency | Pending |
+| EVT-03 | Phase 2: Event And Invite Consistency | Pending |
+| BKP-01 | Phase 3: Backup And Restore Safety | Pending |
+| BKP-02 | Phase 3: Backup And Restore Safety | Pending |
+| BKP-03 | Phase 3: Backup And Restore Safety | Pending |
+| BKP-04 | Phase 3: Backup And Restore Safety | Pending |
+| BKP-05 | Phase 3: Backup And Restore Safety | Pending |
+| BKP-06 | Phase 3: Backup And Restore Safety | Pending |
+| PWA-01 | Phase 4: PWA And Realtime Reliability | Pending |
+| PWA-02 | Phase 4: PWA And Realtime Reliability | Pending |
+| PWA-03 | Phase 4: PWA And Realtime Reliability | Pending |
+| PWA-04 | Phase 4: PWA And Realtime Reliability | Pending |
+| UI-01 | Phase 5: Frontend And Admin UI Modularization | Pending |
+| UI-02 | Phase 5: Frontend And Admin UI Modularization | Pending |
+| UI-03 | Phase 5: Frontend And Admin UI Modularization | Pending |
+| UI-04 | Phase 5: Frontend And Admin UI Modularization | Pending |
+| UI-05 | Phase 5: Frontend And Admin UI Modularization | Pending |
+| UI-06 | Phase 5: Frontend And Admin UI Modularization | Pending |
+| UI-07 | Phase 5: Frontend And Admin UI Modularization | Pending |
+| UI-08 | Phase 5: Frontend And Admin UI Modularization | Pending |
+| REL-01 | Phase 6: Release Verification And Documentation | Pending |
+| REL-02 | Phase 6: Release Verification And Documentation | Pending |
+| REL-03 | Phase 6: Release Verification And Documentation | Pending |
+| REL-04 | Phase 6: Release Verification And Documentation | Pending |
+| REL-05 | Phase 6: Release Verification And Documentation | Pending |
+| REL-06 | Phase 6: Release Verification And Documentation | Pending |
 
 **Coverage:**
 - v1 requirements: 44 total
-- Mapped to phases: 0
-- Unmapped: 44
+- Mapped to phases: 44
+- Unmapped: 0
 
 ---
 *Requirements defined: 2026-04-15*
-*Last updated: 2026-04-15 after scope expansion from app testing*
+*Last updated: 2026-04-15 after roadmap creation*
