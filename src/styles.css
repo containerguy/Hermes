@@ -198,6 +198,23 @@ h2 {
   padding: clamp(18px, 4vw, 24px);
 }
 
+.event-ready {
+  border-color: #72c4a9;
+}
+
+.event-running {
+  border-color: #e2b84d;
+}
+
+.event-full {
+  border-color: #4f8fcf;
+}
+
+.event-cancelled,
+.event-archived {
+  box-shadow: none;
+}
+
 .event-form {
   display: grid;
   gap: 14px;
@@ -256,6 +273,21 @@ h2 {
 .status-running {
   background: #fff2c6;
   color: #765600;
+}
+
+.status-ready {
+  background: #d9f4ea;
+  color: #0d6048;
+}
+
+.status-open {
+  background: #e4e8ec;
+  color: #435364;
+}
+
+.status-full {
+  background: #dcecff;
+  color: #18517d;
 }
 
 .status-cancelled {

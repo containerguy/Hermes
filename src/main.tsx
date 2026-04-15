@@ -108,6 +108,38 @@ function fromDatetimeLocal(value: string) {
   return new Date(value).toISOString();
 }
 
+function getEventStatusLabel(event: GameEvent) {
+  if (
+    event.status !== "archived" &&
+    event.status !== "cancelled" &&
+    event.joinedCount >= event.maxPlayers
+  ) {
+    return "voll";
+  }
+
+  const labels: Record<GameEvent["status"], string> = {
+    open: "offen",
+    ready: "startbereit",
+    running: "laeuft bereits",
+    cancelled: "storniert",
+    archived: "archiviert"
+  };
+
+  return labels[event.status];
+}
+
+function getEventStatusClass(event: GameEvent) {
+  if (
+    event.status !== "archived" &&
+    event.status !== "cancelled" &&
+    event.joinedCount >= event.maxPlayers
+  ) {
+    return "full";
+  }
+
+  return event.status;
+}
+
 function urlBase64ToUint8Array(base64String: string) {
   const padding = "=".repeat((4 - (base64String.length % 4)) % 4);
   const base64 = (base64String + padding).replace(/-/g, "+").replace(/_/g, "/");
@@ -236,6 +268,14 @@ function EventBoard({ currentUser }: { currentUser: User | null }) {
     setError("");
     setMessage("");
 
+    const confirmed = window.confirm(
+      action === "archive" ? "Event wirklich archivieren?" : "Event wirklich stornieren?"
+    );
+
+    if (!confirmed) {
+      return;
+    }
+
     try {
       await requestJson<{ event: GameEvent }>(`/api/events/${eventId}/${action}`, {
         method: "POST"
@@ -269,6 +309,12 @@ function EventBoard({ currentUser }: { currentUser: User | null }) {
       currentUser?.role === "manager" ||
       currentUser?.id === event.createdByUserId
     );
+  }
+
+  function isJoinDisabled(event: GameEvent) {
+    const alreadyJoined = event.myParticipation === "joined";
+    const fullForOthers = event.joinedCount >= event.maxPlayers && !alreadyJoined;
+    return alreadyJoined || fullForOthers;
   }
 
   if (!currentUser) {
@@ -382,14 +428,14 @@ function EventBoard({ currentUser }: { currentUser: User | null }) {
 
       <div className="event-list">
         {events.map((event) => (
-          <article className="event-card" key={event.id}>
+          <article className={`event-card event-${getEventStatusClass(event)}`} key={event.id}>
             <div className="event-header">
               <div>
                 <p className="eyebrow">{event.startMode === "now" ? "Sofort" : "Geplant"}</p>
                 <h2>{event.gameTitle}</h2>
               </div>
-              <span className={`status-pill status-${event.status}`}>
-                {event.status === "running" ? "laeuft bereits" : event.status}
+              <span className={`status-pill status-${getEventStatusClass(event)}`}>
+                {getEventStatusLabel(event)}
               </span>
             </div>
             <dl className="event-stats">
@@ -418,7 +464,7 @@ function EventBoard({ currentUser }: { currentUser: User | null }) {
                 <button
                   type="button"
                   onClick={() => setParticipation(event.id, "joined")}
-                  disabled={event.myParticipation === "joined"}
+                  disabled={isJoinDisabled(event)}
                 >
                   Dabei
                 </button>
@@ -457,6 +503,13 @@ function EventBoard({ currentUser }: { currentUser: User | null }) {
             ) : null}
           </article>
         ))}
+        {events.length === 0 ? (
+          <article className="event-card">
+            <p className="eyebrow">Events</p>
+            <h2>Keine Runden offen.</h2>
+            <p className="muted">Sobald ein Manager etwas anlegt, erscheint es hier.</p>
+          </article>
+        ) : null}
       </div>
     </section>
   );

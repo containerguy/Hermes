@@ -483,7 +483,13 @@ Akzeptanzkriterien:
 - Die Oberflaeche bleibt auf kleinen Displays lesbar.
 - Kritische Aktionen wie Absagen brauchen eine Bestaetigung.
 
-Status: offen.
+Paketpruefung:
+
+- Funktional: Statuslabels, volle Runden, leere Eventliste und Bestaetigung fuer Stornieren/Archivieren sind umgesetzt.
+- Produktziel: Teilnahme und Manageraktionen sind direkt an der Eventkarte erreichbar und auf kleine Displays ausgelegt.
+- Release-Relevanz: Kritische Aktionen sind gegen versehentliche Klicks abgesichert, volle Runden werden nicht mehr als frei dargestellt.
+
+Status: abgeschlossen.
 
 ### AP 10 - Tests und Qualitaet
 
@@ -564,6 +570,7 @@ Status: offen.
 - 2026-04-15: AP 6 implementiert Teilnahme mit `dabei`/`nicht dabei` und serverseitiger Maximalspieler-Regel.
 - 2026-04-15: AP 7 implementiert Server-Sent Events mit Polling-Fallback und Status-Refresh.
 - 2026-04-15: AP 8 implementiert Web Push mit VAPID, geraetebezogenen Subscriptions und User-Praeferenz.
+- 2026-04-15: AP 9 schaerft LAN-UX mit klaren Statuslabels, leeren Zustaenden und Bestaetigungen fuer kritische Aktionen.
 - 2026-04-15: Hermes wird als Docker Image ausgeliefert; SSL/TLS, Reverse Proxy und Domain-Handling sind out of scope.
 - 2026-04-15: Manager werden durch den Haupt-Admin definiert; globale Einstellungen werden persistent gespeichert.
 - 2026-04-15: Login-Einmalcodes werden per E-Mail versendet.
