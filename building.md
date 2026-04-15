@@ -34,6 +34,23 @@ HERMES_S3_RESTORE_MODE=if-missing
 
 `s3.creds` bleibt lokal und wird nicht committed.
 
+Unterstuetzte Credential-Datei-Formate:
+
+```env
+AWS_ACCESS_KEY_ID=...
+AWS_SECRET_ACCESS_KEY=...
+```
+
+```env
+access-key=...
+secret-key=...
+```
+
+```text
+ACCESS_KEY
+SECRET_KEY
+```
+
 ## Build
 
 ```bash

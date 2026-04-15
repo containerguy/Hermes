@@ -52,6 +52,13 @@ access_key=...
 secret_key=...
 ```
 
+Wasabi-Export mit Bindestrich wird ebenfalls erkannt:
+
+```env
+access-key=...
+secret-key=...
+```
+
 Oder zwei Zeilen ohne Schluesselname:
 
 ```text

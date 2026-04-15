@@ -15,41 +15,71 @@ function isS3StorageEnabled() {
   return process.env.HERMES_STORAGE_BACKEND === "s3";
 }
 
-function readCredentialFile(filePath: string): Partial<S3Credentials> {
-  if (!fs.existsSync(filePath)) {
-    throw new Error(`S3 credentials file not found: ${filePath}`);
-  }
+function normalizeCredentialKey(key: string) {
+  return key.toLowerCase().replace(/[^a-z0-9]/g, "");
+}
 
-  const lines = fs
-    .readFileSync(filePath, "utf8")
+function parseCredentialFileContent(content: string): Partial<S3Credentials> {
+  const lines = content
     .split(/\r?\n/)
     .map((line) => line.trim())
-    .filter((line) => line && !line.startsWith("#"));
+    .filter((line) => line && !line.startsWith("#") && !line.startsWith("["));
   const values: Record<string, string> = {};
   const bareValues: string[] = [];
 
   for (const line of lines) {
-    const separatorIndex = line.indexOf("=");
+    if (line.includes(",") && !line.includes("=") && !line.includes(":")) {
+      bareValues.push(
+        ...line
+          .split(",")
+          .map((value) => value.trim())
+          .filter(Boolean)
+      );
+      continue;
+    }
+
+    const equalsIndex = line.indexOf("=");
+    const colonIndex = line.indexOf(":");
+    const separatorIndex =
+      equalsIndex !== -1
+        ? equalsIndex
+        : colonIndex !== -1
+          ? colonIndex
+          : -1;
 
     if (separatorIndex === -1) {
       bareValues.push(line);
       continue;
     }
 
-    values[line.slice(0, separatorIndex).trim().toLowerCase()] = line
+    values[normalizeCredentialKey(line.slice(0, separatorIndex).trim())] = line
       .slice(separatorIndex + 1)
-      .trim();
+      .trim()
+      .replace(/^['"]|['"]$/g, "");
   }
 
   return {
     accessKeyId:
-      values.aws_access_key_id ?? values.access_key_id ?? values.access_key ?? bareValues[0],
+      values.awsaccesskeyid ??
+      values.accesskeyid ??
+      values.accesskey ??
+      values.accessid ??
+      bareValues[0],
     secretAccessKey:
-      values.aws_secret_access_key ??
-      values.secret_access_key ??
-      values.secret_key ??
+      values.awssecretaccesskey ??
+      values.secretaccesskey ??
+      values.secretkey ??
+      values.secret ??
       bareValues[1]
   };
+}
+
+export function readCredentialFile(filePath: string): Partial<S3Credentials> {
+  if (!fs.existsSync(filePath)) {
+    throw new Error(`S3 credentials file not found: ${filePath}`);
+  }
+
+  return parseCredentialFileContent(fs.readFileSync(filePath, "utf8"));
 }
 
 function readS3Credentials(): S3Credentials {
@@ -66,7 +96,12 @@ function readS3Credentials(): S3Credentials {
     fromFile.secretAccessKey;
 
   if (!accessKeyId || !secretAccessKey) {
-    throw new Error("S3 storage is enabled, but S3 credentials are missing.");
+    const fileHint = process.env.HERMES_S3_CREDS_FILE
+      ? ` File configured: ${process.env.HERMES_S3_CREDS_FILE}.`
+      : " No HERMES_S3_CREDS_FILE configured.";
+    throw new Error(
+      `S3 storage is enabled, but S3 credentials are missing or not parseable.${fileHint} Supported keys include AWS_ACCESS_KEY_ID/AWS_SECRET_ACCESS_KEY, access-key/secret-key, access_key/secret_key, or two bare lines.`
+    );
   }
 
   return { accessKeyId, secretAccessKey };
