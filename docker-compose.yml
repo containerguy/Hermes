@@ -9,10 +9,18 @@ services:
       HERMES_HOST: 0.0.0.0
       HERMES_PORT: 3000
       HERMES_DB_PATH: /data/hermes.sqlite
+      HERMES_STORAGE_BACKEND: s3
+      HERMES_S3_BUCKET: hermes-storage
+      HERMES_S3_REGION: eu-central-2
+      HERMES_S3_ENDPOINT: https://s3.eu-central-2.wasabisys.com
+      HERMES_S3_CREDS_FILE: /run/secrets/s3.creds
+      HERMES_S3_DB_KEY: hermes.sqlite
+      HERMES_S3_RESTORE_MODE: if-missing
     ports:
       - "3000:3000"
     volumes:
       - hermes-data:/data
+      - ./s3.creds:/run/secrets/s3.creds:ro
     restart: unless-stopped
 
 volumes:

@@ -586,6 +586,7 @@ Status: blockiert fuer lokalen Docker-Build; Produktionsbundle abgeschlossen.
 - 2026-04-15: AP 10 ergaenzt Vitest/API-Tests und einen Playwright-Kernflow; lokaler Browserlauf ist durch fehlende OS-Abhaengigkeiten blockiert.
 - 2026-04-15: AP 11 ergaenzt Dockerfile, Docker Compose, Produktionsbundle und Betriebsdokumentation; lokaler Docker-Build ist mangels Docker-CLI blockiert.
 - 2026-04-15: Hermes wird als Docker Image ausgeliefert; SSL/TLS, Reverse Proxy und Domain-Handling sind out of scope.
+- 2026-04-15: Einstellungen und App-Daten bleiben in SQLite; Wasabi S3 (`hermes-storage`, `eu-central-2`) wird als Snapshot-Storage-Backend verwendet.
 - 2026-04-15: Manager werden durch den Haupt-Admin definiert; globale Einstellungen werden persistent gespeichert.
 - 2026-04-15: Login-Einmalcodes werden per E-Mail versendet.
 - 2026-04-15: Teilnahmeoptionen sind nur `dabei` und `nicht dabei`; es gibt keine Warteliste.

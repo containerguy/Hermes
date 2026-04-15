@@ -17,6 +17,7 @@
     "test:e2e": "npm run build && playwright test"
   },
   "dependencies": {
+    "@aws-sdk/client-s3": "^3.1030.0",
     "better-sqlite3": "^12.9.0",
     "cookie-parser": "^1.4.7",
     "drizzle-orm": "^0.45.2",

@@ -8,7 +8,7 @@ import { bootstrapAdmin } from "../src/server/db/bootstrap-admin";
 import { createHermesApp } from "../src/server/app";
 
 let server: http.Server;
-let closeApp: () => void;
+let closeApp: () => Promise<void>;
 let baseUrl: string;
 let databasePath: string;
 
@@ -31,11 +31,12 @@ test.beforeAll(async () => {
   process.env.HERMES_ADMIN_EMAIL = "hauptadmin@example.test";
   process.env.HERMES_MAIL_MODE = "console";
   process.env.HERMES_DEV_LOGIN_CODE = "123456";
+  delete process.env.HERMES_STORAGE_BACKEND;
   delete process.env.HERMES_VAPID_PUBLIC_KEY;
   delete process.env.HERMES_VAPID_PRIVATE_KEY;
 
-  bootstrapAdmin();
-  const started = createHermesApp();
+  await bootstrapAdmin();
+  const started = await createHermesApp();
   closeApp = started.close;
   server = started.app.listen(0, "127.0.0.1");
   await new Promise<void>((resolve) => server.once("listening", resolve));
@@ -50,7 +51,7 @@ test.beforeAll(async () => {
 
 test.afterAll(async () => {
   await new Promise<void>((resolve) => server.close(() => resolve()));
-  closeApp();
+  await closeApp();
 
   for (const suffix of ["", "-wal", "-shm"]) {
     fs.rmSync(`${databasePath}${suffix}`, { force: true });

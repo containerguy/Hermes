@@ -5,6 +5,7 @@ import { readRequiredEnv } from "../env";
 import { createDb } from "./client";
 import { runMigrations } from "./migrate";
 import { appSettings, users } from "./schema";
+import { persistDatabaseSnapshot, restoreDatabaseFromStorageIfNeeded } from "../storage/s3-storage";
 
 const DEFAULT_SETTINGS = {
   appName: "Hermes",
@@ -16,10 +17,11 @@ function nowIso() {
   return new Date().toISOString();
 }
 
-export function bootstrapAdmin() {
+export async function bootstrapAdmin() {
   const phoneNumber = readRequiredEnv("HERMES_ADMIN_PHONE");
   const username = readRequiredEnv("HERMES_ADMIN_USERNAME");
   const email = readRequiredEnv("HERMES_ADMIN_EMAIL");
+  await restoreDatabaseFromStorageIfNeeded();
   const { db, sqlite } = createDb();
 
   runMigrations(sqlite);
@@ -72,6 +74,7 @@ export function bootstrapAdmin() {
       .run();
   }
 
+  await persistDatabaseSnapshot(sqlite);
   sqlite.close();
 
   return {
@@ -85,6 +88,6 @@ export function bootstrapAdmin() {
 const entrypoint = process.argv[1] ? path.basename(process.argv[1]) : "";
 
 if (entrypoint === "bootstrap-admin.ts" || entrypoint === "bootstrap-admin.js") {
-  const admin = bootstrapAdmin();
+  const admin = await bootstrapAdmin();
   console.log(`Admin ensured: ${admin.username} <${admin.email}>`);
 }

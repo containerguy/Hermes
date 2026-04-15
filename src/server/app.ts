@@ -10,8 +10,14 @@ import { createRealtimeRouter } from "./http/realtime-routes";
 import { createDb } from "./db/client";
 import { runMigrations } from "./db/migrate";
 import { broadcastEventsChanged } from "./realtime/event-bus";
+import {
+  flushDatabaseSnapshot,
+  restoreDatabaseFromStorageIfNeeded,
+  scheduleDatabaseSnapshot
+} from "./storage/s3-storage";
 
-export function createHermesApp() {
+export async function createHermesApp() {
+  await restoreDatabaseFromStorageIfNeeded();
   const context = createDb();
   runMigrations(context.sqlite);
 
@@ -19,6 +25,15 @@ export function createHermesApp() {
   app.disable("x-powered-by");
   app.use(express.json({ limit: "1mb" }));
   app.use(cookieParser());
+  app.use((request, response, next) => {
+    response.on("finish", () => {
+      if (!["GET", "HEAD", "OPTIONS"].includes(request.method) && response.statusCode < 500) {
+        scheduleDatabaseSnapshot(context.sqlite);
+      }
+    });
+
+    next();
+  });
 
   app.get("/api/health", (_request, response) => {
     response.json({ ok: true });
@@ -51,8 +66,9 @@ export function createHermesApp() {
 
   return {
     app,
-    close: () => {
+    close: async () => {
       clearInterval(statusInterval);
+      await flushDatabaseSnapshot(context.sqlite);
       context.sqlite.close();
     }
   };

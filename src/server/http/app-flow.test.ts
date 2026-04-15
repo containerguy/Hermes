@@ -7,7 +7,7 @@ import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { bootstrapAdmin } from "../db/bootstrap-admin";
 import { createHermesApp } from "../app";
 
-type StartedApp = ReturnType<typeof createHermesApp>;
+type StartedApp = Awaited<ReturnType<typeof createHermesApp>>;
 
 let started: StartedApp | undefined;
 let databasePath: string;
@@ -23,7 +23,7 @@ async function login(agent: ReturnType<typeof request.agent>, phoneNumber: strin
 }
 
 describe("app flow", () => {
-  beforeEach(() => {
+  beforeEach(async () => {
     databasePath = path.join(os.tmpdir(), `hermes-test-${randomUUID()}.sqlite`);
     process.env.HERMES_DB_PATH = databasePath;
     process.env.HERMES_ADMIN_PHONE = "+491701234567";
@@ -31,14 +31,15 @@ describe("app flow", () => {
     process.env.HERMES_ADMIN_EMAIL = "hauptadmin@example.test";
     process.env.HERMES_MAIL_MODE = "console";
     process.env.HERMES_DEV_LOGIN_CODE = "123456";
+    delete process.env.HERMES_STORAGE_BACKEND;
     delete process.env.HERMES_VAPID_PUBLIC_KEY;
     delete process.env.HERMES_VAPID_PRIVATE_KEY;
-    bootstrapAdmin();
-    started = createHermesApp();
+    await bootstrapAdmin();
+    started = await createHermesApp();
   });
 
-  afterEach(() => {
-    started?.close();
+  afterEach(async () => {
+    await started?.close();
     started = undefined;
 
     for (const suffix of ["", "-wal", "-shm"]) {
