@@ -3,6 +3,7 @@ import { Router } from "express";
 import { randomUUID } from "node:crypto";
 import { z } from "zod";
 import { getCurrentSession, publicUser } from "../auth/current-user";
+import { writeAuditLog } from "../audit-log";
 import {
   createSessionToken,
   clearSessionCookie,
@@ -146,6 +147,16 @@ export function createAuthRouter(context: DatabaseContext) {
         .run();
     })();
 
+    writeAuditLog(context, {
+      actor: user,
+      action: "auth.login",
+      entityType: "session",
+      entityId: sessionToken,
+      summary: `${user.username} hat sich angemeldet.`,
+      metadata: {
+        deviceName: parsed.data.deviceName ?? null
+      }
+    });
     setSessionCookie(response, sessionToken);
     response.json({ user: publicUser(user) });
   });
@@ -163,6 +174,7 @@ export function createAuthRouter(context: DatabaseContext) {
 
   router.post("/logout", (request, response) => {
     const token = request.cookies?.[SESSION_COOKIE];
+    const current = getCurrentSession(context, request);
 
     if (token) {
       context.db
@@ -170,6 +182,16 @@ export function createAuthRouter(context: DatabaseContext) {
         .set({ revokedAt: nowIso() })
         .where(eq(sessions.id, token))
         .run();
+    }
+
+    if (current) {
+      writeAuditLog(context, {
+        actor: current.user,
+        action: "auth.logout",
+        entityType: "session",
+        entityId: token,
+        summary: `${current.user.username} hat sich abgemeldet.`
+      });
     }
 
     clearSessionCookie(response);

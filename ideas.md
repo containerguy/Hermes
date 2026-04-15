@@ -581,6 +581,32 @@ Paketpruefung:
 
 Status: abgeschlossen mit Browser-E2E-Umgebungsblocker.
 
+### AP 14 - Audit-Log und Teilnahme-Feedback
+
+Ziel: Admins können nachvollziehen, wer welche relevanten Aktionen ausgelöst hat; Teilnehmeraktionen dürfen nicht wie ein hängender Request wirken.
+
+Aufgaben:
+
+- Persistente Audit-Log-Tabelle ergänzen.
+- Login/Logout, Userverwaltung, Settings, Eventaktionen, Teilnahmen, Backup und Restore auditieren.
+- Adminbereich um eine Audit-Log-Ansicht erweitern.
+- Disabled-Button-Cursor von Wartesymbol auf deaktiviert ändern.
+
+Akzeptanzkriterien:
+
+- Klick auf `Nicht dabei` erzeugt einen Audit-Eintrag `participation.set`.
+- Admin kann die letzten Audit-Einträge im Adminbereich sehen.
+- Deaktivierte Buttons zeigen kein Wartesymbol mehr.
+- Audit-Log wird im S3-Restore berücksichtigt.
+
+Paketprüfung:
+
+- Funktional: API-Test prüft, dass `nicht dabei` im Audit-Log erscheint.
+- Produktziel: Admins erhalten nachvollziehbare Betriebsinformationen direkt in Hermes.
+- Release-Relevanz: Teilnahmeprobleme lassen sich vor Ort nachvollziehen, ohne Serverlogs durchsuchen zu müssen.
+
+Status: abgeschlossen mit Browser-E2E-Umgebungsblocker.
+
 ### AP 13 - Admin-Betrieb, Theme und Login-Feinschliff
 
 Ziel: Admins können Hermes im LAN-Betrieb ohne Dateizugriff besser steuern; Login und UI-Texte sind für deutsche Nutzer sauber.
@@ -652,6 +678,7 @@ Status: abgeschlossen mit Browser-E2E-Umgebungsblocker.
 - 2026-04-15: Event-Ersteller, Manager und Admin koennen Events manuell archivieren oder stornieren.
 - 2026-04-15: UI wurde in getrennte Hash-Seiten fuer Events, Login, Manager und Admin umgebaut; Managerformular laeuft nicht mehr in der Eventuebersicht mit.
 - 2026-04-15: Admin-Settings wurden um Designfarben erweitert; Useranlage braucht keine Telefonnummer mehr; Backup/Restore sind als Admin-Aktionen umgesetzt.
+- 2026-04-15: Audit-Log wird für Admins ergänzt; Teilnahmeaktionen sollen dort sichtbar werden.
 
 ## Naechster sinnvoller Schritt
 

@@ -188,5 +188,6 @@ Admin-Aktionen:
 
 - `POST /api/admin/backup` schreibt den aktuellen SQLite-Stand nach S3.
 - `POST /api/admin/restore` lädt den S3-Snapshot und ersetzt die aktiven SQLite-Tabellen.
+- `GET /api/admin/audit-log` liefert die letzten Audit-Einträge für Admins.
 
 Wichtig: S3 ist Snapshot-Storage, kein Locking-Backend für mehrere gleichzeitig schreibende Hermes-Instanzen.

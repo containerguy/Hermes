@@ -3,6 +3,7 @@ import { Router } from "express";
 import { randomUUID } from "node:crypto";
 import { z } from "zod";
 import { requireUser } from "../auth/current-user";
+import { writeAuditLog } from "../audit-log";
 import type { DatabaseContext } from "../db/client";
 import { appSettings, gameEvents, participations, users } from "../db/schema";
 import { deriveEventStatus, eventInputSchema, shouldAutoArchive } from "../domain/events";
@@ -221,6 +222,19 @@ export function createEventRouter(context: DatabaseContext) {
       .run();
 
     const created = context.db.select().from(gameEvents).where(eq(gameEvents.id, id)).get();
+    writeAuditLog(context, {
+      actor,
+      action: "event.create",
+      entityType: "event",
+      entityId: id,
+      summary: `${actor.username} hat ${parsed.data.gameTitle} angelegt.`,
+      metadata: {
+        gameTitle: parsed.data.gameTitle,
+        startMode: parsed.data.startMode,
+        minPlayers: parsed.data.minPlayers,
+        maxPlayers: parsed.data.maxPlayers
+      }
+    });
     broadcastEventsChanged("event_created");
     void sendPushToEnabledUsers(context, {
       title: "Neue Runde",
@@ -293,6 +307,14 @@ export function createEventRouter(context: DatabaseContext) {
       .run();
 
     const updated = context.db.select().from(gameEvents).where(eq(gameEvents.id, event.id)).get();
+    writeAuditLog(context, {
+      actor,
+      action: "event.update",
+      entityType: "event",
+      entityId: event.id,
+      summary: `${actor.username} hat ${event.gameTitle} aktualisiert.`,
+      metadata: parsed.data
+    });
     broadcastEventsChanged("event_updated");
     response.json({ event: updated ? serializeEvent(context, updated, actor.id) : undefined });
   });
@@ -354,6 +376,20 @@ export function createEventRouter(context: DatabaseContext) {
     const nextStatus = recalculateEventStatus(context, event);
 
     const updated = context.db.select().from(gameEvents).where(eq(gameEvents.id, event.id)).get();
+    writeAuditLog(context, {
+      actor,
+      action: "participation.set",
+      entityType: "event",
+      entityId: event.id,
+      summary:
+        parsed.data.status === "joined"
+          ? `${actor.username} ist bei ${event.gameTitle} dabei.`
+          : `${actor.username} ist bei ${event.gameTitle} nicht dabei.`,
+      metadata: {
+        participation: parsed.data.status,
+        previousParticipation: existing?.status ?? null
+      }
+    });
     broadcastEventsChanged("participation_updated");
     if (previousStatus !== nextStatus && updated) {
       void sendPushToEnabledUsers(context, {
@@ -394,6 +430,13 @@ export function createEventRouter(context: DatabaseContext) {
       .run();
 
     const updated = context.db.select().from(gameEvents).where(eq(gameEvents.id, event.id)).get();
+    writeAuditLog(context, {
+      actor,
+      action: "event.cancel",
+      entityType: "event",
+      entityId: event.id,
+      summary: `${actor.username} hat ${event.gameTitle} storniert.`
+    });
     broadcastEventsChanged("event_cancelled");
     void sendPushToEnabledUsers(context, {
       title: "Runde storniert",
@@ -429,6 +472,13 @@ export function createEventRouter(context: DatabaseContext) {
       .run();
 
     const updated = context.db.select().from(gameEvents).where(eq(gameEvents.id, event.id)).get();
+    writeAuditLog(context, {
+      actor,
+      action: "event.archive",
+      entityType: "event",
+      entityId: event.id,
+      summary: `${actor.username} hat ${event.gameTitle} archiviert.`
+    });
     broadcastEventsChanged("event_archived");
     void sendPushToEnabledUsers(context, {
       title: "Runde archiviert",

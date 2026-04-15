@@ -1,5 +1,5 @@
 import { relations } from "drizzle-orm";
-import { integer, sqliteTable, text, uniqueIndex } from "drizzle-orm/sqlite-core";
+import { index, integer, sqliteTable, text, uniqueIndex } from "drizzle-orm/sqlite-core";
 
 export const users = sqliteTable(
   "users",
@@ -118,6 +118,27 @@ export const appSettings = sqliteTable("app_settings", {
   }),
   updatedAt: text("updated_at").notNull()
 });
+
+export const auditLogs = sqliteTable(
+  "audit_logs",
+  {
+    id: text("id").primaryKey(),
+    actorUserId: text("actor_user_id").references(() => users.id, {
+      onDelete: "set null"
+    }),
+    actorUsername: text("actor_username"),
+    action: text("action").notNull(),
+    entityType: text("entity_type").notNull(),
+    entityId: text("entity_id"),
+    summary: text("summary").notNull(),
+    metadata: text("metadata"),
+    createdAt: text("created_at").notNull()
+  },
+  (table) => [
+    index("audit_logs_created_at_idx").on(table.createdAt),
+    index("audit_logs_actor_user_id_idx").on(table.actorUserId)
+  ]
+);
 
 export const userRelations = relations(users, ({ many }) => ({
   sessions: many(sessions),

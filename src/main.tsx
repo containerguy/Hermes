@@ -38,6 +38,18 @@ type GameEvent = {
   myParticipation: "joined" | "declined" | null;
 };
 
+type AuditLogEntry = {
+  id: string;
+  actorUserId: string | null;
+  actorUsername: string | null;
+  action: string;
+  entityType: string;
+  entityId: string | null;
+  summary: string;
+  metadata: unknown;
+  createdAt: string;
+};
+
 type Route = {
   id: PageId;
   path: string;
@@ -828,6 +840,7 @@ function AdminPanel({
   onSettingsChanged: (settings: AppSettings) => void;
 }) {
   const [users, setUsers] = useState<User[]>([]);
+  const [auditLogs, setAuditLogs] = useState<AuditLogEntry[]>([]);
   const [settings, setSettings] = useState<AppSettings>(defaultSettings);
   const [newUser, setNewUser] = useState({
     username: "",
@@ -845,12 +858,14 @@ function AdminPanel({
       return;
     }
 
-    const [userResult, settingsResult] = await Promise.all([
+    const [userResult, settingsResult, auditResult] = await Promise.all([
       requestJson<{ users: User[] }>("/api/admin/users"),
-      requestJson<{ settings: AppSettings }>("/api/admin/settings")
+      requestJson<{ settings: AppSettings }>("/api/admin/settings"),
+      requestJson<{ auditLogs: AuditLogEntry[] }>("/api/admin/audit-log?limit=80")
     ]);
     setUsers(userResult.users);
     setSettings(settingsResult.settings);
+    setAuditLogs(auditResult.auditLogs);
   }
 
   useEffect(() => {
@@ -916,6 +931,7 @@ function AdminPanel({
 
     try {
       await requestJson<{ ok: boolean }>("/api/admin/backup", { method: "POST" });
+      await loadAdminData();
       setMessage("Backup wurde nach S3 geschrieben.");
     } catch (caught) {
       setError(getErrorMessage(caught));
@@ -1125,6 +1141,37 @@ function AdminPanel({
           <button type="button" className="secondary" onClick={runRestore} disabled={opsBusy}>
             Restore starten
           </button>
+        </div>
+      </section>
+
+      <section className="audit-panel" aria-label="Audit-Log">
+        <div className="section-title-row">
+          <div>
+            <p className="eyebrow">Audit</p>
+            <h2>Letzte Aktionen.</h2>
+          </div>
+          <button type="button" className="secondary" onClick={() => loadAdminData()}>
+            Aktualisieren
+          </button>
+        </div>
+        <div className="audit-list">
+          {auditLogs.map((entry) => (
+            <article className="audit-row" key={entry.id}>
+              <time dateTime={entry.createdAt}>
+                {new Date(entry.createdAt).toLocaleString("de-DE")}
+              </time>
+              <strong>{entry.summary}</strong>
+              <span>
+                {[entry.action, entry.actorUsername ?? "System"].filter(Boolean).join(" | ")}
+              </span>
+            </article>
+          ))}
+          {auditLogs.length === 0 ? (
+            <article className="audit-row">
+              <strong>Noch keine Audit-Einträge.</strong>
+              <span>Neue Aktionen erscheinen hier nach dem Speichern.</span>
+            </article>
+          ) : null}
         </div>
       </section>
     </section>

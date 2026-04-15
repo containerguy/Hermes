@@ -20,6 +20,7 @@ const restorableTables = [
   "game_events",
   "participations",
   "app_settings",
+  "audit_logs",
   "schema_migrations"
 ];
 

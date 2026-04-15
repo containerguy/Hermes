@@ -3,6 +3,7 @@ import { Router } from "express";
 import { randomUUID } from "node:crypto";
 import { z } from "zod";
 import { publicUser, requireAdmin, requireUser } from "../auth/current-user";
+import { listAuditLogs, writeAuditLog } from "../audit-log";
 import type { DatabaseContext } from "../db/client";
 import { users } from "../db/schema";
 import { userRoleSchema } from "../domain/users";
@@ -56,6 +57,11 @@ export function createAdminRouter(context: DatabaseContext) {
     response.json({ users: allUsers.map(publicUser) });
   });
 
+  router.get("/audit-log", (request, response) => {
+    const limit = Number(request.query.limit ?? "100");
+    response.json({ auditLogs: listAuditLogs(context, limit) });
+  });
+
   router.post("/users", (request, response) => {
     const admin = requireAdmin(context, request);
     const parsed = createUserSchema.safeParse(request.body);
@@ -95,6 +101,18 @@ export function createAdminRouter(context: DatabaseContext) {
     }
 
     const created = context.db.select().from(users).where(eq(users.id, id)).get();
+    writeAuditLog(context, {
+      actor: admin,
+      action: "user.create",
+      entityType: "user",
+      entityId: id,
+      summary: `${admin.username} hat User ${parsed.data.username} angelegt.`,
+      metadata: {
+        username: parsed.data.username,
+        email: parsed.data.email,
+        role: parsed.data.role
+      }
+    });
     response.status(201).json({ user: created ? publicUser(created) : undefined });
   });
 
@@ -129,6 +147,15 @@ export function createAdminRouter(context: DatabaseContext) {
     }
 
     const updated = context.db.select().from(users).where(eq(users.id, existing.id)).get();
+    const admin = requireAdmin(context, request);
+    writeAuditLog(context, {
+      actor: admin,
+      action: "user.update",
+      entityType: "user",
+      entityId: existing.id,
+      summary: `${admin?.username ?? "Admin"} hat User ${existing.username} aktualisiert.`,
+      metadata: parsed.data
+    });
     response.json({ user: updated ? publicUser(updated) : undefined });
   });
 
@@ -151,12 +178,29 @@ export function createAdminRouter(context: DatabaseContext) {
     }
 
     writeSettings(context, settingsSchema.parse({ ...readSettings(context), ...parsed.data }), admin.id);
+    writeAuditLog(context, {
+      actor: admin,
+      action: "settings.update",
+      entityType: "settings",
+      entityId: "app",
+      summary: `${admin.username} hat Einstellungen gespeichert.`,
+      metadata: parsed.data
+    });
     response.json({ settings: readSettings(context) });
   });
 
-  router.post("/backup", async (_request, response) => {
+  router.post("/backup", async (request, response) => {
+    const admin = requireAdmin(context, request);
+
     try {
       await persistDatabaseSnapshot(context.sqlite);
+      writeAuditLog(context, {
+        actor: admin,
+        action: "storage.backup",
+        entityType: "storage",
+        entityId: "s3",
+        summary: `${admin?.username ?? "Admin"} hat ein S3-Backup erstellt.`
+      });
       response.json({ ok: true, message: "backup_erstellt" });
     } catch (error) {
       console.error("[Hermes] Failed to create admin backup", error);
@@ -164,9 +208,17 @@ export function createAdminRouter(context: DatabaseContext) {
     }
   });
 
-  router.post("/restore", async (_request, response) => {
+  router.post("/restore", async (request, response) => {
+    const admin = requireAdmin(context, request);
+
     try {
       await restoreDatabaseSnapshotIntoLive(context.sqlite);
+      writeAuditLog(context, {
+        action: "storage.restore",
+        entityType: "storage",
+        entityId: "s3",
+        summary: `${admin?.username ?? "Admin"} hat ein S3-Restore ausgeführt.`
+      });
       response.json({ ok: true, message: "restore_abgeschlossen" });
     } catch (error) {
       console.error("[Hermes] Failed to restore admin backup", error);

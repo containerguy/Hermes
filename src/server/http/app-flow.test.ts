@@ -156,6 +156,17 @@ describe("app flow", () => {
       .send({ status: "declined" })
       .expect(200);
 
+    await adminAgent
+      .get("/api/admin/audit-log?limit=20")
+      .expect(200)
+      .expect((response) => {
+        const summaries = (response.body.auditLogs as Array<{ summary: string }>).map(
+          (entry) => entry.summary
+        );
+        expect(summaries.some((summary) => summary.includes("nicht dabei"))).toBe(true);
+        expect(summaries.some((summary) => summary.includes("Duo Game"))).toBe(true);
+      });
+
     await userTwoAgent
       .post(`/api/events/${eventId}/participation`)
       .send({ status: "joined" })

@@ -15,6 +15,8 @@ Das Managerformular wird bewusst nur im Managerbereich angezeigt. Die Eventüber
 
 Im Adminbereich können zusätzlich die Designfarben gespeichert werden. Diese Werte liegen wie die übrigen App-Einstellungen in `app_settings` und werden beim Laden der WebApp angewendet.
 
+Admins sehen im Bereich `#admin` außerdem ein Audit-Log. Dort werden Login/Logout, User- und Settingsänderungen, Eventaktionen, Teilnahmen sowie Backup/Restore-Aktionen chronologisch angezeigt.
+
 ## Wo Werden Einstellungen Gespeichert?
 
 Hermes speichert Einstellungen in SQLite in der Tabelle `app_settings`.
