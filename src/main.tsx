@@ -122,6 +122,9 @@ function EventBoard({ currentUser }: { currentUser: User | null }) {
   const [editedStartsAt, setEditedStartsAt] = useState<Record<string, string>>({});
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
+  const [liveState, setLiveState] = useState<"offline" | "connecting" | "live" | "polling">(
+    "offline"
+  );
 
   const canCreate = currentUser?.role === "manager" || currentUser?.role === "admin";
 
@@ -140,6 +143,30 @@ function EventBoard({ currentUser }: { currentUser: User | null }) {
 
   useEffect(() => {
     loadEvents().catch(() => undefined);
+  }, [currentUser?.id]);
+
+  useEffect(() => {
+    if (!currentUser) {
+      setLiveState("offline");
+      return undefined;
+    }
+
+    setLiveState("connecting");
+    const source = new EventSource("/api/realtime/events", { withCredentials: true });
+    const poll = window.setInterval(() => {
+      loadEvents().catch(() => setLiveState("polling"));
+    }, 30_000);
+
+    source.onopen = () => setLiveState("live");
+    source.onerror = () => setLiveState("polling");
+    source.addEventListener("events_changed", () => {
+      loadEvents().catch(() => setLiveState("polling"));
+    });
+
+    return () => {
+      source.close();
+      window.clearInterval(poll);
+    };
   }, [currentUser?.id]);
 
   async function createEvent(event: FormEvent<HTMLFormElement>) {
@@ -243,6 +270,14 @@ function EventBoard({ currentUser }: { currentUser: User | null }) {
 
   return (
     <section className="event-board" aria-label="Events">
+      <div className="live-row">
+        <span className={`live-state live-${liveState}`}>
+          {liveState === "live" ? "Live verbunden" : "Polling aktiv"}
+        </span>
+        <button type="button" className="secondary" onClick={() => loadEvents()}>
+          Aktualisieren
+        </button>
+      </div>
       {canCreate ? (
         <form onSubmit={createEvent} className="event-form">
           <label>

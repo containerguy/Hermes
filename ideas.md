@@ -427,7 +427,13 @@ Akzeptanzkriterien:
 - Zwei Browser sehen Status- und Startzeit-Aenderungen zeitnah.
 - Verbindungsabbrueche fuehren nicht zu kaputtem UI.
 
-Status: offen.
+Paketpruefung:
+
+- Funktional: SSE-Client erhaelt `events_changed`; UI verbindet per EventSource und pollt als Fallback.
+- Produktziel: Neue Events, Teilnahme- und Statusaenderungen koennen ohne manuelles Neuladen sichtbar werden.
+- Release-Relevanz: Server refresh’t zeitbasierte Statuswechsel regelmaessig und broadcastet Aenderungen.
+
+Status: abgeschlossen.
 
 ### AP 8 - Push Notifications pro User und Geraet
 
@@ -550,6 +556,7 @@ Status: offen.
 - 2026-04-15: AP 4 implementiert Admin-Userverwaltung, Rollenpflege und persistente Settings.
 - 2026-04-15: AP 5 implementiert Eventanlage, Eventliste, Startzeit-Aenderung, Stornieren, Archivieren und Auto-Archivierung.
 - 2026-04-15: AP 6 implementiert Teilnahme mit `dabei`/`nicht dabei` und serverseitiger Maximalspieler-Regel.
+- 2026-04-15: AP 7 implementiert Server-Sent Events mit Polling-Fallback und Status-Refresh.
 - 2026-04-15: Hermes wird als Docker Image ausgeliefert; SSL/TLS, Reverse Proxy und Domain-Handling sind out of scope.
 - 2026-04-15: Manager werden durch den Haupt-Admin definiert; globale Einstellungen werden persistent gespeichert.
 - 2026-04-15: Login-Einmalcodes werden per E-Mail versendet.

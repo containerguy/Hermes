@@ -7,6 +7,7 @@ import type { DatabaseContext } from "../db/client";
 import { appSettings, gameEvents, participations, users } from "../db/schema";
 import { deriveEventStatus, eventInputSchema, shouldAutoArchive } from "../domain/events";
 import { canCreateEvent, canManageEvent } from "../domain/users";
+import { broadcastEventsChanged } from "../realtime/event-bus";
 
 const updateEventSchema = z.object({
   gameTitle: z.string().trim().min(1).max(120).optional(),
@@ -69,9 +70,10 @@ function recalculateEventStatus(context: DatabaseContext, event: typeof gameEven
   return status;
 }
 
-function refreshEventStatuses(context: DatabaseContext) {
+export function refreshEventStatuses(context: DatabaseContext) {
   const now = new Date();
   const archiveAfterHours = readAutoArchiveHours(context);
+  let changed = false;
   const activeEvents = context.db
     .select()
     .from(gameEvents)
@@ -92,6 +94,7 @@ function refreshEventStatuses(context: DatabaseContext) {
         });
 
     if (nextStatus !== event.status) {
+      changed = true;
       context.db
         .update(gameEvents)
         .set({
@@ -103,6 +106,8 @@ function refreshEventStatuses(context: DatabaseContext) {
         .run();
     }
   }
+
+  return changed;
 }
 
 function serializeEvent(
@@ -215,6 +220,7 @@ export function createEventRouter(context: DatabaseContext) {
       .run();
 
     const created = context.db.select().from(gameEvents).where(eq(gameEvents.id, id)).get();
+    broadcastEventsChanged("event_created");
     response.status(201).json({
       event: created ? serializeEvent(context, created, actor.id) : undefined
     });
@@ -281,6 +287,7 @@ export function createEventRouter(context: DatabaseContext) {
       .run();
 
     const updated = context.db.select().from(gameEvents).where(eq(gameEvents.id, event.id)).get();
+    broadcastEventsChanged("event_updated");
     response.json({ event: updated ? serializeEvent(context, updated, actor.id) : undefined });
   });
 
@@ -340,6 +347,7 @@ export function createEventRouter(context: DatabaseContext) {
     recalculateEventStatus(context, event);
 
     const updated = context.db.select().from(gameEvents).where(eq(gameEvents.id, event.id)).get();
+    broadcastEventsChanged("participation_updated");
     response.json({ event: updated ? serializeEvent(context, updated, actor.id) : undefined });
   });
 
@@ -369,6 +377,7 @@ export function createEventRouter(context: DatabaseContext) {
       .run();
 
     const updated = context.db.select().from(gameEvents).where(eq(gameEvents.id, event.id)).get();
+    broadcastEventsChanged("event_cancelled");
     response.json({ event: updated ? serializeEvent(context, updated, actor.id) : undefined });
   });
 
@@ -398,6 +407,7 @@ export function createEventRouter(context: DatabaseContext) {
       .run();
 
     const updated = context.db.select().from(gameEvents).where(eq(gameEvents.id, event.id)).get();
+    broadcastEventsChanged("event_archived");
     response.json({ event: updated ? serializeEvent(context, updated, actor.id) : undefined });
   });
 

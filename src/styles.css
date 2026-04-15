@@ -217,6 +217,26 @@ h2 {
   gap: 14px;
 }
 
+.live-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.live-state {
+  border-radius: 8px;
+  padding: 9px 11px;
+  background: #e4e8ec;
+  color: #435364;
+  font-weight: 900;
+}
+
+.live-live {
+  background: #d9f4ea;
+  color: #0d6048;
+}
+
 .event-header {
   display: flex;
   align-items: flex-start;

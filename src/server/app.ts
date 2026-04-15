@@ -4,9 +4,11 @@ import fs from "node:fs";
 import path from "node:path";
 import { createAdminRouter } from "./http/admin-routes";
 import { createAuthRouter } from "./http/auth-routes";
-import { createEventRouter } from "./http/event-routes";
+import { createEventRouter, refreshEventStatuses } from "./http/event-routes";
+import { createRealtimeRouter } from "./http/realtime-routes";
 import { createDb } from "./db/client";
 import { runMigrations } from "./db/migrate";
+import { broadcastEventsChanged } from "./realtime/event-bus";
 
 export function createHermesApp() {
   const context = createDb();
@@ -24,6 +26,13 @@ export function createHermesApp() {
   app.use("/api/auth", createAuthRouter(context));
   app.use("/api/admin", createAdminRouter(context));
   app.use("/api/events", createEventRouter(context));
+  app.use("/api/realtime", createRealtimeRouter(context));
+
+  const statusInterval = setInterval(() => {
+    if (refreshEventStatuses(context)) {
+      broadcastEventsChanged("status_refreshed");
+    }
+  }, 30_000);
 
   const staticDirectory = path.join(process.cwd(), "dist");
   if (fs.existsSync(staticDirectory)) {
@@ -40,6 +49,9 @@ export function createHermesApp() {
 
   return {
     app,
-    close: () => context.sqlite.close()
+    close: () => {
+      clearInterval(statusInterval);
+      context.sqlite.close();
+    }
   };
 }
