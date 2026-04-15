@@ -80,7 +80,6 @@ Der Fokus liegt auf einfacher Bedienung waehrend der LAN-Party, nicht auf einer 
 
 ## Noch technische Entscheidungen
 
-- Next.js oder Remix final auswaehlen.
 - ORM final auswaehlen: Prisma oder Drizzle.
 - SMTP-Provider und konkrete Mail-Absenderadresse fuer den Betrieb festlegen.
 - Bootstrap-Mechanismus fuer den ersten Admin festlegen: Umgebungsvariablen oder Initial-Setup im UI.
@@ -89,7 +88,7 @@ Der Fokus liegt auf einfacher Bedienung waehrend der LAN-Party, nicht auf einer 
 ## Vorgeschlagener Tech-Stack
 
 - Sprache: TypeScript
-- WebApp: Next.js oder Remix
+- WebApp: React/Vite mit spaeterem Express-Backend im selben Docker Image
 - UI: React mit responsivem CSS
 - Datenbank: SQLite fuer lokale LAN-Nutzung, spaeter leicht auf Postgres migrierbar
 - ORM: Prisma oder Drizzle
@@ -262,7 +261,13 @@ Akzeptanzkriterien:
 - Layout funktioniert auf Smartphone- und Desktop-Breiten.
 - Erste leere Seiten fuer User, Manager und Admin sind erreichbar.
 
-Status: offen.
+Paketpruefung:
+
+- Funktional: Build laeuft, Preview liefert HTML, Manifest und Service Worker aus.
+- Produktziel: User-, Manager- und Adminbereiche sind als navigierbare Einstiegspunkte vorbereitet.
+- Release-Relevanz: Legt eine kleine, Docker-taugliche Frontend-Basis ohne unnoetige Infrastruktur fest.
+
+Status: abgeschlossen.
 
 ### AP 2 - Datenbank und Domainmodell
 
@@ -510,6 +515,7 @@ Status: offen.
 - 2026-04-15: Planung wird in `ideas.md` gepflegt.
 - 2026-04-15: Repository wird als eigenes Git-Repo unter `/home/eluminare/Hermes` initialisiert.
 - 2026-04-15: Erste Architekturannahme ist eine TypeScript WebApp mit SQLite, PWA und Web Push.
+- 2026-04-15: AP 1 legt React/Vite als Frontend-Grundlage fest; das Backend soll spaeter als Express-Server im selben Image laufen.
 - 2026-04-15: Hermes wird als Docker Image ausgeliefert; SSL/TLS, Reverse Proxy und Domain-Handling sind out of scope.
 - 2026-04-15: Manager werden durch den Haupt-Admin definiert; globale Einstellungen werden persistent gespeichert.
 - 2026-04-15: Login-Einmalcodes werden per E-Mail versendet.
