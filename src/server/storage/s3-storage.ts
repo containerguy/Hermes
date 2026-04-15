@@ -21,6 +21,8 @@ const restorableTables = [
   "participations",
   "app_settings",
   "audit_logs",
+  "invite_codes",
+  "invite_code_uses",
   "schema_migrations"
 ];
 

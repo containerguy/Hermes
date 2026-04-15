@@ -1,11 +1,11 @@
-import { asc, eq } from "drizzle-orm";
+import { asc, desc, eq, isNull } from "drizzle-orm";
 import { Router } from "express";
 import { randomUUID } from "node:crypto";
 import { z } from "zod";
 import { publicUser, requireAdmin, requireUser } from "../auth/current-user";
 import { listAuditLogs, writeAuditLog } from "../audit-log";
 import type { DatabaseContext } from "../db/client";
-import { users } from "../db/schema";
+import { inviteCodes, participations, pushSubscriptions, sessions, users } from "../db/schema";
 import { userRoleSchema } from "../domain/users";
 import { persistDatabaseSnapshot, restoreDatabaseSnapshotIntoLive } from "../storage/s3-storage";
 import { readSettings, settingsSchema, writeSettings } from "../settings";
@@ -25,12 +25,38 @@ const updateUserSchema = z.object({
   notificationsEnabled: z.boolean().optional()
 });
 
+const createInviteCodeSchema = z.object({
+  code: z.string().trim().min(4).max(80).optional(),
+  label: z.string().trim().min(1).max(120),
+  maxUses: z.number().int().min(1).max(500).nullable().optional(),
+  expiresAt: z.string().datetime().nullable().optional()
+});
+
 function nowIso() {
   return new Date().toISOString();
 }
 
 function fallbackPhoneNumber(userId: string) {
   return `user:${userId}`;
+}
+
+function normalizeInviteCode(code: string) {
+  return code.trim().toUpperCase();
+}
+
+function generateInviteCode() {
+  return randomUUID().replace(/-/g, "").slice(0, 10).toUpperCase();
+}
+
+function serializeInviteCode(context: DatabaseContext, invite: typeof inviteCodes.$inferSelect) {
+  const row = context.sqlite
+    .prepare("SELECT COUNT(*) AS count FROM invite_code_uses WHERE invite_code_id = ?")
+    .get(invite.id) as { count: number };
+
+  return {
+    ...invite,
+    usedCount: row.count
+  };
 }
 
 export function createAdminRouter(context: DatabaseContext) {
@@ -53,7 +79,12 @@ export function createAdminRouter(context: DatabaseContext) {
   });
 
   router.get("/users", (_request, response) => {
-    const allUsers = context.db.select().from(users).orderBy(asc(users.username)).all();
+    const allUsers = context.db
+      .select()
+      .from(users)
+      .where(isNull(users.deletedAt))
+      .orderBy(asc(users.username))
+      .all();
     response.json({ users: allUsers.map(publicUser) });
   });
 
@@ -159,8 +190,170 @@ export function createAdminRouter(context: DatabaseContext) {
     response.json({ user: updated ? publicUser(updated) : undefined });
   });
 
+  router.delete("/users/:id", (request, response) => {
+    const admin = requireAdmin(context, request);
+    const existing = context.db.select().from(users).where(eq(users.id, request.params.id)).get();
+
+    if (!admin) {
+      response.status(403).json({ error: "admin_erforderlich" });
+      return;
+    }
+
+    if (!existing || existing.deletedAt) {
+      response.status(404).json({ error: "user_nicht_gefunden" });
+      return;
+    }
+
+    if (existing.id === admin.id) {
+      response.status(409).json({ error: "eigener_user_nicht_loeschbar" });
+      return;
+    }
+
+    const timestamp = nowIso();
+
+    context.sqlite.transaction(() => {
+      context.db
+        .delete(participations)
+        .where(eq(participations.userId, existing.id))
+        .run();
+      context.db
+        .update(pushSubscriptions)
+        .set({ revokedAt: timestamp })
+        .where(eq(pushSubscriptions.userId, existing.id))
+        .run();
+      context.db
+        .update(sessions)
+        .set({ revokedAt: timestamp })
+        .where(eq(sessions.userId, existing.id))
+        .run();
+      context.db
+        .update(users)
+        .set({
+          phoneNumber: `deleted:${existing.id}`,
+          username: `deleted-${existing.id.slice(0, 8)}`,
+          email: `deleted-${existing.id}@deleted.hermes.local`,
+          role: "user",
+          notificationsEnabled: false,
+          deletedAt: timestamp,
+          updatedAt: timestamp
+        })
+        .where(eq(users.id, existing.id))
+        .run();
+    })();
+
+    writeAuditLog(context, {
+      actor: admin,
+      action: "user.delete",
+      entityType: "user",
+      entityId: existing.id,
+      summary: `${admin.username} hat User ${existing.username} gelöscht.`,
+      metadata: { username: existing.username, email: existing.email }
+    });
+
+    response.status(204).send();
+  });
+
   router.get("/settings", (_request, response) => {
     response.json({ settings: readSettings(context) });
+  });
+
+  router.get("/invite-codes", (_request, response) => {
+    const invites = context.db
+      .select()
+      .from(inviteCodes)
+      .orderBy(desc(inviteCodes.createdAt))
+      .all();
+
+    response.json({ inviteCodes: invites.map((invite) => serializeInviteCode(context, invite)) });
+  });
+
+  router.post("/invite-codes", (request, response) => {
+    const admin = requireAdmin(context, request);
+    const parsed = createInviteCodeSchema.safeParse(request.body);
+
+    if (!admin) {
+      response.status(403).json({ error: "admin_erforderlich" });
+      return;
+    }
+
+    if (!parsed.success) {
+      response.status(400).json({ error: "ungueltiger_invite_code" });
+      return;
+    }
+
+    const timestamp = nowIso();
+    const id = randomUUID();
+    const code = normalizeInviteCode(parsed.data.code ?? generateInviteCode());
+
+    try {
+      context.db
+        .insert(inviteCodes)
+        .values({
+          id,
+          code,
+          label: parsed.data.label,
+          maxUses: parsed.data.maxUses ?? null,
+          expiresAt: parsed.data.expiresAt ?? null,
+          revokedAt: null,
+          createdByUserId: admin.id,
+          createdAt: timestamp,
+          updatedAt: timestamp
+        })
+        .run();
+    } catch (error) {
+      console.error("[Hermes] Failed to create invite code", error);
+      response.status(409).json({ error: "invite_code_existiert" });
+      return;
+    }
+
+    const created = context.db.select().from(inviteCodes).where(eq(inviteCodes.id, id)).get();
+    writeAuditLog(context, {
+      actor: admin,
+      action: "invite.create",
+      entityType: "invite_code",
+      entityId: id,
+      summary: `${admin.username} hat Invite ${parsed.data.label} erstellt.`,
+      metadata: { code, maxUses: parsed.data.maxUses ?? null, expiresAt: parsed.data.expiresAt ?? null }
+    });
+    response.status(201).json({
+      inviteCode: created ? serializeInviteCode(context, created) : undefined
+    });
+  });
+
+  router.delete("/invite-codes/:id", (request, response) => {
+    const admin = requireAdmin(context, request);
+    const invite = context.db
+      .select()
+      .from(inviteCodes)
+      .where(eq(inviteCodes.id, request.params.id))
+      .get();
+
+    if (!admin) {
+      response.status(403).json({ error: "admin_erforderlich" });
+      return;
+    }
+
+    if (!invite) {
+      response.status(404).json({ error: "invite_code_nicht_gefunden" });
+      return;
+    }
+
+    context.db
+      .update(inviteCodes)
+      .set({ revokedAt: nowIso(), updatedAt: nowIso() })
+      .where(eq(inviteCodes.id, invite.id))
+      .run();
+
+    writeAuditLog(context, {
+      actor: admin,
+      action: "invite.revoke",
+      entityType: "invite_code",
+      entityId: invite.id,
+      summary: `${admin.username} hat Invite ${invite.label} deaktiviert.`,
+      metadata: { code: invite.code }
+    });
+
+    response.status(204).send();
   });
 
   router.put("/settings", (request, response) => {

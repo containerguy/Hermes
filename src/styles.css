@@ -64,6 +64,10 @@ button.secondary {
   border: 1px solid var(--line);
 }
 
+button.danger {
+  color: var(--rose);
+}
+
 button:hover,
 .text-link:hover {
   filter: brightness(0.95);
@@ -649,7 +653,7 @@ dd {
 
 .admin-list-row {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) 132px;
+  grid-template-columns: minmax(0, 1fr) 132px 104px;
   gap: 12px;
   align-items: center;
   border: 1px solid var(--line);
@@ -667,6 +671,67 @@ dd {
   color: var(--muted);
   font-size: 0.88rem;
   overflow-wrap: anywhere;
+}
+
+.device-panel,
+.invite-panel {
+  display: grid;
+  gap: 14px;
+  margin-top: 18px;
+  border-top: 1px solid var(--line);
+  padding-top: 18px;
+}
+
+.invite-panel {
+  grid-column: 1;
+}
+
+.device-list,
+.invite-list {
+  display: grid;
+  gap: 10px;
+}
+
+.device-row,
+.invite-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 12px;
+  align-items: center;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 12px;
+  background: var(--surface);
+}
+
+.device-row div,
+.invite-row div {
+  display: grid;
+  gap: 4px;
+}
+
+.device-row span,
+.device-row time,
+.invite-row span {
+  color: var(--muted);
+  font-size: 0.84rem;
+  overflow-wrap: anywhere;
+}
+
+.invite-row code {
+  width: fit-content;
+  border-radius: 8px;
+  padding: 4px 7px;
+  background: var(--paper);
+  color: var(--ink);
+  font-weight: 900;
+}
+
+.inline-form {
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 14px;
+  background: var(--surface);
 }
 
 .checkbox-label {
@@ -719,7 +784,8 @@ dd {
   .admin-panel .admin-form:first-of-type,
   .admin-panel .admin-form:last-of-type,
   .admin-list,
-  .admin-ops {
+  .admin-ops,
+  .invite-panel {
     grid-column: 1;
   }
 
@@ -761,6 +827,8 @@ dd {
   .manage-row,
   .signal-list,
   .color-grid,
+  .device-row,
+  .invite-row,
   .admin-list-row,
   .hero-status {
     grid-template-columns: 1fr;

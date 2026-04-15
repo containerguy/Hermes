@@ -7,15 +7,17 @@ Hermes ist eine responsive WebApp für LAN-Party-Spielrunden. User melden sich m
 Die WebApp ist in getrennte Arbeitsbereiche aufgeteilt:
 
 - `#events`: Eventübersicht für Abstimmung, Status, Startzeit und Serverdaten.
-- `#login`: Login, Kontoansicht, Logout und Notification-Einstellungen.
+- `#login`: Login vor der Anmeldung; nach dem Login wird daraus `Profil` mit Konto, Logout, Notification-Einstellungen und Geräteverwaltung.
 - `#manager`: Eventanlage und Eventsteuerung für Manager und Admins.
-- `#admin`: Userverwaltung, Rollenzuweisung und globale Einstellungen.
+- `#admin`: Userverwaltung, Rollenzuweisung, Invite-Codes, Audit-Log und globale Einstellungen.
 
 Das Managerformular wird bewusst nur im Managerbereich angezeigt. Die Eventübersicht bleibt damit für Teilnehmer auf Abstimmung und Status fokussiert.
 
 Im Adminbereich können zusätzlich die Designfarben gespeichert werden. Diese Werte liegen wie die übrigen App-Einstellungen in `app_settings` und werden beim Laden der WebApp angewendet.
 
 Admins sehen im Bereich `#admin` außerdem ein Audit-Log. Dort werden Login/Logout, User- und Settingsänderungen, Eventaktionen, Teilnahmen sowie Backup/Restore-Aktionen chronologisch angezeigt.
+
+Admins können öffentliche Registrierung aktivieren und Invite-Codes für LAN-Partys erstellen. Neue User registrieren sich dann mit Invite-Code, Username und E-Mail-Adresse; danach wird der Login-Code per E-Mail verschickt.
 
 ## Wo Werden Einstellungen Gespeichert?
 
@@ -155,6 +157,8 @@ HERMES_VAPID_PRIVATE_KEY=
 ```
 
 Browser erlauben Push Notifications nur in einem Secure Context. `http://localhost` funktioniert für lokale Tests, normale HTTP-LAN-Adressen wie `http://192.168.x.x` gelten aber nicht als Secure Context. Hermes liefert kein SSL/TLS, keinen Reverse Proxy und kein Zertifikatsmanagement mit.
+
+Hermes setzt bei Push-Benachrichtigungen eine Vibrationssequenz und nutzt `requireInteraction` für neue Runden. Ob das Smartphone vibriert oder einen Ton abspielt, entscheidet trotzdem das Betriebssystem, der Browser und die App-/PWA-Installation. Eigene Benachrichtigungstöne können Web Push Benachrichtigungen auf iOS/Android nicht zuverlässig erzwingen.
 
 ## Backup, Restore Und Reset
 

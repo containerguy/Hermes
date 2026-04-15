@@ -12,8 +12,9 @@ import {
 } from "../auth/sessions";
 import { generateOtp, hashOtp, verifyOtp } from "../auth/otp";
 import type { DatabaseContext } from "../db/client";
-import { loginChallenges, sessions, users } from "../db/schema";
+import { inviteCodes, inviteCodeUses, loginChallenges, sessions, users } from "../db/schema";
 import { sendLoginCode } from "../mail/mailer";
+import { readSettings } from "../settings";
 
 const requestCodeSchema = z.object({
   username: z.string().trim().min(1).max(80)
@@ -24,8 +25,59 @@ const verifyCodeSchema = requestCodeSchema.extend({
   deviceName: z.string().trim().max(120).optional()
 });
 
+const registerSchema = z.object({
+  inviteCode: z.string().trim().min(1).max(80),
+  username: z.string().trim().min(1).max(80),
+  email: z.string().trim().email().max(160)
+});
+
 function nowIso() {
   return new Date().toISOString();
+}
+
+function fallbackPhoneNumber(userId: string) {
+  return `user:${userId}`;
+}
+
+function normalizeInviteCode(code: string) {
+  return code.trim().toUpperCase();
+}
+
+function issueLoginChallenge(context: DatabaseContext, user: typeof users.$inferSelect) {
+  const code = process.env.HERMES_DEV_LOGIN_CODE ?? generateOtp();
+  const timestamp = nowIso();
+  const challengeId = randomUUID();
+
+  context.db
+    .insert(loginChallenges)
+    .values({
+      id: challengeId,
+      phoneNumber: user.phoneNumber,
+      username: user.username,
+      email: user.email,
+      codeHash: hashOtp(code),
+      expiresAt: new Date(Date.now() + 10 * 60 * 1000).toISOString(),
+      consumedAt: null,
+      sentAt: null,
+      createdAt: timestamp
+    })
+    .run();
+
+  return { challengeId, code };
+}
+
+async function sendIssuedLoginCode(
+  context: DatabaseContext,
+  user: typeof users.$inferSelect,
+  issued: { challengeId: string; code: string }
+) {
+  await sendLoginCode({ to: user.email, username: user.username, code: issued.code });
+
+  context.db
+    .update(loginChallenges)
+    .set({ sentAt: nowIso() })
+    .where(eq(loginChallenges.id, issued.challengeId))
+    .run();
 }
 
 export function createAuthRouter(context: DatabaseContext) {
@@ -42,7 +94,7 @@ export function createAuthRouter(context: DatabaseContext) {
     const user = context.db
       .select()
       .from(users)
-      .where(eq(users.username, parsed.data.username))
+      .where(and(eq(users.username, parsed.data.username), isNull(users.deletedAt)))
       .get();
 
     if (!user) {
@@ -50,40 +102,120 @@ export function createAuthRouter(context: DatabaseContext) {
       return;
     }
 
-    const code = process.env.HERMES_DEV_LOGIN_CODE ?? generateOtp();
-    const timestamp = nowIso();
-    const challengeId = randomUUID();
-
-    context.db
-      .insert(loginChallenges)
-      .values({
-        id: challengeId,
-        phoneNumber: user.phoneNumber,
-        username: user.username,
-        email: user.email,
-        codeHash: hashOtp(code),
-        expiresAt: new Date(Date.now() + 10 * 60 * 1000).toISOString(),
-        consumedAt: null,
-        sentAt: null,
-        createdAt: timestamp
-      })
-      .run();
+    const issued = issueLoginChallenge(context, user);
 
     try {
-      await sendLoginCode({ to: user.email, username: user.username, code });
+      await sendIssuedLoginCode(context, user, issued);
     } catch (error) {
       console.error("[Hermes] Failed to send login code", error);
       response.status(502).json({ error: "mailversand_fehlgeschlagen" });
       return;
     }
 
-    context.db
-      .update(loginChallenges)
-      .set({ sentAt: nowIso() })
-      .where(eq(loginChallenges.id, challengeId))
-      .run();
-
     response.status(202).json({ ok: true });
+  });
+
+  router.post("/register", async (request, response) => {
+    const settings = readSettings(context);
+    const parsed = registerSchema.safeParse(request.body);
+
+    if (!settings.publicRegistrationEnabled) {
+      response.status(403).json({ error: "registrierung_deaktiviert" });
+      return;
+    }
+
+    if (!parsed.success) {
+      response.status(400).json({ error: "ungueltige_registrierung" });
+      return;
+    }
+
+    const timestamp = nowIso();
+    const normalizedCode = normalizeInviteCode(parsed.data.inviteCode);
+    const invite = context.db
+      .select()
+      .from(inviteCodes)
+      .where(eq(inviteCodes.code, normalizedCode))
+      .get();
+
+    if (!invite || invite.revokedAt || (invite.expiresAt && invite.expiresAt < timestamp)) {
+      response.status(403).json({ error: "invite_ungueltig" });
+      return;
+    }
+
+    const uses = context.db
+      .select()
+      .from(inviteCodeUses)
+      .where(eq(inviteCodeUses.inviteCodeId, invite.id))
+      .all();
+
+    if (invite.maxUses !== null && uses.length >= invite.maxUses) {
+      response.status(403).json({ error: "invite_ausgeschoepft" });
+      return;
+    }
+
+    const userId = randomUUID();
+
+    try {
+      context.sqlite.transaction(() => {
+        context.db
+          .insert(users)
+          .values({
+            id: userId,
+            phoneNumber: fallbackPhoneNumber(userId),
+            username: parsed.data.username,
+            email: parsed.data.email,
+            role: "user",
+            notificationsEnabled: settings.defaultNotificationsEnabled,
+            createdByUserId: invite.createdByUserId,
+            deletedAt: null,
+            createdAt: timestamp,
+            updatedAt: timestamp
+          })
+          .run();
+
+        context.db
+          .insert(inviteCodeUses)
+          .values({
+            id: randomUUID(),
+            inviteCodeId: invite.id,
+            userId,
+            usedAt: timestamp
+          })
+          .run();
+      })();
+    } catch (error) {
+      console.error("[Hermes] Failed to register invited user", error);
+      response.status(409).json({ error: "user_existiert_bereits" });
+      return;
+    }
+
+    const created = context.db.select().from(users).where(eq(users.id, userId)).get();
+
+    if (!created) {
+      response.status(500).json({ error: "registrierung_fehlgeschlagen" });
+      return;
+    }
+
+    const issued = issueLoginChallenge(context, created);
+
+    try {
+      await sendIssuedLoginCode(context, created, issued);
+    } catch (error) {
+      console.error("[Hermes] Failed to send registration login code", error);
+      response.status(502).json({ error: "mailversand_fehlgeschlagen" });
+      return;
+    }
+
+    writeAuditLog(context, {
+      actor: created,
+      action: "auth.register",
+      entityType: "user",
+      entityId: created.id,
+      summary: `${created.username} hat sich mit Invite ${invite.label} registriert.`,
+      metadata: { inviteCodeId: invite.id, inviteLabel: invite.label }
+    });
+
+    response.status(201).json({ user: publicUser(created), codeSent: true });
   });
 
   router.post("/verify-code", (request, response) => {
@@ -116,7 +248,7 @@ export function createAuthRouter(context: DatabaseContext) {
     const user = context.db
       .select()
       .from(users)
-      .where(eq(users.username, parsed.data.username))
+      .where(and(eq(users.username, parsed.data.username), isNull(users.deletedAt)))
       .get();
 
     if (!user) {
@@ -170,6 +302,74 @@ export function createAuthRouter(context: DatabaseContext) {
     }
 
     response.json({ user: publicUser(current.user) });
+  });
+
+  router.get("/sessions", (request, response) => {
+    const current = getCurrentSession(context, request);
+
+    if (!current) {
+      response.status(401).json({ error: "nicht_angemeldet" });
+      return;
+    }
+
+    const userSessions = context.db
+      .select()
+      .from(sessions)
+      .where(and(eq(sessions.userId, current.user.id), isNull(sessions.revokedAt)))
+      .orderBy(desc(sessions.lastSeenAt))
+      .all();
+
+    response.json({
+      sessions: userSessions.map((session) => ({
+        id: session.id,
+        deviceName: session.deviceName,
+        userAgent: session.userAgent,
+        lastSeenAt: session.lastSeenAt,
+        createdAt: session.createdAt,
+        current: session.id === current.session.id
+      }))
+    });
+  });
+
+  router.delete("/sessions/:id", (request, response) => {
+    const current = getCurrentSession(context, request);
+
+    if (!current) {
+      response.status(401).json({ error: "nicht_angemeldet" });
+      return;
+    }
+
+    const target = context.db
+      .select()
+      .from(sessions)
+      .where(and(eq(sessions.id, request.params.id), eq(sessions.userId, current.user.id)))
+      .get();
+
+    if (!target) {
+      response.status(404).json({ error: "session_nicht_gefunden" });
+      return;
+    }
+
+    context.db
+      .update(sessions)
+      .set({ revokedAt: nowIso() })
+      .where(eq(sessions.id, target.id))
+      .run();
+
+    writeAuditLog(context, {
+      actor: current.user,
+      action: "auth.session_revoke",
+      entityType: "session",
+      entityId: target.id,
+      summary: `${current.user.username} hat ein Gerät abgemeldet.`,
+      metadata: { deviceName: target.deviceName, current: target.id === current.session.id }
+    });
+
+    if (target.id === current.session.id) {
+      clearSessionCookie(response);
+    }
+
+    response.json({ revokedCurrent: target.id === current.session.id });
   });
 
   router.post("/logout", (request, response) => {

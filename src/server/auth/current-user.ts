@@ -15,7 +15,8 @@ export function publicUser(user: typeof users.$inferSelect) {
     username: user.username,
     email: user.email,
     role: user.role,
-    notificationsEnabled: user.notificationsEnabled
+    notificationsEnabled: user.notificationsEnabled,
+    deletedAt: user.deletedAt
   };
 }
 
@@ -33,7 +34,7 @@ export function getCurrentSession(context: DatabaseContext, request: Request) {
     .where(and(eq(sessions.id, token), isNull(sessions.revokedAt)))
     .get();
 
-  if (!result) {
+  if (!result || result.user.deletedAt) {
     return undefined;
   }
 

@@ -189,5 +189,13 @@ Admin-Aktionen:
 - `POST /api/admin/backup` schreibt den aktuellen SQLite-Stand nach S3.
 - `POST /api/admin/restore` lädt den S3-Snapshot und ersetzt die aktiven SQLite-Tabellen.
 - `GET /api/admin/audit-log` liefert die letzten Audit-Einträge für Admins.
+- `POST /api/admin/invite-codes` erstellt Invite-Codes für öffentliche Registrierung.
+- `DELETE /api/admin/users/:id` löscht User per Soft-Delete, widerruft Sessions und Push-Subscriptions.
+
+Profil-Aktionen:
+
+- `GET /api/auth/sessions` listet aktive Geräte des eingeloggten Users.
+- `DELETE /api/auth/sessions/:id` meldet ein Gerät ab.
+- `POST /api/auth/register` registriert neue User mit aktivem Invite-Code, sofern öffentliche Registrierung in den Settings aktiviert ist.
 
 Wichtig: S3 ist Snapshot-Storage, kein Locking-Backend für mehrere gleichzeitig schreibende Hermes-Instanzen.

@@ -239,7 +239,9 @@ export function createEventRouter(context: DatabaseContext) {
     void sendPushToEnabledUsers(context, {
       title: "Neue Runde",
       body: `${actor.username}: ${parsed.data.gameTitle}`,
-      url: "/#events"
+      url: "/#events",
+      vibrate: [220, 80, 220],
+      requireInteraction: true
     });
     response.status(201).json({
       event: created ? serializeEvent(context, created, actor.id) : undefined
@@ -398,7 +400,8 @@ export function createEventRouter(context: DatabaseContext) {
           nextStatus === "ready"
             ? `${updated.gameTitle} ist startbereit.`
             : `${updated.gameTitle}: ${nextStatus}`,
-        url: "/#events"
+        url: "/#events",
+        vibrate: [180, 80, 180]
       });
     }
     response.json({ event: updated ? serializeEvent(context, updated, actor.id) : undefined });
@@ -441,7 +444,8 @@ export function createEventRouter(context: DatabaseContext) {
     void sendPushToEnabledUsers(context, {
       title: "Runde storniert",
       body: `${event.gameTitle} wurde storniert.`,
-      url: "/#events"
+      url: "/#events",
+      vibrate: [260, 90, 120]
     });
     response.json({ event: updated ? serializeEvent(context, updated, actor.id) : undefined });
   });
@@ -483,7 +487,8 @@ export function createEventRouter(context: DatabaseContext) {
     void sendPushToEnabledUsers(context, {
       title: "Runde archiviert",
       body: `${event.gameTitle} wurde archiviert.`,
-      url: "/#events"
+      url: "/#events",
+      vibrate: [120]
     });
     response.json({ event: updated ? serializeEvent(context, updated, actor.id) : undefined });
   });

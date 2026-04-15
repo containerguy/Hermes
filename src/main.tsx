@@ -9,12 +9,14 @@ type User = {
   email: string;
   role: "user" | "manager" | "admin";
   notificationsEnabled: boolean;
+  deletedAt?: string | null;
 };
 
 type AppSettings = {
   appName: string;
   defaultNotificationsEnabled: boolean;
   eventAutoArchiveHours: number;
+  publicRegistrationEnabled: boolean;
   themePrimaryColor: string;
   themeLoginColor: string;
   themeManagerColor: string;
@@ -48,6 +50,26 @@ type AuditLogEntry = {
   summary: string;
   metadata: unknown;
   createdAt: string;
+};
+
+type UserSession = {
+  id: string;
+  deviceName: string | null;
+  userAgent: string | null;
+  lastSeenAt: string;
+  createdAt: string;
+  current: boolean;
+};
+
+type InviteCode = {
+  id: string;
+  code: string;
+  label: string;
+  maxUses: number | null;
+  expiresAt: string | null;
+  revokedAt: string | null;
+  createdAt: string;
+  usedCount: number;
 };
 
 type Route = {
@@ -104,6 +126,7 @@ const defaultSettings: AppSettings = {
   appName: "Hermes",
   defaultNotificationsEnabled: true,
   eventAutoArchiveHours: 8,
+  publicRegistrationEnabled: false,
   themePrimaryColor: "#0f766e",
   themeLoginColor: "#be123c",
   themeManagerColor: "#b7791f",
@@ -114,15 +137,25 @@ const defaultSettings: AppSettings = {
 const errorMessages: Record<string, string> = {
   admin_erforderlich: "Adminrechte erforderlich.",
   backup_fehlgeschlagen: "Backup konnte nicht erstellt werden. Prüfe S3-Konfiguration und Logs.",
+  eigener_user_nicht_loeschbar: "Der eigene Admin-User kann nicht gelöscht werden.",
+  invite_ausgeschoepft: "Dieser Invite-Code ist bereits ausgeschöpft.",
+  invite_code_existiert: "Dieser Invite-Code existiert bereits.",
+  invite_ungueltig: "Dieser Invite-Code ist ungültig oder abgelaufen.",
+  invite_code_nicht_gefunden: "Invite-Code nicht gefunden.",
   permission_abgelehnt: "Benachrichtigung wurde vom Browser abgelehnt.",
   push_nicht_konfiguriert: "Push ist serverseitig noch nicht konfiguriert. VAPID Keys fehlen.",
   push_nicht_unterstuetzt:
     "Push wird in diesem Browser oder Kontext nicht unterstützt. Auf LAN-HTTP-Adressen braucht Web Push normalerweise HTTPS; localhost ist die Ausnahme.",
   request_failed: "Anfrage fehlgeschlagen.",
+  registrierung_deaktiviert: "Öffentliche Registrierung ist derzeit deaktiviert.",
+  registrierung_fehlgeschlagen: "Registrierung fehlgeschlagen.",
   restore_fehlgeschlagen: "Restore konnte nicht ausgeführt werden. Prüfe S3-Konfiguration und Logs.",
+  session_nicht_gefunden: "Gerät nicht gefunden.",
   secure_context_erforderlich:
     "Push benötigt HTTPS oder localhost. Über eine normale HTTP-LAN-Adresse deaktivieren Browser Web Push.",
+  ungueltige_registrierung: "Registrierungsdaten sind ungültig.",
   ungueltige_settings: "Einstellungen sind ungültig.",
+  ungueltiger_invite_code: "Invite-Code ist ungültig.",
   ungueltiger_user: "Userdaten sind ungültig.",
   user_existiert_bereits: "Username oder E-Mail existiert bereits.",
   user_update_konflikt: "User konnte wegen eines Konflikts nicht gespeichert werden."
@@ -615,22 +648,41 @@ function EventBoard({
 
 function LoginPanel({
   currentUser,
+  settings,
   onLoggedIn,
   onLoggedOut,
   onUserUpdated
 }: {
   currentUser: User | null;
+  settings: AppSettings;
   onLoggedIn: (user: User) => void;
   onLoggedOut: () => void;
   onUserUpdated: (user: User) => void;
 }) {
   const [username, setUsername] = useState("");
+  const [registration, setRegistration] = useState({ inviteCode: "", username: "", email: "" });
   const [code, setCode] = useState("");
   const [deviceName, setDeviceName] = useState("");
   const [step, setStep] = useState<"request" | "verify">("request");
+  const [mode, setMode] = useState<"login" | "register">("login");
+  const [sessions, setSessions] = useState<UserSession[]>([]);
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
+
+  async function loadSessions() {
+    if (!currentUser) {
+      setSessions([]);
+      return;
+    }
+
+    const result = await requestJson<{ sessions: UserSession[] }>("/api/auth/sessions");
+    setSessions(result.sessions);
+  }
+
+  useEffect(() => {
+    loadSessions().catch(() => undefined);
+  }, [currentUser?.id]);
 
   async function requestCode(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -673,6 +725,28 @@ function LoginPanel({
     }
   }
 
+  async function registerUser(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    setBusy(true);
+    setError("");
+    setMessage("");
+
+    try {
+      await requestJson<{ user: User; codeSent: boolean }>("/api/auth/register", {
+        method: "POST",
+        body: JSON.stringify(registration)
+      });
+      setUsername(registration.username);
+      setMode("login");
+      setStep("verify");
+      setMessage("Registrierung gespeichert. Code wurde per E-Mail versendet.");
+    } catch (caught) {
+      setError(getErrorMessage(caught));
+    } finally {
+      setBusy(false);
+    }
+  }
+
   async function logout() {
     setBusy(true);
     setError("");
@@ -681,6 +755,31 @@ function LoginPanel({
     setStep("request");
     setMessage("Abgemeldet.");
     setBusy(false);
+  }
+
+  async function revokeSession(sessionId: string) {
+    setBusy(true);
+    setError("");
+    setMessage("");
+
+    try {
+      const result = await requestJson<{ revokedCurrent: boolean }>(`/api/auth/sessions/${sessionId}`, {
+        method: "DELETE"
+      });
+
+      if (result.revokedCurrent) {
+        onLoggedOut();
+        setMessage("Dieses Gerät wurde abgemeldet.");
+        return;
+      }
+
+      await loadSessions();
+      setMessage("Gerät abgemeldet.");
+    } catch (caught) {
+      setError(getErrorMessage(caught));
+    } finally {
+      setBusy(false);
+    }
   }
 
   async function enableNotifications() {
@@ -748,7 +847,7 @@ function LoginPanel({
   if (currentUser) {
     return (
       <section className="login-panel" id="login" aria-label="Aktuelle Anmeldung">
-        <p className="eyebrow">Angemeldet</p>
+        <p className="eyebrow">Profil</p>
         <h2>{currentUser.username}</h2>
         <dl className="account-list">
           <div>
@@ -773,14 +872,103 @@ function LoginPanel({
         <button type="button" className="secondary" onClick={logout} disabled={busy}>
           Logout
         </button>
+        <section className="device-panel" aria-label="Angemeldete Geräte">
+          <div className="section-title-row">
+            <div>
+              <p className="eyebrow">Geräte</p>
+              <h2>Angemeldete Geräte.</h2>
+            </div>
+            <button type="button" className="secondary" onClick={() => loadSessions()} disabled={busy}>
+              Aktualisieren
+            </button>
+          </div>
+          <div className="device-list">
+            {sessions.map((session) => (
+              <article className="device-row" key={session.id}>
+                <div>
+                  <strong>
+                    {session.deviceName || "Unbenanntes Gerät"}
+                    {session.current ? " · aktuell" : ""}
+                  </strong>
+                  <span>{session.userAgent || "Kein User-Agent gespeichert"}</span>
+                  <time dateTime={session.lastSeenAt}>
+                    Zuletzt aktiv: {new Date(session.lastSeenAt).toLocaleString("de-DE")}
+                  </time>
+                </div>
+                <button
+                  type="button"
+                  className="secondary"
+                  onClick={() => revokeSession(session.id)}
+                  disabled={busy}
+                >
+                  Abmelden
+                </button>
+              </article>
+            ))}
+            {sessions.length === 0 ? (
+              <article className="device-row">
+                <strong>Keine Geräte geladen.</strong>
+                <span>Aktualisieren lädt deine aktiven Sessions.</span>
+              </article>
+            ) : null}
+          </div>
+        </section>
       </section>
     );
   }
 
   return (
     <section className="login-panel" id="login" aria-label="Login">
-      <p className="eyebrow">Login</p>
-      <h2>{step === "request" ? "Einmalcode anfordern." : "Code eingeben."}</h2>
+      <p className="eyebrow">{mode === "register" ? "Registrierung" : "Login"}</p>
+      <h2>
+        {mode === "register"
+          ? "Mit Invite-Code registrieren."
+          : step === "request"
+            ? "Einmalcode anfordern."
+            : "Code eingeben."}
+      </h2>
+      {mode === "register" ? (
+        <form onSubmit={registerUser}>
+          <label>
+            Invite-Code
+            <input
+              value={registration.inviteCode}
+              onChange={(event) =>
+                setRegistration({ ...registration, inviteCode: event.target.value })
+              }
+              required
+            />
+          </label>
+          <label>
+            Username
+            <input
+              autoComplete="username"
+              value={registration.username}
+              onChange={(event) => setRegistration({ ...registration, username: event.target.value })}
+              required
+            />
+          </label>
+          <label>
+            E-Mail
+            <input
+              type="email"
+              value={registration.email}
+              onChange={(event) => setRegistration({ ...registration, email: event.target.value })}
+              required
+            />
+          </label>
+          {message ? <p className="notice">{message}</p> : null}
+          {error ? <p className="error">{error}</p> : null}
+          <div className="action-row">
+            <button type="button" className="secondary" onClick={() => setMode("login")}>
+              Zum Login
+            </button>
+            <button type="submit" disabled={busy}>
+              Registrieren
+            </button>
+          </div>
+        </form>
+      ) : (
       <form onSubmit={step === "request" ? requestCode : verifyCode}>
         <label>
           Username
@@ -827,7 +1015,13 @@ function LoginPanel({
             {step === "request" ? "Code senden" : "Einloggen"}
           </button>
         </div>
+        {settings.publicRegistrationEnabled ? (
+          <button type="button" className="secondary" onClick={() => setMode("register")}>
+            Mit Invite-Code registrieren
+          </button>
+        ) : null}
       </form>
+      )}
     </section>
   );
 }
@@ -841,11 +1035,18 @@ function AdminPanel({
 }) {
   const [users, setUsers] = useState<User[]>([]);
   const [auditLogs, setAuditLogs] = useState<AuditLogEntry[]>([]);
+  const [inviteCodes, setInviteCodes] = useState<InviteCode[]>([]);
   const [settings, setSettings] = useState<AppSettings>(defaultSettings);
   const [newUser, setNewUser] = useState({
     username: "",
     email: "",
     role: "user" as User["role"]
+  });
+  const [newInvite, setNewInvite] = useState({
+    label: "",
+    code: "",
+    maxUses: 25,
+    expiresAt: ""
   });
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
@@ -858,14 +1059,16 @@ function AdminPanel({
       return;
     }
 
-    const [userResult, settingsResult, auditResult] = await Promise.all([
+    const [userResult, settingsResult, auditResult, inviteResult] = await Promise.all([
       requestJson<{ users: User[] }>("/api/admin/users"),
       requestJson<{ settings: AppSettings }>("/api/admin/settings"),
-      requestJson<{ auditLogs: AuditLogEntry[] }>("/api/admin/audit-log?limit=80")
+      requestJson<{ auditLogs: AuditLogEntry[] }>("/api/admin/audit-log?limit=80"),
+      requestJson<{ inviteCodes: InviteCode[] }>("/api/admin/invite-codes")
     ]);
     setUsers(userResult.users);
     setSettings(settingsResult.settings);
     setAuditLogs(auditResult.auditLogs);
+    setInviteCodes(inviteResult.inviteCodes);
   }
 
   useEffect(() => {
@@ -901,6 +1104,67 @@ function AdminPanel({
       });
       await loadAdminData();
       setMessage("Rolle gespeichert.");
+    } catch (caught) {
+      setError(getErrorMessage(caught));
+    }
+  }
+
+  async function deleteUser(user: User) {
+    const confirmed = window.confirm(`User ${user.username} wirklich löschen?`);
+
+    if (!confirmed) {
+      return;
+    }
+
+    setError("");
+    setMessage("");
+
+    try {
+      await requestJson<void>(`/api/admin/users/${user.id}`, { method: "DELETE" });
+      await loadAdminData();
+      setMessage("User gelöscht.");
+    } catch (caught) {
+      setError(getErrorMessage(caught));
+    }
+  }
+
+  async function createInviteCode(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    setError("");
+    setMessage("");
+
+    try {
+      await requestJson<{ inviteCode: InviteCode }>("/api/admin/invite-codes", {
+        method: "POST",
+        body: JSON.stringify({
+          label: newInvite.label,
+          code: newInvite.code || undefined,
+          maxUses: newInvite.maxUses || null,
+          expiresAt: newInvite.expiresAt ? fromDatetimeLocal(newInvite.expiresAt) : null
+        })
+      });
+      setNewInvite({ label: "", code: "", maxUses: 25, expiresAt: "" });
+      await loadAdminData();
+      setMessage("Invite-Code erstellt.");
+    } catch (caught) {
+      setError(getErrorMessage(caught));
+    }
+  }
+
+  async function revokeInviteCode(invite: InviteCode) {
+    const confirmed = window.confirm(`Invite ${invite.label} deaktivieren?`);
+
+    if (!confirmed) {
+      return;
+    }
+
+    setError("");
+    setMessage("");
+
+    try {
+      await requestJson<void>(`/api/admin/invite-codes/${invite.id}`, { method: "DELETE" });
+      await loadAdminData();
+      setMessage("Invite-Code deaktiviert.");
     } catch (caught) {
       setError(getErrorMessage(caught));
     }
@@ -1032,6 +1296,14 @@ function AdminPanel({
               <option value="manager">Manager</option>
               <option value="admin">Admin</option>
             </select>
+            <button
+              type="button"
+              className="secondary danger"
+              onClick={() => deleteUser(user)}
+              disabled={user.id === currentUser?.id}
+            >
+              Löschen
+            </button>
           </div>
         ))}
       </div>
@@ -1073,6 +1345,19 @@ function AdminPanel({
             }
           />
           Notifications standardmäßig aktiv
+        </label>
+        <label className="checkbox-label">
+          <input
+            type="checkbox"
+            checked={settings.publicRegistrationEnabled}
+            onChange={(event) =>
+              setSettings({
+                ...settings,
+                publicRegistrationEnabled: event.target.checked
+              })
+            }
+          />
+          Öffentliche Registrierung per Invite-Code erlauben
         </label>
         <div className="color-grid" aria-label="Designfarben">
           <label>
@@ -1144,6 +1429,82 @@ function AdminPanel({
         </div>
       </section>
 
+      <section className="invite-panel" aria-label="Invite-Codes">
+        <p className="eyebrow">Invites</p>
+        <h2>LAN-Party Invite-Codes.</h2>
+        <form onSubmit={createInviteCode} className="admin-form inline-form">
+          <label>
+            Name
+            <input
+              value={newInvite.label}
+              onChange={(event) => setNewInvite({ ...newInvite, label: event.target.value })}
+              placeholder="LAN Party April"
+              required
+            />
+          </label>
+          <label>
+            Code optional
+            <input
+              value={newInvite.code}
+              onChange={(event) => setNewInvite({ ...newInvite, code: event.target.value })}
+              placeholder="APRIL2026"
+            />
+          </label>
+          <label>
+            Max. Nutzungen
+            <input
+              type="number"
+              min={1}
+              max={500}
+              value={newInvite.maxUses}
+              onChange={(event) =>
+                setNewInvite({ ...newInvite, maxUses: Number(event.target.value) })
+              }
+            />
+          </label>
+          <label>
+            Gültig bis
+            <input
+              type="datetime-local"
+              value={newInvite.expiresAt}
+              onChange={(event) => setNewInvite({ ...newInvite, expiresAt: event.target.value })}
+            />
+          </label>
+          <button type="submit">Invite erstellen</button>
+        </form>
+        <div className="invite-list">
+          {inviteCodes.map((invite) => (
+            <article className="invite-row" key={invite.id}>
+              <div>
+                <strong>{invite.label}</strong>
+                <code>{invite.code}</code>
+                <span>
+                  {invite.usedCount} / {invite.maxUses ?? "∞"} genutzt
+                  {invite.expiresAt
+                    ? ` · gültig bis ${new Date(invite.expiresAt).toLocaleString("de-DE")}`
+                    : ""}
+                  {invite.revokedAt ? " · deaktiviert" : ""}
+                </span>
+              </div>
+              <button
+                type="button"
+                className="secondary"
+                onClick={() => revokeInviteCode(invite)}
+                disabled={Boolean(invite.revokedAt)}
+              >
+                Deaktivieren
+              </button>
+            </article>
+          ))}
+          {inviteCodes.length === 0 ? (
+            <article className="invite-row">
+              <strong>Noch keine Invite-Codes.</strong>
+              <span>Neue Registrierungen brauchen einen aktiven Code.</span>
+            </article>
+          ) : null}
+        </div>
+      </section>
+
       <section className="audit-panel" aria-label="Audit-Log">
         <div className="section-title-row">
           <div>
@@ -1203,11 +1564,13 @@ function PageHeader({ route, currentUser }: { route: Route; currentUser: User | 
 
 function LoginPage({
   currentUser,
+  settings,
   onLoggedIn,
   onLoggedOut,
   onUserUpdated
 }: {
   currentUser: User | null;
+  settings: AppSettings;
   onLoggedIn: (user: User) => void;
   onLoggedOut: () => void;
   onUserUpdated: (user: User) => void;
@@ -1216,6 +1579,7 @@ function LoginPage({
     <section className="auth-layout" aria-label="Login Arbeitsbereich">
       <LoginPanel
         currentUser={currentUser}
+        settings={settings}
         onLoggedIn={onLoggedIn}
         onLoggedOut={onLoggedOut}
         onUserUpdated={onUserUpdated}
@@ -1282,12 +1646,24 @@ function App() {
   }, []);
 
   const activeRoute = routes.find((route) => route.id === activePage) ?? routes[0];
+  const displayRoute =
+    activePage === "login" && currentUser
+      ? {
+          ...activeRoute,
+          label: "Profil",
+          eyebrow: "Profil",
+          title: "Profil und Geräte.",
+          description:
+            "Verwalte deine Anmeldung, Notifications und alle Geräte, die mit deinem Account aktiv sind."
+        }
+      : activeRoute;
 
   function renderActivePage() {
     if (activePage === "login") {
       return (
         <LoginPage
           currentUser={currentUser}
+          settings={appSettings}
           onLoggedIn={setCurrentUser}
           onLoggedOut={() => setCurrentUser(null)}
           onUserUpdated={setCurrentUser}
@@ -1331,13 +1707,13 @@ function App() {
               className={activePage === route.id ? "active" : undefined}
               aria-current={activePage === route.id ? "page" : undefined}
             >
-              {route.label}
+              {route.id === "login" && currentUser ? "Profil" : route.label}
             </a>
           ))}
         </nav>
       </header>
       <div className="page-shell">
-        <PageHeader route={activeRoute} currentUser={currentUser} />
+        <PageHeader route={displayRoute} currentUser={currentUser} />
         {renderActivePage()}
       </div>
     </main>

@@ -16,6 +16,16 @@ self.addEventListener("push", (event) => {
       body: payload.body || "",
       icon: "/icon.svg",
       badge: "/icon.svg",
+      tag: payload.tag || "hermes-event",
+      renotify: Boolean(payload.renotify),
+      requireInteraction: Boolean(payload.requireInteraction),
+      vibrate: payload.vibrate || [180, 80, 180],
+      actions: [
+        {
+          action: "open",
+          title: "Öffnen"
+        }
+      ],
       data: {
         url: payload.url || "/"
       }

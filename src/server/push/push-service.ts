@@ -7,6 +7,8 @@ type PushPayload = {
   title: string;
   body: string;
   url?: string;
+  vibrate?: number[];
+  requireInteraction?: boolean;
 };
 
 let configured = false;

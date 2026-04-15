@@ -581,6 +581,38 @@ Paketpruefung:
 
 Status: abgeschlossen mit Browser-E2E-Umgebungsblocker.
 
+### AP 15 - Profil, Geräte und Invite-Registrierung
+
+Ziel: Angemeldete User verwalten ihr Profil und ihre Geräte; Admins können LAN-Partys über Invite-Codes vorbereiten und User löschen.
+
+Aufgaben:
+
+- Nach Login den Navigationspunkt `Login` als `Profil` anzeigen.
+- Profilbereich mit Konto, Notification-Toggle, Logout und angemeldeten Geräten bauen.
+- Sessions pro User auflisten und einzeln widerrufen.
+- Öffentliche Registrierung per Setting aktivierbar machen.
+- Invite-Codes mit Label, Code, Ablaufdatum und Nutzungslimit zentral im Adminbereich verwalten.
+- Registrierung per Invite-Code, Username und E-Mail ermöglichen.
+- User-Löschen als Soft-Delete mit Session-/Push-Widerruf implementieren.
+- Smartphone-Push um Vibration und stärkere Notification-Optionen erweitern.
+
+Akzeptanzkriterien:
+
+- User sieht nach Login `Profil` statt `Login`.
+- User kann aktive Geräte sehen und abmelden.
+- Admin kann Invite-Codes erstellen und deaktivieren.
+- Registrierung funktioniert nur bei aktivierter öffentlicher Registrierung und gültigem Invite-Code.
+- Admin kann User löschen, ohne historische Events zu zerstören.
+- Push-Benachrichtigungen enthalten Vibrationsmuster; eigene Sounds bleiben browserbedingt nicht garantiert.
+
+Paketprüfung:
+
+- Funktional: API-Test prüft Invite-Registrierung, Sessionverwaltung und User-Löschung.
+- Produktziel: LAN-Party-Onboarding kann ohne manuelle Useranlage vorbereitet werden.
+- Release-Relevanz: Invite-Codes und Geräteverwaltung reduzieren Admin-Aufwand vor Ort.
+
+Status: abgeschlossen mit Browser-E2E-Umgebungsblocker.
+
 ### AP 14 - Audit-Log und Teilnahme-Feedback
 
 Ziel: Admins können nachvollziehen, wer welche relevanten Aktionen ausgelöst hat; Teilnehmeraktionen dürfen nicht wie ein hängender Request wirken.
@@ -679,6 +711,7 @@ Status: abgeschlossen mit Browser-E2E-Umgebungsblocker.
 - 2026-04-15: UI wurde in getrennte Hash-Seiten fuer Events, Login, Manager und Admin umgebaut; Managerformular laeuft nicht mehr in der Eventuebersicht mit.
 - 2026-04-15: Admin-Settings wurden um Designfarben erweitert; Useranlage braucht keine Telefonnummer mehr; Backup/Restore sind als Admin-Aktionen umgesetzt.
 - 2026-04-15: Audit-Log wird für Admins ergänzt; Teilnahmeaktionen sollen dort sichtbar werden.
+- 2026-04-15: Profil/Geräteverwaltung, Invite-Registrierung und User-Löschen werden als nächstes Betriebspaket umgesetzt.
 
 ## Naechster sinnvoller Schritt
 

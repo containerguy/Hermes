@@ -91,6 +91,7 @@ describe("app flow", () => {
         appName: "Hermes Test",
         defaultNotificationsEnabled: true,
         eventAutoArchiveHours: 8,
+        publicRegistrationEnabled: true,
         themePrimaryColor: "#0f766e",
         themeLoginColor: "#be123c",
         themeManagerColor: "#b7791f",
@@ -98,6 +99,35 @@ describe("app flow", () => {
         themeSurfaceColor: "#f6f8f4"
       })
       .expect(200);
+
+    const invite = await adminAgent
+      .post("/api/admin/invite-codes")
+      .send({ label: "Test LAN", code: "TESTLAN", maxUses: 5 })
+      .expect(201);
+
+    const invitedAgent = request.agent(started!.app);
+    const invited = await invitedAgent
+      .post("/api/auth/register")
+      .send({ inviteCode: "TESTLAN", username: "invitee", email: "invitee@example.test" })
+      .expect(201);
+
+    await invitedAgent
+      .post("/api/auth/verify-code")
+      .send({ username: "invitee", code: "123456", deviceName: "phone" })
+      .expect(200);
+
+    const sessionsResponse = await invitedAgent.get("/api/auth/sessions").expect(200);
+    expect(sessionsResponse.body.sessions).toHaveLength(1);
+    await invitedAgent
+      .delete(`/api/auth/sessions/${sessionsResponse.body.sessions[0].id}`)
+      .expect(200)
+      .expect((response) => {
+        expect(response.body.revokedCurrent).toBe(true);
+      });
+
+    expect(invite.body.inviteCode.usedCount).toBe(0);
+    await adminAgent.delete(`/api/admin/users/${invited.body.user.id}`).expect(204);
+    await request(started!.app).post("/api/auth/request-code").send({ username: "invitee" }).expect(404);
 
     await request(started!.app)
       .get("/api/settings")

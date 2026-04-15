@@ -13,6 +13,7 @@ export const users = sqliteTable(
       .notNull()
       .default(true),
     createdByUserId: text("created_by_user_id"),
+    deletedAt: text("deleted_at"),
     createdAt: text("created_at").notNull(),
     updatedAt: text("updated_at").notNull()
   },
@@ -140,11 +141,45 @@ export const auditLogs = sqliteTable(
   ]
 );
 
+export const inviteCodes = sqliteTable(
+  "invite_codes",
+  {
+    id: text("id").primaryKey(),
+    code: text("code").notNull(),
+    label: text("label").notNull(),
+    maxUses: integer("max_uses"),
+    expiresAt: text("expires_at"),
+    revokedAt: text("revoked_at"),
+    createdByUserId: text("created_by_user_id").references(() => users.id, {
+      onDelete: "set null"
+    }),
+    createdAt: text("created_at").notNull(),
+    updatedAt: text("updated_at").notNull()
+  },
+  (table) => [uniqueIndex("invite_codes_code_unique").on(table.code)]
+);
+
+export const inviteCodeUses = sqliteTable(
+  "invite_code_uses",
+  {
+    id: text("id").primaryKey(),
+    inviteCodeId: text("invite_code_id")
+      .notNull()
+      .references(() => inviteCodes.id, { onDelete: "cascade" }),
+    userId: text("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    usedAt: text("used_at").notNull()
+  },
+  (table) => [uniqueIndex("invite_code_uses_user_unique").on(table.userId)]
+);
+
 export const userRelations = relations(users, ({ many }) => ({
   sessions: many(sessions),
   pushSubscriptions: many(pushSubscriptions),
   participations: many(participations),
-  createdEvents: many(gameEvents)
+  createdEvents: many(gameEvents),
+  inviteCodeUses: many(inviteCodeUses)
 }));
 
 export const gameEventRelations = relations(gameEvents, ({ one, many }) => ({
