@@ -1,0 +1,160 @@
+# Requirements: Hermes
+
+**Defined:** 2026-04-15
+**Core Value:** During the LAN party, everyone can quickly see which game round is viable, when it starts, who is in, and how to join it.
+
+## v1 Requirements
+
+These requirements define the next release milestone for the existing Hermes app. The baseline product loop already exists; v1 focuses on making it safer and more reliable for the upcoming LAN party.
+
+### Authentication And Sessions
+
+- [ ] **AUTH-01**: Login-code requests return a generic success-shaped response that does not reveal whether a username exists.
+- [ ] **AUTH-02**: Login-code request and verification endpoints enforce practical rate limits by username and request source.
+- [ ] **AUTH-03**: Expired or superseded login challenges are cleaned up and indexed so repeated login attempts do not grow the database unbounded.
+- [ ] **AUTH-04**: Session tokens are not stored as reusable raw bearer tokens in persisted SQLite data or S3 snapshots.
+- [ ] **AUTH-05**: Security-sensitive user changes, such as deletion or role changes, have defined session invalidation behavior and test coverage.
+- [ ] **AUTH-06**: Mutating cookie-authenticated admin routes have an explicit CSRF decision that is implemented or documented with rationale.
+- [ ] **AUTH-07**: Each email address can belong to only one active account, enforced consistently for admin-created users, invite registration, and profile email changes.
+
+### User Profile And Devices
+
+- [ ] **PROF-01**: A newly registered device gets the best available default device name, such as browser/device hints or a clear fallback, before the user edits it.
+- [ ] **PROF-02**: A logged-in user can change their own display name with validation and audit coverage.
+- [ ] **PROF-03**: A logged-in user can change their own email address through a safe confirmation flow before the new address is used for login codes.
+
+### Invite Registration
+
+- [ ] **INV-01**: Public invite registration is throttled to reduce brute-force attempts against invite codes.
+- [ ] **INV-02**: Invite codes meet a documented minimum entropy level and are treated as credentials in docs and audit metadata.
+- [ ] **INV-03**: Invite `maxUses` enforcement is atomic, so concurrent registrations cannot oversubscribe a limited invite.
+- [ ] **INV-04**: Admin invite list and audit entries avoid unnecessary reusable invite-code disclosure while preserving operator usability.
+- [ ] **INV-05**: Admins can deactivate and reactivate invite codes without deleting their usage history.
+- [ ] **INV-06**: Admins can edit invite max uses and validity windows with validation that preserves already-used invite accounting.
+- [ ] **INV-07**: Admins can delete unused invite codes or clearly remove them from active planning without breaking historical audit context.
+
+### Event Participation
+
+- [ ] **EVT-01**: Event participation capacity checks and `dabei` writes are transactionally protected so concurrent joins cannot exceed `maxPlayers`.
+- [ ] **EVT-02**: Participation changes keep the event board, realtime updates, audit logs, and push notifications consistent after success and failure.
+- [ ] **EVT-03**: Event lifecycle transitions continue to support manual archive/cancel and automatic archive after the configured running window.
+
+### Backup And Restore
+
+- [ ] **BKP-01**: Admins can see last successful backup time and the last backup failure state when S3 snapshot storage is enabled.
+- [ ] **BKP-02**: Manual restore validates snapshot schema, expected tables, and foreign-key integrity before mutating live data.
+- [ ] **BKP-03**: Manual restore creates a pre-restore backup of the current live database and returns its recovery identifier.
+- [ ] **BKP-04**: Restore copies data by explicit compatible columns or rejects incompatible snapshots before mutation.
+- [ ] **BKP-05**: Restore audit entries capture the acting admin and outcome without exposing secrets or misleading partial state.
+- [ ] **BKP-06**: Operator documentation explains recovery from a failed restore and the single-writer S3 snapshot model.
+
+### Notifications And PWA
+
+- [ ] **PWA-01**: Notification settings explain secure-context, browser, OS, and PWA installation limitations directly in the product UI.
+- [ ] **PWA-02**: The service worker handles missing or malformed push payloads without throwing.
+- [ ] **PWA-03**: Repeatedly invalid or expired push subscriptions are cleaned up or marked inactive without breaking notification delivery to other devices.
+- [ ] **PWA-04**: Realtime event updates remain resilient across idle proxy connections or reconnects.
+
+### Frontend Maintainability
+
+- [ ] **UI-01**: Shared client API helpers, DTO types, and error mapping are extracted from `src/main.tsx`.
+- [ ] **UI-02**: Event board and event creation UI are extracted into focused modules without changing user-visible behavior.
+- [ ] **UI-03**: Login, profile, device/session management, invite registration, and push setup are extracted into focused modules.
+- [ ] **UI-04**: Admin user/settings/theme/invite/audit/backup/restore UI is split into focused modules before additional admin UX expansion.
+- [ ] **UI-05**: Existing responsive styling and admin-controlled theme behavior remain intact after extraction.
+- [ ] **UI-06**: The admin area uses a modular submenu or page structure so each major admin function has a clear dedicated view.
+- [ ] **UI-07**: Event action buttons remain usable and correctly sized on narrow smartphone and small browser widths.
+- [ ] **UI-08**: The site header is compact enough that primary content is visible without excessive vertical offset on desktop and mobile.
+
+### Testing And Release Readiness
+
+- [ ] **REL-01**: Focused API tests cover auth throttling, generic login responses, session revocation, invite limits, and concurrent event joins.
+- [ ] **REL-02**: Storage and admin tests cover restore validation, schema mismatch, foreign-key failures, pre-restore backup, and destructive-action authorization.
+- [ ] **REL-03**: Push tests cover malformed payloads and failed subscription cleanup.
+- [ ] **REL-04**: `readme.md`, `building.md`, `.env.example`, Docker files, and GitHub Actions match the production deployment contract.
+- [ ] **REL-05**: The release checklist covers TLS/reverse proxy ownership, secure cookies, SMTP, VAPID keys, S3 credentials, one active writer, backup verification, and rollback.
+- [ ] **REL-06**: The project passes `npm test`, `npm run build`, and `npm audit --omit=dev` before release handoff.
+
+## v2 Requirements
+
+Deferred until the LAN-party release hardening is complete.
+
+### Future Scope
+
+- **FUT-01**: Native mobile apps for iOS or Android.
+- **FUT-02**: Multi-instance active/active operation.
+- **FUT-03**: Full backup version browser with retention management.
+- **FUT-04**: Tournament brackets, chat, calendar, or broader social features.
+- **FUT-05**: Built-in TLS, DNS, reverse-proxy, or certificate management.
+
+## Out of Scope
+
+| Feature | Reason |
+|---------|--------|
+| Native mobile app | Hermes is a responsive WebApp/PWA for this release. |
+| Built-in TLS or reverse proxy | Explicitly operator-owned and out of app scope. |
+| Active/active multi-instance deployment | SQLite plus S3 snapshots are a single-writer design. |
+| Waitlists | Product decision is only `dabei` and `nicht dabei`. |
+| Paid SMS login | Email one-time code keeps operation free. |
+| Public SaaS or multi-tenant mode | Hermes is a self-hosted LAN-party tool. |
+| Guaranteed custom mobile notification sounds | Browser and OS behavior cannot reliably guarantee this for Web Push. |
+
+## Traceability
+
+Traceability is populated during roadmap creation. Until then every v1 requirement is intentionally unmapped.
+
+| Requirement | Phase | Status |
+|-------------|-------|--------|
+| AUTH-01 | TBD | Pending |
+| AUTH-02 | TBD | Pending |
+| AUTH-03 | TBD | Pending |
+| AUTH-04 | TBD | Pending |
+| AUTH-05 | TBD | Pending |
+| AUTH-06 | TBD | Pending |
+| AUTH-07 | TBD | Pending |
+| PROF-01 | TBD | Pending |
+| PROF-02 | TBD | Pending |
+| PROF-03 | TBD | Pending |
+| INV-01 | TBD | Pending |
+| INV-02 | TBD | Pending |
+| INV-03 | TBD | Pending |
+| INV-04 | TBD | Pending |
+| INV-05 | TBD | Pending |
+| INV-06 | TBD | Pending |
+| INV-07 | TBD | Pending |
+| EVT-01 | TBD | Pending |
+| EVT-02 | TBD | Pending |
+| EVT-03 | TBD | Pending |
+| BKP-01 | TBD | Pending |
+| BKP-02 | TBD | Pending |
+| BKP-03 | TBD | Pending |
+| BKP-04 | TBD | Pending |
+| BKP-05 | TBD | Pending |
+| BKP-06 | TBD | Pending |
+| PWA-01 | TBD | Pending |
+| PWA-02 | TBD | Pending |
+| PWA-03 | TBD | Pending |
+| PWA-04 | TBD | Pending |
+| UI-01 | TBD | Pending |
+| UI-02 | TBD | Pending |
+| UI-03 | TBD | Pending |
+| UI-04 | TBD | Pending |
+| UI-05 | TBD | Pending |
+| UI-06 | TBD | Pending |
+| UI-07 | TBD | Pending |
+| UI-08 | TBD | Pending |
+| REL-01 | TBD | Pending |
+| REL-02 | TBD | Pending |
+| REL-03 | TBD | Pending |
+| REL-04 | TBD | Pending |
+| REL-05 | TBD | Pending |
+| REL-06 | TBD | Pending |
+
+**Coverage:**
+- v1 requirements: 44 total
+- Mapped to phases: 0
+- Unmapped: 44
+
+---
+*Requirements defined: 2026-04-15*
+*Last updated: 2026-04-15 after scope expansion from app testing*
