@@ -80,9 +80,7 @@ Der Fokus liegt auf einfacher Bedienung waehrend der LAN-Party, nicht auf einer 
 
 ## Noch technische Entscheidungen
 
-- ORM final auswaehlen: Prisma oder Drizzle.
 - SMTP-Provider und konkrete Mail-Absenderadresse fuer den Betrieb festlegen.
-- Bootstrap-Mechanismus fuer den ersten Admin festlegen: Umgebungsvariablen oder Initial-Setup im UI.
 - Entscheiden, ob Realtime per Server-Sent Events oder WebSocket umgesetzt wird.
 
 ## Vorgeschlagener Tech-Stack
@@ -91,7 +89,7 @@ Der Fokus liegt auf einfacher Bedienung waehrend der LAN-Party, nicht auf einer 
 - WebApp: React/Vite mit spaeterem Express-Backend im selben Docker Image
 - UI: React mit responsivem CSS
 - Datenbank: SQLite fuer lokale LAN-Nutzung, spaeter leicht auf Postgres migrierbar
-- ORM: Prisma oder Drizzle
+- ORM: Drizzle mit expliziten SQL-Migrationen
 - Auth: eigene Session-Logik mit OTP-Challenges und sicheren Cookies
 - Mail: SMTP-Adapter fuer Einmalcodes
 - Realtime: Server-Sent Events oder WebSocket
@@ -289,7 +287,13 @@ Akzeptanzkriterien:
 - Teilnahme kennt nur `joined` und `declined`.
 - Settings koennen persistent gespeichert werden.
 
-Status: offen.
+Paketpruefung:
+
+- Funktional: Migrationen laufen gegen SQLite, Admin-Bootstrap erzeugt einen Admin und Default-Settings.
+- Produktziel: Rollen, Settings, Events, Teilnahme, Sessions und Push-Subscriptions sind im Datenmodell abgebildet.
+- Release-Relevanz: SQLite bleibt Docker-freundlich und der erste Admin kann reproduzierbar per Umgebungsvariablen bereitgestellt werden.
+
+Status: abgeschlossen.
 
 ### AP 3 - Login mit Telefonnummer, Username und E-Mail-Einmalcode
 
@@ -516,6 +520,8 @@ Status: offen.
 - 2026-04-15: Repository wird als eigenes Git-Repo unter `/home/eluminare/Hermes` initialisiert.
 - 2026-04-15: Erste Architekturannahme ist eine TypeScript WebApp mit SQLite, PWA und Web Push.
 - 2026-04-15: AP 1 legt React/Vite als Frontend-Grundlage fest; das Backend soll spaeter als Express-Server im selben Image laufen.
+- 2026-04-15: AP 2 legt Drizzle mit expliziten SQL-Migrationen als Datenzugriff fest.
+- 2026-04-15: Der erste Admin wird per Bootstrap-Umgebungsvariablen erzeugt oder aktualisiert.
 - 2026-04-15: Hermes wird als Docker Image ausgeliefert; SSL/TLS, Reverse Proxy und Domain-Handling sind out of scope.
 - 2026-04-15: Manager werden durch den Haupt-Admin definiert; globale Einstellungen werden persistent gespeichert.
 - 2026-04-15: Login-Einmalcodes werden per E-Mail versendet.
