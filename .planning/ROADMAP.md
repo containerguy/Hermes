@@ -11,7 +11,7 @@ Hermes already has the core LAN-party workflow in place. This milestone turns th
 - Decimal phases (2.1, 2.2): Urgent insertions if needed
 
 - [ ] **Phase 1: Auth, Profile, And Invite Hardening** - Reduce login/invite abuse risk, protect credential-like data, and define account/session safety.
-- [ ] **Phase 2: Event And Invite Consistency** - Make limited invite usage and event participation capacity transactionally correct.
+- [x] **Phase 2: Event And Invite Consistency** - Make limited invite usage and event participation capacity transactionally correct. (completed 2026-04-16)
 - [ ] **Phase 3: Backup And Restore Safety** - Make S3 snapshot restore validated, recoverable, audited, and visible to operators.
 - [ ] **Phase 4: PWA And Realtime Reliability** - Improve notification guidance, push failure handling, and SSE resilience.
 - [ ] **Phase 5: Frontend And Admin UI Modularization** - Split the client monolith and tighten responsive/admin UX without behavior drift.
@@ -137,7 +137,7 @@ Phases execute in numeric order: 1 -> 2 -> 3 -> 4 -> 5 -> 6
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
 | 1. Auth, Profile, And Invite Hardening | 2/8 | In Progress|  |
-| 2. Event And Invite Consistency | 2/3 | In Progress|  |
+| 2. Event And Invite Consistency | 3/3 | Complete    | 2026-04-16 |
 | 3. Backup And Restore Safety | 0/3 | Not started | - |
 | 4. PWA And Realtime Reliability | 0/3 | Not started | - |
 | 5. Frontend And Admin UI Modularization | 0/4 | Not started | - |
