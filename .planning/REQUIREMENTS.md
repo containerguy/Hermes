@@ -68,12 +68,12 @@ These requirements define the next release milestone for the existing Hermes app
 
 ### Testing And Release Readiness
 
-- [ ] **REL-01**: Focused API tests cover auth throttling, generic login responses, session revocation, invite limits, and concurrent event joins.
-- [ ] **REL-02**: Storage and admin tests cover restore validation, schema mismatch, foreign-key failures, pre-restore backup, and destructive-action authorization.
-- [ ] **REL-03**: Push tests cover malformed payloads and failed subscription cleanup.
-- [ ] **REL-04**: `readme.md`, `building.md`, `.env.example`, Docker files, and GitHub Actions match the production deployment contract.
-- [ ] **REL-05**: The release checklist covers TLS/reverse proxy ownership, secure cookies, SMTP, VAPID keys, S3 credentials, one active writer, backup verification, and rollback.
-- [ ] **REL-06**: The project passes `npm test`, `npm run build`, and `npm audit --omit=dev` before release handoff.
+- [x] **REL-01**: Focused API tests cover auth throttling, generic login responses, session revocation, invite limits, and concurrent event joins.
+- [x] **REL-02**: Storage and admin tests cover restore validation, schema mismatch, foreign-key failures, pre-restore backup, and destructive-action authorization.
+- [x] **REL-03**: Push tests cover malformed payloads and failed subscription cleanup.
+- [x] **REL-04**: `readme.md`, `building.md`, `.env.example`, Docker files, and GitHub Actions match the production deployment contract.
+- [x] **REL-05**: The release checklist covers TLS/reverse proxy ownership, secure cookies, SMTP, VAPID keys, S3 credentials, one active writer, backup verification, and rollback.
+- [x] **REL-06**: The project passes `npm test`, `npm run build`, and `npm audit --omit=dev` before release handoff.
 
 ## v2 Requirements
 
@@ -143,12 +143,12 @@ Every v1 requirement maps to exactly one roadmap phase and remains pending until
 | UI-06 | Phase 5: Frontend And Admin UI Modularization | Complete |
 | UI-07 | Phase 5: Frontend And Admin UI Modularization | Complete |
 | UI-08 | Phase 5: Frontend And Admin UI Modularization | Complete |
-| REL-01 | Phase 6: Release Verification And Documentation | Pending |
-| REL-02 | Phase 6: Release Verification And Documentation | Pending |
-| REL-03 | Phase 6: Release Verification And Documentation | Pending |
-| REL-04 | Phase 6: Release Verification And Documentation | Pending |
-| REL-05 | Phase 6: Release Verification And Documentation | Pending |
-| REL-06 | Phase 6: Release Verification And Documentation | Pending |
+| REL-01 | Phase 6: Release Verification And Documentation | Complete |
+| REL-02 | Phase 6: Release Verification And Documentation | Complete |
+| REL-03 | Phase 6: Release Verification And Documentation | Complete |
+| REL-04 | Phase 6: Release Verification And Documentation | Complete |
+| REL-05 | Phase 6: Release Verification And Documentation | Complete |
+| REL-06 | Phase 6: Release Verification And Documentation | Complete |
 
 **Coverage:**
 - v1 requirements: 44 total
