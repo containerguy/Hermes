@@ -203,7 +203,13 @@ describe("app flow", () => {
 
   it("returns a generic success response for unknown login-code requests without creating challenges", async () => {
     const agent = request(started!.app);
-    await agent.post("/api/auth/request-code").send({ username: "unbekannt" }).expect(202);
+    const unknownResponse = await agent
+      .post("/api/auth/request-code")
+      .send({ username: "unbekannt" })
+      .expect(202)
+      .expect((response) => {
+        expect(response.body).toEqual({ ok: true });
+      });
 
     const sqlite = new Database(databasePath);
     const count = sqlite
@@ -211,6 +217,25 @@ describe("app flow", () => {
       .get("unbekannt") as { count: number };
     sqlite.close();
     expect(count.count).toBe(0);
+
+    const adminAgent = request.agent(started!.app);
+    await login(adminAgent, "hauptadmin");
+    const csrf = await fetchCsrf(adminAgent);
+    await adminAgent
+      .post("/api/admin/users")
+      .send({ username: "known-user", email: "known-user@example.test", role: "user" })
+      .set(CSRF_HEADER, csrf)
+      .expect(201);
+
+    const knownResponse = await agent
+      .post("/api/auth/request-code")
+      .send({ username: "known-user" })
+      .expect(202)
+      .expect((response) => {
+        expect(response.body).toEqual({ ok: true });
+      });
+
+    expect(knownResponse.body).toEqual(unknownResponse.body);
   });
 
   it("supersedes older login challenges and cleans expired challenges", async () => {
