@@ -2,6 +2,7 @@ import fs from "node:fs";
 import { randomUUID } from "node:crypto";
 import os from "node:os";
 import path from "node:path";
+import Database from "better-sqlite3";
 import request from "supertest";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { bootstrapAdmin } from "../db/bootstrap-admin";
@@ -45,6 +46,50 @@ describe("app flow", () => {
     for (const suffix of ["", "-wal", "-shm"]) {
       fs.rmSync(`${databasePath}${suffix}`, { force: true });
     }
+  });
+
+  it("applies schema migrations including Phase 1 auth hardening foundations", async () => {
+    const sqlite = new Database(databasePath);
+
+    const usersColumns = sqlite
+      .prepare("SELECT name FROM pragma_table_info('users') ORDER BY cid")
+      .all()
+      .map((row) => (row as { name: string }).name);
+    expect(usersColumns).toContain("display_name");
+
+    const sessionsColumns = sqlite
+      .prepare("SELECT name FROM pragma_table_info('sessions') ORDER BY cid")
+      .all()
+      .map((row) => (row as { name: string }).name);
+    expect(sessionsColumns).toContain("token_hash");
+
+    const tables = sqlite
+      .prepare("SELECT name FROM sqlite_master WHERE type = 'table'")
+      .all()
+      .map((row) => (row as { name: string }).name);
+    expect(tables).toContain("email_change_challenges");
+    expect(tables).toContain("rate_limit_entries");
+    expect(tables).toContain("rate_limit_allowlist");
+
+    const indexes = sqlite
+      .prepare("SELECT name FROM sqlite_master WHERE type = 'index'")
+      .all()
+      .map((row) => (row as { name: string }).name);
+    expect(indexes).toContain("sessions_token_hash_unique");
+    expect(indexes).toContain("login_challenges_username_created_at_idx");
+    expect(indexes).toContain("login_challenges_username_consumed_expires_idx");
+    expect(indexes).toContain("login_challenges_expires_at_idx");
+    expect(indexes).toContain("rate_limit_entries_scope_key_unique");
+    expect(indexes).toContain("rate_limit_allowlist_ip_or_cidr_unique");
+
+    sqlite.close();
+
+    const packageJson = JSON.parse(fs.readFileSync("package.json", "utf8")) as {
+      scripts?: Record<string, string>;
+    };
+    const buildServer = packageJson.scripts?.["build:server"] ?? "";
+    expect(buildServer).toContain("cp src/server/db/migrations/*.sql dist-server/migrations/");
+    expect(buildServer).toContain("cp src/server/db/migrations/*.sql dist-server/db/migrations/");
   });
 
   it("logs in, manages roles, creates events and enforces participation capacity", async () => {
