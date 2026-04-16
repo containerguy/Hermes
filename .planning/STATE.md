@@ -94,7 +94,7 @@ Recent decisions affecting current work:
 
 ### Pending Todos
 
-None yet.
+- 2026-04-16 — Bulk import of users (`.planning/todos/pending/2026-04-16-bulk-import-of-users.md`)
 
 ### Blockers/Concerns
 
