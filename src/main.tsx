@@ -1297,6 +1297,9 @@ function AdminPanel({
   const [users, setUsers] = useState<User[]>([]);
   const [auditLogs, setAuditLogs] = useState<AuditLogEntry[]>([]);
   const [inviteCodes, setInviteCodes] = useState<InviteCode[]>([]);
+  const [inviteDrafts, setInviteDrafts] = useState<
+    Record<string, { label: string; maxUses: string; expiresAt: string }>
+  >({});
   const [settings, setSettings] = useState<AppSettings>(defaultSettings);
   const [newUser, setNewUser] = useState({
     username: "",
@@ -1305,8 +1308,7 @@ function AdminPanel({
   });
   const [newInvite, setNewInvite] = useState({
     label: "",
-    code: "",
-    maxUses: 25,
+    maxUses: "",
     expiresAt: ""
   });
   const [message, setMessage] = useState("");
@@ -1330,6 +1332,18 @@ function AdminPanel({
     setSettings(settingsResult.settings);
     setAuditLogs(auditResult.auditLogs);
     setInviteCodes(inviteResult.inviteCodes);
+    setInviteDrafts(
+      Object.fromEntries(
+        inviteResult.inviteCodes.map((invite) => [
+          invite.id,
+          {
+            label: invite.label,
+            maxUses: invite.maxUses === null ? "" : String(invite.maxUses),
+            expiresAt: invite.expiresAt ? toDatetimeLocal(invite.expiresAt) : ""
+          }
+        ])
+      )
+    );
   }
 
   useEffect(() => {
@@ -1395,16 +1409,23 @@ function AdminPanel({
     setMessage("");
 
     try {
+      const payload: { label: string; maxUses?: number | null; expiresAt?: string | null } = {
+        label: newInvite.label
+      };
+
+      if (newInvite.maxUses !== "") {
+        payload.maxUses = Number(newInvite.maxUses);
+      }
+
+      if (newInvite.expiresAt !== "") {
+        payload.expiresAt = fromDatetimeLocal(newInvite.expiresAt);
+      }
+
       await requestJson<{ inviteCode: InviteCode }>("/api/admin/invite-codes", {
         method: "POST",
-        body: JSON.stringify({
-          label: newInvite.label,
-          code: newInvite.code || undefined,
-          maxUses: newInvite.maxUses || null,
-          expiresAt: newInvite.expiresAt ? fromDatetimeLocal(newInvite.expiresAt) : null
-        })
+        body: JSON.stringify(payload)
       });
-      setNewInvite({ label: "", code: "", maxUses: 25, expiresAt: "" });
+      setNewInvite({ label: "", maxUses: "", expiresAt: "" });
       await loadAdminData();
       setMessage("Invite-Code erstellt.");
     } catch (caught) {
@@ -1412,8 +1433,83 @@ function AdminPanel({
     }
   }
 
-  async function revokeInviteCode(invite: InviteCode) {
-    const confirmed = window.confirm(`Invite ${invite.label} deaktivieren?`);
+  async function deactivateInviteCode(invite: InviteCode) {
+    const confirmed = window.confirm(`Invite ${invite.label} wirklich deaktivieren?`);
+
+    if (!confirmed) {
+      return;
+    }
+
+    setError("");
+    setMessage("");
+
+    try {
+      await requestJson<{ inviteCode: InviteCode }>(`/api/admin/invite-codes/${invite.id}/deactivate`, {
+        method: "POST"
+      });
+      await loadAdminData();
+      setMessage("Invite-Code deaktiviert.");
+    } catch (caught) {
+      setError(getErrorMessage(caught));
+    }
+  }
+
+  async function reactivateInviteCode(invite: InviteCode) {
+    const confirmed = window.confirm(`Invite ${invite.label} wirklich reaktivieren?`);
+
+    if (!confirmed) {
+      return;
+    }
+
+    setError("");
+    setMessage("");
+
+    try {
+      await requestJson<{ inviteCode: InviteCode }>(`/api/admin/invite-codes/${invite.id}/reactivate`, {
+        method: "POST"
+      });
+      await loadAdminData();
+      setMessage("Invite-Code reaktiviert.");
+    } catch (caught) {
+      setError(getErrorMessage(caught));
+    }
+  }
+
+  async function updateInviteCode(invite: InviteCode) {
+    setError("");
+    setMessage("");
+
+    const draft = inviteDrafts[invite.id];
+    if (!draft) {
+      return;
+    }
+
+    try {
+      const payload: { label?: string; maxUses?: number | null; expiresAt?: string | null } = {
+        label: draft.label.trim()
+      };
+
+      if (draft.maxUses.trim() === "") {
+        payload.maxUses = null;
+      } else {
+        payload.maxUses = Number(draft.maxUses);
+      }
+
+      payload.expiresAt = draft.expiresAt.trim() ? fromDatetimeLocal(draft.expiresAt) : null;
+
+      await requestJson<{ inviteCode: InviteCode }>(`/api/admin/invite-codes/${invite.id}`, {
+        method: "PATCH",
+        body: JSON.stringify(payload)
+      });
+      await loadAdminData();
+      setMessage("Invite gespeichert.");
+    } catch (caught) {
+      setError(getErrorMessage(caught));
+    }
+  }
+
+  async function deleteUnusedInviteCode(invite: InviteCode) {
+    const confirmed = window.confirm(`Invite ${invite.label} wirklich löschen? (Nur möglich ohne Nutzungen)`);
 
     if (!confirmed) {
       return;
@@ -1425,7 +1521,7 @@ function AdminPanel({
     try {
       await requestJson<void>(`/api/admin/invite-codes/${invite.id}`, { method: "DELETE" });
       await loadAdminData();
-      setMessage("Invite-Code deaktiviert.");
+      setMessage("Invite gelöscht.");
     } catch (caught) {
       setError(getErrorMessage(caught));
     }
@@ -1693,6 +1789,10 @@ function AdminPanel({
       <section className="invite-panel" aria-label="Invite-Codes">
         <p className="eyebrow">Invites</p>
         <h2>LAN-Party Invite-Codes.</h2>
+        <p className="muted">
+          Wenn Felder leer bleiben, nutzt Hermes standardmäßig <strong>300</strong> Nutzungen und{" "}
+          <strong>30 Tage</strong> Laufzeit.
+        </p>
         <form onSubmit={createInviteCode} className="admin-form inline-form">
           <label>
             Name
@@ -1704,14 +1804,6 @@ function AdminPanel({
             />
           </label>
           <label>
-            Code optional
-            <input
-              value={newInvite.code}
-              onChange={(event) => setNewInvite({ ...newInvite, code: event.target.value })}
-              placeholder="APRIL2026"
-            />
-          </label>
-          <label>
             Max. Nutzungen
             <input
               type="number"
@@ -1719,8 +1811,9 @@ function AdminPanel({
               max={500}
               value={newInvite.maxUses}
               onChange={(event) =>
-                setNewInvite({ ...newInvite, maxUses: Number(event.target.value) })
+                setNewInvite({ ...newInvite, maxUses: event.target.value })
               }
+              placeholder="300"
             />
           </label>
           <label>
@@ -1729,6 +1822,7 @@ function AdminPanel({
               type="datetime-local"
               value={newInvite.expiresAt}
               onChange={(event) => setNewInvite({ ...newInvite, expiresAt: event.target.value })}
+              placeholder="30 Tage"
             />
           </label>
           <button type="submit">Invite erstellen</button>
@@ -1746,15 +1840,93 @@ function AdminPanel({
                     : ""}
                   {invite.revokedAt ? " · deaktiviert" : ""}
                 </span>
+                <div className="form-grid">
+                  <label>
+                    Label
+                    <input
+                      value={inviteDrafts[invite.id]?.label ?? invite.label}
+                      onChange={(event) =>
+                        setInviteDrafts({
+                          ...inviteDrafts,
+                          [invite.id]: {
+                            label: event.target.value,
+                            maxUses:
+                              inviteDrafts[invite.id]?.maxUses ??
+                              (invite.maxUses === null ? "" : String(invite.maxUses)),
+                            expiresAt:
+                              inviteDrafts[invite.id]?.expiresAt ??
+                              (invite.expiresAt ? toDatetimeLocal(invite.expiresAt) : "")
+                          }
+                        })
+                      }
+                    />
+                  </label>
+                  <label>
+                    Max. Nutzungen (leer = ∞)
+                    <input
+                      type="number"
+                      min={1}
+                      max={500}
+                      value={inviteDrafts[invite.id]?.maxUses ?? (invite.maxUses === null ? "" : String(invite.maxUses))}
+                      onChange={(event) =>
+                        setInviteDrafts({
+                          ...inviteDrafts,
+                          [invite.id]: {
+                            label: inviteDrafts[invite.id]?.label ?? invite.label,
+                            maxUses: event.target.value,
+                            expiresAt:
+                              inviteDrafts[invite.id]?.expiresAt ??
+                              (invite.expiresAt ? toDatetimeLocal(invite.expiresAt) : "")
+                          }
+                        })
+                      }
+                    />
+                  </label>
+                  <label>
+                    Gültig bis (leer = nie)
+                    <input
+                      type="datetime-local"
+                      value={inviteDrafts[invite.id]?.expiresAt ?? (invite.expiresAt ? toDatetimeLocal(invite.expiresAt) : "")}
+                      onChange={(event) =>
+                        setInviteDrafts({
+                          ...inviteDrafts,
+                          [invite.id]: {
+                            label: inviteDrafts[invite.id]?.label ?? invite.label,
+                            maxUses:
+                              inviteDrafts[invite.id]?.maxUses ??
+                              (invite.maxUses === null ? "" : String(invite.maxUses)),
+                            expiresAt: event.target.value
+                          }
+                        })
+                      }
+                    />
+                  </label>
+                </div>
               </div>
-              <button
-                type="button"
-                className="secondary"
-                onClick={() => revokeInviteCode(invite)}
-                disabled={Boolean(invite.revokedAt)}
-              >
-                Deaktivieren
-              </button>
+              <div className="device-actions">
+                <button type="button" className="secondary" onClick={() => updateInviteCode(invite)}>
+                  Speichern
+                </button>
+                <button
+                  type="button"
+                  className="secondary"
+                  onClick={() => deactivateInviteCode(invite)}
+                  disabled={Boolean(invite.revokedAt)}
+                >
+                  Deaktivieren
+                </button>
+                <button
+                  type="button"
+                  className="secondary"
+                  onClick={() => reactivateInviteCode(invite)}
+                  disabled={!invite.revokedAt}
+                >
+                  Reaktivieren
+                </button>
+                <button type="button" className="secondary danger" onClick={() => deleteUnusedInviteCode(invite)}>
+                  Löschen
+                </button>
+              </div>
             </article>
           ))}
           {inviteCodes.length === 0 ? (
