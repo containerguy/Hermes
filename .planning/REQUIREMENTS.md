@@ -15,13 +15,13 @@ These requirements define the next release milestone for the existing Hermes app
 - [x] **AUTH-04**: Session tokens are not stored as reusable raw bearer tokens in persisted SQLite data or S3 snapshots.
 - [x] **AUTH-05**: Security-sensitive user changes, such as deletion or role changes, have defined session invalidation behavior and test coverage.
 - [x] **AUTH-06**: Mutating cookie-authenticated admin routes have an explicit CSRF decision that is implemented or documented with rationale.
-- [ ] **AUTH-07**: Each email address can belong to only one active account, enforced consistently for admin-created users, invite registration, and profile email changes.
+- [x] **AUTH-07**: Each email address can belong to only one active account, enforced consistently for admin-created users, invite registration, and profile email changes.
 
 ### User Profile And Devices
 
-- [ ] **PROF-01**: A newly registered device gets the best available default device name, such as browser/device hints or a clear fallback, before the user edits it.
-- [ ] **PROF-02**: A logged-in user can change their own display name with validation and audit coverage.
-- [ ] **PROF-03**: A logged-in user can change their own email address through a safe confirmation flow before the new address is used for login codes.
+- [x] **PROF-01**: A newly registered device gets the best available default device name, such as browser/device hints or a clear fallback, before the user edits it.
+- [x] **PROF-02**: A logged-in user can change their own display name with validation and audit coverage.
+- [x] **PROF-03**: A logged-in user can change their own email address through a safe confirmation flow before the new address is used for login codes.
 
 ### Invite Registration
 
@@ -111,10 +111,10 @@ Every v1 requirement maps to exactly one roadmap phase and remains pending until
 | AUTH-04 | Phase 1: Auth, Profile, And Invite Hardening | Complete |
 | AUTH-05 | Phase 1: Auth, Profile, And Invite Hardening | Complete |
 | AUTH-06 | Phase 1: Auth, Profile, And Invite Hardening | Complete |
-| AUTH-07 | Phase 1: Auth, Profile, And Invite Hardening | Pending |
-| PROF-01 | Phase 1: Auth, Profile, And Invite Hardening | Pending |
-| PROF-02 | Phase 1: Auth, Profile, And Invite Hardening | Pending |
-| PROF-03 | Phase 1: Auth, Profile, And Invite Hardening | Pending |
+| AUTH-07 | Phase 1: Auth, Profile, And Invite Hardening | Complete |
+| PROF-01 | Phase 1: Auth, Profile, And Invite Hardening | Complete |
+| PROF-02 | Phase 1: Auth, Profile, And Invite Hardening | Complete |
+| PROF-03 | Phase 1: Auth, Profile, And Invite Hardening | Complete |
 | INV-01 | Phase 1: Auth, Profile, And Invite Hardening | Complete |
 | INV-02 | Phase 1: Auth, Profile, And Invite Hardening | Complete |
 | INV-03 | Phase 2: Event And Invite Consistency | Pending |
