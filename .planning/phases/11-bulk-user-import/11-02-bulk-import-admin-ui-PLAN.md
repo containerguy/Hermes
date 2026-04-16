@@ -235,7 +235,7 @@ From src/client/components/AdminPanel.tsx (existing pattern to mirror):
       1. **Input panel** (always shown in `idle` / `preview`):
          - Radio toggle: "Einfügen" (paste) vs. "Datei hochladen" (upload) — per D-01.
          - Paste mode: `<textarea>` with German placeholder and 2000-char minHeight hint. Live-parse on blur or explicit "Vorschau anzeigen" button.
-         - Upload mode: `<input type="file" accept=".csv,.json,text/csv,application/json" />`. Read with `FileReader.readAsText`. Reject `file.size > 1_048_576` with the `import_nutzlast_zu_gross` client-only message (it never round-trips; client-side guard mirrors D-11).
+         - Upload mode: `<input type="file" accept=".csv,.json,text/csv,application/json" />`. Read with `FileReader.readAsText`. Reject `file.size > 1_048_576` with the `import_nutzlast_zu_gross` client-only code (it never round-trips; client-side guard mirrors D-11). ALSO add a German copy entry to `src/client/errors/errors.ts` in the same Task 2 edit: `import_nutzlast_zu_gross: "Datei ist zu groß (maximal 1 MB)."` — this MUST ship alongside the component so `getErrorMessage("import_nutzlast_zu_gross")` never returns a raw code.
          - Format chip shows detected `csv` / `json` / "unbekannt" (uses `sniffFormat`).
          - Primary action: "Vorschau" triggers `parseRows` → updates preview.
 
@@ -247,10 +247,13 @@ From src/client/components/AdminPanel.tsx (existing pattern to mirror):
            - `error: <code>` (red) per row-level error, joined with `; `.
          - A header summary line: `"N Zeilen — X gültig · Y Duplikate · Z Fehler"`.
          - Buttons:
-           - "Dry-Run" (secondary) — sends only rows with `errors.length === 0 && !duplicateInBatch`, `dryRun: true`. If client has already filtered bad rows, include ALL rows anyway to let the server do the authoritative check — use the server's duplicate detection as source of truth per D-06. (Implementation: send `rows = parseResult.rows.map(r => r.normalized)` ONLY for rows with no row-level client errors; duplicates-in-batch rows are included so server can also confirm.)
-           - "Import bestätigen" (primary) — `dryRun: false`, same payload shape.
+           - "Dry-Run" (secondary) — `dryRun: true`. Payload rule (canonical): send `rows = parseResult.rows.filter(r => r.errors.length === 0).map(r => r.normalized)`. Rows with row-level client-parse errors are NEVER sent (they would fail Zod server-side anyway and clutter outcomes). Rows flagged `duplicateInBatch` ARE still sent so the server-side authoritative duplicate detection (per D-06) produces the canonical outcomes.
+           - "Import bestätigen" (primary) — `dryRun: false`, SAME payload rule as Dry-Run.
            - "Zurücksetzen" (secondary) — returns to `idle`, clears state.
-         - Disable both import buttons when any row has row-level client errors (but Dry-Run is allowed to help diagnose).
+         - Button enablement rule (canonical, resolves any earlier ambiguity):
+           - "Import bestätigen" is DISABLED when any row has row-level client-parse errors (a write should never run with known-bad rows).
+           - "Dry-Run" is ENABLED even when some rows have row-level client-parse errors — it still sends only the clean rows (per payload rule above) so the admin can at least validate the salvageable subset against the server.
+           - If EVERY row has a client-parse error, BOTH buttons are disabled (nothing to send).
 
       3. **Result view** (per D-05):
          - Totals summary: `received / created / skipped / failed` with badges.

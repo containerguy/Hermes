@@ -39,7 +39,7 @@ Out of scope: high-entropy fingerprinting (Canvas/WebGL), cross-site identificat
 ### Cross-Cutting (locked)
 
 - D-14: All new endpoints follow the existing CSRF + session-cookie conventions from Phase 1.
-- D-15: No new third-party dependencies for QR rendering if a small, dependency-light client-side QR generator can be inlined (≤ 5 KB gzipped). Otherwise the planner may justify and add `qrcode`.
+- D-15: No new third-party dependencies for QR rendering if a small, dependency-light client-side QR generator can be inlined (≤ 5 KB gzipped). Otherwise the planner may justify and add a small, zero-native-dep, MIT-licensed QR encoder — either `qrcode` or `qrcode-generator` are acceptable; pick the lighter one and record the choice + size in the plan SUMMARY.
 - D-16: Migration: schema changes ship as an explicit SQL migration (consistent with the project's "no implicit Drizzle push" convention — see `01-auth-profile-and-invite-hardening` precedent).
 - D-17: Tests are required for both happy and negative paths in `src/server/http/auth-routes.ts` test suites (re-login same device, pair create, pair redeem, expiry, consumed, origin-revoked).
 

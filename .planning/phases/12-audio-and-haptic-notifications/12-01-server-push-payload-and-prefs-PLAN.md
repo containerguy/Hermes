@@ -5,7 +5,7 @@ type: execute
 wave: 1
 depends_on: []
 files_modified:
-  - src/server/db/migrations/0010_audio_haptic_prefs.sql
+  - src/server/db/migrations/0012_audio_haptic_prefs.sql
   - src/server/db/schema.ts
   - src/server/auth/current-user.ts
   - src/server/db/bootstrap-admin.ts
@@ -28,7 +28,7 @@ must_haves:
     - "Push payload shape is validated by a Zod schema before `web-push.sendNotification` is called (D-03)."
     - "No new npm dependencies are added (D-15); `package.json` diff is empty."
   artifacts:
-    - path: "src/server/db/migrations/0010_audio_haptic_prefs.sql"
+    - path: "src/server/db/migrations/0012_audio_haptic_prefs.sql"
       provides: "Adds `notifications_audible_enabled` and `notifications_haptic_enabled` INTEGER NOT NULL DEFAULT 0 to `users`."
       contains: "ALTER TABLE users ADD COLUMN notifications_audible_enabled"
     - path: "src/server/db/schema.ts"
@@ -63,7 +63,7 @@ Server-side foundation for NOTIF-01: persist two per-user sub-toggles (`notifica
 
 Purpose: Unblock the client plan (12-02) with a stable, Zod-validated contract for push payloads and user preferences, and guarantee per-user gating on the server so the client cannot bypass it.
 
-Output: Migration `0010_audio_haptic_prefs.sql`, schema + `publicUser` additions, a `finalizePushPayload(user, payload)` helper wired into `sendPushToUser`, an extended `preferenceSchema` on `/api/push/preferences`, and a new `push-payload.test.ts` asserting payload shape across toggle states.
+Output: Migration `0012_audio_haptic_prefs.sql`, schema + `publicUser` additions, a `finalizePushPayload(user, payload)` helper wired into `sendPushToUser`, an extended `preferenceSchema` on `/api/push/preferences`, and a new `push-payload.test.ts` asserting payload shape across toggle states.
 </objective>
 
 <execution_context>
@@ -145,8 +145,8 @@ notificationsEnabled: integer("notifications_enabled", { mode: "boolean" })
 <tasks>
 
 <task type="auto">
-  <name>Task 1: Migration 0010, Drizzle schema, publicUser, user-creation defaults</name>
-  <files>src/server/db/migrations/0010_audio_haptic_prefs.sql, src/server/db/schema.ts, src/server/auth/current-user.ts, src/server/db/bootstrap-admin.ts, src/server/http/admin-routes.ts, src/server/http/auth-routes.ts</files>
+  <name>Task 1: Migration 0012, Drizzle schema, publicUser, user-creation defaults</name>
+  <files>src/server/db/migrations/0012_audio_haptic_prefs.sql, src/server/db/schema.ts, src/server/auth/current-user.ts, src/server/db/bootstrap-admin.ts, src/server/http/admin-routes.ts, src/server/http/auth-routes.ts</files>
   <read_first>
     - src/server/db/schema.ts (users table shape)
     - src/server/db/migrations/0008_push_subscription_failures.sql (canonical pattern for simple ALTER TABLE ADD COLUMN migrations — imitate it)
@@ -154,20 +154,20 @@ notificationsEnabled: integer("notifications_enabled", { mode: "boolean" })
     - src/server/db/bootstrap-admin.ts, src/server/http/admin-routes.ts, src/server/http/auth-routes.ts (every place a user row is INSERTed — all three must set the new columns to `false`)
   </read_first>
   <action>
-    1. Create `src/server/db/migrations/0010_audio_haptic_prefs.sql` with exactly two `ALTER TABLE users ADD COLUMN` statements:
+    1. Create `src/server/db/migrations/0012_audio_haptic_prefs.sql` with exactly two `ALTER TABLE users ADD COLUMN` statements:
        - `notifications_audible_enabled INTEGER NOT NULL DEFAULT 0`
        - `notifications_haptic_enabled INTEGER NOT NULL DEFAULT 0`
        Defaults are **0 / false** for all existing users — this implements D-09 "no implicit opt-in". Do NOT touch `notifications_enabled`.
     2. In `src/server/db/schema.ts` add two Drizzle columns named exactly `notificationsAudibleEnabled` and `notificationsHapticEnabled`, mirroring the existing `notificationsEnabled` definition but with `.default(false)`. Column name strings must match the migration (`notifications_audible_enabled`, `notifications_haptic_enabled`).
     3. In `src/server/auth/current-user.ts` extend `publicUser` to also return `notificationsAudibleEnabled` and `notificationsHapticEnabled`. Keep all existing fields in place.
-    4. In `src/server/db/bootstrap-admin.ts`, wherever `notificationsEnabled: true` is set on the admin insert/update, also set `notificationsAudibleEnabled: false` and `notificationsHapticEnabled: false` (admin bootstrap is an existing user path per D-09).
+    4. In `src/server/db/bootstrap-admin.ts`, BOTH the existing-admin UPDATE branch AND the new-admin INSERT branch set `notificationsEnabled: true`; extend BOTH sites to ALSO set `notificationsAudibleEnabled: false` and `notificationsHapticEnabled: false` (admin bootstrap is an existing user path per D-09). Partial coverage (only the insert or only the update) is a defect — both literals MUST appear twice in the file.
     5. In `src/server/http/admin-routes.ts`, at the user-create insert (currently uses `notificationsEnabled: readSettings(context).defaultNotificationsEnabled`), also set `notificationsAudibleEnabled: false` and `notificationsHapticEnabled: false`. Do NOT add them to `updateUserSchema` — those toggles are owned by the owning user, not admins, per D-10/D-11.
     6. In `src/server/http/auth-routes.ts`, at the invite-registration insert (line ~324, the block that sets `notificationsEnabled: settings.defaultNotificationsEnabled`), also set `notificationsAudibleEnabled: false` and `notificationsHapticEnabled: false`.
     7. Do NOT add an audit entry for any of this (D-11). Do NOT add new dependencies (D-15).
     8. Run `npm test` — all existing suites must still pass (the new boolean fields default to false everywhere, so no existing payload shape changes).
   </action>
   <verify>
-    <automated>grep -n "notifications_audible_enabled" src/server/db/migrations/0010_audio_haptic_prefs.sql &amp;&amp; grep -n "notifications_haptic_enabled" src/server/db/migrations/0010_audio_haptic_prefs.sql &amp;&amp; grep -n "notificationsAudibleEnabled" src/server/db/schema.ts &amp;&amp; grep -n "notificationsHapticEnabled" src/server/db/schema.ts &amp;&amp; grep -n "notificationsAudibleEnabled" src/server/auth/current-user.ts &amp;&amp; grep -n "notificationsHapticEnabled" src/server/auth/current-user.ts &amp;&amp; grep -n "notificationsAudibleEnabled: false" src/server/db/bootstrap-admin.ts src/server/http/admin-routes.ts src/server/http/auth-routes.ts &amp;&amp; grep -n "notificationsHapticEnabled: false" src/server/db/bootstrap-admin.ts src/server/http/admin-routes.ts src/server/http/auth-routes.ts &amp;&amp; npx vitest run --dir src 2>&amp;1 | tail -20</automated>
+    <automated>grep -n "notifications_audible_enabled" src/server/db/migrations/0012_audio_haptic_prefs.sql &amp;&amp; grep -n "notifications_haptic_enabled" src/server/db/migrations/0012_audio_haptic_prefs.sql &amp;&amp; grep -n "notificationsAudibleEnabled" src/server/db/schema.ts &amp;&amp; grep -n "notificationsHapticEnabled" src/server/db/schema.ts &amp;&amp; grep -n "notificationsAudibleEnabled" src/server/auth/current-user.ts &amp;&amp; grep -n "notificationsHapticEnabled" src/server/auth/current-user.ts &amp;&amp; test "$(grep -c 'notificationsAudibleEnabled: false' src/server/db/bootstrap-admin.ts)" -ge 2 &amp;&amp; test "$(grep -c 'notificationsHapticEnabled: false' src/server/db/bootstrap-admin.ts)" -ge 2 &amp;&amp; grep -n "notificationsAudibleEnabled: false" src/server/http/admin-routes.ts src/server/http/auth-routes.ts &amp;&amp; grep -n "notificationsHapticEnabled: false" src/server/http/admin-routes.ts src/server/http/auth-routes.ts &amp;&amp; git diff --quiet package.json package-lock.json &amp;&amp; npx vitest run --dir src 2>&amp;1 | tail -20</automated>
   </verify>
   <done>
     Migration file exists with both ALTER TABLE statements, Drizzle schema exposes both camelCase properties, `publicUser` surfaces both, and all three user-insert sites set the new columns to `false`. `npx vitest run --dir src` exits 0 with no new failures.

@@ -198,7 +198,7 @@ Note: To make the redemption banner visible when the URL is `#login?pair=...`, w
   <files>src/client/components/QrCanvas.tsx</files>
   <read_first>
     - src/client/components/LoginPanel.tsx (component style — function component, plain props, no state libraries)
-    - .planning/phases/09-device-recognition-and-pairing/09-CONTEXT.md (D-15: no new dep if ≤5 KB inline; otherwise justify `qrcode`)
+    - .planning/phases/09-device-recognition-and-pairing/09-CONTEXT.md (D-15: no new dep if ≤5 KB inline; otherwise `qrcode` or `qrcode-generator`, pick the lighter one)
     - AGENTS.md (no new dep without justification — this plan honors D-15 by using a tiny inline encoder)
   </read_first>
   <action>

@@ -2,14 +2,14 @@
 gsd_state_version: 1.0
 milestone: v1.2
 milestone_name: Post-LAN Quality of Life
-status: planning
-stopped_at: Promoted 6 todos to phases 9-13; planning in progress
-last_updated: "2026-04-16T20:35:00.000Z"
+status: ready_to_execute
+stopped_at: All 5 v1.2 phases planned and verified; ready to execute Phase 9
+last_updated: "2026-04-16T21:30:00.000Z"
 last_activity: 2026-04-16
 progress:
   total_phases: 5
   completed_phases: 0
-  total_plans: 0
+  total_plans: 14
   completed_plans: 0
   percent: 0
 ---
@@ -21,16 +21,26 @@ progress:
 See: .planning/PROJECT.md (updated 2026-04-15)
 
 **Core value:** During the LAN party, everyone can quickly see which game round is viable, when it starts, who is in, and how to join it.
-**Current focus:** v1.2 — Post-LAN Quality of Life (planning)
+**Current focus:** v1.2 — Post-LAN Quality of Life (all phases planned; ready to execute)
 
 ## Current Position
 
-Phase: 9 — Device Recognition and Session-Bound Pairing (next to plan)
-Plan: —
-Status: Planning milestone v1.2 (Phases 9–13)
+Phase: 9 — Device Recognition and Session-Bound Pairing (next to execute)
+Plan: 09-01-schema-and-device-model-PLAN.md (wave 1)
+Status: 5 phases planned (9: 4 plans, 10: 5 plans, 11: 2 plans, 12: 2 plans, 13: 1 plan = 14 total); all plan-checker verdicts PASS or PASS-WITH-WARNINGS (warnings inlined)
 Last activity: 2026-04-16
 
-Progress: [..........] 0%
+Progress: [..........] 0% (0 of 14 plans executed)
+
+### Plan Roster (v1.2)
+
+| Phase | Plans | Key Migration | Checker Verdict |
+|-------|-------|---------------|-----------------|
+| 9 — Device Recognition & Pairing | 4 | `0010_device_pairing.sql` | PASS-WITH-WARNINGS (fixed) |
+| 10 — Theme System & Copy Refresh | 5 | `0011_theme_background_settings.sql` | PASS-WITH-WARNINGS (fixed) |
+| 11 — Bulk User Import | 2 | — | PASS-WITH-WARNINGS (fixed) |
+| 12 — Audio & Haptic Notifications | 2 | `0012_audio_haptic_prefs.sql` | PASS-WITH-WARNINGS (fixed) |
+| 13 — CI Node 24 Readiness | 1 | — | PASS |
 
 ## Performance Metrics
 
@@ -112,6 +122,6 @@ Items acknowledged and carried forward from previous milestone close:
 
 ## Session Continuity
 
-Last session: 2026-04-16T20:35:00.000Z
-Stopped at: v1.2 opened — 5 phases scoped, planning in progress
-Resume file: .planning/phases/09-device-recognition-and-pairing/09-CONTEXT.md
+Last session: 2026-04-16T21:30:00.000Z
+Stopped at: v1.2 planning complete — 14 plans across 5 phases, all verified; ready to execute
+Resume file: .planning/phases/09-device-recognition-and-pairing/09-01-schema-and-device-model-PLAN.md

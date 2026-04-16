@@ -343,8 +343,8 @@ Audit codes (D-11): `device_pair_created`, `device_pair_redeemed`. (Optionally a
     - `grep -n 'csrfExemptPaths' src/server/http/auth-routes.ts | head -1` and the set literal contains `/pair-redeem` (visual / `grep -A1 csrfExemptPaths`).
     - All four error codes appear: `grep -E 'pair_token_invalid|pair_token_expired|pair_token_consumed|pair_origin_revoked' src/server/http/auth-routes.ts | wc -l` ≥ 4.
     - `grep -n 'device_pair_redeemed' src/server/http/auth-routes.ts` returns ≥ 1 line.
-    - `grep -nE 'metadata:.*token[^a-zA-Z]' src/server/http/auth-routes.ts` returns no matches inside the redeem handler (token never in metadata).
-    - There is NO `update(sessions).set({ revokedAt:` call inside the new redeem handler (originating session stays active per D-10) — `grep -n 'revokedAt' src/server/http/auth-routes.ts` should NOT show a new occurrence inside the pair-redeem block.
+    - No bare `token` key appears in any `metadata:` literal inside the redeem handler: `grep -nE 'metadata:\s*\{[^}]*\btoken\s*:' src/server/http/auth-routes.ts` returns no matches (the string `pair_token_*` inside error codes is NOT a match for this key-shape check).
+    - There is NO `update(sessions).set({ revokedAt:` call in the new redeem handler (originating session stays active per D-10). The `revokedAt: null` initializer on the NEW session row in the INSERT is expected and not flagged. Narrow check: `grep -n 'update(sessions)' src/server/http/auth-routes.ts` inside the redeem block returns no matches against `tokenRow.originSessionId`.
     - `npx tsc --noEmit -p tsconfig.json` exits 0.
   </acceptance_criteria>
   <done>Public, atomically-single-use redemption endpoint creates a new session and sets the cookie; original session untouched.</done>

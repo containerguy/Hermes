@@ -283,7 +283,7 @@ self.registration.showNotification(payload.title || "Hermes", {
        The FIRST call to `loadEvents()` (empty `previousEventsRef`) MUST NOT trigger — skip haptic detection when `previousEventsRef.current.size === 0`. This prevents a buzz on initial page load.
     3. Do NOT fire haptic for event creation, participation updates that do not cross into `ready`, archival, or any other transition — keep the trigger set MINIMAL per D-07.
     4. Do NOT call `navigator.vibrate` directly anywhere in `EventBoard.tsx` — always go through `triggerHaptic` (D-12 single-choke-point).
-    5. Add a vitest case to `src/client/haptic.test.ts` OR a new `src/client/components/event-board-haptic.test.tsx` (prefer extending `haptic.test.ts` with a synthetic diff test on a pure helper you extract, rather than rendering the full component — that keeps context cost down). Specifically, factor the diff logic into a pure exported function `detectHapticTransitions(prev: Map&lt;string, GameEvent&gt;, next: GameEvent[], userId: string): boolean` inside `EventBoard.tsx` (export it) and assert:
+    5. Add a vitest case to `src/client/haptic.test.ts` OR a new `src/client/components/event-board-haptic.test.tsx` (prefer extending `haptic.test.ts` with a synthetic diff test on a pure helper you extract, rather than rendering the full component — that keeps context cost down). Specifically, factor the diff logic into a pure exported function `detectHapticTransitions(prev: Map&lt;string, GameEvent&gt;, next: GameEvent[]): boolean` inside `EventBoard.tsx` (export it) and assert:
        - Empty `prev` → returns `false` (initial load).
        - Event goes `open → ready` → returns `true`.
        - Event the current user had `joined` goes `open → cancelled` → returns `true`.
@@ -293,7 +293,7 @@ self.registration.showNotification(payload.title || "Hermes", {
     7. No new dependencies (D-15).
   </action>
   <verify>
-    <automated>grep -n "triggerHaptic" src/client/components/EventBoard.tsx &amp;&amp; grep -n "previousEventsRef" src/client/components/EventBoard.tsx &amp;&amp; grep -n "detectHapticTransitions" src/client/components/EventBoard.tsx &amp;&amp; ! grep -n "navigator.vibrate" src/client/components/EventBoard.tsx &amp;&amp; npx tsc -p tsconfig.json --noEmit &amp;&amp; npx vitest run --dir src 2>&amp;1 | tail -25</automated>
+    <automated>grep -n "triggerHaptic" src/client/components/EventBoard.tsx &amp;&amp; grep -n "previousEventsRef" src/client/components/EventBoard.tsx &amp;&amp; grep -n "detectHapticTransitions" src/client/components/EventBoard.tsx &amp;&amp; ! grep -n "navigator.vibrate" src/client/components/EventBoard.tsx &amp;&amp; git diff --quiet package.json package-lock.json &amp;&amp; npx tsc -p tsconfig.json --noEmit &amp;&amp; npx vitest run --dir src 2>&amp;1 | tail -25</automated>
   </verify>
   <done>
     `EventBoard.tsx` imports and calls `triggerHaptic` only; `detectHapticTransitions` is exported and covered by unit tests for all five cases in the action; initial page load does not vibrate; second load that includes an `open → ready` transition vibrates once; a `joined → cancelled` transition vibrates once; irrelevant transitions do not vibrate; `navigator.vibrate` is not called directly from `EventBoard.tsx`; `npx tsc --noEmit` passes; full `npx vitest run --dir src` exits 0.
