@@ -1,3 +1,125 @@
+# Domain Pitfalls — Hermes v1.1 UX Polish
+
+**Domain:** Responsive LAN-party coordination web app (React/Vite + Express) with sessions, SSE realtime updates, and optional PWA/push  
+**Researched:** 2026-04-16  
+**Scope focus:** UX/a11y pitfalls, regression risks during UI polish, hash routing quirks, mobile Safari/PWA issues, behavior drift avoidance
+
+## Critical Pitfalls
+
+Mistakes that commonly cause rewrites, production regressions, or “same feature, different behavior” drift during polish.
+
+### Pitfall 1: “Polish” changes core behavior via route/state coupling
+**What goes wrong:** Navigation rework accidentally changes who can see/do what (Admin/Manager vs regular user), resets in-progress inputs, changes default views, or breaks “back” navigation patterns.  
+**Why it happens:** UI state is intertwined with routing, and “module separation” introduces implicit remounts that wipe state or re-run effects.  
+**Consequences:** Users lose votes, end up on wrong screens, role-only pages become reachable, or critical actions become hidden behind extra taps.  
+**Prevention:**
+- Treat routes as **public contract**: define allowed entrypoints for Events / Login(Profile) / Manager / Admin, and explicitly map them.
+- Keep “polish” to **presentation** and **information architecture**: avoid changing permission checks, default filters, server calls, and persistence semantics.
+- When splitting UI modules, ensure “state that must survive navigation” is either URL-driven (safe query/hash params) or persisted in a stable store (not component-local).
+**Detection:**
+- Manual “behavior drift” checklist (before/after): login → view events → vote dabei/nicht dabei → update/cancel/archiving visibility → logout/session switching.
+- Regression watchpoints: unexpected API calls on navigation, votes flipping, or default filters changing.
+
+### Pitfall 2: Accessibility regressions from “visual cleanup”
+**What goes wrong:** Removing outlines, using divs as buttons, icon-only controls without labels, focus traps in dialogs, or broken tab order.  
+**Why it happens:** Design-driven changes prioritize appearance over semantic HTML and keyboard flow.  
+**Consequences:** Keyboard users can’t operate critical actions (vote, change settings), screen reader UX becomes ambiguous, and mobile users lose obvious tap targets.  
+**Prevention:**
+- Prefer semantic elements (`button`, `a`, `label`, `fieldset/legend`, `dialog` patterns) over ARIA “patching”.
+- Preserve or enhance focus styles; if custom, ensure contrast and visibility on all themes.
+- Ensure every icon button has an accessible name (visible text or `aria-label`) and state is announced (`aria-pressed`, `aria-expanded`, `aria-current`).
+**Detection:**
+- Keyboard-only pass: reach every primary action in Events/Profile/Manager/Admin; ensure visible focus and sensible tab order.
+- Screen-reader spot check: page landmarks/headings, “vote” affordance and current state announced.
+
+### Pitfall 3: Real-time UI drift (SSE) causing flicker, double updates, or stale UI
+**What goes wrong:** Status/capacity visualization becomes inconsistent, flickers on updates, or shows stale derived state after SSE messages.  
+**Why it happens:** New visualization layers compute derived state inconsistently across components, or update logic mixes server truth with optimistic UI without reconciliation.  
+**Consequences:** Users lose trust (“is it full or not?”), vote buttons disable incorrectly, capacity looks wrong.  
+**Prevention:**
+- Single source of truth: keep canonical event/participation state normalized; derive UI consistently from that shape.
+- Avoid duplicating business rules in multiple components (e.g., readiness/running/cancelled/archived rules).
+**Detection:**
+- Stress sanity check: open two browsers, vote quickly, watch capacity/status visuals remain consistent.
+
+### Pitfall 4: Hash routing edge cases (deep links, back/forward, scrolling)
+**What goes wrong:** Deep links land on blank/incorrect views, `#` fragments collide with in-page anchors, back button behaves oddly, or scroll restoration breaks.  
+**Why it happens:** Hash routers share the fragment namespace with anchor links; libraries can interpret hash changes differently across browsers.  
+**Consequences:** Users can’t reliably bookmark Events vs Admin pages, “back” doesn’t return to previous view, or auto-scroll jumps unexpectedly.  
+**Prevention:**
+- Decide whether Hermes uses hash solely for routing or also for anchors; avoid mixing without a plan.
+- Keep route generation centralized (single helper) to avoid inconsistent `#/path` shapes.
+- Treat scroll behavior as a feature: either restore previous scroll on back, or always scroll-to-top on route change—pick one consistently.
+**Detection:**
+- Deep link matrix: open a fresh tab to each major area (Events, Profile/Login, Manager, Admin) and verify correct initial render + permissions.
+- Back/forward matrix: navigate between areas and ensure state doesn’t reset unexpectedly.
+
+### Pitfall 5: Mobile Safari + PWA “almost works” failures (especially around focus/viewport)
+**What goes wrong:** Inputs are obscured by the keyboard, the app “zooms” unexpectedly, fixed headers overlap content, or tapping controls triggers unintended scroll.  
+**Why it happens:** iOS Safari has special viewport behavior (`100vh` issues), keyboard resize quirks, and different default focus/scrolling semantics; PWA standalone mode differs again.  
+**Consequences:** Users can’t enter login code comfortably, can’t reach primary actions, perceive the app as broken on phones.  
+**Prevention:**
+- Avoid naive `100vh`; prefer dynamic viewport units (`dvh/svh/lvh`) or layout that tolerates viewport changes.
+- Ensure tap targets are large enough and spaced; avoid tiny icon-only actions without padding.
+- Avoid “position: fixed” traps on critical flows unless tested on iOS Safari and PWA standalone.
+**Detection:**
+- iPhone Safari manual checks: login flow (OTP entry), event list scrolling, vote actions, manager/admin forms.
+- PWA standalone check: same flows with “Add to Home Screen” style viewport (if applicable in your setup).
+
+### Pitfall 6: Navigation polish breaks auth/session expectations
+**What goes wrong:** Moving Profile/Login causes accidental logout, session switching becomes hidden, or privileged areas start showing “flash of unauthorized content” before redirect.  
+**Why it happens:** UI route guards are implemented in components (post-render) instead of at route level; new layouts load data before role checks.  
+**Consequences:** Confusing UX, potential data exposure in UI, or session management becomes hard to find during the LAN event.  
+**Prevention:**
+- Ensure access control remains enforced by the server, and avoid rendering privileged content until role/session state is resolved.
+- Keep session management discoverable from both smartphone and PC (not buried behind hover-only UI).
+**Detection:**
+- Role matrix: normal user vs manager vs admin; verify each route is gated and has clear affordances to “go back”.
+
+## Moderate Pitfalls
+
+### Pitfall: Theme/contrast regressions when adjusting visual hierarchy
+**What goes wrong:** New “status colors” or badges become unreadable in certain themes, or color becomes the only indicator of status.  
+**Prevention:**
+- Ensure sufficient contrast and pair color with text/iconography (e.g., “Ready”, “Running”, “Full” labels).
+- Verify in both light/dark (or configured theme colors) and on mobile in bright light.
+
+### Pitfall: Action affordances become less discoverable (especially on mobile)
+**What goes wrong:** Replacing buttons with icons, hiding actions in overflow menus, or relying on hover tooltips.  
+**Prevention:**
+- Primary actions remain visible without hover; avoid burying “vote” behind menus.
+- Keep destructive actions clearly separated and confirmable (cancel/archive).
+
+### Pitfall: Skeleton/loading polish causes perceived slowness or layout shifts
+**What goes wrong:** Added placeholders shift layout when content arrives, causing mis-taps (especially on phones).  
+**Prevention:**
+- Reserve stable space for key controls; minimize layout shift in event cards/rows.
+
+## Minor Pitfalls
+
+### Pitfall: Copy tweaks introduce ambiguity
+**What goes wrong:** “Dabei”/“Nicht dabei” labels change meaning subtly, or status labels aren’t consistent across views.  
+**Prevention:**
+- Keep terminology consistent and map labels 1:1 to existing states.
+
+### Pitfall: Over-animated UI harms clarity
+**What goes wrong:** Animations make it harder to track real-time changes or cause nausea for some users.  
+**Prevention:**
+- Keep motion subtle; respect `prefers-reduced-motion`.
+
+## Phase-Specific Warnings (v1.1 UX Polish)
+
+| Phase Topic | Likely Pitfall | Mitigation |
+|-------------|---------------|------------|
+| Clearer navigation between Events / Profile(Login) / Manager / Admin | Behavior drift via route remounts, broken deep links, confusing back button | Centralize route definitions; verify deep link + back/forward + role matrix |
+| Better visualization of event status/capacity | Duplicated business rules, inconsistent derived state under SSE | Normalize data; derive status/capacity in one place; two-device sanity check |
+| UX/a11y polish + responsive tweaks | Focus/keyboard traps, invisible focus, insufficient tap targets | Keyboard-only pass; screen reader spot check; iOS Safari manual flow checks |
+| Hash routing quirks | Anchors vs routes collision; scroll restoration weirdness | Avoid mixing anchors with hash routes; define consistent scroll behavior |
+| Mobile Safari/PWA | 100vh/keyboard issues; fixed headers overlap; standalone differences | Prefer dvh/svh; avoid fixed traps; test Safari + PWA mode for login/event flows |
+
+## Sources
+
+- `.planning/PROJECT.md` (Hermes v1.1 goal: polish without behavior change; smartphone focus; PWA/push constraints; hash routing context implied by SPA routing)
 # Pitfalls Research
 
 ## Context

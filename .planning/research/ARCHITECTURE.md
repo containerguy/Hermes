@@ -1,137 +1,256 @@
-# Architecture Research
+# Architecture Patterns (Client): Hermes v1.1 UX Polish
 
-## Scope
+**Domain:** Responsive LAN-party coordination web app (React/Vite client + Express API)
+**Researched:** 2026-04-16
+**Scope:** Client structure for modular UI, state management patterns, error handling, hash-based routing, and maintainable admin/event flows.
 
-This note covers architecture implications for the next Hermes milestone: authentication and invite hardening, profile/session/invite operations, safer backup and restore, and frontend maintainability. It is based on the current composition root in `src/server/app.ts`, the frontend entrypoint in `src/main.tsx`, and the codebase architecture notes under `.planning/codebase/`.
+## Recommended Architecture
 
-Hermes should remain a single-instance React/Vite, Express, SQLite, and optional S3 snapshot app for this milestone. The most useful architecture work is tightening existing boundaries and extracting small frontend modules, not introducing a broad service layer or a new state-management framework.
+Hermes already works with a “server as source of truth” model and hash routing (no router package). For v1.1 UX polish, keep that model but make the client **modular**:
 
-## Current Component Boundaries
+- Keep backend behavior and API contracts stable.
+- Stop growing `src/main.tsx`; make it a thin composition root.
+- Organize by **feature** (Events / Login(Profile) / Manager / Admin) with a small `shared/` layer.
+- Centralize HTTP + error normalization so every page behaves consistently (401/403, offline, validation errors).
 
-`src/server/app.ts` is the server composition boundary. It restores the configured SQLite snapshot before opening the database, creates the `DatabaseContext`, runs migrations, mounts all API routers, schedules debounced snapshot uploads after non-read responses, runs the event status refresh interval, serves `dist/`, and exposes the shutdown hook.
+## Component Boundaries
 
-The HTTP routers are the active server feature boundaries:
+### App shell (`src/app/*`)
 
-- `src/server/http/auth-routes.ts` owns login code requests, OTP verification, invite registration, current user lookup, logout, session listing, and session revocation.
-- `src/server/http/admin-routes.ts` owns admin-only user management, invite code administration, settings, audit logs, backup, and restore.
-- `src/server/http/event-routes.ts` owns event lifecycle and participation writes.
-- `src/server/http/push-routes.ts` owns push subscription and notification preference APIs.
-- `src/server/http/realtime-routes.ts` owns authenticated SSE event streams.
+- **Responsibility:** route selection, navigation chrome, global settings/theme application, and top-level surfaces (global toasts / fatal fallback UI).
+- **Must not:** contain feature logic (event SSE wiring, admin workflows, login forms).
 
-Pure or near-pure domain helpers live in `src/server/domain/events.ts` and `src/server/domain/users.ts`. Cross-cutting helpers live in `src/server/auth/*`, `src/server/settings.ts`, `src/server/audit-log.ts`, `src/server/push/push-service.ts`, `src/server/realtime/event-bus.ts`, and `src/server/storage/s3-storage.ts`.
+### Feature modules (`src/features/*`)
 
-The frontend boundary is currently weak: `src/main.tsx` contains API contracts, fetch helpers, route definitions, theme application, event UI, login/profile/session UI, invite registration, admin user/settings/invite/audit/backup/restore UI, push subscription logic, and the root app state. `src/styles.css` is similarly global. The next milestone should create focused modules around existing panels before adding more UI behavior.
+Each feature owns:
 
-## Data Flow For Hardening
+- **UI pages + internal components**
+- **API wrappers** (`*.api.ts`) for endpoints it uses
+- **State boundary hook** (`useEvents`, `useCurrentUser`, `useAdminUsers`, …) as the only place that does “load/refresh/invalidate”
 
-Authentication currently flows from `src/main.tsx` to `/api/auth/request-code`, then email or console delivery in `src/server/mail/mailer.ts`, then `/api/auth/verify-code`, session creation in `src/server/auth/sessions.ts`, and current-user resolution through `src/server/auth/current-user.ts`.
+This keeps “flow complexity” local: admin polish doesn’t force edits in events/auth, and vice versa.
 
-Hardening should preserve that flow but insert controls close to the HTTP edge:
+### Shared layer (`src/shared/*`)
 
-- Request validation and generic external responses should remain in `src/server/http/auth-routes.ts`.
-- Rate-limit state can start as a small in-process helper or SQLite-backed table, depending on whether the first target is abuse reduction for one LAN instance or persistence across restarts. For the current single-instance app, an in-process limiter is simpler, but critical limits such as invite use counts and participation capacity should be enforced in SQLite transactions.
-- OTP challenge cleanup and lookup efficiency belong near the login challenge table and auth route implementation, not in the mailer.
-- Session revocation and profile/device operations should remain cookie-session based and use `src/server/auth/current-user.ts` for identity resolution. Role changes and soft-deletes should explicitly revoke or invalidate affected sessions if the milestone chooses that behavior.
-- Audit events for auth hardening should be written through `src/server/audit-log.ts`, but metadata must not include OTP values, raw session tokens, invite code secrets, or credential values.
+Only cross-cutting utilities + primitives:
 
-External login responses should become less user-enumerating while preserving useful internal audit detail. The server can return the same success-shaped response for unknown users and real users on login-code request, while recording a redacted audit entry for investigation.
+- `shared/api/*`: fetch wrapper, error normalization, SSE helper
+- `shared/ui/*`: accessible UI primitives (buttons, dialogs, banners, spinners, toasts)
+- `shared/hooks/*`: small generic hooks (async state, hash-route subscription)
+- `shared/theme/*`: theme mapping (CSS custom properties)
 
-## Data Flow For Invite And Profile Operations
+**Rule:** shared code must not import from `features/*`.
 
-Invite registration currently crosses `src/main.tsx`, `/api/auth/register`, invite code rows, user creation, invite use rows, session creation, settings-controlled public registration, and audit logs. Admin invite management flows through `src/server/http/admin-routes.ts`.
+## Proposed Client Folder Layout
 
-For concurrency safety, invite consumption should move from "read uses, compare count, insert use" into a transaction in `src/server/http/auth-routes.ts` or a small invite-domain helper called by that route. The transaction should read the invite row, verify expiry/revocation, enforce `maxUses`, create the user, insert `invite_code_uses`, and create the session as one unit where practical. If SQLite locking or uniqueness constraints raise a conflict, the API should return an existing public error code such as `invite_ausgeschoepft` or `user_existiert_bereits`.
+Opinionated, minimal, and compatible with the current hash-routing approach:
 
-Admin invite listing in `src/server/http/admin-routes.ts` should distinguish operational display from secret disclosure. The UI in `src/main.tsx` currently expects full code values through the `InviteCode` type. A safer next step is to keep code creation response display explicit, but avoid repeatedly exposing reusable code secrets in audit metadata and list responses unless the product requires copy-after-create behavior.
+```
+src/
+  main.tsx                  # boot + mount only (thin)
+  app/
+    App.tsx                 # app shell composition (nav, layout)
+    routes.ts               # hash route parsing + route table
+    guards.ts               # role-based route guards + redirects
+    providers.tsx           # Settings/User provider(s) if needed
+  shared/
+    api/
+      http.ts               # requestJson(), typed ApiError, retry policy
+      errors.ts             # error normalization (401/403/offline/timeout)
+      realtime.ts           # EventSource wrapper + fallback polling helpers
+    ui/
+      Button.tsx
+      Dialog.tsx
+      Toasts.tsx
+      Spinner.tsx
+      ErrorBanner.tsx
+    hooks/
+      useHashRoute.ts       # subscribe to hash changes
+      useAsync.ts           # tiny helper for async state (idle/loading/error)
+    theme/
+      applyTheme.ts         # CSS var mapping (from server settings)
+  features/
+    events/
+      EventsPage.tsx
+      events.api.ts
+      useEvents.ts
+      components/
+        EventCard.tsx
+        EventStatusBadge.tsx
+        ParticipationButtons.tsx
+    auth/
+      LoginPage.tsx
+      ProfilePage.tsx       # sessions + notification prefs
+      auth.api.ts
+      useCurrentUser.ts
+      push/
+        usePushRegistration.ts
+    manager/
+      ManagerPage.tsx
+      manager.api.ts
+    admin/
+      AdminPage.tsx
+      users/
+      settings/
+      invites/
+      audit/
+      backupRestore/
+```
 
-Profile and device operations should stay under `/api/auth` unless they become admin operations. `GET /api/auth/me`, session list, session revoke, notification preference, and profile details are all user-owned account concerns. Admin user changes belong in `/api/admin/users`. The frontend should separate these into a profile/session module instead of growing `LoginPanel()` further inside `src/main.tsx`.
+## Data Flow (State Management) Patterns
 
-## Data Flow For Safer Backup And Restore
+### Principle: server is source of truth
 
-Backup and restore currently flow from admin UI in `src/main.tsx` to `src/server/http/admin-routes.ts`, then into `src/server/storage/s3-storage.ts`. Startup restore is called earlier from `src/server/app.ts` before migrations and normal route mounting.
+Keep current semantics:
 
-The restore path should become a staged operator flow:
+- After **mutations**, **refetch** the relevant list/detail (avoid optimistic UI that can desync).
+- Treat SSE (`/api/realtime/events`) as an **invalidation signal**, not canonical state.
 
-1. Admin requests restore validation or restore preview from `/api/admin`.
-2. Server downloads the configured snapshot through `src/server/storage/s3-storage.ts`.
-3. Server validates schema compatibility, expected tables, and `PRAGMA foreign_key_check` result rows before touching live data.
-4. Server writes a pre-restore local or S3 backup of the current live database.
-5. Server performs the live restore in a bounded transaction or clearly documented critical section.
-6. Server invalidates or refreshes state that may have been replaced, including sessions, settings, and event broadcasts.
-7. Server returns a recovery summary with backup identifier, validation result, and next operator checks.
+This is correct for Hermes’ scale and avoids cache correctness bugs.
 
-`src/server/storage/s3-storage.ts` is still the right low-level module for snapshot IO and table copying, but restore policy should not be hidden entirely there. `src/server/http/admin-routes.ts` owns the admin operation and should coordinate confirmation, audit logging, and response shape. If the code grows, introduce a narrow `src/server/storage/restore-service.ts` rather than a general application service layer.
+### Pattern: per-feature “resource hook” with explicit invalidation
 
-Restore must not depend on identical column order long-term. The current `INSERT INTO table SELECT * FROM sourceTable` approach is fragile across migrations. A safer helper should derive column names from `PRAGMA table_info` for each restorable table and copy only compatible columns, or reject incompatible snapshots with an explicit validation error before mutation.
+Each feature exposes one hook that manages:
 
-Because `src/server/app.ts` schedules snapshots after successful non-read responses, restore endpoints need special care. A failed restore validation should not schedule a new snapshot. A successful restore should either flush the restored database intentionally or defer upload until after validation, audit logging, and any session invalidation decisions are complete.
+- `data`
+- `loading`
+- `error`
+- `reload()`
+- mutation functions that call API then trigger `reload()`
 
-## Frontend Maintainability Boundary
+Illustrative shape:
 
-The frontend should be split along the panels and shared utilities that already exist conceptually in `src/main.tsx`:
+```typescript
+export type ApiError =
+  | { kind: "offline" }
+  | { kind: "unauthorized" }
+  | { kind: "forbidden" }
+  | { kind: "http"; status: number; message?: string; code?: string }
+  | { kind: "unknown"; message?: string };
 
-- API helper and shared DTO types: extract `requestJson()`, error handling, and API payload types into a small module such as `src/client/api.ts` or `src/client/types.ts`.
-- App shell and routing: keep hash-route state, settings loading, theme application, and role-aware navigation in an app-level module.
-- Event board: move event list, event creation, participation, and SSE/polling behavior out of the root file.
-- Auth/profile: move login, invite registration, current session/device management, logout, and push setup into a focused module.
-- Admin: move user management, settings, invite code management, audit log, backup, and restore UI into smaller admin subcomponents.
+export type Resource<T> = {
+  data: T | null;
+  loading: boolean;
+  error: ApiError | null;
+  reload: () => Promise<void>;
+};
+```
 
-This should be an extraction-first change. Preserve current behavior and fetch-after-mutation semantics before changing workflows. The app currently treats server responses as the source of truth; adding a cache, client state library, or generated API client is not required for the current size and would raise migration risk.
+**Why:** prevents duplicated `useEffect(fetch...)` patterns and enables consistent UX (spinners, disabled states, banners) across pages.
 
-The frontend should not treat role-gated visibility as authorization. Backend checks in `src/server/http/*` remain the security boundary. Extracted components should continue to handle `401` and `403` responses predictably because session restore, admin restore, and role changes can invalidate the current UI state.
+### Cross-feature state: keep it tiny
 
-## Build Order Implications
+Global state should be limited to:
 
-Build order should reduce blast radius before adding behavior.
+- **Route** (hash)
+- **Current user** (or “anonymous”)
+- **Settings** (theme + toggles)
 
-1. Add focused tests around existing risks before refactors: auth generic responses, rate-limit behavior, invite max-use concurrency, participation capacity concurrency, restore validation, pre-restore backup, and session revocation. Existing HTTP integration tests in `src/server/http/app-flow.test.ts` are the natural first target.
-2. Harden server invariants before frontend affordances. Concurrency and destructive restore safety must be enforced in `src/server/http/auth-routes.ts`, `src/server/http/event-routes.ts`, `src/server/http/admin-routes.ts`, `src/server/storage/s3-storage.ts`, and SQLite transactions, not only by UI confirmations.
-3. Extract frontend utilities and panels from `src/main.tsx` with no behavior change. This lowers merge risk for profile, invite, and restore UI additions.
-4. Add profile/session/invite UI changes after the API contracts are stable. This avoids reshaping UI types repeatedly.
-5. Add clearer operator restore flow last, once server validation and backup identifiers exist. The UI can then present real validation and recovery data rather than frontend-only confirmation text.
-6. Update deployment and recovery docs after behavior is implemented, especially around secure cookies, SMTP mode, VAPID, S3 credentials, TLS/reverse proxy, and single-instance operation.
+Prefer `useState` + Context only where it reduces duplication; do not introduce Redux/React Query for v1.1.
 
-Server hardening and frontend extraction can proceed in parallel if write ownership is separated: server workers should avoid `src/main.tsx`, and frontend workers should avoid modifying router behavior except for response handling already agreed in API contracts.
+## Hash-Based Routing (No Router Package)
 
-## Fragile Integration Points
+### Route table + parsing in one place
 
-`src/server/app.ts` couples mutating HTTP responses to S3 snapshot scheduling. New endpoints that validate, preview, or partially fail must be intentional about response codes and whether a snapshot should follow.
+- Define a `RouteId` union (e.g. `events | login | manager | admin`).
+- Parse `location.hash` into `{ id, params }`.
+- Centralize `navigate(route)` helper that updates `location.hash`.
 
-`src/server/storage/s3-storage.ts` depends on SQLite WAL checkpointing, a fixed restorable table list, and compatible table shapes. Restore changes must account for migrations in `src/server/db/migrations/` and schema definitions in `src/server/db/schema.ts`.
+### Guards: role-aware, but server-enforced
 
-`src/server/http/auth-routes.ts` currently owns both login and invite registration. It is the right place to enforce public auth behavior, but it can become overloaded if profile, invite, session, and limiter logic all stay inline. Extract small helpers only when the route becomes hard to test.
+Client guards are for UX clarity, not security:
 
-`src/server/http/event-routes.ts` capacity checks are vulnerable to concurrent writes. Fixing invite concurrency should use the same transaction discipline that will later apply to participation.
+- If a user hits `#admin` without admin role, redirect to `#events` with a clear explanation.
+- Always handle `401` (session expired/revoked) and `403` (role changed) from APIs.
 
-`src/server/auth/current-user.ts` updates `lastSeenAt` during authenticated requests. Adding rate limits, CSRF checks, restore invalidation, or session expiry must consider that reads can already cause writes.
+### Deep links and defaults
 
-`src/server/audit-log.ts` is useful for operator visibility but can leak sensitive operational material if callers pass raw metadata. Hardening work should define redacted audit metadata shapes for auth, invite, backup, and restore operations.
+- Default route: `#events`
+- Preserve hash on reload
+- Keep anchors stable so users can share “go here” links inside the LAN
 
-`src/main.tsx` duplicates API DTOs and user-facing error codes. If server responses are made more generic or restore endpoints gain staged states, the extracted client API layer should centralize those mappings.
+## Error Handling (Consistent UX)
 
-`public/sw.js` and browser push behavior depend on secure-context and OS/browser rules outside the app. Frontend maintainability work can improve messaging, but it cannot make LAN HTTP push reliable without deployment TLS.
+### Centralize HTTP + error normalization
 
-## What Not To Over-Abstract Yet
+All network calls should go through one wrapper that:
 
-Do not introduce a full service/repository architecture across all routers. The codebase is small, and broad rewrites would add risk before the LAN-party release. Prefer narrow helpers for rate limiting, invite consumption, restore validation, and frontend API calls.
+- Always uses `credentials: "include"`
+- Normalizes common failures:
+  - offline / fetch failure
+  - non-2xx responses
+  - JSON parse errors
+  - app-level error codes (if used by Hermes)
 
-Do not add Redux, React Query, a router package, or generated API clients as a prerequisite for this milestone. The immediate frontend need is file/component separation and shared API typing, not a new client architecture.
+### Global handling + local rendering
 
-Do not turn S3 into a coordination backend. `src/server/storage/s3-storage.ts` should remain snapshot storage for a single active writer. Multi-instance safety is out of scope and requires a different persistence or locking design.
+- **Global:** a top-level “session expired” reaction (on 401) that offers re-login and can navigate to `#login`.
+- **Local:** page-level `ErrorBanner` for recoverable issues (load failed, validation error, mutation failed).
+- **Boundary:** a React error boundary at the shell to prevent blank screens and provide “Reload” affordance.
 
-Do not over-generalize audit metadata redaction into a complex policy engine yet. Start with explicit safe metadata in the auth, invite, backup, and restore call sites.
+## Maintainable Admin & Event Flows
 
-Do not build a generic workflow engine for restore. A small staged restore operation with validation, pre-restore backup, audit, and recovery summary is enough.
+### Model actions as small workflow components
 
-Do not rely on frontend confirmations or disabled buttons as safety controls. Destructive admin behavior must be safe at the server and storage layer even if a request is sent manually.
+Admin/manager pages tend to accumulate one-off buttons. Keep them maintainable by using small “work units”:
 
-## Suggested Architecture Outcomes
+- Change role modal
+- Create/revoke invite code dialog
+- Settings sections (theme colors, registration toggles)
+- Event manage actions (update time, cancel/archive) with confirmation
 
-After the milestone, Hermes should still feel like the same app architecturally, but with sharper boundaries:
+Each workflow should reuse the same primitives:
 
-- Auth and invite endpoints return less enumerating public responses and enforce abuse controls at the HTTP/database boundary.
-- Invite and participation limits are protected by SQLite transactions or constraints rather than read-then-write checks.
-- Restore validates snapshots, creates a pre-restore backup, checks foreign keys, and returns operator recovery information before scheduling any follow-up snapshot.
-- `src/main.tsx` is reduced to app composition, with panel components and API helpers moved into frontend modules.
-- Audit entries remain useful but avoid storing reusable secrets, OTPs, raw session tokens, or credential values.
-- Documentation matches the real deployment contract: one active writer, TLS/reverse proxy outside Hermes, secure cookies enabled in production, SMTP and VAPID configured explicitly, and S3 used only for snapshots.
+- `Dialog` (a11y-first)
+- `BusyButton` / spinner state
+- `Toast` for success feedback
+- `ErrorBanner` for failure
+
+### Invalidation boundaries
+
+Avoid “partial refresh spaghetti”:
+
+- Each admin sub-area owns its `useX()` hook (`useAdminUsers`, `useAuditLog`, …).
+- Successful mutations trigger only that area’s `reload()`.
+- Events reload events; admin does not reload events, and vice versa.
+
+### SSE belongs to Events only
+
+Only the Events feature should own:
+
+- `EventSource` lifecycle
+- reconnect/backoff strategy
+- fallback polling schedule
+
+Other pages should not open SSE connections “just in case”.
+
+## Anti-Patterns to Avoid (v1.1)
+
+### Anti-pattern: growing `src/main.tsx`
+
+**Why it’s bad:** merge conflicts + accidental coupling; UX polish becomes risky.
+**Instead:** move pages into `features/*`, keep `main.tsx` for boot/mount only.
+
+### Anti-pattern: ad-hoc fetch calls scattered across components
+
+**Why it’s bad:** inconsistent spinners and error messages; duplicated 401/403 handling.
+**Instead:** `shared/api/http.ts` + per-feature resource hooks.
+
+### Anti-pattern: “UI hides admin = secure”
+
+**Why it’s bad:** role changes and session revokes still happen; manual requests exist.
+**Instead:** rely on backend enforcement and render 401/403 states gracefully everywhere.
+
+## Scalability Considerations (Right-Sized)
+
+Hermes is optimized for ~25 users, single instance:
+
+- **At ~25 users:** refetch-after-mutation + SSE invalidation is simplest and reliable.
+- **At 200+ users (future):** consider selective reload (per-event updates) to reduce redundant fetches.
+- **Multi-instance (out of scope):** SSE/in-memory broadcast would need external pub/sub and a different persistence/locking story.
+
+## Sources
+
+- `.planning/PROJECT.md` (v1.1 goals: clearer navigation Events/Login/Manager/Admin; UX/a11y/responsive polish; no behavior change)
+- `.planning/codebase/ARCHITECTURE.md` (current implementation notes: hash routing in `src/main.tsx`, server as source of truth, SSE invalidation model)
+
