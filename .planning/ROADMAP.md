@@ -125,9 +125,9 @@ Plans:
 **Plans**: 3 plans
 
 Plans:
-- [ ] 06-01: Add focused API/storage tests for security, concurrency, restore, push, and destructive admin actions.
-- [ ] 06-02: Update `readme.md`, `building.md`, `.env.example`, Docker, compose, and CI docs to match the production contract.
-- [ ] 06-03: Run release validation commands and document any remaining environment-specific blockers.
+- [x] 06-01: Add focused API/storage tests for security, concurrency, restore, push, and destructive admin actions.
+- [x] 06-02: Update `readme.md`, `building.md`, `.env.example`, Docker, compose, and CI docs to match the production contract.
+- [x] 06-03: Run release validation commands and document any remaining environment-specific blockers.
 
 ## Progress
 

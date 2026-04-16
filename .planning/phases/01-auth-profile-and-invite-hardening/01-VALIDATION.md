@@ -100,10 +100,10 @@ created: 2026-04-16
 
 ## Validation Sign-Off
 
-- [ ] All tasks have `<automated>` verify or explicit manual-only rationale.
-- [ ] Sampling continuity: no 3 consecutive tasks without automated verify.
-- [ ] No watch-mode flags in verification commands.
-- [ ] Feedback latency < 90 seconds for quick API suite.
-- [ ] `nyquist_compliant: true` set in frontmatter.
+- [x] All tasks have `<automated>` verify or explicit manual-only rationale.
+- [x] Sampling continuity: no 3 consecutive tasks without automated verify.
+- [x] No watch-mode flags in verification commands.
+- [x] Feedback latency < 90 seconds for quick API suite.
+- [x] `nyquist_compliant: true` set in frontmatter.
 
-**Approval:** pending
+**Approval:** complete
