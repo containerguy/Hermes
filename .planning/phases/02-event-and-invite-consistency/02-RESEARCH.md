@@ -270,16 +270,18 @@ try {
 | A1 | Post-commit side effects are preferable (and acceptable) for SSE/push/audit ordering to prevent “before commit” inconsistencies. | Architecture Patterns / Pitfalls | Might require small refactor and could change perceived timing; must ensure UI refresh still feels immediate. |
 | A2 | Transaction+count (no schema change) is sufficient performance-wise given LAN-party scale. | Alternatives Considered | If event board usage is heavy, counting could become hot; may require caching or schema optimization later. |
 
-## Open Questions
+## Open Questions (RESOLVED)
 
-1. **`409 event_voll` payload shape (D-09)**
-   - What we know: UI needs to communicate “Spieler 9 von 8” and refresh consistently.
-   - What's unclear: Whether API should return `{ error, event }` on `409` to avoid a follow-up GET.
-   - Recommendation: Return `{ error: "event_voll", event: serializeEvent(...) }` on 409 so UI can render joinedCount/maxPlayers immediately and stay consistent without extra fetch. [ASSUMED]
+1. **`409 event_voll` payload shape (D-09) — RESOLVED**
+   - Resolution: Return `409 { error: "event_voll", event: serializeEvent(...) }` for capacity losers.
+   - Rationale: Lets the client render the “Spieler X von Y” copy deterministically without requiring an extra GET; still compatible with the existing fallback behavior when only `{ error }` is present.
 
-2. **Rejection audit schema (D-12)**
-   - What we know: Need audit entries for rejected invite registrations and joins with rich metadata.
-   - Recommendation: Keep the existing action (`auth.register` / `participation.set`) but add `outcome: "rejected"` + `reason` and contextual fields in metadata to avoid proliferating action strings. [ASSUMED]
+2. **Rejection audit schema (D-12) — RESOLVED**
+   - Resolution: Keep the existing action names where possible (`auth.register`, `participation.set`) and add structured metadata fields such as:
+     - `outcome: "rejected"`
+     - `reason: "invite_ausgeschoepft" | "event_voll"`
+     - contextual fields (`joinedCount`, `maxPlayers`, `previousParticipation`, request ip/username when available)
+   - Rationale: Avoids proliferating action strings while keeping audit queries and dashboards consistent.
 
 ## Sources
 
