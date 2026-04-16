@@ -10,6 +10,15 @@ The current product is a brownfield TypeScript/React/Express app with SQLite as 
 
 During the LAN party, everyone can quickly see which game round is viable, when it starts, who is in, and how to join it.
 
+## Current Milestone: v1.1 UX Polish
+
+**Goal:** Improve UI/UX clarity and separation of functions, with better visualization and navigation, without changing core behavior.
+
+**Target features:**
+- Clearer navigation between Events / Login(Profile) / Manager / Admin
+- Better visualization of event status/capacity and action affordances
+- UX/a11y polish and responsive tweaks (especially smartphone)
+
 ## Requirements
 
 ### Validated

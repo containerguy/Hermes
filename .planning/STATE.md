@@ -1,17 +1,17 @@
 ---
 gsd_state_version: 1.0
-milestone: v1.0
-milestone_name: milestone
-status: complete
-stopped_at: Milestone v1.0 complete
-last_updated: "2026-04-16T17:05:30.000Z"
+milestone: v1.1
+milestone_name: UX Polish
+status: defining_requirements
+stopped_at: New milestone initialized
+last_updated: "2026-04-16T17:30:00.000Z"
 last_activity: 2026-04-16
 progress:
   total_phases: 6
-  completed_phases: 6
-  total_plans: 22
-  completed_plans: 22
-  percent: 100
+  completed_phases: 0
+  total_plans: 0
+  completed_plans: 0
+  percent: 0
 ---
 
 # Project State
@@ -21,16 +21,16 @@ progress:
 See: .planning/PROJECT.md (updated 2026-04-15)
 
 **Core value:** During the LAN party, everyone can quickly see which game round is viable, when it starts, who is in, and how to join it.
-**Current focus:** Milestone v1.0 complete
+**Current focus:** v1.1 — defining requirements
 
 ## Current Position
 
-Phase: 6
-Plan: Complete
-Status: Milestone complete
+Phase: Not started (defining requirements)
+Plan: —
+Status: Defining requirements
 Last activity: 2026-04-16
 
-Progress: [██████████] 100%
+Progress: [----------] 0%
 
 ## Performance Metrics
 
