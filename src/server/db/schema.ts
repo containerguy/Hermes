@@ -7,6 +7,7 @@ export const users = sqliteTable(
     id: text("id").primaryKey(),
     phoneNumber: text("phone_number").notNull(),
     username: text("username").notNull(),
+    displayName: text("display_name"),
     email: text("email").notNull(),
     role: text("role", { enum: ["user", "manager", "admin"] }).notNull().default("user"),
     notificationsEnabled: integer("notifications_enabled", { mode: "boolean" })
@@ -34,7 +35,15 @@ export const loginChallenges = sqliteTable("login_challenges", {
   consumedAt: text("consumed_at"),
   sentAt: text("sent_at"),
   createdAt: text("created_at").notNull()
-});
+}, (table) => [
+  index("login_challenges_username_created_at_idx").on(table.username, table.createdAt),
+  index("login_challenges_username_consumed_expires_idx").on(
+    table.username,
+    table.consumedAt,
+    table.expiresAt
+  ),
+  index("login_challenges_expires_at_idx").on(table.expiresAt)
+]);
 
 export const sessions = sqliteTable("sessions", {
   id: text("id").primaryKey(),
@@ -45,8 +54,67 @@ export const sessions = sqliteTable("sessions", {
   userAgent: text("user_agent"),
   lastSeenAt: text("last_seen_at").notNull(),
   createdAt: text("created_at").notNull(),
+  tokenHash: text("token_hash"),
   revokedAt: text("revoked_at")
-});
+}, (table) => [uniqueIndex("sessions_token_hash_unique").on(table.tokenHash)]);
+
+export const emailChangeChallenges = sqliteTable(
+  "email_change_challenges",
+  {
+    id: text("id").primaryKey(),
+    userId: text("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    newEmail: text("new_email").notNull(),
+    codeHash: text("code_hash").notNull(),
+    expiresAt: text("expires_at").notNull(),
+    consumedAt: text("consumed_at"),
+    sentAt: text("sent_at"),
+    createdAt: text("created_at").notNull()
+  },
+  (table) => [
+    index("email_change_challenges_user_id_created_at_idx").on(table.userId, table.createdAt),
+    index("email_change_challenges_user_id_consumed_expires_idx").on(
+      table.userId,
+      table.consumedAt,
+      table.expiresAt
+    ),
+    index("email_change_challenges_expires_at_idx").on(table.expiresAt),
+    index("email_change_challenges_new_email_idx").on(table.newEmail)
+  ]
+);
+
+export const rateLimitEntries = sqliteTable(
+  "rate_limit_entries",
+  {
+    id: text("id").primaryKey(),
+    scope: text("scope").notNull(),
+    key: text("key").notNull(),
+    attemptCount: integer("attempt_count").notNull().default(0),
+    windowStartedAt: text("window_started_at").notNull(),
+    lastAttemptAt: text("last_attempt_at").notNull(),
+    blockedUntil: text("blocked_until"),
+    createdAt: text("created_at").notNull(),
+    updatedAt: text("updated_at").notNull()
+  },
+  (table) => [
+    uniqueIndex("rate_limit_entries_scope_key_unique").on(table.scope, table.key),
+    index("rate_limit_entries_blocked_until_idx").on(table.blockedUntil),
+    index("rate_limit_entries_updated_at_idx").on(table.updatedAt)
+  ]
+);
+
+export const rateLimitAllowlist = sqliteTable(
+  "rate_limit_allowlist",
+  {
+    id: text("id").primaryKey(),
+    ipOrCidr: text("ip_or_cidr").notNull(),
+    note: text("note"),
+    createdAt: text("created_at").notNull(),
+    updatedAt: text("updated_at").notNull()
+  },
+  (table) => [uniqueIndex("rate_limit_allowlist_ip_or_cidr_unique").on(table.ipOrCidr)]
+);
 
 export const pushSubscriptions = sqliteTable(
   "push_subscriptions",
