@@ -308,7 +308,8 @@ describe("app flow", () => {
 
     expect(verify.body.user.id).toBe(userId);
 
-    const cookieHeader = (verify.headers["set-cookie"] ?? []) as string[];
+    const setCookie = verify.headers["set-cookie"];
+    const cookieHeader = Array.isArray(setCookie) ? setCookie : setCookie ? [setCookie] : [];
     const sessionCookie = cookieHeader.find((value) => value.startsWith("hermes_session="));
     expect(sessionCookie).toBeTruthy();
 
