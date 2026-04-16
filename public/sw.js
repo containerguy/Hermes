@@ -7,9 +7,22 @@ self.addEventListener("activate", (event) => {
 });
 
 self.addEventListener("push", (event) => {
-  const payload = event.data
-    ? event.data.json()
-    : { title: "Hermes", body: "Neue Benachrichtigung", url: "/" };
+  const fallback = { title: "Hermes", body: "Neue Benachrichtigung", url: "/" };
+  let parsed = null;
+
+  if (event.data) {
+    try {
+      parsed = event.data.json();
+    } catch (_error) {
+      parsed = null;
+    }
+  }
+
+  const candidate = parsed && typeof parsed === "object" ? parsed : {};
+  const payload = {
+    ...fallback,
+    ...candidate
+  };
 
   event.waitUntil(
     self.registration.showNotification(payload.title || "Hermes", {
