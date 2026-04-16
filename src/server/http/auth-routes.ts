@@ -270,7 +270,6 @@ export function createAuthRouter(context: DatabaseContext) {
       return;
     }
 
-    const timestamp = nowIso();
     const normalizedCode = normalizeInviteCode(parsed.data.inviteCode);
     const invite = context.db
       .select()
@@ -278,6 +277,7 @@ export function createAuthRouter(context: DatabaseContext) {
       .where(eq(inviteCodes.code, normalizedCode))
       .get();
 
+    const timestamp = nowIso();
     if (!invite || invite.revokedAt || (invite.expiresAt && invite.expiresAt < timestamp)) {
       recordRateLimitFailure(context, { scope: "invite_register", key: registerKey });
       response.status(403).json({ error: "invite_ungueltig" });
@@ -289,13 +289,18 @@ export function createAuthRouter(context: DatabaseContext) {
     const registerInvitedUser = () => {
       return context.sqlite
         .transaction(() => {
+          const transactionTimestamp = nowIso();
           const freshInvite = context.db
             .select()
             .from(inviteCodes)
             .where(eq(inviteCodes.id, invite.id))
             .get();
 
-          if (!freshInvite || freshInvite.revokedAt || (freshInvite.expiresAt && freshInvite.expiresAt < timestamp)) {
+          if (
+            !freshInvite ||
+            freshInvite.revokedAt ||
+            (freshInvite.expiresAt && freshInvite.expiresAt < transactionTimestamp)
+          ) {
             throw new InviteInvalidError();
           }
 
@@ -319,8 +324,8 @@ export function createAuthRouter(context: DatabaseContext) {
               notificationsEnabled: settings.defaultNotificationsEnabled,
               createdByUserId: freshInvite.createdByUserId,
               deletedAt: null,
-              createdAt: timestamp,
-              updatedAt: timestamp
+              createdAt: transactionTimestamp,
+              updatedAt: transactionTimestamp
             })
             .run();
 
@@ -330,7 +335,7 @@ export function createAuthRouter(context: DatabaseContext) {
               id: randomUUID(),
               inviteCodeId: freshInvite.id,
               userId,
-              usedAt: timestamp
+              usedAt: transactionTimestamp
             })
             .run();
 
@@ -348,7 +353,17 @@ export function createAuthRouter(context: DatabaseContext) {
         result = registerInvitedUser();
       } catch (error) {
         if (isSqliteBusyOrLocked(error)) {
-          result = registerInvitedUser();
+          try {
+            result = registerInvitedUser();
+          } catch (retryError) {
+            if (isSqliteBusyOrLocked(retryError)) {
+              console.error("[Hermes] Invite registration failed after retry (sqlite busy/locked)", retryError);
+              recordRateLimitFailure(context, { scope: "invite_register", key: registerKey });
+              response.status(500).json({ error: "registrierung_fehlgeschlagen" });
+              return;
+            }
+            throw retryError;
+          }
         } else {
           throw error;
         }

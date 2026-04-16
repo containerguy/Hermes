@@ -182,6 +182,7 @@ const errorMessages: Record<string, string> = {
   registrierung_deaktiviert: "Öffentliche Registrierung ist derzeit deaktiviert.",
   registrierung_fehlgeschlagen: "Registrierung fehlgeschlagen.",
   restore_fehlgeschlagen: "Restore konnte nicht ausgeführt werden. Prüfe S3-Konfiguration und Logs.",
+  teilnahme_fehlgeschlagen: "Teilnahme konnte gerade nicht gespeichert werden. Bitte erneut versuchen.",
   session_nicht_gefunden: "Gerät nicht gefunden.",
   secure_context_erforderlich:
     "Push benötigt HTTPS oder localhost. Über eine normale HTTP-LAN-Adresse deaktivieren Browser Web Push.",
