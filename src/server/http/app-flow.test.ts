@@ -98,6 +98,15 @@ describe("app flow", () => {
     expect(indexes).toContain("rate_limit_entries_scope_key_unique");
     expect(indexes).toContain("rate_limit_allowlist_ip_or_cidr_unique");
 
+    expect(sessionsColumns).toContain("device_key_hash");
+    expect(sessionsColumns).toContain("device_signals");
+    expect(tables).toContain("pairing_tokens");
+    expect(indexes).toContain("pairing_tokens_token_hash_unique");
+    expect(indexes).toContain("sessions_user_device_key_idx");
+    expect(indexes).toContain("sessions_user_device_signals_idx");
+    expect(indexes).toContain("pairing_tokens_origin_session_idx");
+    expect(indexes).toContain("pairing_tokens_user_expires_idx");
+
     sqlite.close();
 
     const packageJson = JSON.parse(fs.readFileSync("package.json", "utf8")) as {
