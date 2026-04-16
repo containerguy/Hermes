@@ -10,14 +10,17 @@ The current product is a brownfield TypeScript/React/Express app with SQLite as 
 
 During the LAN party, everyone can quickly see which game round is viable, when it starts, who is in, and how to join it.
 
-## Current Milestone: v1.1 UX Polish
+## Current Milestone: v1.2 Post-LAN Quality of Life
 
-**Goal:** Improve UI/UX clarity and separation of functions, with better visualization and navigation, without changing core behavior.
+**Goal:** Reduce login/device friction, refresh the look-and-feel for the LAN audience, make admin onboarding faster, ensure notifications are actually perceptible, and keep CI green for the Node 24 cutover.
 
 **Target features:**
-- Clearer navigation between Events / Login(Profile) / Manager / Admin
-- Better visualization of event status/capacity and action affordances
-- UX/a11y polish and responsive tweaks (especially smartphone)
+- Device recognition on re-login + session-bound device pairing without a second OTP
+- Admin-selectable gaming theme presets, custom theme editor, and background image picker
+- Project-wide UI copy refresh to a modern/concise/clear voice
+- Bulk user import (CSV/JSON) in the AdminPanel with preview & dry-run
+- Audio/haptic notification affordances with feature-detected fallbacks
+- GitHub Actions pinned for Node.js 24 compatibility
 
 ## Requirements
 
@@ -44,9 +47,16 @@ During the LAN party, everyone can quickly see which game round is viable, when 
 - ✓ Frontend modularization (split modules for events/login/admin) — v1.0 (Phase 5)
 - ✓ Release verification + deployment contract docs — v1.0 (Phase 6)
 
-### Active
+### Active (v1.2)
 
-- [ ] (Next milestone) Decide on post-LAN priorities (e.g. usability polish, ops tooling, feature expansion).
+- [ ] **AUTH-01**: Recognize same device on re-login (no duplicate sessions). — Phase 9
+- [ ] **AUTH-02**: Session-bound QR/link pairing for additional devices (no extra email OTP). — Phase 9
+- [ ] **THEME-01**: Admin theme presets + custom CSS-token themes. — Phase 10
+- [ ] **THEME-02**: Admin background image picker from S3 presets. — Phase 10
+- [ ] **COPY-01**: UI copy refresh to modern/concise/clear voice. — Phase 10
+- [ ] **ADM-02**: Bulk user import (CSV/JSON) in AdminPanel. — Phase 11
+- [ ] **NOTIF-01**: Audio/haptic notification UX with feature-detected fallback. — Phase 12
+- [ ] **CI-01**: GitHub Actions Node 24 readiness. — Phase 13
 
 ### Out of Scope
 
@@ -121,4 +131,4 @@ This document evolves at phase transitions and milestone boundaries.
 4. Update Context with current state
 
 ---
-*Last updated: 2026-04-16 after v1.0 milestone completion*
+*Last updated: 2026-04-16 — opened milestone v1.2 (Post-LAN Quality of Life)*

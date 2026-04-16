@@ -1,17 +1,17 @@
 ---
 gsd_state_version: 1.0
-milestone: v1.1
-milestone_name: UX Polish
-status: complete
-stopped_at: Completed Phase 8 (08-01)
-last_updated: "2026-04-16T19:35:00.000Z"
+milestone: v1.2
+milestone_name: Post-LAN Quality of Life
+status: planning
+stopped_at: Promoted 6 todos to phases 9-13; planning in progress
+last_updated: "2026-04-16T20:35:00.000Z"
 last_activity: 2026-04-16
 progress:
-  total_phases: 2
-  completed_phases: 2
-  total_plans: 2
-  completed_plans: 2
-  percent: 100
+  total_phases: 5
+  completed_phases: 0
+  total_plans: 0
+  completed_plans: 0
+  percent: 0
 ---
 
 # Project State
@@ -21,16 +21,16 @@ progress:
 See: .planning/PROJECT.md (updated 2026-04-15)
 
 **Core value:** During the LAN party, everyone can quickly see which game round is viable, when it starts, who is in, and how to join it.
-**Current focus:** v1.1 — complete
+**Current focus:** v1.2 — Post-LAN Quality of Life (planning)
 
 ## Current Position
 
-Phase: 8 — Admin Event Soft Delete
-Plan: 08-01
-Status: Complete
+Phase: 9 — Device Recognition and Session-Bound Pairing (next to plan)
+Plan: —
+Status: Planning milestone v1.2 (Phases 9–13)
 Last activity: 2026-04-16
 
-Progress: [##########] 100%
+Progress: [..........] 0%
 
 ## Performance Metrics
 
@@ -94,12 +94,7 @@ Recent decisions affecting current work:
 
 ### Pending Todos
 
-- 2026-04-16 — Bulk import of users (`.planning/todos/pending/2026-04-16-bulk-import-of-users.md`)
-- 2026-04-16 — Recognize device on re-login (`.planning/todos/pending/2026-04-16-recognize-device-on-re-login.md`)
-- 2026-04-16 — Add device via session QR/link (`.planning/todos/pending/2026-04-16-add-device-via-session-qr-link.md`)
-- 2026-04-16 — Update GitHub Actions for Node 24 (`.planning/todos/pending/2026-04-16-update-github-actions-for-node-24.md`)
-- 2026-04-16 — Gaming themes and modern copy (`.planning/todos/pending/2026-04-16-gaming-themes-and-modern-copy.md`)
-- 2026-04-16 — Audio and haptic notifications (`.planning/todos/pending/2026-04-16-audio-and-haptic-notifications.md`)
+(none — all 6 prior todos were promoted to v1.2 phases 9–13 on 2026-04-16)
 
 ### Blockers/Concerns
 
@@ -117,6 +112,6 @@ Items acknowledged and carried forward from previous milestone close:
 
 ## Session Continuity
 
-Last session: 2026-04-16T13:24:33.919Z
-Stopped at: Phase 03 context gathered
-Resume file: .planning/phases/03-backup-and-restore-safety/03-CONTEXT.md
+Last session: 2026-04-16T20:35:00.000Z
+Stopped at: v1.2 opened — 5 phases scoped, planning in progress
+Resume file: .planning/phases/09-device-recognition-and-pairing/09-CONTEXT.md
