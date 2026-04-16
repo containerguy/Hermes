@@ -1,4 +1,4 @@
-import { eq } from "drizzle-orm";
+import { and, eq } from "drizzle-orm";
 import { createHash, randomUUID } from "node:crypto";
 import net from "node:net";
 import type { DatabaseContext } from "../db/client";
@@ -104,8 +104,7 @@ export function checkRateLimit(
   const row = context.db
     .select()
     .from(rateLimitEntries)
-    .where(eq(rateLimitEntries.scope, input.scope))
-    .where(eq(rateLimitEntries.key, redactKey(input.key)))
+    .where(and(eq(rateLimitEntries.scope, input.scope), eq(rateLimitEntries.key, redactKey(input.key))))
     .get();
  
   if (!row?.blockedUntil) {
@@ -135,8 +134,7 @@ export function recordRateLimitFailure(
   const existing = context.db
     .select()
     .from(rateLimitEntries)
-    .where(eq(rateLimitEntries.scope, input.scope))
-    .where(eq(rateLimitEntries.key, redactedKey))
+    .where(and(eq(rateLimitEntries.scope, input.scope), eq(rateLimitEntries.key, redactedKey)))
     .get();
  
   if (!existing) {

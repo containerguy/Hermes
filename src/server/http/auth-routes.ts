@@ -1,9 +1,10 @@
-import { and, desc, eq, gt, isNull } from "drizzle-orm";
+import { and, desc, eq, gt, isNull, lt } from "drizzle-orm";
 import { Router } from "express";
 import { randomUUID } from "node:crypto";
 import { z } from "zod";
 import { getCurrentSession, publicUser } from "../auth/current-user";
 import { writeAuditLog } from "../audit-log";
+import { checkRateLimit, recordRateLimitFailure } from "../auth/rate-limits";
 import {
   createSessionToken,
   clearSessionCookie,
@@ -33,6 +34,10 @@ const registerSchema = z.object({
 
 function nowIso() {
   return new Date().toISOString();
+}
+
+function normalizeUsername(username: string) {
+  return username.trim().toLowerCase();
 }
 
 function fallbackPhoneNumber(userId: string) {
@@ -91,6 +96,24 @@ export function createAuthRouter(context: DatabaseContext) {
       return;
     }
 
+    const usernameKey = normalizeUsername(parsed.data.username);
+    const requestKey = `username:${usernameKey}|ip:${request.ip ?? ""}`;
+    const rateLimit = checkRateLimit(context, {
+      scope: "login_request",
+      key: requestKey,
+      sourceIp: request.ip
+    });
+
+    if (!rateLimit.ok) {
+      response.status(429).json({
+        error: rateLimit.error,
+        retryAfterSeconds: rateLimit.retryAfterSeconds
+      });
+      return;
+    }
+
+    recordRateLimitFailure(context, { scope: "login_request", key: requestKey });
+
     const user = context.db
       .select()
       .from(users)
@@ -98,11 +121,32 @@ export function createAuthRouter(context: DatabaseContext) {
       .get();
 
     if (!user) {
-      response.status(404).json({ error: "user_nicht_gefunden" });
+      writeAuditLog(context, {
+        action: "auth.request_unknown",
+        entityType: "user",
+        entityId: null,
+        summary: `Unbekannter Login-Code-Request für ${usernameKey}.`,
+        metadata: { username: usernameKey.slice(0, 3) + "***" }
+      });
+      response.status(202).json({ ok: true });
       return;
     }
 
-    const issued = issueLoginChallenge(context, user);
+    const timestamp = nowIso();
+    const issued = context.sqlite.transaction(() => {
+      context.db
+        .delete(loginChallenges)
+        .where(and(eq(loginChallenges.username, user.username), lt(loginChallenges.expiresAt, timestamp)))
+        .run();
+
+      context.db
+        .update(loginChallenges)
+        .set({ consumedAt: timestamp })
+        .where(and(eq(loginChallenges.username, user.username), isNull(loginChallenges.consumedAt)))
+        .run();
+
+      return issueLoginChallenge(context, user);
+    })();
 
     try {
       await sendIssuedLoginCode(context, user, issued);
@@ -128,6 +172,22 @@ export function createAuthRouter(context: DatabaseContext) {
       response.status(400).json({ error: "ungueltige_registrierung" });
       return;
     }
+
+    const usernameKey = normalizeUsername(parsed.data.username);
+    const registerKey = `username:${usernameKey}|ip:${request.ip ?? ""}`;
+    const registerRateLimit = checkRateLimit(context, {
+      scope: "invite_register",
+      key: registerKey,
+      sourceIp: request.ip
+    });
+    if (!registerRateLimit.ok) {
+      response.status(429).json({
+        error: registerRateLimit.error,
+        retryAfterSeconds: registerRateLimit.retryAfterSeconds
+      });
+      return;
+    }
+    recordRateLimitFailure(context, { scope: "invite_register", key: registerKey });
 
     const timestamp = nowIso();
     const normalizedCode = normalizeInviteCode(parsed.data.inviteCode);
@@ -226,6 +286,21 @@ export function createAuthRouter(context: DatabaseContext) {
       return;
     }
 
+    const usernameKey = normalizeUsername(parsed.data.username);
+    const verifyKey = `username:${usernameKey}|ip:${request.ip ?? ""}`;
+    const verifyRateLimit = checkRateLimit(context, {
+      scope: "login_verify",
+      key: verifyKey,
+      sourceIp: request.ip
+    });
+    if (!verifyRateLimit.ok) {
+      response.status(429).json({
+        error: verifyRateLimit.error,
+        retryAfterSeconds: verifyRateLimit.retryAfterSeconds
+      });
+      return;
+    }
+
     const timestamp = nowIso();
     const challenge = context.db
       .select()
@@ -241,6 +316,7 @@ export function createAuthRouter(context: DatabaseContext) {
       .get();
 
     if (!challenge || !verifyOtp(parsed.data.code, challenge.codeHash)) {
+      recordRateLimitFailure(context, { scope: "login_verify", key: verifyKey });
       response.status(401).json({ error: "code_abgelehnt" });
       return;
     }
@@ -252,6 +328,7 @@ export function createAuthRouter(context: DatabaseContext) {
       .get();
 
     if (!user) {
+      recordRateLimitFailure(context, { scope: "login_verify", key: verifyKey });
       response.status(401).json({ error: "code_abgelehnt" });
       return;
     }

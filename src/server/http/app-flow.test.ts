@@ -24,7 +24,8 @@ async function login(agent: ReturnType<typeof request.agent>, username: string) 
 }
 
 describe("app flow", () => {
-  beforeEach(async () => {
+  beforeEach(
+    async () => {
     databasePath = path.join(os.tmpdir(), `hermes-test-${randomUUID()}.sqlite`);
     process.env.HERMES_DB_PATH = databasePath;
     process.env.HERMES_ADMIN_PHONE = "+491701234567";
@@ -37,7 +38,9 @@ describe("app flow", () => {
     delete process.env.HERMES_VAPID_PRIVATE_KEY;
     await bootstrapAdmin();
     started = await createHermesApp();
-  });
+    },
+    30_000
+  );
 
   afterEach(async () => {
     await started?.close();
@@ -140,6 +143,89 @@ describe("app flow", () => {
       });
   });
 
+  it("returns a generic success response for unknown login-code requests without creating challenges", async () => {
+    const agent = request(started!.app);
+    await agent.post("/api/auth/request-code").send({ username: "unbekannt" }).expect(202);
+
+    const sqlite = new Database(databasePath);
+    const count = sqlite
+      .prepare("SELECT COUNT(*) AS count FROM login_challenges WHERE username = ?")
+      .get("unbekannt") as { count: number };
+    sqlite.close();
+    expect(count.count).toBe(0);
+  });
+
+  it("supersedes older login challenges and cleans expired challenges", async () => {
+    const adminAgent = request.agent(started!.app);
+    await login(adminAgent, "hauptadmin");
+
+    await adminAgent
+      .post("/api/admin/users")
+      .send({ username: "spieler", email: "spieler@example.test", role: "user" })
+      .expect(201);
+
+    const sqlite = new Database(databasePath);
+    const expiredId = randomUUID();
+    const past = new Date(Date.now() - 60_000).toISOString();
+    sqlite
+      .prepare(
+        `
+        INSERT INTO login_challenges (
+          id, phone_number, username, email, code_hash, expires_at, consumed_at, sent_at, created_at
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+      `
+      )
+      .run(expiredId, "user:expired", "spieler", "spieler@example.test", "hash", past, null, null, past);
+    sqlite.close();
+
+    await request(started!.app).post("/api/auth/request-code").send({ username: "spieler" }).expect(202);
+    await request(started!.app).post("/api/auth/request-code").send({ username: "spieler" }).expect(202);
+
+    const sqliteAfter = new Database(databasePath);
+    const rows = sqliteAfter
+      .prepare(
+        "SELECT id, consumed_at, expires_at FROM login_challenges WHERE username = ? ORDER BY created_at ASC"
+      )
+      .all("spieler") as Array<{ id: string; consumed_at: string | null; expires_at: string }>;
+    sqliteAfter.close();
+
+    expect(rows.some((row) => row.id === expiredId)).toBe(false);
+    expect(rows.length).toBeGreaterThanOrEqual(2);
+    expect(rows[0].consumed_at).not.toBeNull();
+    expect(rows[rows.length - 1].consumed_at).toBeNull();
+  });
+
+  it("rate-limits repeated login-code requests and OTP verification attempts", async () => {
+    for (let i = 0; i < 5; i += 1) {
+      await request(started!.app).post("/api/auth/request-code").send({ username: "unbekannt2" }).expect(202);
+    }
+
+    await request(started!.app)
+      .post("/api/auth/request-code")
+      .send({ username: "unbekannt2" })
+      .expect(429)
+      .expect((response) => {
+        expect(response.body.error).toBe("rate_limit_aktiv");
+        expect(typeof response.body.retryAfterSeconds).toBe("number");
+      });
+
+    for (let i = 0; i < 8; i += 1) {
+      await request(started!.app)
+        .post("/api/auth/verify-code")
+        .send({ username: "unbekannt2", code: "000000", deviceName: "x" })
+        .expect(401);
+    }
+
+    await request(started!.app)
+      .post("/api/auth/verify-code")
+      .send({ username: "unbekannt2", code: "000000", deviceName: "x" })
+      .expect(429)
+      .expect((response) => {
+        expect(response.body.error).toBe("rate_limit_aktiv");
+        expect(typeof response.body.retryAfterSeconds).toBe("number");
+      });
+  });
+
   it("logs in, manages roles, creates events and enforces participation capacity", async () => {
     const adminAgent = request.agent(started!.app);
     await login(adminAgent, "hauptadmin");
@@ -220,7 +306,7 @@ describe("app flow", () => {
 
     expect(invite.body.inviteCode.usedCount).toBe(0);
     await adminAgent.delete(`/api/admin/users/${invited.body.user.id}`).expect(204);
-    await request(started!.app).post("/api/auth/request-code").send({ username: "invitee" }).expect(404);
+    await request(started!.app).post("/api/auth/request-code").send({ username: "invitee" }).expect(202);
 
     await request(started!.app)
       .get("/api/settings")
