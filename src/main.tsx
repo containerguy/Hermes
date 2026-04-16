@@ -73,6 +73,26 @@ type InviteCode = {
   usedCount: number;
 };
 
+type RateLimitEntry = {
+  id: string;
+  scope: string;
+  key: string;
+  attemptCount: number;
+  windowStartedAt: string;
+  lastAttemptAt: string;
+  blockedUntil: string | null;
+  createdAt: string;
+  updatedAt: string;
+};
+
+type RateLimitAllowlistEntry = {
+  id: string;
+  ipOrCidr: string;
+  note: string | null;
+  createdAt: string;
+  updatedAt: string;
+};
+
 type Route = {
   id: PageId;
   path: string;
@@ -1297,6 +1317,9 @@ function AdminPanel({
   const [users, setUsers] = useState<User[]>([]);
   const [auditLogs, setAuditLogs] = useState<AuditLogEntry[]>([]);
   const [inviteCodes, setInviteCodes] = useState<InviteCode[]>([]);
+  const [rateLimits, setRateLimits] = useState<RateLimitEntry[]>([]);
+  const [rateLimitAllowlist, setRateLimitAllowlist] = useState<RateLimitAllowlistEntry[]>([]);
+  const [allowlistDraft, setAllowlistDraft] = useState({ ipOrCidr: "", note: "" });
   const [inviteDrafts, setInviteDrafts] = useState<
     Record<string, { label: string; maxUses: string; expiresAt: string }>
   >({});
@@ -1314,6 +1337,7 @@ function AdminPanel({
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
   const [opsBusy, setOpsBusy] = useState(false);
+  const [rateLimitBusy, setRateLimitBusy] = useState(false);
 
   const isAdmin = currentUser?.role === "admin";
 
@@ -1322,16 +1346,27 @@ function AdminPanel({
       return;
     }
 
-    const [userResult, settingsResult, auditResult, inviteResult] = await Promise.all([
+    const [
+      userResult,
+      settingsResult,
+      auditResult,
+      inviteResult,
+      rateLimitResult,
+      allowlistResult
+    ] = await Promise.all([
       requestJson<{ users: User[] }>("/api/admin/users"),
       requestJson<{ settings: AppSettings }>("/api/admin/settings"),
       requestJson<{ auditLogs: AuditLogEntry[] }>("/api/admin/audit-log?limit=80"),
-      requestJson<{ inviteCodes: InviteCode[] }>("/api/admin/invite-codes")
+      requestJson<{ inviteCodes: InviteCode[] }>("/api/admin/invite-codes"),
+      requestJson<{ rateLimits: RateLimitEntry[] }>("/api/admin/rate-limits"),
+      requestJson<{ allowlist: RateLimitAllowlistEntry[] }>("/api/admin/rate-limits/allowlist")
     ]);
     setUsers(userResult.users);
     setSettings(settingsResult.settings);
     setAuditLogs(auditResult.auditLogs);
     setInviteCodes(inviteResult.inviteCodes);
+    setRateLimits(rateLimitResult.rateLimits);
+    setRateLimitAllowlist(allowlistResult.allowlist);
     setInviteDrafts(
       Object.fromEntries(
         inviteResult.inviteCodes.map((invite) => [
@@ -1349,6 +1384,81 @@ function AdminPanel({
   useEffect(() => {
     loadAdminData().catch(() => undefined);
   }, [isAdmin]);
+
+  function getActiveRateLimitEntries() {
+    const now = Date.now();
+    return rateLimits
+      .filter((entry) => entry.blockedUntil && new Date(entry.blockedUntil).getTime() > now)
+      .sort((a, b) => new Date(b.blockedUntil ?? 0).getTime() - new Date(a.blockedUntil ?? 0).getTime());
+  }
+
+  async function clearRateLimitEntry(entry: RateLimitEntry) {
+    const confirmed = window.confirm("Rate-Limit wirklich löschen? (Block wird sofort aufgehoben)");
+    if (!confirmed) {
+      return;
+    }
+
+    setRateLimitBusy(true);
+    setError("");
+    setMessage("");
+
+    try {
+      await requestJson<{ ok: true }>(`/api/admin/rate-limits/${entry.id}`, { method: "DELETE" });
+      await loadAdminData();
+      setMessage("Rate-Limit gelöscht.");
+    } catch (caught) {
+      setError(getErrorMessage(caught));
+    } finally {
+      setRateLimitBusy(false);
+    }
+  }
+
+  async function addAllowlistEntry(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    setRateLimitBusy(true);
+    setError("");
+    setMessage("");
+
+    try {
+      await requestJson<{ ok: true; id: string }>("/api/admin/rate-limits/allowlist", {
+        method: "POST",
+        body: JSON.stringify({
+          ipOrCidr: allowlistDraft.ipOrCidr,
+          note: allowlistDraft.note
+        })
+      });
+      setAllowlistDraft({ ipOrCidr: "", note: "" });
+      await loadAdminData();
+      setMessage("Allowlist-Eintrag gespeichert.");
+    } catch (caught) {
+      setError(getErrorMessage(caught));
+    } finally {
+      setRateLimitBusy(false);
+    }
+  }
+
+  async function deleteAllowlistEntry(entry: RateLimitAllowlistEntry) {
+    const confirmed = window.confirm("Allowlist-Eintrag wirklich löschen?");
+    if (!confirmed) {
+      return;
+    }
+
+    setRateLimitBusy(true);
+    setError("");
+    setMessage("");
+
+    try {
+      await requestJson<{ ok: true }>(`/api/admin/rate-limits/allowlist/${entry.id}`, {
+        method: "DELETE"
+      });
+      await loadAdminData();
+      setMessage("Allowlist-Eintrag gelöscht.");
+    } catch (caught) {
+      setError(getErrorMessage(caught));
+    } finally {
+      setRateLimitBusy(false);
+    }
+  }
 
   async function createUser(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -1599,6 +1709,8 @@ function AdminPanel({
     );
   }
 
+  const activeRateLimits = getActiveRateLimitEntries();
+
   return (
     <section id="admin" className="admin-panel" aria-label="Adminbereich">
       <p className="eyebrow">Admin</p>
@@ -1783,6 +1895,96 @@ function AdminPanel({
           <button type="button" className="secondary" onClick={runRestore} disabled={opsBusy}>
             Restore starten
           </button>
+        </div>
+      </section>
+
+      <section className="rate-limit-panel" aria-label="Rate-Limit Betrieb">
+        <div className="section-title-row">
+          <div>
+            <p className="eyebrow">Rate-Limits</p>
+            <h2>Sperren prüfen und aufheben.</h2>
+          </div>
+          <button type="button" className="secondary" onClick={() => loadAdminData()} disabled={rateLimitBusy}>
+            Aktualisieren
+          </button>
+        </div>
+        <p className="muted">
+          Wenn sich jemand im LAN versehentlich aussperrt, kannst du aktive IP/Username-Sperren hier
+          sehen, löschen und lokale IPs/PREFIXe in eine Allowlist aufnehmen.
+        </p>
+
+        <div className="device-list" aria-label="Aktive Rate-Limit Sperren">
+          {activeRateLimits.map((entry) => (
+            <article className="device-row" key={entry.id}>
+              <div>
+                <strong>{entry.scope}</strong>
+                <span>Key: {entry.key.slice(0, 10)}…</span>
+                <span>Versuche: {entry.attemptCount}</span>
+                <time dateTime={entry.blockedUntil ?? undefined}>
+                  Gesperrt bis:{" "}
+                  {entry.blockedUntil ? new Date(entry.blockedUntil).toLocaleString("de-DE") : "—"}
+                </time>
+              </div>
+              <div className="device-actions">
+                <button type="button" className="secondary danger" onClick={() => clearRateLimitEntry(entry)} disabled={rateLimitBusy}>
+                  Sperre löschen
+                </button>
+              </div>
+            </article>
+          ))}
+          {activeRateLimits.length === 0 ? (
+            <article className="device-row">
+              <strong>Keine aktiven Sperren.</strong>
+              <span>Wenn Rate-Limits aktiv sind, erscheinen sie hier.</span>
+            </article>
+          ) : null}
+        </div>
+
+        <form onSubmit={addAllowlistEntry} className="admin-form inline-form" aria-label="Allowlist Eintrag hinzufügen">
+          <label>
+            IP oder CIDR (z.B. 192.168.0.42 oder 192.168.0.0/24)
+            <input
+              value={allowlistDraft.ipOrCidr}
+              onChange={(event) => setAllowlistDraft({ ...allowlistDraft, ipOrCidr: event.target.value })}
+              required
+            />
+          </label>
+          <label>
+            Label (z.B. "Router", "Gaming-PC", "Admin-Laptop")
+            <input
+              value={allowlistDraft.note}
+              onChange={(event) => setAllowlistDraft({ ...allowlistDraft, note: event.target.value })}
+              required
+            />
+          </label>
+          <button type="submit" disabled={rateLimitBusy}>
+            Allowlist speichern
+          </button>
+        </form>
+
+        <div className="device-list" aria-label="Rate-Limit Allowlist">
+          {rateLimitAllowlist.map((entry) => (
+            <article className="device-row" key={entry.id}>
+              <div>
+                <strong>{entry.ipOrCidr}</strong>
+                <span>{entry.note ?? "Ohne Label"}</span>
+                <time dateTime={entry.updatedAt}>
+                  Aktualisiert: {new Date(entry.updatedAt).toLocaleString("de-DE")}
+                </time>
+              </div>
+              <div className="device-actions">
+                <button type="button" className="secondary danger" onClick={() => deleteAllowlistEntry(entry)} disabled={rateLimitBusy}>
+                  Entfernen
+                </button>
+              </div>
+            </article>
+          ))}
+          {rateLimitAllowlist.length === 0 ? (
+            <article className="device-row">
+              <strong>Noch keine Allowlist-Einträge.</strong>
+              <span>Für stabile LAN-Setups können lokale IPs hier ausgenommen werden.</span>
+            </article>
+          ) : null}
         </div>
       </section>
 

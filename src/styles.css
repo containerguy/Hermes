@@ -604,6 +604,15 @@ dd {
   padding-top: 18px;
 }
 
+.rate-limit-panel {
+  display: grid;
+  grid-column: 1;
+  gap: 14px;
+  margin-top: 8px;
+  border-top: 1px solid var(--line);
+  padding-top: 18px;
+}
+
 .audit-panel {
   display: grid;
   grid-column: 1 / -1;
