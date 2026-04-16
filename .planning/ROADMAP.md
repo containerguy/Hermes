@@ -37,7 +37,7 @@ Plans:
 - [x] 01-02: Harden auth entry points with generic login responses and persisted throttling; add admin rate-limit operations APIs.
 - [x] 01-03: Implement profile, confirmed email-change, active-email uniqueness, and device/session backend behavior.
 - [x] 01-04: Harden invite registration and admin invite lifecycle with generated-only high-entropy codes and masked audit metadata.
-- [ ] 01-05: Wire profile, invite lifecycle, and CSRF-aware client requests into the existing UI.
+- [x] 01-05: Wire profile, invite lifecycle, and CSRF-aware client requests into the existing UI.
 - [ ] 01-06: Complete Phase 1 regression coverage, docs/env updates, and final validation.
 - [x] 01-07: Split out hashed-token sessions, sensitive session revocation, and CSRF enforcement.
 - [ ] 01-08: Split out the admin rate-limit operations UI for LAN lockout recovery.
