@@ -14,6 +14,15 @@ type AuditLogInput = {
   metadata?: Record<string, unknown>;
 };
 
+export function maskInviteCode(code: string) {
+  const normalized = code.trim();
+  if (!normalized) return "";
+  if (normalized.length <= 6) {
+    return normalized.slice(0, 1) + "***" + normalized.slice(-1);
+  }
+  return normalized.slice(0, 3) + "***" + normalized.slice(-3);
+}
+
 export function writeAuditLog(context: DatabaseContext, input: AuditLogInput) {
   context.db
     .insert(auditLogs)

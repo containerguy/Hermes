@@ -327,6 +327,60 @@ describe("app flow", () => {
       });
   });
 
+  it("rejects admin-supplied custom invite codes and redacts invite codes in audit metadata", async () => {
+    const adminAgent = request.agent(started!.app);
+    await login(adminAgent, "hauptadmin");
+    const csrf = await fetchCsrf(adminAgent);
+
+    await adminAgent
+      .put("/api/admin/settings")
+      .send({
+        appName: "Hermes Test",
+        defaultNotificationsEnabled: true,
+        eventAutoArchiveHours: 8,
+        publicRegistrationEnabled: true,
+        themePrimaryColor: "#0f766e",
+        themeLoginColor: "#be123c",
+        themeManagerColor: "#b7791f",
+        themeAdminColor: "#2563eb",
+        themeSurfaceColor: "#f6f8f4"
+      })
+      .set(CSRF_HEADER, csrf)
+      .expect(200);
+
+    await adminAgent
+      .post("/api/admin/invite-codes")
+      .send({ label: "Weak", code: "TESTLAN" })
+      .set(CSRF_HEADER, csrf)
+      .expect(400)
+      .expect((response) => {
+        expect(response.body.error).toBe("invite_code_custom_deaktiviert");
+      });
+
+    const created = await adminAgent
+      .post("/api/admin/invite-codes")
+      .send({ label: "Generated only" })
+      .set(CSRF_HEADER, csrf)
+      .expect(201);
+
+    const fullCode = (created.body.inviteCode as { code: string }).code;
+    expect(fullCode).toMatch(/^[0-9A-HJKMNP-TV-Z]{16}$/);
+
+    await adminAgent
+      .get("/api/admin/audit-log?limit=20")
+      .expect(200)
+      .expect((response) => {
+        const inviteCreate = (response.body.auditLogs as Array<{ action: string; metadata: unknown }>).find(
+          (entry) => entry.action === "invite.create"
+        );
+        expect(inviteCreate).toBeTruthy();
+        const metadata = inviteCreate?.metadata as Record<string, unknown> | null | undefined;
+        expect(metadata).toBeTruthy();
+        const metadataString = JSON.stringify(metadata ?? {});
+        expect(metadataString.includes(fullCode)).toBe(false);
+      });
+  });
+
   it("stores hashed session tokens, rejects legacy sessions, and revokes sessions after sensitive admin changes", async () => {
     const adminAgent = request.agent(started!.app);
     await login(adminAgent, "hauptadmin");
@@ -509,14 +563,17 @@ describe("app flow", () => {
 
     const invite = await adminAgent
       .post("/api/admin/invite-codes")
-      .send({ label: "Test LAN", code: "TESTLAN", maxUses: 5 })
+      .send({ label: "Test LAN", maxUses: 5 })
       .set(CSRF_HEADER, adminCsrf)
       .expect(201);
+
+    const createdInvite = invite.body.inviteCode as { code: string; usedCount: number };
+    expect(createdInvite.code).toMatch(/^[0-9A-HJKMNP-TV-Z]{16}$/);
 
     const invitedAgent = request.agent(started!.app);
     const invited = await invitedAgent
       .post("/api/auth/register")
-      .send({ inviteCode: "TESTLAN", username: "invitee", email: "invitee@example.test" })
+      .send({ inviteCode: createdInvite.code, username: "invitee", email: "invitee@example.test" })
       .expect(201);
 
     await invitedAgent

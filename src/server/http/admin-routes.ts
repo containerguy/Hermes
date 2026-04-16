@@ -1,10 +1,10 @@
 import { asc, desc, eq, isNull } from "drizzle-orm";
 import { Router } from "express";
-import { randomUUID } from "node:crypto";
+import { randomBytes, randomUUID } from "node:crypto";
 import { z } from "zod";
 import { requireCsrf } from "../auth/csrf";
 import { publicUser, requireAdmin, requireUser } from "../auth/current-user";
-import { listAuditLogs, tryWriteAuditLog } from "../audit-log";
+import { listAuditLogs, maskInviteCode, tryWriteAuditLog } from "../audit-log";
 import {
   addRateLimitAllowlist,
   clearRateLimitBlock,
@@ -34,7 +34,8 @@ const updateUserSchema = z.object({
 });
 
 const createInviteCodeSchema = z.object({
-  code: z.string().trim().min(4).max(80).optional(),
+  code: z.string().trim().min(1).max(80).optional(),
+  customCode: z.string().trim().min(1).max(80).optional(),
   label: z.string().trim().min(1).max(120),
   maxUses: z.number().int().min(1).max(500).nullable().optional(),
   expiresAt: z.string().datetime().nullable().optional()
@@ -58,7 +59,27 @@ function normalizeInviteCode(code: string) {
 }
 
 function generateInviteCode() {
-  return randomUUID().replace(/-/g, "").slice(0, 10).toUpperCase();
+  // 10 random bytes = 80 bits entropy; encoded as 16 Crockford-base32 characters.
+  const bytes = randomBytes(10);
+  const alphabet = "0123456789ABCDEFGHJKMNPQRSTVWXYZ";
+  let out = "";
+  let buffer = 0;
+  let bits = 0;
+
+  for (const byte of bytes) {
+    buffer = (buffer << 8) | byte;
+    bits += 8;
+    while (bits >= 5) {
+      bits -= 5;
+      out += alphabet[(buffer >> bits) & 31] ?? "0";
+    }
+  }
+
+  if (bits > 0) {
+    out += alphabet[(buffer << (5 - bits)) & 31] ?? "0";
+  }
+
+  return out.slice(0, 16);
 }
 
 function serializeInviteCode(context: DatabaseContext, invite: typeof inviteCodes.$inferSelect) {
@@ -397,9 +418,19 @@ export function createAdminRouter(context: DatabaseContext) {
       return;
     }
 
+    if (parsed.data.code !== undefined || parsed.data.customCode !== undefined) {
+      response.status(400).json({ error: "invite_code_custom_deaktiviert" });
+      return;
+    }
+
     const timestamp = nowIso();
     const id = randomUUID();
-    const code = normalizeInviteCode(parsed.data.code ?? generateInviteCode());
+    const code = normalizeInviteCode(generateInviteCode());
+    const maxUses = parsed.data.maxUses === undefined ? 300 : parsed.data.maxUses;
+    const expiresAt =
+      parsed.data.expiresAt === undefined
+        ? new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString()
+        : parsed.data.expiresAt;
 
     try {
       context.db
@@ -408,8 +439,8 @@ export function createAdminRouter(context: DatabaseContext) {
           id,
           code,
           label: parsed.data.label,
-          maxUses: parsed.data.maxUses ?? null,
-          expiresAt: parsed.data.expiresAt ?? null,
+          maxUses,
+          expiresAt,
           revokedAt: null,
           createdByUserId: admin.id,
           createdAt: timestamp,
@@ -429,7 +460,13 @@ export function createAdminRouter(context: DatabaseContext) {
       entityType: "invite_code",
       entityId: id,
       summary: `${admin.username} hat Invite ${parsed.data.label} erstellt.`,
-      metadata: { code, maxUses: parsed.data.maxUses ?? null, expiresAt: parsed.data.expiresAt ?? null }
+      metadata: {
+        inviteCodeId: id,
+        inviteLabel: parsed.data.label,
+        inviteMaskedCode: maskInviteCode(code),
+        maxUses,
+        expiresAt
+      }
     });
     response.status(201).json({
       inviteCode: created ? serializeInviteCode(context, created) : undefined
@@ -466,7 +503,11 @@ export function createAdminRouter(context: DatabaseContext) {
       entityType: "invite_code",
       entityId: invite.id,
       summary: `${admin.username} hat Invite ${invite.label} deaktiviert.`,
-      metadata: { code: invite.code }
+      metadata: {
+        inviteCodeId: invite.id,
+        inviteLabel: invite.label,
+        inviteMaskedCode: maskInviteCode(invite.code)
+      }
     });
 
     response.status(204).send();
