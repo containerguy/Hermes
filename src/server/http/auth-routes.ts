@@ -7,6 +7,7 @@ import { getCurrentSession, publicUser } from "../auth/current-user";
 import { deviceSignalsFingerprint, hashDeviceKey, normalizeDeviceSignals } from "../auth/device-key";
 import { resolveDeviceName, validateDeviceName } from "../auth/device-names";
 import { maskInviteCode, tryWriteAuditLog } from "../audit-log";
+import { createPairingToken, hashPairingToken, PAIR_TOKEN_TTL_MS } from "../auth/pairing-tokens";
 import { checkRateLimit, recordRateLimitFailure } from "../auth/rate-limits";
 import {
   createSessionId,
@@ -17,7 +18,15 @@ import {
 } from "../auth/sessions";
 import { generateOtp, hashOtp, verifyOtp } from "../auth/otp";
 import type { DatabaseContext } from "../db/client";
-import { emailChangeChallenges, inviteCodes, inviteCodeUses, loginChallenges, sessions, users } from "../db/schema";
+import {
+  emailChangeChallenges,
+  inviteCodes,
+  inviteCodeUses,
+  loginChallenges,
+  pairingTokens,
+  sessions,
+  users
+} from "../db/schema";
 import { ensureActiveEmailAvailable } from "../domain/users";
 import { sendEmailChangeCode, sendLoginCode } from "../mail/mailer";
 import { readSettings } from "../settings";
@@ -929,6 +938,76 @@ export function createAuthRouter(context: DatabaseContext) {
     }
 
     response.json({ revokedCurrent: target.id === current.session.id });
+  });
+
+  router.post("/pair-token", (request, response) => {
+    const current = getCurrentSession(context, request);
+    if (!current) {
+      response.status(401).json({ error: "nicht_angemeldet" });
+      return;
+    }
+
+    const sessionKey = `session:${current.session.id}`;
+    const userKey = `user:${current.user.id}`;
+    const sessionLimit = checkRateLimit(context, {
+      scope: "pair_token_create",
+      key: sessionKey,
+      sourceIp: request.ip
+    });
+    if (!sessionLimit.ok) {
+      response.status(429).json({
+        error: sessionLimit.error,
+        retryAfterSeconds: sessionLimit.retryAfterSeconds
+      });
+      return;
+    }
+    const userLimit = checkRateLimit(context, {
+      scope: "pair_token_create",
+      key: userKey,
+      sourceIp: request.ip
+    });
+    if (!userLimit.ok) {
+      response.status(429).json({
+        error: userLimit.error,
+        retryAfterSeconds: userLimit.retryAfterSeconds
+      });
+      return;
+    }
+
+    const token = createPairingToken();
+    const tokenHash = hashPairingToken(token);
+    const tokenId = randomUUID();
+    const timestamp = nowIso();
+    const expiresAt = new Date(Date.now() + PAIR_TOKEN_TTL_MS).toISOString();
+
+    context.db
+      .insert(pairingTokens)
+      .values({
+        id: tokenId,
+        userId: current.user.id,
+        originSessionId: current.session.id,
+        tokenHash,
+        expiresAt,
+        consumedAt: null,
+        consumedSessionId: null,
+        createdAt: timestamp
+      })
+      .run();
+
+    recordRateLimitFailure(context, { scope: "pair_token_create", key: sessionKey });
+    recordRateLimitFailure(context, { scope: "pair_token_create", key: userKey });
+
+    tryWriteAuditLog(context, {
+      actor: current.user,
+      action: "device_pair_created",
+      entityType: "session",
+      entityId: current.session.id,
+      summary: `${current.user.username} hat ein Pairing-Token erstellt.`,
+      metadata: { originSessionId: current.session.id, expiresAt }
+    });
+
+    response.setHeader("Cache-Control", "no-store");
+    response.status(201).json({ token, expiresAt });
   });
 
   router.post("/logout", (request, response) => {
