@@ -61,6 +61,8 @@ Each task was committed atomically:
 
 1. **Task 1: Add admin rate-limit operations view** - `1604ab6` (feat)
 
+**Plan metadata:** `7624601` (docs: complete plan)
+
 ## Files Created/Modified
 
 - `src/main.tsx` - AdminPanel rate-limit operations view (list/clear blocks, allowlist add/delete)
