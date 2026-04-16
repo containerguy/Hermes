@@ -209,6 +209,19 @@ export const auditLogs = sqliteTable(
   ]
 );
 
+export const storageBackupStatus = sqliteTable("storage_backup_status", {
+  backend: text("backend").primaryKey(),
+  lastSuccessAt: text("last_success_at"),
+  lastFailureAt: text("last_failure_at"),
+  failureCode: text("failure_code"),
+  failureSummary: text("failure_summary"),
+  bucket: text("bucket"),
+  key: text("key"),
+  region: text("region"),
+  endpoint: text("endpoint"),
+  updatedAt: text("updated_at").notNull()
+});
+
 export const inviteCodes = sqliteTable(
   "invite_codes",
   {

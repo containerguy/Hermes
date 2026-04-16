@@ -10,6 +10,24 @@ type S3Credentials = {
   secretAccessKey: string;
 };
 
+export type StorageBackend = "s3" | "disabled";
+
+export type S3LocationDetails = {
+  bucket: string;
+  key: string;
+  region: string;
+  endpoint: string;
+};
+
+export type BackupStatusRow = {
+  lastSuccessAt: string | null;
+  lastFailureAt: string | null;
+  failureCode: string | null;
+  failureSummary: string | null;
+  location: S3LocationDetails | null;
+  updatedAt: string;
+};
+
 let snapshotTimer: NodeJS.Timeout | undefined;
 
 const restorableTables = [
@@ -28,6 +46,10 @@ const restorableTables = [
 
 function isS3StorageEnabled() {
   return process.env.HERMES_STORAGE_BACKEND === "s3";
+}
+
+export function getStorageBackend(): StorageBackend {
+  return isS3StorageEnabled() ? "s3" : "disabled";
 }
 
 function normalizeCredentialKey(key: string) {
@@ -135,6 +157,25 @@ function readS3Config() {
   };
 }
 
+function readS3LocationConfig(): S3LocationDetails {
+  const region = process.env.HERMES_S3_REGION ?? "eu-central-2";
+  const bucket = process.env.HERMES_S3_BUCKET ?? "hermes-storage";
+
+  return {
+    bucket,
+    key: process.env.HERMES_S3_DB_KEY ?? "hermes.sqlite",
+    region,
+    endpoint: process.env.HERMES_S3_ENDPOINT ?? `https://s3.${region}.wasabisys.com`
+  };
+}
+
+export function getS3LocationDetails(): S3LocationDetails | null {
+  if (!isS3StorageEnabled()) {
+    return null;
+  }
+  return readS3LocationConfig();
+}
+
 function createS3Client() {
   const config = readS3Config();
 
@@ -151,6 +192,214 @@ function createS3Client() {
 
 function quoteIdentifier(identifier: string) {
   return `"${identifier.replace(/"/g, '""')}"`;
+}
+
+function truncate(input: string, max = 240) {
+  if (input.length <= max) return input;
+  return input.slice(0, max - 1) + "…";
+}
+
+function looksSensitive(value: string) {
+  const lowered = value.toLowerCase();
+  return (
+    lowered.includes("authorization") ||
+    lowered.includes("cookie") ||
+    lowered.includes("x-amz-") ||
+    lowered.includes("x-amzn-") ||
+    lowered.includes("accesskey") ||
+    lowered.includes("secret") ||
+    lowered.includes("token")
+  );
+}
+
+export function toSafeBackupFailureSummary(error: unknown) {
+  if (!error) {
+    return "Unbekannter Fehler.";
+  }
+
+  const name = error instanceof Error ? error.name : "";
+  const message = error instanceof Error ? error.message : "";
+  const code =
+    typeof (error as { code?: unknown } | null | undefined)?.code === "string"
+      ? ((error as { code: string }).code as string)
+      : "";
+
+  const parts = [name, code, message].filter(Boolean).join(": ");
+  const summarized = parts || "Backup fehlgeschlagen.";
+
+  const cleaned = summarized.replace(/\s+/g, " ").trim();
+  if (looksSensitive(cleaned)) {
+    return "Backup fehlgeschlagen. Details wurden aus Sicherheitsgründen entfernt.";
+  }
+  return truncate(cleaned, 240);
+}
+
+export function readBackupStatus(sqlite: Database.Database): BackupStatusRow | null {
+  const row = sqlite
+    .prepare(
+      `
+      SELECT
+        last_success_at AS lastSuccessAt,
+        last_failure_at AS lastFailureAt,
+        failure_code AS failureCode,
+        failure_summary AS failureSummary,
+        bucket,
+        key,
+        region,
+        endpoint,
+        updated_at AS updatedAt
+      FROM storage_backup_status
+      WHERE backend = ?
+    `
+    )
+    .get("s3") as
+    | (Record<string, unknown> & {
+        lastSuccessAt: string | null;
+        lastFailureAt: string | null;
+        failureCode: string | null;
+        failureSummary: string | null;
+        bucket: string | null;
+        key: string | null;
+        region: string | null;
+        endpoint: string | null;
+        updatedAt: string;
+      })
+    | undefined;
+
+  if (!row) {
+    return null;
+  }
+
+  const location =
+    row.bucket && row.key && row.region && row.endpoint
+      ? {
+          bucket: row.bucket,
+          key: row.key,
+          region: row.region,
+          endpoint: row.endpoint
+        }
+      : null;
+
+  return {
+    lastSuccessAt: row.lastSuccessAt,
+    lastFailureAt: row.lastFailureAt,
+    failureCode: row.failureCode,
+    failureSummary: row.failureSummary,
+    location,
+    updatedAt: row.updatedAt
+  };
+}
+
+type BackupStatusPatch = Partial<{
+  lastSuccessAt: string | null;
+  lastFailureAt: string | null;
+  failureCode: string | null;
+  failureSummary: string | null;
+  location: S3LocationDetails | null;
+}>;
+
+export function writeBackupStatus(sqlite: Database.Database, patch: BackupStatusPatch) {
+  const existing = sqlite
+    .prepare(
+      `
+      SELECT
+        last_success_at AS lastSuccessAt,
+        last_failure_at AS lastFailureAt,
+        failure_code AS failureCode,
+        failure_summary AS failureSummary,
+        bucket,
+        key,
+        region,
+        endpoint
+      FROM storage_backup_status
+      WHERE backend = ?
+    `
+    )
+    .get("s3") as
+    | {
+        lastSuccessAt: string | null;
+        lastFailureAt: string | null;
+        failureCode: string | null;
+        failureSummary: string | null;
+        bucket: string | null;
+        key: string | null;
+        region: string | null;
+        endpoint: string | null;
+      }
+    | undefined;
+
+  const resolvedLocation = patch.location ?? undefined;
+  const next = {
+    lastSuccessAt: patch.lastSuccessAt !== undefined ? patch.lastSuccessAt : existing?.lastSuccessAt ?? null,
+    lastFailureAt: patch.lastFailureAt !== undefined ? patch.lastFailureAt : existing?.lastFailureAt ?? null,
+    failureCode: patch.failureCode !== undefined ? patch.failureCode : existing?.failureCode ?? null,
+    failureSummary: patch.failureSummary !== undefined ? patch.failureSummary : existing?.failureSummary ?? null,
+    bucket:
+      resolvedLocation !== undefined
+        ? resolvedLocation?.bucket ?? null
+        : existing?.bucket ?? null,
+    key:
+      resolvedLocation !== undefined
+        ? resolvedLocation?.key ?? null
+        : existing?.key ?? null,
+    region:
+      resolvedLocation !== undefined
+        ? resolvedLocation?.region ?? null
+        : existing?.region ?? null,
+    endpoint:
+      resolvedLocation !== undefined
+        ? resolvedLocation?.endpoint ?? null
+        : existing?.endpoint ?? null,
+    updatedAt: new Date().toISOString()
+  };
+
+  sqlite
+    .prepare(
+      `
+      INSERT INTO storage_backup_status (
+        backend,
+        last_success_at,
+        last_failure_at,
+        failure_code,
+        failure_summary,
+        bucket,
+        key,
+        region,
+        endpoint,
+        updated_at
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      ON CONFLICT(backend) DO UPDATE SET
+        last_success_at = excluded.last_success_at,
+        last_failure_at = excluded.last_failure_at,
+        failure_code = excluded.failure_code,
+        failure_summary = excluded.failure_summary,
+        bucket = excluded.bucket,
+        key = excluded.key,
+        region = excluded.region,
+        endpoint = excluded.endpoint,
+        updated_at = excluded.updated_at
+    `
+    )
+    .run(
+      "s3",
+      next.lastSuccessAt,
+      next.lastFailureAt,
+      next.failureCode,
+      next.failureSummary,
+      next.bucket,
+      next.key,
+      next.region,
+      next.endpoint,
+      next.updatedAt
+    );
+}
+
+function tryWriteBackupStatus(sqlite: Database.Database, patch: BackupStatusPatch) {
+  try {
+    writeBackupStatus(sqlite, patch);
+  } catch (error) {
+    console.error("[Hermes] Failed to persist backup status", error);
+  }
 }
 
 async function downloadSnapshotToFile(targetPath: string) {
@@ -255,15 +504,33 @@ export async function persistDatabaseSnapshot(sqlite: Database.Database, databas
 
   sqlite.pragma("wal_checkpoint(TRUNCATE)");
 
-  const { bucket, key, client } = createS3Client();
-  await client.send(
-    new PutObjectCommand({
-      Bucket: bucket,
-      Key: key,
-      Body: fs.createReadStream(databasePath),
-      ContentType: "application/vnd.sqlite3"
-    })
-  );
+  const location = readS3LocationConfig();
+  try {
+    const { bucket, key, client } = createS3Client();
+    await client.send(
+      new PutObjectCommand({
+        Bucket: bucket,
+        Key: key,
+        Body: fs.createReadStream(databasePath),
+        ContentType: "application/vnd.sqlite3"
+      })
+    );
+    tryWriteBackupStatus(sqlite, {
+      lastSuccessAt: new Date().toISOString(),
+      lastFailureAt: null,
+      failureCode: null,
+      failureSummary: null,
+      location
+    });
+  } catch (error) {
+    tryWriteBackupStatus(sqlite, {
+      lastFailureAt: new Date().toISOString(),
+      failureCode: "backup_fehlgeschlagen",
+      failureSummary: toSafeBackupFailureSummary(error),
+      location
+    });
+    throw error;
+  }
 }
 
 export async function flushDatabaseSnapshot(sqlite: Database.Database) {

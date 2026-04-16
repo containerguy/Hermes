@@ -25,6 +25,26 @@ type AppSettings = {
   themeSurfaceColor: string;
 };
 
+type StorageLocationDetails = {
+  bucket: string;
+  key: string;
+  region: string;
+  endpoint: string;
+};
+
+type StorageBackupStatus = {
+  lastSuccessAt: string | null;
+  lastFailureAt: string | null;
+  failureCode: string | null;
+  failureSummary: string | null;
+};
+
+type StorageInfo = {
+  backend: "s3" | "disabled";
+  location: StorageLocationDetails | null;
+  backupStatus: StorageBackupStatus | null;
+};
+
 type GameEvent = {
   id: string;
   gameTitle: string;
@@ -1361,6 +1381,7 @@ function AdminPanel({
     Record<string, { label: string; maxUses: string; expiresAt: string }>
   >({});
   const [settings, setSettings] = useState<AppSettings>(defaultSettings);
+  const [storage, setStorage] = useState<StorageInfo | null>(null);
   const [newUser, setNewUser] = useState({
     username: "",
     email: "",
@@ -1392,7 +1413,7 @@ function AdminPanel({
       allowlistResult
     ] = await Promise.all([
       requestJson<{ users: User[] }>("/api/admin/users"),
-      requestJson<{ settings: AppSettings }>("/api/admin/settings"),
+      requestJson<{ settings: AppSettings; storage?: StorageInfo }>("/api/admin/settings"),
       requestJson<{ auditLogs: AuditLogEntry[] }>("/api/admin/audit-log?limit=80"),
       requestJson<{ inviteCodes: InviteCode[] }>("/api/admin/invite-codes"),
       requestJson<{ rateLimits: RateLimitEntry[] }>("/api/admin/rate-limits"),
@@ -1400,6 +1421,7 @@ function AdminPanel({
     ]);
     setUsers(userResult.users);
     setSettings(settingsResult.settings);
+    setStorage(settingsResult.storage ?? null);
     setAuditLogs(auditResult.auditLogs);
     setInviteCodes(inviteResult.inviteCodes);
     setRateLimits(rateLimitResult.rateLimits);
@@ -1925,6 +1947,42 @@ function AdminPanel({
           Backup schreibt den aktuellen SQLite-Snapshot nach S3. Restore ersetzt die aktiven Daten
           durch den Snapshot aus S3.
         </p>
+        {storage?.backend === "disabled" ? (
+          <p className="muted">S3 Snapshot Storage ist deaktiviert (HERMES_STORAGE_BACKEND ≠ s3).</p>
+        ) : (
+          <div className="device-list" aria-label="Backup Status">
+            <article className="device-row">
+              <div>
+                <strong>Backup Status</strong>
+                <span>
+                  Letzter Erfolg:{" "}
+                  {storage?.backupStatus?.lastSuccessAt
+                    ? new Date(storage.backupStatus.lastSuccessAt).toLocaleString("de-DE")
+                    : "—"}
+                </span>
+                <span>
+                  Letzter Fehler:{" "}
+                  {storage?.backupStatus?.lastFailureAt
+                    ? new Date(storage.backupStatus.lastFailureAt).toLocaleString("de-DE")
+                    : "—"}
+                </span>
+                <span>
+                  Fehlercode: {storage?.backupStatus?.failureCode ? storage.backupStatus.failureCode : "—"}
+                </span>
+                <span>
+                  Hinweis: {storage?.backupStatus?.failureSummary ? storage.backupStatus.failureSummary : "—"}
+                </span>
+                <span>
+                  Ziel:{" "}
+                  {storage?.location
+                    ? `s3://${storage.location.bucket}/${storage.location.key} (${storage.location.region})`
+                    : "—"}
+                </span>
+                <span>Endpoint: {storage?.location?.endpoint ?? "—"}</span>
+              </div>
+            </article>
+          </div>
+        )}
         <div className="action-row">
           <button type="button" onClick={runBackup} disabled={opsBusy}>
             Backup starten

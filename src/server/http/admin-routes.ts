@@ -15,7 +15,13 @@ import {
 import type { DatabaseContext } from "../db/client";
 import { inviteCodes, participations, pushSubscriptions, sessions, users } from "../db/schema";
 import { ensureActiveEmailAvailable, userRoleSchema } from "../domain/users";
-import { persistDatabaseSnapshot, restoreDatabaseSnapshotIntoLive } from "../storage/s3-storage";
+import {
+  getS3LocationDetails,
+  getStorageBackend,
+  persistDatabaseSnapshot,
+  readBackupStatus,
+  restoreDatabaseSnapshotIntoLive
+} from "../storage/s3-storage";
 import { readSettings, settingsSchema, writeSettings } from "../settings";
 
 const createUserSchema = z.object({
@@ -424,7 +430,31 @@ export function createAdminRouter(context: DatabaseContext) {
   });
 
   router.get("/settings", (_request, response) => {
-    response.json({ settings: readSettings(context) });
+    const backend = getStorageBackend();
+    const location = getS3LocationDetails();
+    let backupStatus = null;
+    try {
+      backupStatus = readBackupStatus(context.sqlite);
+    } catch (error) {
+      console.error("[Hermes] Failed to read backup status", error);
+      backupStatus = null;
+    }
+
+    response.json({
+      settings: readSettings(context),
+      storage: {
+        backend,
+        location,
+        backupStatus: backupStatus
+          ? {
+              lastSuccessAt: backupStatus.lastSuccessAt,
+              lastFailureAt: backupStatus.lastFailureAt,
+              failureCode: backupStatus.failureCode,
+              failureSummary: backupStatus.failureSummary
+            }
+          : null
+      }
+    });
   });
 
   router.get("/invite-codes", (_request, response) => {

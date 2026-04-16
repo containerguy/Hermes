@@ -687,6 +687,19 @@ describe("app flow", () => {
       .expect(200);
   });
 
+  it("includes storage status data in the admin settings payload without a dedicated status endpoint (BKP-01)", async () => {
+    const adminAgent = request.agent(started!.app);
+    await login(adminAgent, "hauptadmin");
+    const response = await adminAgent.get("/api/admin/settings").expect(200);
+
+    expect(response.body.settings).toBeTruthy();
+    expect(response.body.storage).toBeTruthy();
+    expect(response.body.storage.backend).toBe("disabled");
+    expect(response.body.storage.backupStatus === null || typeof response.body.storage.backupStatus === "object").toBe(
+      true
+    );
+  });
+
   it("enforces active email uniqueness (email_existiert_bereits) across admin create/update and invite registration", async () => {
     const adminAgent = request.agent(started!.app);
     await login(adminAgent, "hauptadmin");
