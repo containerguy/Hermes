@@ -408,6 +408,24 @@ function urlBase64ToUint8Array(base64String: string) {
   return outputArray;
 }
 
+function getPushSupport() {
+  const isSecure = window.isSecureContext;
+  const hasServiceWorker = "serviceWorker" in navigator;
+  const hasPushManager = "PushManager" in window;
+  const hasNotification = "Notification" in window;
+  const permission = hasNotification ? Notification.permission : "unsupported";
+  const hasApis = hasServiceWorker && hasPushManager && hasNotification;
+  return {
+    isSecure,
+    hasServiceWorker,
+    hasPushManager,
+    hasNotification,
+    permission,
+    hasApis,
+    canAttemptSubscribe: isSecure && hasApis
+  };
+}
+
 function EventBoard({
   currentUser,
   mode = "events"
@@ -1065,12 +1083,17 @@ function LoginPanel({
     setMessage("");
 
     try {
-      if (!window.isSecureContext) {
+      const support = getPushSupport();
+      if (!support.isSecure) {
         throw new Error("secure_context_erforderlich");
       }
 
-      if (!("serviceWorker" in navigator) || !("PushManager" in window) || !("Notification" in window)) {
+      if (!support.hasApis) {
         throw new Error("push_nicht_unterstuetzt");
+      }
+
+      if (support.permission === "denied") {
+        throw new Error("permission_abgelehnt");
       }
 
       const { publicKey } = await requestJson<{ publicKey: string }>("/api/push/public-key");
@@ -1122,6 +1145,7 @@ function LoginPanel({
   }
 
   if (currentUser) {
+    const pushSupport = getPushSupport();
     return (
       <section className="login-panel" id="login" aria-label="Aktuelle Anmeldung">
         <p className="eyebrow">Profil</p>
@@ -1199,6 +1223,39 @@ function LoginPanel({
 
         {message ? <p className="notice">{message}</p> : null}
         {error ? <p className="error">{error}</p> : null}
+        <section className="device-panel" aria-label="Notifications Hinweise">
+          <div className="section-title-row">
+            <div>
+              <p className="eyebrow">Notifications</p>
+              <h2>Voraussetzungen.</h2>
+            </div>
+          </div>
+          <p className="muted">
+            Push braucht <strong>HTTPS</strong> (oder <strong>localhost</strong>), Browser-Unterstützung und eine
+            aktivierte OS-Permission. Auf Smartphones funktioniert es oft am zuverlässigsten, wenn Hermes als{" "}
+            <strong>PWA installiert</strong> ist.
+          </p>
+          <dl className="account-list">
+            <div>
+              <dt>Secure Context</dt>
+              <dd>{pushSupport.isSecure ? "ok" : "HTTPS/localhost erforderlich"}</dd>
+            </div>
+            <div>
+              <dt>Browser APIs</dt>
+              <dd>{pushSupport.hasApis ? "ok" : "Push/Notification/ServiceWorker fehlt"}</dd>
+            </div>
+            <div>
+              <dt>Permission</dt>
+              <dd>
+                {pushSupport.permission === "unsupported"
+                  ? "nicht verfügbar"
+                  : pushSupport.permission === "default"
+                    ? "noch nicht gefragt"
+                    : pushSupport.permission}
+              </dd>
+            </div>
+          </dl>
+        </section>
         <div className="action-row">
           <button type="button" onClick={enableNotifications} disabled={busy}>
             Notifications aktivieren
