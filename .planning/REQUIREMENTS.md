@@ -36,8 +36,8 @@ These requirements define the next release milestone for the existing Hermes app
 ### Event Participation
 
 - [x] **EVT-01**: Event participation capacity checks and `dabei` writes are transactionally protected so concurrent joins cannot exceed `maxPlayers`.
-- [ ] **EVT-02**: Participation changes keep the event board, realtime updates, audit logs, and push notifications consistent after success and failure.
-- [ ] **EVT-03**: Event lifecycle transitions continue to support manual archive/cancel and automatic archive after the configured running window.
+- [x] **EVT-02**: Participation changes keep the event board, realtime updates, audit logs, and push notifications consistent after success and failure.
+- [x] **EVT-03**: Event lifecycle transitions continue to support manual archive/cancel and automatic archive after the configured running window.
 
 ### Backup And Restore
 
@@ -123,8 +123,8 @@ Every v1 requirement maps to exactly one roadmap phase and remains pending until
 | INV-06 | Phase 1: Auth, Profile, And Invite Hardening | Complete |
 | INV-07 | Phase 1: Auth, Profile, And Invite Hardening | Complete |
 | EVT-01 | Phase 2: Event And Invite Consistency | Complete |
-| EVT-02 | Phase 2: Event And Invite Consistency | Pending |
-| EVT-03 | Phase 2: Event And Invite Consistency | Pending |
+| EVT-02 | Phase 2: Event And Invite Consistency | Complete |
+| EVT-03 | Phase 2: Event And Invite Consistency | Complete |
 | BKP-01 | Phase 3: Backup And Restore Safety | Pending |
 | BKP-02 | Phase 3: Backup And Restore Safety | Pending |
 | BKP-03 | Phase 3: Backup And Restore Safety | Pending |

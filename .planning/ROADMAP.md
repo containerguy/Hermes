@@ -57,7 +57,7 @@ Plans:
 Plans:
 - [x] 02-01: Move invite consumption into an atomic SQLite transaction or constraint-backed write path.
 - [x] 02-02: Move event participation capacity enforcement into an atomic SQLite transaction or constraint-backed write path.
-- [ ] 02-03: Verify realtime, push, audit, and lifecycle behavior around successful and rejected participation changes.
+- [x] 02-03: Verify realtime, push, audit, and lifecycle behavior around successful and rejected participation changes.
 
 ### Phase 3: Backup And Restore Safety
 **Goal**: Admin backup and restore are operationally safe: snapshot status is visible, restore is validated before mutation, pre-restore recovery is created, and failures leave clear recovery information.
