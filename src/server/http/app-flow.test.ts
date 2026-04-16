@@ -736,6 +736,40 @@ describe("app flow", () => {
     expect(actions).toContain("storage.restore_failed");
   });
 
+  it("requires authentication and admin role for backup/restore mutations (REL-02)", async () => {
+    await request(started!.app).post("/api/admin/backup").expect(401).expect({ error: "nicht_angemeldet" });
+    await request(started!.app).post("/api/admin/restore").expect(401).expect({ error: "nicht_angemeldet" });
+
+    const adminAgent = request.agent(started!.app);
+    await login(adminAgent, "hauptadmin");
+    const adminCsrf = await fetchCsrf(adminAgent);
+    await adminAgent
+      .post("/api/admin/users")
+      .send({ username: "normal-user", email: "normal-user@example.test", role: "user" })
+      .set(CSRF_HEADER, adminCsrf)
+      .expect(201);
+
+    const userAgent = request.agent(started!.app);
+    await login(userAgent, "normal-user");
+    const userCsrf = await fetchCsrf(userAgent);
+
+    await userAgent
+      .post("/api/admin/backup")
+      .set(CSRF_HEADER, userCsrf)
+      .expect(403)
+      .expect((response) => {
+        expect(response.body.error).toBe("admin_erforderlich");
+      });
+
+    await userAgent
+      .post("/api/admin/restore")
+      .set(CSRF_HEADER, userCsrf)
+      .expect(403)
+      .expect((response) => {
+        expect(response.body.error).toBe("admin_erforderlich");
+      });
+  });
+
   it("enforces active email uniqueness (email_existiert_bereits) across admin create/update and invite registration", async () => {
     const adminAgent = request.agent(started!.app);
     await login(adminAgent, "hauptadmin");
