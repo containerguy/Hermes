@@ -14,8 +14,8 @@
 
 ## Phases
 
-- [ ] **Phase 7: UX Polish – UI Correctness** - Fix UI correctness issues across Events/Manager/Admin (buttons + audit log panel scrolling).
-- [ ] **Phase 8: Admin Event Soft Delete** - Allow admins to soft-delete archived/cancelled events with audit logging and UI removal.
+- [x] **Phase 7: UX Polish – UI Correctness** - Fix UI correctness issues across Events/Manager/Admin (buttons + audit log panel scrolling).
+- [x] **Phase 8: Admin Event Soft Delete** - Allow admins to soft-delete archived/cancelled events with audit logging and UI removal.
 
 ## Phase Details
 
@@ -27,7 +27,7 @@
   1. Action buttons do not overflow/overlap/bleed their frames across Events, Manager, and Admin views on both desktop and mobile.
   2. The Admin audit log list scrolls within its panel on narrow screens while header/actions remain accessible.
   3. Changes do not introduce major new UI framework dependencies (keep the stack minimal).
-**Plans**: TBD
+**Plans**: `07-01`
 **UI hint**: yes
 
 ### Phase 8: Admin Event Soft Delete
@@ -38,18 +38,18 @@
   1. Only admins can soft-delete an event, and only when it is cancelled or archived (attempts otherwise fail clearly).
   2. A soft-deleted event no longer appears on the event board (for users/managers/admins).
   3. Each deletion is captured in the audit log with enough context to diagnose who deleted what and when.
-**Plans**: TBD
+**Plans**: `08-01`
 **UI hint**: yes
 
 ## Progress
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
-| 7. UX Polish – UI Correctness | 0/0 | Not started | - |
-| 8. Admin Event Soft Delete | 0/0 | Not started | - |
+| 7. UX Polish – UI Correctness | 1/1 | Complete | 2026-04-16 |
+| 8. Admin Event Soft Delete | 1/1 | Complete | 2026-04-16 |
 
 ## Next
 
 Next up:
 
-- `/gsd-plan-phase 7`
+- v1.1 complete

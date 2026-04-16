@@ -159,8 +159,12 @@ export const gameEvents = sqliteTable("game_events", {
   archivedByUserId: text("archived_by_user_id").references(() => users.id, {
     onDelete: "set null"
   }),
+  deletedByUserId: text("deleted_by_user_id").references(() => users.id, {
+    onDelete: "set null"
+  }),
   cancelledAt: text("cancelled_at"),
   archivedAt: text("archived_at"),
+  deletedAt: text("deleted_at"),
   createdAt: text("created_at").notNull(),
   updatedAt: text("updated_at").notNull()
 });

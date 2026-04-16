@@ -10,12 +10,12 @@ These requirements focus on UI/UX correctness and polish without changing core d
 
 ### UI/UX Correctness
 
-- [ ] **UI-09**: Action buttons are consistently rendered (no overflow/overlap/partial “frame bleed”) across Events, Manager, and Admin views on desktop and mobile.
-- [ ] **UI-10**: The Admin audit log list is scrollable within its panel and remains usable on narrow screens (header/actions remain accessible while scrolling).
+- [x] **UI-09**: Action buttons are consistently rendered (no overflow/overlap/partial “frame bleed”) across Events, Manager, and Admin views on desktop and mobile.
+- [x] **UI-10**: The Admin audit log list is scrollable within its panel and remains usable on narrow screens (header/actions remain accessible while scrolling).
 
 ### Event Lifecycle (Operator UX)
 
-- [ ] **EVT-04**: Admins can soft-delete events **only after** they are cancelled or archived; deletion removes the event from the board and is captured in the audit log.
+- [x] **EVT-04**: Admins can soft-delete events **only after** they are cancelled or archived; deletion removes the event from the board and is captured in the audit log.
 
 ## Future Requirements (deferred)
 
@@ -36,7 +36,7 @@ Every v1.1 requirement maps to exactly one roadmap phase and remains pending unt
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| UI-09 | Phase 7 | Pending |
-| UI-10 | Phase 7 | Pending |
-| EVT-04 | Phase 8 | Pending |
+| UI-09 | Phase 7 | Complete |
+| UI-10 | Phase 7 | Complete |
+| EVT-04 | Phase 8 | Complete |
 

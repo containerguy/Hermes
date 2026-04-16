@@ -13,8 +13,9 @@ import {
   listRateLimitEntries
 } from "../auth/rate-limits";
 import type { DatabaseContext } from "../db/client";
-import { inviteCodes, participations, pushSubscriptions, sessions, users } from "../db/schema";
+import { gameEvents, inviteCodes, participations, pushSubscriptions, sessions, users } from "../db/schema";
 import { ensureActiveEmailAvailable, userRoleSchema } from "../domain/users";
+import { broadcastEventsChanged } from "../realtime/event-bus";
 import {
   getS3LocationDetails,
   getS3CredentialSourcePresence,
@@ -430,6 +431,57 @@ export function createAdminRouter(context: DatabaseContext) {
       metadata: { username: existing.username, email: existing.email }
     });
 
+    response.status(204).send();
+  });
+
+  router.delete("/events/:id", (request, response) => {
+    const admin = requireAdmin(context, request);
+    const event = context.db
+      .select()
+      .from(gameEvents)
+      .where(eq(gameEvents.id, request.params.id))
+      .get();
+
+    if (!admin) {
+      response.status(403).json({ error: "admin_erforderlich" });
+      return;
+    }
+
+    if (!event || event.deletedAt) {
+      response.status(404).json({ error: "event_nicht_gefunden" });
+      return;
+    }
+
+    if (event.status !== "archived" && event.status !== "cancelled") {
+      response.status(409).json({ error: "event_nicht_loeschbar" });
+      return;
+    }
+
+    const timestamp = nowIso();
+    context.db
+      .update(gameEvents)
+      .set({
+        deletedAt: timestamp,
+        deletedByUserId: admin.id,
+        updatedAt: timestamp
+      })
+      .where(eq(gameEvents.id, event.id))
+      .run();
+
+    tryWriteAuditLog(context, {
+      actor: admin,
+      action: "event.soft_delete",
+      entityType: "event",
+      entityId: event.id,
+      summary: `${admin.username} hat Event ${event.gameTitle} gelöscht.`,
+      metadata: {
+        gameTitle: event.gameTitle,
+        status: event.status,
+        deletedAt: timestamp
+      }
+    });
+
+    broadcastEventsChanged("event_soft_deleted");
     response.status(204).send();
   });
 

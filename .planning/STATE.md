@@ -2,16 +2,16 @@
 gsd_state_version: 1.0
 milestone: v1.1
 milestone_name: UX Polish
-status: planning
-stopped_at: Ready to plan Phase 7
-last_updated: "2026-04-16T17:40:00.000Z"
+status: complete
+stopped_at: Completed Phase 8 (08-01)
+last_updated: "2026-04-16T19:35:00.000Z"
 last_activity: 2026-04-16
 progress:
   total_phases: 2
-  completed_phases: 0
-  total_plans: 0
-  completed_plans: 0
-  percent: 0
+  completed_phases: 2
+  total_plans: 2
+  completed_plans: 2
+  percent: 100
 ---
 
 # Project State
@@ -21,16 +21,16 @@ progress:
 See: .planning/PROJECT.md (updated 2026-04-15)
 
 **Core value:** During the LAN party, everyone can quickly see which game round is viable, when it starts, who is in, and how to join it.
-**Current focus:** v1.1 — plan Phase 7
+**Current focus:** v1.1 — complete
 
 ## Current Position
 
-Phase: 7 — UX Polish – UI Correctness
-Plan: —
-Status: Planning
+Phase: 8 — Admin Event Soft Delete
+Plan: 08-01
+Status: Complete
 Last activity: 2026-04-16
 
-Progress: [----------] 0%
+Progress: [##########] 100%
 
 ## Performance Metrics
 
@@ -44,8 +44,8 @@ Progress: [----------] 0%
 
 | Phase | Plans | Total | Avg/Plan |
 |-------|-------|-------|----------|
-| 7. UX Polish – UI Correctness | 0 | 0 | n/a |
-| 8. Admin Event Soft Delete | 0 | 0 | n/a |
+| 7. UX Polish – UI Correctness | 1 | 1 | n/a |
+| 8. Admin Event Soft Delete | 1 | 1 | n/a |
 | 1. Auth, Profile, And Invite Hardening | 0 | 6 | n/a |
 | 2. Event And Invite Consistency | 0 | 3 | n/a |
 | 3. Backup And Restore Safety | 0 | 3 | n/a |

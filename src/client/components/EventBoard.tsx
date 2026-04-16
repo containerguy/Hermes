@@ -229,6 +229,27 @@ export function EventBoard({
     }
   }
 
+  async function softDeleteEvent(eventId: string) {
+    setError("");
+    setMessage("");
+
+    const event = events.find((candidate) => candidate.id === eventId);
+    const confirmed = window.confirm(
+      `Event wirklich löschen?${event ? ` (${event.gameTitle})` : ""} (nur Admins, nur archiviert/storniert)`
+    );
+    if (!confirmed) {
+      return;
+    }
+
+    try {
+      await requestJson<void>(`/api/admin/events/${eventId}`, { method: "DELETE" });
+      await loadEvents();
+      setMessage("Event gelöscht.");
+    } catch (caught) {
+      setError(getErrorMessage(caught));
+    }
+  }
+
   async function setParticipation(eventId: string, status: "joined" | "declined") {
     setError("");
     setMessage("");
@@ -271,6 +292,13 @@ export function EventBoard({
       currentUser?.role === "admin" ||
       currentUser?.role === "manager" ||
       currentUser?.id === event.createdByUserId
+    );
+  }
+
+  function canSoftDelete(event: GameEvent) {
+    return (
+      currentUser?.role === "admin" &&
+      (event.status === "archived" || event.status === "cancelled")
     );
   }
 
@@ -492,6 +520,13 @@ export function EventBoard({
                   onClick={() => changeEventStatus(event.id, "cancel")}
                 >
                   Stornieren
+                </button>
+              </div>
+            ) : null}
+            {canSoftDelete(event) ? (
+              <div className="action-row">
+                <button type="button" className="secondary danger" onClick={() => softDeleteEvent(event.id)}>
+                  Löschen
                 </button>
               </div>
             ) : null}

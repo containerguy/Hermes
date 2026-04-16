@@ -72,6 +72,13 @@ describe("app flow", () => {
       .map((row) => (row as { name: string }).name);
     expect(sessionsColumns).toContain("token_hash");
 
+    const gameEventsColumns = sqlite
+      .prepare("SELECT name FROM pragma_table_info('game_events') ORDER BY cid")
+      .all()
+      .map((row) => (row as { name: string }).name);
+    expect(gameEventsColumns).toContain("deleted_at");
+    expect(gameEventsColumns).toContain("deleted_by_user_id");
+
     const tables = sqlite
       .prepare("SELECT name FROM sqlite_master WHERE type = 'table'")
       .all()

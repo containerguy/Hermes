@@ -1,4 +1,4 @@
-import { and, eq, inArray, sql } from "drizzle-orm";
+import { and, eq, inArray, isNull, sql } from "drizzle-orm";
 import { Router } from "express";
 import { randomUUID } from "node:crypto";
 import { z } from "zod";
@@ -190,6 +190,7 @@ export function createEventRouter(context: DatabaseContext) {
     const events = context.db
       .select()
       .from(gameEvents)
+      .where(isNull(gameEvents.deletedAt))
       .orderBy(sql`datetime(${gameEvents.startsAt}) ASC`)
       .all();
 
@@ -274,8 +275,13 @@ export function createEventRouter(context: DatabaseContext) {
     const actor = requireUser(context, request);
     const event = context.db.select().from(gameEvents).where(eq(gameEvents.id, request.params.id)).get();
 
-    if (!actor || !event) {
-      response.status(event ? 403 : 404).json({ error: event ? "verboten" : "event_nicht_gefunden" });
+    if (!actor) {
+      response.status(403).json({ error: "verboten" });
+      return;
+    }
+
+    if (!event || event.deletedAt) {
+      response.status(404).json({ error: "event_nicht_gefunden" });
       return;
     }
 
@@ -348,8 +354,13 @@ export function createEventRouter(context: DatabaseContext) {
     const event = context.db.select().from(gameEvents).where(eq(gameEvents.id, request.params.id)).get();
     const parsed = z.object({ status: z.enum(["joined", "declined"]) }).safeParse(request.body);
 
-    if (!actor || !event) {
-      response.status(event ? 403 : 404).json({ error: event ? "verboten" : "event_nicht_gefunden" });
+    if (!actor) {
+      response.status(403).json({ error: "verboten" });
+      return;
+    }
+
+    if (!event || event.deletedAt) {
+      response.status(404).json({ error: "event_nicht_gefunden" });
       return;
     }
 
@@ -548,8 +559,13 @@ export function createEventRouter(context: DatabaseContext) {
     const actor = requireUser(context, request);
     const event = context.db.select().from(gameEvents).where(eq(gameEvents.id, request.params.id)).get();
 
-    if (!actor || !event) {
-      response.status(event ? 403 : 404).json({ error: event ? "verboten" : "event_nicht_gefunden" });
+    if (!actor) {
+      response.status(403).json({ error: "verboten" });
+      return;
+    }
+
+    if (!event || event.deletedAt) {
+      response.status(404).json({ error: "event_nicht_gefunden" });
       return;
     }
 
@@ -591,8 +607,13 @@ export function createEventRouter(context: DatabaseContext) {
     const actor = requireUser(context, request);
     const event = context.db.select().from(gameEvents).where(eq(gameEvents.id, request.params.id)).get();
 
-    if (!actor || !event) {
-      response.status(event ? 403 : 404).json({ error: event ? "verboten" : "event_nicht_gefunden" });
+    if (!actor) {
+      response.status(403).json({ error: "verboten" });
+      return;
+    }
+
+    if (!event || event.deletedAt) {
+      response.status(404).json({ error: "event_nicht_gefunden" });
       return;
     }
 
