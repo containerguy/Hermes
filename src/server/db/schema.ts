@@ -55,8 +55,14 @@ export const sessions = sqliteTable("sessions", {
   lastSeenAt: text("last_seen_at").notNull(),
   createdAt: text("created_at").notNull(),
   tokenHash: text("token_hash"),
-  revokedAt: text("revoked_at")
-}, (table) => [uniqueIndex("sessions_token_hash_unique").on(table.tokenHash)]);
+  revokedAt: text("revoked_at"),
+  deviceKeyHash: text("device_key_hash"),
+  deviceSignals: text("device_signals")
+}, (table) => [
+  uniqueIndex("sessions_token_hash_unique").on(table.tokenHash),
+  index("sessions_user_device_key_idx").on(table.userId, table.deviceKeyHash),
+  index("sessions_user_device_signals_idx").on(table.userId, table.deviceSignals)
+]);
 
 export const emailChangeChallenges = sqliteTable(
   "email_change_challenges",
@@ -269,6 +275,32 @@ export const inviteCodeUses = sqliteTable(
     usedAt: text("used_at").notNull()
   },
   (table) => [uniqueIndex("invite_code_uses_user_unique").on(table.userId)]
+);
+
+export const pairingTokens = sqliteTable(
+  "pairing_tokens",
+  {
+    id: text("id").primaryKey(),
+    userId: text("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    originSessionId: text("origin_session_id")
+      .notNull()
+      .references(() => sessions.id, { onDelete: "cascade" }),
+    tokenHash: text("token_hash").notNull(),
+    expiresAt: text("expires_at").notNull(),
+    consumedAt: text("consumed_at"),
+    consumedSessionId: text("consumed_session_id").references(() => sessions.id, {
+      onDelete: "set null"
+    }),
+    createdAt: text("created_at").notNull()
+  },
+  (table) => [
+    uniqueIndex("pairing_tokens_token_hash_unique").on(table.tokenHash),
+    index("pairing_tokens_origin_session_idx").on(table.originSessionId),
+    index("pairing_tokens_user_expires_idx").on(table.userId, table.expiresAt),
+    index("pairing_tokens_expires_at_idx").on(table.expiresAt)
+  ]
 );
 
 export const userRelations = relations(users, ({ many }) => ({
