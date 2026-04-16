@@ -208,6 +208,19 @@ export function getS3LocationDetails(): S3LocationDetails | null {
   return readS3LocationConfig();
 }
 
+export function getS3CredentialSourcePresence() {
+  const credsFile = process.env.HERMES_S3_CREDS_FILE ?? null;
+  const envAccessKeyPresent = Boolean(
+    process.env.HERMES_S3_ACCESS_KEY_ID ?? process.env.AWS_ACCESS_KEY_ID
+  );
+  const envSecretPresent = Boolean(
+    process.env.HERMES_S3_SECRET_ACCESS_KEY ?? process.env.AWS_SECRET_ACCESS_KEY
+  );
+  const credsFileConfigured = Boolean(credsFile);
+  const credsFileExists = credsFileConfigured ? fs.existsSync(credsFile as string) : false;
+  return { envAccessKeyPresent, envSecretPresent, credsFileConfigured, credsFileExists, credsFile };
+}
+
 function createS3Client() {
   const config = readS3Config();
 
@@ -834,6 +847,12 @@ export async function restoreDatabaseSnapshotIntoLive(sqlite: Database.Database)
       throw new RestoreValidationError("Restore copy failed", {
         kind: "copy_failed",
         summary: toSafeRestoreSummary(error),
+        snapshot: {
+          bucket: snapshotLocation.bucket,
+          key: snapshotLocation.key,
+          region: snapshotLocation.region,
+          endpoint: snapshotLocation.endpoint
+        },
         recovery: recovery ?? undefined
       });
     } finally {

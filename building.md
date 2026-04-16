@@ -193,7 +193,8 @@ Beim Shutdown:
 Admin-Aktionen:
 
 - `POST /api/admin/backup` schreibt den aktuellen SQLite-Stand nach S3.
-- `POST /api/admin/restore` lädt den S3-Snapshot und ersetzt die aktiven SQLite-Tabellen.
+- `GET /api/admin/settings` liefert Settings + Storage-Status (Backup Erfolg/Fehler + Location) für die Admin UI.
+- `POST /api/admin/restore` lädt den S3-Snapshot, validiert ihn **vorher**, erstellt ein Recovery-Backup und ersetzt danach (all-or-nothing) die aktiven SQLite-Tabellen.
 - `GET /api/admin/audit-log` liefert die letzten Audit-Einträge für Admins.
 - `POST /api/admin/invite-codes` erstellt Invite-Codes für öffentliche Registrierung.
 - `DELETE /api/admin/users/:id` löscht User per Soft-Delete, widerruft Sessions und Push-Subscriptions.
@@ -205,3 +206,44 @@ Profil-Aktionen:
 - `POST /api/auth/register` registriert neue User mit aktivem Invite-Code, sofern öffentliche Registrierung in den Settings aktiviert ist.
 
 Wichtig: S3 ist Snapshot-Storage, kein Locking-Backend für mehrere gleichzeitig schreibende Hermes-Instanzen.
+
+## Operator Runbook: Backup & Restore
+
+**Single-Writer Warnung:** Hermes ist für **eine** schreibende Instanz gedacht (SQLite + S3 Snapshots). Mehrere Writer können zu inkonsistenten Snapshots führen.
+
+### Backup prüfen
+
+Im Adminbereich (`/#admin`) zeigt Hermes im Storage-Panel:
+
+- letzte erfolgreiche Backup-Zeit
+- letzte Backup-Fehlerzeit inkl. Fehlercode + kurzer Hinweis (ohne Secrets)
+- Bucket/Key/Region/Endpoint (nicht geheim)
+
+### Restore Safety
+
+- Restore ist **validation-first** (Tabellen, Migrationen, Spalten, Foreign Keys) und ist bei Fehlern **hard-blocked**.
+- Vor dem Restore erstellt Hermes ein **Recovery-Snapshot** unter `recoveries/<timestamp>-<id>.sqlite`.
+- Restore ist **all-or-nothing** in einer Transaktion.
+- Retention: Hermes behält die letzten **10** Recoveries (Cleanup ist best-effort).
+
+### Rollback mit Recovery-Key
+
+Nach einem Restore liefert Hermes `recovery.id` und `recovery.key`.
+
+Recovery herunterladen:
+
+```bash
+aws s3 cp "s3://<bucket>/<recovery.key>" ./recovery.sqlite
+```
+
+Rollback:
+
+- Recovery als Live-Key hochladen (z.B. `HERMES_S3_DB_KEY=hermes.sqlite`) und Restore erneut ausführen:
+
+```bash
+aws s3 cp ./recovery.sqlite "s3://<bucket>/<HERMES_S3_DB_KEY>"
+```
+
+- Oder temporär `HERMES_S3_DB_KEY` auf den Recovery-Key setzen und Restore erneut starten.
+
+Hermes validiert den Snapshot immer vor dem Überschreiben.

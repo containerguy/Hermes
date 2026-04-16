@@ -39,6 +39,24 @@ type StorageBackupStatus = {
   failureSummary: string | null;
 };
 
+type RestoreDiagnostics = {
+  kind: "validation_failed" | "copy_failed" | "recovery_failed";
+  summary: string;
+  snapshot?: { bucket: string; key: string; region: string; endpoint: string };
+  recovery?: { id: string; key: string };
+  missingTables?: string[];
+  columnMismatches?: Array<{ table: string; missingInSnapshot: string[]; extraInSnapshot: string[] }>;
+  foreignKeyFailures?: Array<{ table: string; rowid: number; parent: string; fkid: number }>;
+  migrations?: {
+    liveLatest?: string | null;
+    snapshotLatest?: string | null;
+    liveCount?: number;
+    snapshotCount?: number;
+  };
+};
+
+type RestoreRecovery = { id: string; key: string };
+
 type StorageInfo = {
   backend: "s3" | "disabled";
   location: StorageLocationDetails | null;
@@ -1382,6 +1400,8 @@ function AdminPanel({
   >({});
   const [settings, setSettings] = useState<AppSettings>(defaultSettings);
   const [storage, setStorage] = useState<StorageInfo | null>(null);
+  const [restoreDiagnostics, setRestoreDiagnostics] = useState<RestoreDiagnostics | null>(null);
+  const [restoreRecovery, setRestoreRecovery] = useState<RestoreRecovery | null>(null);
   const [newUser, setNewUser] = useState({
     username: "",
     email: "",
@@ -1732,7 +1752,7 @@ function AdminPanel({
 
   async function runRestore() {
     const confirmed = window.confirm(
-      "Restore wirklich starten? Der aktuelle Datenstand wird durch den S3-Snapshot ersetzt."
+      "Restore wirklich starten? Hermes validiert zuerst den Snapshot und erstellt vor dem Restore ein Recovery-Backup."
     );
 
     if (!confirmed) {
@@ -1742,13 +1762,30 @@ function AdminPanel({
     setOpsBusy(true);
     setError("");
     setMessage("");
+    setRestoreDiagnostics(null);
+    setRestoreRecovery(null);
 
     try {
-      await requestJson<{ ok: boolean }>("/api/admin/restore", { method: "POST" });
+      const result = await requestJson<{
+        ok: boolean;
+        recovery?: RestoreRecovery | null;
+      }>("/api/admin/restore", { method: "POST" });
       await loadAdminData();
-      setMessage("Restore abgeschlossen. Bitte prüfe User, Events und deine aktuelle Session.");
+      const recovery = result.recovery ?? null;
+      setRestoreRecovery(recovery);
+      setMessage(
+        recovery
+          ? `Restore abgeschlossen. Recovery: ${recovery.id} (${recovery.key}). Bitte prüfe User, Events und deine aktuelle Session.`
+          : "Restore abgeschlossen. Bitte prüfe User, Events und deine aktuelle Session."
+      );
     } catch (caught) {
       setError(getErrorMessage(caught));
+      if (caught instanceof ApiError) {
+        const body = caught.body as { diagnostics?: RestoreDiagnostics; recovery?: RestoreRecovery | null } | null | undefined;
+        const diagnostics = body?.diagnostics ?? null;
+        setRestoreDiagnostics(diagnostics);
+        setRestoreRecovery(body?.recovery ?? diagnostics?.recovery ?? null);
+      }
     } finally {
       setOpsBusy(false);
     }
@@ -1991,6 +2028,54 @@ function AdminPanel({
             Restore starten
           </button>
         </div>
+        {restoreRecovery ? (
+          <p className="muted">
+            Recovery: <strong>{restoreRecovery.id}</strong> · <code>{restoreRecovery.key}</code>
+          </p>
+        ) : null}
+        {restoreDiagnostics ? (
+          <div className="device-list" aria-label="Restore Diagnostik">
+            <article className="device-row">
+              <div>
+                <strong>Restore Diagnostik</strong>
+                <span>Typ: {restoreDiagnostics.kind}</span>
+                <span>Hinweis: {restoreDiagnostics.summary}</span>
+                {restoreDiagnostics.migrations ? (
+                  <span>
+                    Migrationen: live {restoreDiagnostics.migrations.liveLatest ?? "—"} · snapshot{" "}
+                    {restoreDiagnostics.migrations.snapshotLatest ?? "—"}
+                  </span>
+                ) : null}
+                {restoreDiagnostics.missingTables?.length ? (
+                  <span>Fehlende Tabellen: {restoreDiagnostics.missingTables.slice(0, 10).join(", ")}</span>
+                ) : null}
+                {restoreDiagnostics.columnMismatches?.length ? (
+                  <span>
+                    Spalten:{" "}
+                    {restoreDiagnostics.columnMismatches
+                      .slice(0, 5)
+                      .map((m) => `${m.table} (missing: ${m.missingInSnapshot.slice(0, 6).join(", ")})`)
+                      .join(" · ")}
+                  </span>
+                ) : null}
+                {restoreDiagnostics.foreignKeyFailures?.length ? (
+                  <span>
+                    FK Fehler:{" "}
+                    {restoreDiagnostics.foreignKeyFailures
+                      .slice(0, 5)
+                      .map((fk) => `${fk.table}#${fk.rowid} -> ${fk.parent}`)
+                      .join(" · ")}
+                  </span>
+                ) : null}
+                {restoreDiagnostics.snapshot ? (
+                  <span>
+                    Snapshot: s3://{restoreDiagnostics.snapshot.bucket}/{restoreDiagnostics.snapshot.key}
+                  </span>
+                ) : null}
+              </div>
+            </article>
+          </div>
+        ) : null}
       </section>
 
       <section className="rate-limit-panel" aria-label="Rate-Limit Betrieb">

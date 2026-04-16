@@ -172,7 +172,51 @@ Hermes setzt bei Push-Benachrichtigungen eine Vibrationssequenz und nutzt `requi
 
 S3 ist das primäre persistente Snapshot-Backend. Admins können im Adminbereich aktiv ein Backup nach S3 starten oder den aktuellen Datenstand aus dem S3-Snapshot wiederherstellen.
 
-Restore ersetzt die aktiven SQLite-Daten durch den S3-Snapshot. Danach sollten User, Events und die aktuelle Session geprüft werden.
+**Single-Writer Warnung:** Hermes nutzt SQLite + S3 Snapshots. Das ist **kein** Live-Locking-Backend. Es sollte immer nur **eine** schreibende Hermes-Instanz laufen, sonst können Snapshots inkonsistent werden.
+
+### Backup prüfen (Admin UI)
+
+Im Adminbereich (`/#admin`) zeigt Hermes im Storage-Bereich:
+
+- letzte erfolgreiche Backup-Zeit
+- letzte Backup-Fehlerzeit inkl. Fehlercode + kurzer Hinweis (ohne Secrets)
+- nicht-geheime Location-Details (Bucket/Key/Region/Endpoint)
+
+### Restore Safety Modell
+
+Restore ist bewusst **validation-first** und **hard-blocked**:
+
+- Snapshot wird vor dem Überschreiben geprüft (Tabellen, Migrations-Stand, kompatible Spalten, Foreign Keys).
+- Wenn die Validierung fehlschlägt, wird **nichts** mutiert (kein “force restore”).
+- Vor dem eigentlichen Restore erstellt Hermes ein **Recovery-Snapshot** nach S3.
+- Restore läuft all-or-nothing in einer Transaktion.
+
+Recovery Retention: Hermes behält die letzten **10** Recoveries (ältere werden best-effort gelöscht).
+
+### Failed-Restore Recovery (Rollback)
+
+Bei einem erfolgreichen Restore zeigt Hermes die Recovery Info:
+
+- `recovery.id`
+- `recovery.key` (z.B. `recoveries/...sqlite`)
+
+Recovery aus S3 herunterladen (Beispiel):
+
+```bash
+aws s3 cp "s3://<bucket>/<recovery.key>" ./recovery.sqlite
+```
+
+Rollback-Optionen:
+
+1) Recovery-Snapshot als neues Live-Snapshot-Target hochladen (z.B. `HERMES_S3_DB_KEY=hermes.sqlite`):
+
+```bash
+aws s3 cp ./recovery.sqlite "s3://<bucket>/<HERMES_S3_DB_KEY>"
+```
+
+2) Alternativ temporär `HERMES_S3_DB_KEY` auf den Recovery-Key setzen und Restore erneut ausführen.
+
+Hermes validiert den Snapshot immer vor dem Überschreiben.
 
 Für lokale manuelle Backups kann zusätzlich die SQLite-Datei gesichert werden.
 

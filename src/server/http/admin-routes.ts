@@ -17,11 +17,13 @@ import { inviteCodes, participations, pushSubscriptions, sessions, users } from 
 import { ensureActiveEmailAvailable, userRoleSchema } from "../domain/users";
 import {
   getS3LocationDetails,
+  getS3CredentialSourcePresence,
   getStorageBackend,
   persistDatabaseSnapshot,
   readBackupStatus,
   RestoreValidationError,
   restoreDatabaseSnapshotIntoLive,
+  toSafeBackupFailureSummary,
   toSafeRestoreDiagnostics
 } from "../storage/s3-storage";
 import { readSettings, settingsSchema, writeSettings } from "../settings";
@@ -765,12 +767,41 @@ export function createAdminRouter(context: DatabaseContext) {
 
   router.post("/backup", async (request, response) => {
     const admin = requireAdmin(context, request);
+    const backend = getStorageBackend();
+    const location = getS3LocationDetails();
+    const creds = getS3CredentialSourcePresence();
+
+    tryWriteAuditLog(context, {
+      actor: admin,
+      action: "storage.config_check",
+      entityType: "storage",
+      entityId: "s3",
+      summary: `${admin?.username ?? "Admin"} hat Storage-Konfiguration geprüft.`,
+      metadata: {
+        backend,
+        location,
+        credentialSource: {
+          envAccessKeyPresent: creds.envAccessKeyPresent,
+          envSecretPresent: creds.envSecretPresent,
+          credsFileConfigured: creds.credsFileConfigured,
+          credsFileExists: creds.credsFileExists
+        }
+      }
+    });
+
+    tryWriteAuditLog(context, {
+      actor: admin,
+      action: "storage.backup_start",
+      entityType: "storage",
+      entityId: "s3",
+      summary: `${admin?.username ?? "Admin"} hat ein S3-Backup gestartet.`
+    });
 
     try {
       await persistDatabaseSnapshot(context.sqlite);
       tryWriteAuditLog(context, {
         actor: admin,
-        action: "storage.backup",
+        action: "storage.backup_success",
         entityType: "storage",
         entityId: "s3",
         summary: `${admin?.username ?? "Admin"} hat ein S3-Backup erstellt.`
@@ -778,20 +809,79 @@ export function createAdminRouter(context: DatabaseContext) {
       response.json({ ok: true, message: "backup_erstellt" });
     } catch (error) {
       console.error("[Hermes] Failed to create admin backup", error);
+      tryWriteAuditLog(context, {
+        actor: admin,
+        action: "storage.backup_failed",
+        entityType: "storage",
+        entityId: "s3",
+        summary: `${admin?.username ?? "Admin"} konnte kein S3-Backup erstellen.`,
+        metadata: {
+          hint: toSafeBackupFailureSummary(error),
+          backend,
+          location
+        }
+      });
       response.status(500).json({ error: "backup_fehlgeschlagen" });
     }
   });
 
   router.post("/restore", async (request, response) => {
     const admin = requireAdmin(context, request);
+    const backend = getStorageBackend();
+    const location = getS3LocationDetails();
+    const creds = getS3CredentialSourcePresence();
+
+    tryWriteAuditLog(context, {
+      actor: admin,
+      action: "storage.config_check",
+      entityType: "storage",
+      entityId: "s3",
+      summary: `${admin?.username ?? "Admin"} hat Storage-Konfiguration geprüft.`,
+      metadata: {
+        backend,
+        location,
+        credentialSource: {
+          envAccessKeyPresent: creds.envAccessKeyPresent,
+          envSecretPresent: creds.envSecretPresent,
+          credsFileConfigured: creds.credsFileConfigured,
+          credsFileExists: creds.credsFileExists
+        }
+      }
+    });
+
+    tryWriteAuditLog(context, {
+      actor: admin,
+      action: "storage.restore_start",
+      entityType: "storage",
+      entityId: "s3",
+      summary: `${admin?.username ?? "Admin"} hat ein S3-Restore gestartet.`
+    });
 
     try {
       const result = await restoreDatabaseSnapshotIntoLive(context.sqlite);
       tryWriteAuditLog(context, {
-        action: "storage.restore",
+        actor: admin,
+        action: "storage.restore_validated",
         entityType: "storage",
         entityId: "s3",
-        summary: `${admin?.username ?? "Admin"} hat ein S3-Restore ausgeführt.`
+        summary: `${admin?.username ?? "Admin"} hat ein Restore validiert.`
+      });
+      if (result?.recovery) {
+        tryWriteAuditLog(context, {
+          actor: admin,
+          action: "storage.restore_recovery_created",
+          entityType: "storage",
+          entityId: "s3",
+          summary: `${admin?.username ?? "Admin"} hat ein Recovery-Snapshot erstellt.`,
+          metadata: { recoveryId: result.recovery.id, recoveryKey: result.recovery.key }
+        });
+      }
+      tryWriteAuditLog(context, {
+        actor: admin,
+        action: "storage.restore_completed",
+        entityType: "storage",
+        entityId: "s3",
+        summary: `${admin?.username ?? "Admin"} hat ein S3-Restore abgeschlossen.`
       });
       response.json({
         ok: true,
@@ -802,6 +892,40 @@ export function createAdminRouter(context: DatabaseContext) {
     } catch (error) {
       console.error("[Hermes] Failed to restore admin backup", error);
       const diagnostics = toSafeRestoreDiagnostics(error);
+      const kind = diagnostics.kind;
+
+      if (kind !== "validation_failed") {
+        tryWriteAuditLog(context, {
+          actor: admin,
+          action: "storage.restore_validated",
+          entityType: "storage",
+          entityId: "s3",
+          summary: `${admin?.username ?? "Admin"} hat ein Restore validiert.`
+        });
+      }
+      if (diagnostics.recovery) {
+        tryWriteAuditLog(context, {
+          actor: admin,
+          action: "storage.restore_recovery_created",
+          entityType: "storage",
+          entityId: "s3",
+          summary: `${admin?.username ?? "Admin"} hat ein Recovery-Snapshot erstellt.`,
+          metadata: { recoveryId: diagnostics.recovery.id, recoveryKey: diagnostics.recovery.key }
+        });
+      }
+      tryWriteAuditLog(context, {
+        actor: admin,
+        action: "storage.restore_failed",
+        entityType: "storage",
+        entityId: "s3",
+        summary: `${admin?.username ?? "Admin"} konnte kein S3-Restore durchführen.`,
+        metadata: {
+          kind,
+          summary: diagnostics.summary,
+          snapshotKey: diagnostics.snapshot?.key ?? null,
+          recoveryId: diagnostics.recovery?.id ?? null
+        }
+      });
       if (error instanceof RestoreValidationError) {
         response.status(400).json({ error: "restore_fehlgeschlagen", diagnostics });
         return;

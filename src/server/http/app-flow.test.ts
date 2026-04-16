@@ -718,6 +718,24 @@ describe("app flow", () => {
     }
   });
 
+  it("writes best-effort audit events for backup/restore without blocking primary actions (BKP-05)", async () => {
+    const adminAgent = request.agent(started!.app);
+    await login(adminAgent, "hauptadmin");
+    const csrf = await fetchCsrf(adminAgent);
+
+    await adminAgent.post("/api/admin/backup").set(CSRF_HEADER, csrf).expect(200);
+    await adminAgent.post("/api/admin/restore").set(CSRF_HEADER, csrf).expect(400);
+
+    const audit = await adminAgent.get("/api/admin/audit-log?limit=50").expect(200);
+    const actions = (audit.body.auditLogs as Array<{ action: string }>).map((entry) => entry.action);
+
+    expect(actions).toContain("storage.config_check");
+    expect(actions).toContain("storage.backup_start");
+    expect(actions).toContain("storage.backup_success");
+    expect(actions).toContain("storage.restore_start");
+    expect(actions).toContain("storage.restore_failed");
+  });
+
   it("enforces active email uniqueness (email_existiert_bereits) across admin create/update and invite registration", async () => {
     const adminAgent = request.agent(started!.app);
     await login(adminAgent, "hauptadmin");
