@@ -3,12 +3,12 @@ import { Router } from "express";
 import { randomUUID } from "node:crypto";
 import { z } from "zod";
 import { requireUser } from "../auth/current-user";
-import { writeAuditLog } from "../audit-log";
+import { tryWriteAuditLog, writeAuditLog } from "../audit-log";
 import type { DatabaseContext } from "../db/client";
 import { appSettings, gameEvents, participations, users } from "../db/schema";
 import { deriveEventStatus, eventInputSchema, shouldAutoArchive } from "../domain/events";
 import { canCreateEvent, canManageEvent } from "../domain/users";
-import { sendPushToEnabledUsers } from "../push/push-service";
+import { sendPushToEnabledUsers, sendPushToOperators } from "../push/push-service";
 import { broadcastEventsChanged } from "../realtime/event-bus";
 
 const updateEventSchema = z.object({
@@ -421,6 +421,34 @@ export function createEventRouter(context: DatabaseContext) {
       transactionResult = transaction.immediate();
     } catch (error) {
       if (error instanceof EventCapacityError) {
+        const existing = context.db
+          .select()
+          .from(participations)
+          .where(and(eq(participations.eventId, event.id), eq(participations.userId, actor.id)))
+          .get();
+
+        tryWriteAuditLog(context, {
+          actor,
+          action: "participation.set",
+          entityType: "event",
+          entityId: event.id,
+          summary: `${actor.username} konnte bei ${event.gameTitle} nicht dabei sein (Event voll).`,
+          metadata: {
+            participation: parsed.data.status,
+            previousParticipation: existing?.status ?? null,
+            outcome: "rejected",
+            reason: "event_voll",
+            joinedCount: error.joinedCount,
+            maxPlayers: error.maxPlayers
+          }
+        });
+        void sendPushToOperators(context, {
+          title: "Runde voll",
+          body: `${event.gameTitle}: Beitritt abgelehnt (Spieler ${error.joinedCount + 1} von ${error.maxPlayers}).`,
+          url: "/#events",
+          vibrate: [180, 80, 180]
+        });
+
         const refreshed = context.db.select().from(gameEvents).where(eq(gameEvents.id, event.id)).get();
         response.status(409).json({
           error: "event_voll",
@@ -434,6 +462,34 @@ export function createEventRouter(context: DatabaseContext) {
           transactionResult = transaction.immediate();
         } catch (retryError) {
           if (retryError instanceof EventCapacityError) {
+            const existing = context.db
+              .select()
+              .from(participations)
+              .where(and(eq(participations.eventId, event.id), eq(participations.userId, actor.id)))
+              .get();
+
+            tryWriteAuditLog(context, {
+              actor,
+              action: "participation.set",
+              entityType: "event",
+              entityId: event.id,
+              summary: `${actor.username} konnte bei ${event.gameTitle} nicht dabei sein (Event voll).`,
+              metadata: {
+                participation: parsed.data.status,
+                previousParticipation: existing?.status ?? null,
+                outcome: "rejected",
+                reason: "event_voll",
+                joinedCount: retryError.joinedCount,
+                maxPlayers: retryError.maxPlayers
+              }
+            });
+            void sendPushToOperators(context, {
+              title: "Runde voll",
+              body: `${event.gameTitle}: Beitritt abgelehnt (Spieler ${retryError.joinedCount + 1} von ${retryError.maxPlayers}).`,
+              url: "/#events",
+              vibrate: [180, 80, 180]
+            });
+
             const refreshed = context.db.select().from(gameEvents).where(eq(gameEvents.id, event.id)).get();
             response.status(409).json({
               error: "event_voll",
@@ -454,7 +510,7 @@ export function createEventRouter(context: DatabaseContext) {
     }
 
     const { existingStatus, previousStatus, nextStatus, updated } = transactionResult;
-    writeAuditLog(context, {
+    tryWriteAuditLog(context, {
       actor,
       action: "participation.set",
       entityType: "event",

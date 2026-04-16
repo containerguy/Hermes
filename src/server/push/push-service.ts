@@ -1,4 +1,4 @@
-import { and, eq, isNull } from "drizzle-orm";
+import { and, eq, inArray, isNull } from "drizzle-orm";
 import webpush from "web-push";
 import type { DatabaseContext } from "../db/client";
 import { pushSubscriptions, users } from "../db/schema";
@@ -95,6 +95,18 @@ export async function sendPushToEnabledUsers(context: DatabaseContext, payload: 
     .select()
     .from(users)
     .where(eq(users.notificationsEnabled, true))
+    .all();
+
+  await Promise.all(targets.map((target) => sendPushToUser(context, target.id, payload)));
+}
+
+export async function sendPushToOperators(context: DatabaseContext, payload: PushPayload) {
+  const targets = context.db
+    .select()
+    .from(users)
+    .where(
+      and(eq(users.notificationsEnabled, true), inArray(users.role, ["admin", "manager"]))
+    )
     .all();
 
   await Promise.all(targets.map((target) => sendPushToUser(context, target.id, payload)));
