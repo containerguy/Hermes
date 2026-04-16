@@ -2,7 +2,9 @@ import React, { FormEvent, useEffect, useState } from "react";
 import type { AppSettings, User, UserSession } from "../types/core";
 import { requestJson } from "../api/request";
 import { clearCsrfToken, primeCsrfToken } from "../api/csrf";
+import { forgetDeviceKey, getDeviceContext } from "../api/device-key";
 import { getErrorMessage } from "../errors/errors";
+import { QrCanvas } from "./QrCanvas";
 
 function urlBase64ToUint8Array(base64String: string) {
   const padding = "=".repeat((4 - (base64String.length % 4)) % 4);
@@ -62,6 +64,11 @@ export function LoginPanel({
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
+  const [pairingToken, setPairingToken] = useState<string | null>(null);
+  const [pairingExpiresAt, setPairingExpiresAt] = useState<string | null>(null);
+  const [redeemStatus, setRedeemStatus] = useState<
+    "idle" | "redeeming" | "done" | "error"
+  >("idle");
 
   async function loadSessions() {
     if (!currentUser) {
@@ -94,6 +101,108 @@ export function LoginPanel({
     setEmailDraft(currentUser.email);
   }, [currentUser?.id, currentUser?.displayName, currentUser?.email, currentUser?.username]);
 
+  useEffect(() => {
+    const hash = window.location.hash || "";
+    const queryStart = hash.indexOf("?");
+    if (queryStart < 0) {
+      return;
+    }
+    const params = new URLSearchParams(hash.slice(queryStart + 1));
+    const pair = params.get("pair");
+    if (!pair) {
+      return;
+    }
+
+    setRedeemStatus("redeeming");
+    const deviceContext = getDeviceContext();
+    const deviceName =
+      typeof navigator !== "undefined" && navigator.userAgent
+        ? navigator.userAgent.slice(0, 80)
+        : "Verbundenes Gerät";
+
+    requestJson<{ user: User }>("/api/auth/pair-redeem", {
+      method: "POST",
+      body: JSON.stringify({
+        token: pair,
+        deviceName,
+        deviceKey: deviceContext.deviceKey,
+        pwa: deviceContext.pwa
+      })
+    })
+      .then((result) => {
+        onLoggedIn(result.user);
+        primeCsrfToken();
+        setRedeemStatus("done");
+        setMessage("Gerät erfolgreich verbunden.");
+      })
+      .catch((caught) => {
+        setRedeemStatus("error");
+        setError(getErrorMessage(caught));
+      })
+      .finally(() => {
+        params.delete("pair");
+        const baseHash = hash.slice(0, queryStart);
+        const remaining = params.toString();
+        const nextHash = remaining
+          ? `${baseHash}?${remaining}`
+          : baseHash || "#login";
+        window.history.replaceState(
+          null,
+          "",
+          `${window.location.pathname}${window.location.search}${nextHash}`
+        );
+      });
+  }, []);
+
+  async function mintPairingToken() {
+    setBusy(true);
+    setError("");
+    setMessage("");
+    try {
+      const result = await requestJson<{ token: string; expiresAt: string }>(
+        "/api/auth/pair-token",
+        { method: "POST" }
+      );
+      setPairingToken(result.token);
+      setPairingExpiresAt(result.expiresAt);
+    } catch (caught) {
+      setError(getErrorMessage(caught));
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  function clearPairingToken() {
+    setPairingToken(null);
+    setPairingExpiresAt(null);
+  }
+
+  async function forgetDevice() {
+    if (!currentUser) {
+      return;
+    }
+    setBusy(true);
+    setError("");
+    try {
+      const currentSession = sessions.find((session) => session.current);
+      if (currentSession) {
+        await requestJson<{ revokedCurrent: boolean }>(
+          `/api/auth/sessions/${currentSession.id}`,
+          { method: "DELETE" }
+        );
+      }
+      forgetDeviceKey();
+      clearCsrfToken();
+      onLoggedOut();
+      setStep("request");
+      setMessage("Dieses Gerät wurde vergessen.");
+    } catch (caught) {
+      setError(getErrorMessage(caught));
+    } finally {
+      setBusy(false);
+    }
+  }
+
   async function requestCode(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setBusy(true);
@@ -121,9 +230,16 @@ export function LoginPanel({
     setMessage("");
 
     try {
+      const deviceContext = getDeviceContext();
       const result = await requestJson<{ user: User }>("/api/auth/verify-code", {
         method: "POST",
-        body: JSON.stringify({ username, code, deviceName })
+        body: JSON.stringify({
+          username,
+          code,
+          deviceName,
+          deviceKey: deviceContext.deviceKey,
+          pwa: deviceContext.pwa
+        })
       });
       onLoggedIn(result.user);
       primeCsrfToken();
@@ -466,6 +582,72 @@ export function LoginPanel({
         <button type="button" className="secondary" onClick={logout} disabled={busy}>
           Logout
         </button>
+        <section className="device-panel" aria-label="Gerät hinzufügen">
+          <div className="section-title-row">
+            <div>
+              <p className="eyebrow">Pairing</p>
+              <h2>Add a device</h2>
+              <p className="muted">
+                Generiere einen Pairing-Code für ein weiteres Gerät.
+              </p>
+            </div>
+            {pairingToken ? (
+              <button
+                type="button"
+                className="secondary"
+                onClick={clearPairingToken}
+                disabled={busy}
+              >
+                Schließen
+              </button>
+            ) : null}
+          </div>
+          {pairingToken ? (
+            (() => {
+              const pairUrl = `${window.location.origin}${window.location.pathname}#login?pair=${pairingToken}`;
+              return (
+                <div className="pair-token-panel">
+                  <QrCanvas
+                    payload={pairUrl}
+                    pixelSize={256}
+                    label="Pairing QR-Code"
+                  />
+                  <a
+                    href={pairUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="pair-link"
+                  >
+                    {pairUrl}
+                  </a>
+                  {pairingExpiresAt ? (
+                    <time dateTime={pairingExpiresAt} className="pair-expires">
+                      Gültig bis {new Date(pairingExpiresAt).toLocaleString("de-DE")}
+                    </time>
+                  ) : null}
+                  <div className="action-row">
+                    <button
+                      type="button"
+                      onClick={mintPairingToken}
+                      disabled={busy}
+                    >
+                      Neuen Code erzeugen
+                    </button>
+                  </div>
+                </div>
+              );
+            })()
+          ) : (
+            <div className="action-row">
+              <button type="button" onClick={mintPairingToken} disabled={busy}>
+                Pairing-Code erzeugen
+              </button>
+            </div>
+          )}
+          {redeemStatus === "done" ? (
+            <p className="notice">Gerät erfolgreich verbunden.</p>
+          ) : null}
+        </section>
         <section className="device-panel" aria-label="Angemeldete Geräte">
           <div className="section-title-row">
             <div>
@@ -514,6 +696,16 @@ export function LoginPanel({
                   >
                     Abmelden
                   </button>
+                  {session.current ? (
+                    <button
+                      type="button"
+                      className="secondary"
+                      onClick={forgetDevice}
+                      disabled={busy}
+                    >
+                      Dieses Gerät vergessen
+                    </button>
+                  ) : null}
                 </div>
               </article>
             ))}

@@ -95,7 +95,10 @@ function applyTheme(settings: AppSettings) {
 }
 
 function getPageFromHash(): PageId {
-  const route = routes.find((item) => item.path === window.location.hash);
+  const rawHash = window.location.hash || "";
+  const queryStart = rawHash.indexOf("?");
+  const hashPath = queryStart >= 0 ? rawHash.slice(0, queryStart) : rawHash;
+  const route = routes.find((item) => item.path === hashPath);
   return route?.id ?? "events";
 }
 

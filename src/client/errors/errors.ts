@@ -2,6 +2,7 @@ export const errorMessages: Record<string, string> = {
   admin_erforderlich: "Adminrechte erforderlich.",
   backup_fehlgeschlagen: "Backup konnte nicht erstellt werden. Prüfe S3-Konfiguration und Logs.",
   csrf_token_ungueltig: "Sicherheitsprüfung fehlgeschlagen. Bitte Seite neu laden und erneut versuchen.",
+  device_key_required: "Dieses Gerät hat noch keinen Geräteschlüssel. Bitte Seite neu laden.",
   device_name_ungueltig: "Der Gerätename ist ungültig.",
   email_code_abgelehnt: "Der Bestätigungscode wurde abgelehnt.",
   email_existiert_bereits: "Diese E-Mail-Adresse wird bereits verwendet.",
@@ -17,10 +18,10 @@ export const errorMessages: Record<string, string> = {
   invite_max_uses_unter_used_count:
     "Max. Nutzungen kann nicht unter die bereits genutzte Anzahl gesetzt werden.",
   pair_origin_revoked:
-    "Die Quelle dieses Pairing-Links ist nicht mehr aktiv. Bitte lass einen neuen Link erstellen.",
-  pair_token_consumed: "Dieser Pairing-Link wurde bereits benutzt. Bitte fordere einen neuen an.",
-  pair_token_expired: "Dieser Pairing-Link ist abgelaufen. Bitte fordere einen neuen an.",
-  pair_token_invalid: "Der Pairing-Link ist ungültig. Bitte fordere einen neuen an.",
+    "Die ursprüngliche Sitzung ist abgelaufen. Auf dem anderen Gerät erneut anmelden und einen neuen QR-Code erzeugen.",
+  pair_token_consumed: "Pairing-Code wurde bereits eingelöst. Bitte einen neuen QR-Code erzeugen.",
+  pair_token_expired: "Pairing-Code ist abgelaufen. Bitte einen neuen QR-Code erzeugen.",
+  pair_token_invalid: "Pairing-Code ist ungültig. Bitte einen neuen QR-Code erzeugen.",
   permission_abgelehnt: "Benachrichtigung wurde vom Browser abgelehnt.",
   push_nicht_konfiguriert: "Push ist serverseitig noch nicht konfiguriert. VAPID Keys fehlen.",
   push_nicht_unterstuetzt:
