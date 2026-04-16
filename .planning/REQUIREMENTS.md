@@ -41,12 +41,12 @@ These requirements define the next release milestone for the existing Hermes app
 
 ### Backup And Restore
 
-- [ ] **BKP-01**: Admins can see last successful backup time and the last backup failure state when S3 snapshot storage is enabled.
-- [ ] **BKP-02**: Manual restore validates snapshot schema, expected tables, and foreign-key integrity before mutating live data.
-- [ ] **BKP-03**: Manual restore creates a pre-restore backup of the current live database and returns its recovery identifier.
-- [ ] **BKP-04**: Restore copies data by explicit compatible columns or rejects incompatible snapshots before mutation.
-- [ ] **BKP-05**: Restore audit entries capture the acting admin and outcome without exposing secrets or misleading partial state.
-- [ ] **BKP-06**: Operator documentation explains recovery from a failed restore and the single-writer S3 snapshot model.
+- [x] **BKP-01**: Admins can see last successful backup time and the last backup failure state when S3 snapshot storage is enabled.
+- [x] **BKP-02**: Manual restore validates snapshot schema, expected tables, and foreign-key integrity before mutating live data.
+- [x] **BKP-03**: Manual restore creates a pre-restore backup of the current live database and returns its recovery identifier.
+- [x] **BKP-04**: Restore copies data by explicit compatible columns or rejects incompatible snapshots before mutation.
+- [x] **BKP-05**: Restore audit entries capture the acting admin and outcome without exposing secrets or misleading partial state.
+- [x] **BKP-06**: Operator documentation explains recovery from a failed restore and the single-writer S3 snapshot model.
 
 ### Notifications And PWA
 
@@ -125,12 +125,12 @@ Every v1 requirement maps to exactly one roadmap phase and remains pending until
 | EVT-01 | Phase 2: Event And Invite Consistency | Complete |
 | EVT-02 | Phase 2: Event And Invite Consistency | Complete |
 | EVT-03 | Phase 2: Event And Invite Consistency | Complete |
-| BKP-01 | Phase 3: Backup And Restore Safety | Pending |
-| BKP-02 | Phase 3: Backup And Restore Safety | Pending |
-| BKP-03 | Phase 3: Backup And Restore Safety | Pending |
-| BKP-04 | Phase 3: Backup And Restore Safety | Pending |
-| BKP-05 | Phase 3: Backup And Restore Safety | Pending |
-| BKP-06 | Phase 3: Backup And Restore Safety | Pending |
+| BKP-01 | Phase 3: Backup And Restore Safety | Complete |
+| BKP-02 | Phase 3: Backup And Restore Safety | Complete |
+| BKP-03 | Phase 3: Backup And Restore Safety | Complete |
+| BKP-04 | Phase 3: Backup And Restore Safety | Complete |
+| BKP-05 | Phase 3: Backup And Restore Safety | Complete |
+| BKP-06 | Phase 3: Backup And Restore Safety | Complete |
 | PWA-01 | Phase 4: PWA And Realtime Reliability | Pending |
 | PWA-02 | Phase 4: PWA And Realtime Reliability | Pending |
 | PWA-03 | Phase 4: PWA And Realtime Reliability | Pending |

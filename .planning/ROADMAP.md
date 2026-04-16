@@ -12,7 +12,7 @@ Hermes already has the core LAN-party workflow in place. This milestone turns th
 
 - [ ] **Phase 1: Auth, Profile, And Invite Hardening** - Reduce login/invite abuse risk, protect credential-like data, and define account/session safety.
 - [x] **Phase 2: Event And Invite Consistency** - Make limited invite usage and event participation capacity transactionally correct. (completed 2026-04-16)
-- [ ] **Phase 3: Backup And Restore Safety** - Make S3 snapshot restore validated, recoverable, audited, and visible to operators.
+- [x] **Phase 3: Backup And Restore Safety** - Make S3 snapshot restore validated, recoverable, audited, and visible to operators. (completed 2026-04-16)
 - [ ] **Phase 4: PWA And Realtime Reliability** - Improve notification guidance, push failure handling, and SSE resilience.
 - [ ] **Phase 5: Frontend And Admin UI Modularization** - Split the client monolith and tighten responsive/admin UX without behavior drift.
 - [ ] **Phase 6: Release Verification And Documentation** - Add release-critical tests and align docs, env, Docker, and CI with the production contract.
@@ -73,9 +73,9 @@ Plans:
 **Plans**: 3 plans
 
 Plans:
-- [ ] 03-01: Add backup status tracking and admin visibility for S3 snapshot success/failure state.
-- [ ] 03-02: Build restore validation, explicit compatible-column copying, foreign-key failure handling, and pre-restore backup creation.
-- [ ] 03-03: Wire restore UI, audit, recovery output, and operator documentation around the safer restore service.
+- [x] 03-01: Add backup status tracking and admin visibility for S3 snapshot success/failure state.
+- [x] 03-02: Build restore validation, explicit compatible-column copying, foreign-key failure handling, and pre-restore backup creation.
+- [x] 03-03: Wire restore UI, audit, recovery output, and operator documentation around the safer restore service.
 
 ### Phase 4: PWA And Realtime Reliability
 **Goal**: Mobile notification expectations are honest in-product, push delivery failures are isolated, and realtime event updates survive common idle/reconnect conditions.
@@ -138,7 +138,7 @@ Phases execute in numeric order: 1 -> 2 -> 3 -> 4 -> 5 -> 6
 |-------|----------------|--------|-----------|
 | 1. Auth, Profile, And Invite Hardening | 2/8 | In Progress|  |
 | 2. Event And Invite Consistency | 3/3 | Complete    | 2026-04-16 |
-| 3. Backup And Restore Safety | 0/3 | Not started | - |
+| 3. Backup And Restore Safety | 3/3 | Complete   | 2026-04-16 |
 | 4. PWA And Realtime Reliability | 0/3 | Not started | - |
 | 5. Frontend And Admin UI Modularization | 0/4 | Not started | - |
 | 6. Release Verification And Documentation | 0/3 | Not started | - |
