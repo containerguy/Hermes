@@ -606,7 +606,7 @@ describe("app flow", () => {
       .expect(200);
   });
 
-  it("rejects duplicate active emails for admin create, admin update, and invite registration", async () => {
+  it("enforces active email uniqueness (email_existiert_bereits) across admin create/update and invite registration", async () => {
     const adminAgent = request.agent(started!.app);
     await login(adminAgent, "hauptadmin");
     const adminCsrf = await fetchCsrf(adminAgent);
@@ -685,7 +685,7 @@ describe("app flow", () => {
       });
   });
 
-  it("supports profile display-name updates and confirmed email changes", async () => {
+  it("supports profile display name updates and confirmed email change", async () => {
     const logSpy = vi.spyOn(console, "log").mockImplementation(() => {});
     try {
       const adminAgent = request.agent(started!.app);
@@ -833,7 +833,7 @@ describe("app flow", () => {
       });
   });
 
-  it("derives useful default device names from user agent when omitted", async () => {
+  it("derives default device names from user agent when omitted", async () => {
     const adminAgent = request.agent(started!.app);
     await login(adminAgent, "hauptadmin");
     const adminCsrf = await fetchCsrf(adminAgent);
@@ -879,7 +879,7 @@ describe("app flow", () => {
     expect(iphoneSessions.body.sessions[0].deviceName).toBe("iPhone");
   });
 
-  it("allows session renames only for the owning user", async () => {
+  it("enforces session rename ownership", async () => {
     const adminAgent = request.agent(started!.app);
     await login(adminAgent, "hauptadmin");
     const adminCsrf = await fetchCsrf(adminAgent);
