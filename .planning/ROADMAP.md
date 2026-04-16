@@ -80,7 +80,10 @@ Plans:
   1. Web Push notification payloads include the fields needed for OS/browser sound + vibration when those affordances exist.
   2. Profile/Settings has toggles for "audible cues" and "haptic feedback"; in-app calls to `navigator.vibrate` are feature-detected and never throw if the API is unavailable.
   3. Server tests assert push payload shape; client tests assert that vibration/audio paths only run when their APIs are present and respect the user toggles.
-**Plans**: TBD
+**Plans:** 2 plans
+Plans:
+- [ ] 12-01-server-push-payload-and-prefs-PLAN.md — Migration `0010_audio_haptic_prefs.sql`, Drizzle + `publicUser` additions for `notificationsAudibleEnabled` / `notificationsHapticEnabled` (defaults OFF per D-09), `finalizePushPayload` helper gating `silent` + `vibrate` per user with `[120, 60, 120]` default (D-02), Zod push payload contract (D-03), `/api/push/preferences` PATCH extended for both sub-toggles, new `push-payload.test.ts` covering all four toggle combinations (NOTIF-01 server).
+- [ ] 12-02-client-toggles-sw-and-haptic-PLAN.md — New `src/client/haptic.ts` feature-detected helper (D-05/D-06/D-12) + tests, two Profile toggles "Hörbare Signale" / "Haptisches Feedback" in LoginPanel (D-08), in-app haptic on `open → ready` and `joined → cancelled` realtime transitions in EventBoard (D-07), `public/sw.js` passthrough of server-finalized `silent`/`vibrate` (removes client-side fallback) (NOTIF-01 client, depends on 12-01).
 **UI hint**: yes
 
 ### Phase 13: CI Node 24 Readiness
@@ -102,7 +105,7 @@ Plans:
 | 9. Device Recognition and Session-Bound Pairing | 0/4 | Not started | — |
 | 10. Admin Theme System, Backgrounds, and Copy Refresh | 0/5 | Not started | — |
 | 11. Admin Bulk User Import | 0/2 | Not started | — |
-| 12. Audio and Haptic Notification UX | 0/0 | Not started | — |
+| 12. Audio and Haptic Notification UX | 0/2 | Not started | — |
 | 13. CI Node 24 Readiness | 0/0 | Not started | — |
 
 ## Next
