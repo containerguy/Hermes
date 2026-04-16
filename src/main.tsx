@@ -194,6 +194,17 @@ const errorMessages: Record<string, string> = {
   user_update_konflikt: "User konnte wegen eines Konflikts nicht gespeichert werden."
 };
 
+class ApiError extends Error {
+  status: number;
+  body: unknown;
+
+  constructor(input: { code: string; status: number; body: unknown }) {
+    super(input.code);
+    this.status = input.status;
+    this.body = input.body;
+  }
+}
+
 function getErrorMessage(caught: unknown) {
   const code = caught instanceof Error ? caught.message : "request_failed";
   return errorMessages[code] ?? code;
@@ -289,7 +300,11 @@ async function requestJson<T>(url: string, options?: RequestInit): Promise<T> {
     if (response.status === 401) {
       clearCsrfToken();
     }
-    throw new Error(body.error ?? "request_failed");
+    throw new ApiError({
+      code: body.error ?? "request_failed",
+      status: response.status,
+      body
+    });
   }
 
   if (response.status === 204) {
@@ -507,6 +522,27 @@ function EventBoard({
       await loadEvents();
       setMessage(status === "joined" ? "Teilnahme gespeichert." : "Absage gespeichert.");
     } catch (caught) {
+      if (caught instanceof ApiError && caught.message === "event_voll") {
+        const body = caught.body as { event?: Partial<GameEvent> } | null | undefined;
+        const serverEvent = body?.event;
+        const fallbackEvent = events.find((event) => event.id === eventId);
+        const joinedCount = Number(serverEvent?.joinedCount ?? fallbackEvent?.joinedCount);
+        const maxPlayers = Number(serverEvent?.maxPlayers ?? fallbackEvent?.maxPlayers);
+        const playerNumber = Number.isFinite(joinedCount) ? joinedCount + 1 : NaN;
+
+        const parts = [];
+        if (Number.isFinite(playerNumber) && Number.isFinite(maxPlayers) && maxPlayers > 0) {
+          parts.push(`Event ist voll: Du wärst Spieler ${playerNumber} von ${maxPlayers}.`);
+        } else {
+          parts.push("Event ist voll.");
+        }
+        parts.push("Vielleicht ist es Zeit für eine neue Runde.");
+
+        await loadEvents().catch(() => undefined);
+        setError(parts.join(" "));
+        return;
+      }
+
       setError(getErrorMessage(caught));
     }
   }
