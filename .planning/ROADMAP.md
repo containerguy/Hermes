@@ -40,7 +40,7 @@ Plans:
 - [x] 01-05: Wire profile, invite lifecycle, and CSRF-aware client requests into the existing UI.
 - [ ] 01-06: Complete Phase 1 regression coverage, docs/env updates, and final validation.
 - [x] 01-07: Split out hashed-token sessions, sensitive session revocation, and CSRF enforcement.
-- [ ] 01-08: Split out the admin rate-limit operations UI for LAN lockout recovery.
+- [x] 01-08: Split out the admin rate-limit operations UI for LAN lockout recovery.
 
 ### Phase 2: Event And Invite Consistency
 **Goal**: Capacity-sensitive writes cannot oversubscribe invite max uses or event max players, and event/invite side effects remain consistent after success and failure.
