@@ -50,6 +50,12 @@ function normalizeInviteCode(code: string) {
   return code.trim().toUpperCase();
 }
 
+function getInviteRegisterRateLimitKey(input: { sourceIp?: string; inviteCode?: string }) {
+  const ip = input.sourceIp ?? "";
+  const normalized = input.inviteCode ? normalizeInviteCode(input.inviteCode) : "";
+  return `ip:${ip}|invite:${normalized}`;
+}
+
 function issueLoginChallenge(context: DatabaseContext, user: typeof users.$inferSelect) {
   const code = process.env.HERMES_DEV_LOGIN_CODE ?? generateOtp();
   const timestamp = nowIso();
@@ -188,24 +194,19 @@ export function createAuthRouter(context: DatabaseContext) {
   router.post("/register", async (request, response) => {
     const settings = readSettings(context);
     const parsed = registerSchema.safeParse(request.body);
-
-    if (!settings.publicRegistrationEnabled) {
-      response.status(403).json({ error: "registrierung_deaktiviert" });
-      return;
-    }
-
-    if (!parsed.success) {
-      response.status(400).json({ error: "ungueltige_registrierung" });
-      return;
-    }
-
-    const usernameKey = normalizeUsername(parsed.data.username);
-    const registerKey = `username:${usernameKey}|ip:${request.ip ?? ""}`;
+    const registerKey = getInviteRegisterRateLimitKey({
+      sourceIp: request.ip,
+      inviteCode:
+        typeof (request.body as { inviteCode?: unknown } | undefined)?.inviteCode === "string"
+          ? (request.body as { inviteCode: string }).inviteCode
+          : undefined
+    });
     const registerRateLimit = checkRateLimit(context, {
       scope: "invite_register",
       key: registerKey,
       sourceIp: request.ip
     });
+
     if (!registerRateLimit.ok) {
       response.status(429).json({
         error: registerRateLimit.error,
@@ -213,7 +214,18 @@ export function createAuthRouter(context: DatabaseContext) {
       });
       return;
     }
-    recordRateLimitFailure(context, { scope: "invite_register", key: registerKey });
+
+    if (!settings.publicRegistrationEnabled) {
+      recordRateLimitFailure(context, { scope: "invite_register", key: registerKey });
+      response.status(403).json({ error: "registrierung_deaktiviert" });
+      return;
+    }
+
+    if (!parsed.success) {
+      recordRateLimitFailure(context, { scope: "invite_register", key: registerKey });
+      response.status(400).json({ error: "ungueltige_registrierung" });
+      return;
+    }
 
     const timestamp = nowIso();
     const normalizedCode = normalizeInviteCode(parsed.data.inviteCode);
@@ -224,6 +236,7 @@ export function createAuthRouter(context: DatabaseContext) {
       .get();
 
     if (!invite || invite.revokedAt || (invite.expiresAt && invite.expiresAt < timestamp)) {
+      recordRateLimitFailure(context, { scope: "invite_register", key: registerKey });
       response.status(403).json({ error: "invite_ungueltig" });
       return;
     }
@@ -235,6 +248,7 @@ export function createAuthRouter(context: DatabaseContext) {
       .all();
 
     if (invite.maxUses !== null && uses.length >= invite.maxUses) {
+      recordRateLimitFailure(context, { scope: "invite_register", key: registerKey });
       response.status(403).json({ error: "invite_ausgeschoepft" });
       return;
     }
@@ -271,6 +285,7 @@ export function createAuthRouter(context: DatabaseContext) {
       })();
     } catch (error) {
       console.error("[Hermes] Failed to register invited user", error);
+      recordRateLimitFailure(context, { scope: "invite_register", key: registerKey });
       response.status(409).json({ error: "user_existiert_bereits" });
       return;
     }

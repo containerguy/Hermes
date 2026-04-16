@@ -286,6 +286,47 @@ describe("app flow", () => {
       });
   });
 
+  it("throttles repeated invite registration attempts for invalid invite codes", async () => {
+    const adminAgent = request.agent(started!.app);
+    await login(adminAgent, "hauptadmin");
+    const adminCsrf = await fetchCsrf(adminAgent);
+
+    await adminAgent
+      .put("/api/admin/settings")
+      .send({
+        appName: "Hermes Test",
+        defaultNotificationsEnabled: true,
+        eventAutoArchiveHours: 8,
+        publicRegistrationEnabled: true,
+        themePrimaryColor: "#0f766e",
+        themeLoginColor: "#be123c",
+        themeManagerColor: "#b7791f",
+        themeAdminColor: "#2563eb",
+        themeSurfaceColor: "#f6f8f4"
+      })
+      .set(CSRF_HEADER, adminCsrf)
+      .expect(200);
+
+    for (let i = 0; i < 10; i += 1) {
+      await request(started!.app)
+        .post("/api/auth/register")
+        .send({ inviteCode: "FALSCH", username: `probe${i}`, email: `probe${i}@example.test` })
+        .expect(403)
+        .expect((response) => {
+          expect(response.body.error).toBe("invite_ungueltig");
+        });
+    }
+
+    await request(started!.app)
+      .post("/api/auth/register")
+      .send({ inviteCode: "FALSCH", username: "probe10", email: "probe10@example.test" })
+      .expect(429)
+      .expect((response) => {
+        expect(response.body.error).toBe("rate_limit_aktiv");
+        expect(typeof response.body.retryAfterSeconds).toBe("number");
+      });
+  });
+
   it("stores hashed session tokens, rejects legacy sessions, and revokes sessions after sensitive admin changes", async () => {
     const adminAgent = request.agent(started!.app);
     await login(adminAgent, "hauptadmin");
