@@ -9,9 +9,9 @@ These requirements define the next release milestone for the existing Hermes app
 
 ### Authentication And Sessions
 
-- [ ] **AUTH-01**: Login-code requests return a generic success-shaped response that does not reveal whether a username exists.
-- [ ] **AUTH-02**: Login-code request and verification endpoints enforce practical rate limits by username and request source.
-- [ ] **AUTH-03**: Expired or superseded login challenges are cleaned up and indexed so repeated login attempts do not grow the database unbounded.
+- [x] **AUTH-01**: Login-code requests return a generic success-shaped response that does not reveal whether a username exists.
+- [x] **AUTH-02**: Login-code request and verification endpoints enforce practical rate limits by username and request source.
+- [x] **AUTH-03**: Expired or superseded login challenges are cleaned up and indexed so repeated login attempts do not grow the database unbounded.
 - [ ] **AUTH-04**: Session tokens are not stored as reusable raw bearer tokens in persisted SQLite data or S3 snapshots.
 - [ ] **AUTH-05**: Security-sensitive user changes, such as deletion or role changes, have defined session invalidation behavior and test coverage.
 - [ ] **AUTH-06**: Mutating cookie-authenticated admin routes have an explicit CSRF decision that is implemented or documented with rationale.
@@ -25,7 +25,7 @@ These requirements define the next release milestone for the existing Hermes app
 
 ### Invite Registration
 
-- [ ] **INV-01**: Public invite registration is throttled to reduce brute-force attempts against invite codes.
+- [x] **INV-01**: Public invite registration is throttled to reduce brute-force attempts against invite codes.
 - [ ] **INV-02**: Invite codes meet a documented minimum entropy level and are treated as credentials in docs and audit metadata.
 - [ ] **INV-03**: Invite `maxUses` enforcement is atomic, so concurrent registrations cannot oversubscribe a limited invite.
 - [ ] **INV-04**: Admin invite list and audit entries avoid unnecessary reusable invite-code disclosure while preserving operator usability.
@@ -105,9 +105,9 @@ Every v1 requirement maps to exactly one roadmap phase and remains pending until
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| AUTH-01 | Phase 1: Auth, Profile, And Invite Hardening | Pending |
-| AUTH-02 | Phase 1: Auth, Profile, And Invite Hardening | Pending |
-| AUTH-03 | Phase 1: Auth, Profile, And Invite Hardening | Pending |
+| AUTH-01 | Phase 1: Auth, Profile, And Invite Hardening | Complete |
+| AUTH-02 | Phase 1: Auth, Profile, And Invite Hardening | Complete |
+| AUTH-03 | Phase 1: Auth, Profile, And Invite Hardening | Complete |
 | AUTH-04 | Phase 1: Auth, Profile, And Invite Hardening | Pending |
 | AUTH-05 | Phase 1: Auth, Profile, And Invite Hardening | Pending |
 | AUTH-06 | Phase 1: Auth, Profile, And Invite Hardening | Pending |
@@ -115,7 +115,7 @@ Every v1 requirement maps to exactly one roadmap phase and remains pending until
 | PROF-01 | Phase 1: Auth, Profile, And Invite Hardening | Pending |
 | PROF-02 | Phase 1: Auth, Profile, And Invite Hardening | Pending |
 | PROF-03 | Phase 1: Auth, Profile, And Invite Hardening | Pending |
-| INV-01 | Phase 1: Auth, Profile, And Invite Hardening | Pending |
+| INV-01 | Phase 1: Auth, Profile, And Invite Hardening | Complete |
 | INV-02 | Phase 1: Auth, Profile, And Invite Hardening | Pending |
 | INV-03 | Phase 2: Event And Invite Consistency | Pending |
 | INV-04 | Phase 1: Auth, Profile, And Invite Hardening | Pending |

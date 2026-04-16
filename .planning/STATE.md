@@ -3,15 +3,15 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
 status: executing
-stopped_at: Phase 1 plans revised after checker feedback
-last_updated: "2026-04-16T09:11:41.730Z"
-last_activity: 2026-04-16 -- Phase 01 execution started
+stopped_at: Completed 01-02-PLAN.md
+last_updated: "2026-04-16T09:28:04.888Z"
+last_activity: 2026-04-16
 progress:
   total_phases: 6
   completed_phases: 0
   total_plans: 8
-  completed_plans: 0
-  percent: 0
+  completed_plans: 2
+  percent: 25
 ---
 
 # Project State
@@ -26,9 +26,9 @@ See: .planning/PROJECT.md (updated 2026-04-15)
 ## Current Position
 
 Phase: 01 (auth-profile-and-invite-hardening) — EXECUTING
-Plan: 1 of 8
-Status: Executing Phase 01
-Last activity: 2026-04-16 -- Phase 01 execution started
+Plan: 2 of 8
+Status: Ready to execute
+Last activity: 2026-04-16
 
 Progress: [----------] 0%
 
@@ -57,6 +57,7 @@ Progress: [----------] 0%
 - Trend: n/a
 
 *Updated after each plan completion*
+| Phase 01 P01-02 | 10m | 3 tasks | 5 files |
 
 ## Accumulated Context
 
@@ -69,6 +70,9 @@ Recent decisions affecting current work:
 - Use Wasabi/S3 only as snapshot backup/restore storage, not as multi-writer storage.
 - Keep TLS/reverse proxy outside Hermes while documenting secure-context requirements for push.
 - Prioritize hardening, consistency, restore safety, PWA reliability, frontend modularity, and release readiness before feature expansion.
+- [Phase 01]: Persistierte Rate-Limits (Entries + Allowlist) sind per Admin-API list-/löschbar.
+- [Phase 01]: Login-Code-Requests antworten generisch (202 ok) für syntaktisch valide Usernames (kein Enumeration-Leak).
+- [Phase 01]: Audit-Logging ist best-effort und blockiert keine primären Aktionen (D-27).
 
 ### Pending Todos
 
@@ -90,6 +94,6 @@ Items acknowledged and carried forward from previous milestone close:
 
 ## Session Continuity
 
-Last session: 2026-04-15T22:36:23.642Z
-Stopped at: Phase 1 plans revised after checker feedback
-Resume file: .planning/phases/01-auth-profile-and-invite-hardening/01-01-PLAN.md
+Last session: 2026-04-16T09:28:04.878Z
+Stopped at: Completed 01-02-PLAN.md
+Resume file: None

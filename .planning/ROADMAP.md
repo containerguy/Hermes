@@ -34,7 +34,7 @@ Hermes already has the core LAN-party workflow in place. This milestone turns th
 
 Plans:
 - [x] 01-01: Create Phase 1 schema foundations and migration coverage before dependent code lands.
-- [ ] 01-02: Harden auth entry points with generic login responses and persisted throttling; add admin rate-limit operations APIs.
+- [x] 01-02: Harden auth entry points with generic login responses and persisted throttling; add admin rate-limit operations APIs.
 - [ ] 01-03: Implement profile, confirmed email-change, active-email uniqueness, and device/session backend behavior.
 - [ ] 01-04: Harden invite registration and admin invite lifecycle with generated-only high-entropy codes and masked audit metadata.
 - [ ] 01-05: Wire profile, invite lifecycle, and CSRF-aware client requests into the existing UI.
@@ -136,7 +136,7 @@ Phases execute in numeric order: 1 -> 2 -> 3 -> 4 -> 5 -> 6
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
-| 1. Auth, Profile, And Invite Hardening | 0/6 | Not started | - |
+| 1. Auth, Profile, And Invite Hardening | 2/8 | In Progress|  |
 | 2. Event And Invite Consistency | 0/3 | Not started | - |
 | 3. Backup And Restore Safety | 0/3 | Not started | - |
 | 4. PWA And Realtime Reliability | 0/3 | Not started | - |
