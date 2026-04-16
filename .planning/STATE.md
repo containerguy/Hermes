@@ -3,15 +3,15 @@ gsd_state_version: 1.0
 milestone: v1.2
 milestone_name: Post-LAN Quality of Life
 status: executing
-stopped_at: Completed 09-02-same-device-recognition-PLAN.md
-last_updated: "2026-04-16T20:21:23.862Z"
+stopped_at: Completed 09-03-pairing-endpoints-PLAN.md
+last_updated: "2026-04-16T20:31:32.000Z"
 last_activity: 2026-04-16
 progress:
   total_phases: 5
   completed_phases: 0
   total_plans: 14
-  completed_plans: 2
-  percent: 14
+  completed_plans: 3
+  percent: 21
 ---
 
 # Project State
@@ -26,11 +26,11 @@ See: .planning/PROJECT.md (updated 2026-04-15)
 ## Current Position
 
 Phase: 09 (device-recognition-and-pairing) — EXECUTING
-Plan: 3 of 4
-Status: Ready to execute
+Plan: 4 of 4
+Status: Ready to execute (09-04 client pairing UX)
 Last activity: 2026-04-16
 
-Progress: [..........] 0% (0 of 14 plans executed)
+Progress: [==........] 21% (3 of 14 plans executed)
 
 ### Plan Roster (v1.2)
 
@@ -83,6 +83,7 @@ Progress: [..........] 0% (0 of 14 plans executed)
 | Phase 02 P03 | 6m | 3 tasks | 4 files |
 | Phase 09 P01 | 6min | 4 tasks | 6 files |
 | Phase 09 P02 | 3min | 2 tasks | 2 files |
+| Phase 09 P03 | 8min | 3 tasks | 3 files |
 
 ## Accumulated Context
 
@@ -107,6 +108,8 @@ Recent decisions affecting current work:
 - [Phase 09]: 09-01: HMAC-SHA256 with HERMES_DEVICE_KEY_SECRET and HERMES_PAIR_TOKEN_SECRET env vars for all secret-adjacent hashes at rest; plain SHA-256 reserved for RL key redaction + session tokens.
 - [Phase 09]: 09-02: Recognition is deviceKey-first; signals fallback only reuses when exactly 1 non-revoked, non-key-bound candidate matches — ambiguity inserts a new row (T-09-10).
 - [Phase 09]: 09-02: auth.login_recognized vs auth.login distinguishes returning-device re-login; audit metadata never carries raw deviceKey (T-09-08).
+- [Phase 09]: 09-03: /api/auth/pair-token is CSRF-gated + auth-required + rate-limited (pair_token_create, per-session AND per-user); /api/auth/pair-redeem is public + CSRF-exempt + single-use atomic; redeeming never revokes the origin session (D-10).
+- [Phase 09]: 09-03: Four stable pairing error codes (pair_token_invalid/expired/consumed/pair_origin_revoked) mapped with German messages in src/client/errors/errors.ts; T-09-15 (no per-IP RL on /pair-redeem) still open but mitigated by 256-bit entropy + 10-min TTL + single-use + device_pair_failed audit.
 
 ### Pending Todos
 
@@ -128,6 +131,6 @@ Items acknowledged and carried forward from previous milestone close:
 
 ## Session Continuity
 
-Last session: 2026-04-16T20:21:16.255Z
-Stopped at: Completed 09-02-same-device-recognition-PLAN.md
+Last session: 2026-04-16T20:31:32.000Z
+Stopped at: Completed 09-03-pairing-endpoints-PLAN.md
 Resume file: None

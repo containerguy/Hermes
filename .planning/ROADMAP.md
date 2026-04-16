@@ -37,7 +37,7 @@
 Plans:
 - [x] 09-01-schema-and-device-model-PLAN.md — Migration `0010_device_pairing.sql`, Drizzle schema for `pairing_tokens` + `sessions.device_key_hash`, helper modules (`device-key.ts`, `pairing-tokens.ts`), `pair_token_create` rate-limit scope (AUTH-01, AUTH-02 foundation).
 - [x] 09-02-same-device-recognition-PLAN.md — Extend `verify-code` to recognize `(userId, deviceKeyHash)` or normalized signals and update existing session in place; new `auth.login_recognized` audit code; vitest covering happy + negative paths (AUTH-01 server).
-- [ ] 09-03-pairing-endpoints-PLAN.md — `POST /api/auth/pair-token` (auth + CSRF + rate-limited mint) and `POST /api/auth/pair-redeem` (public, single-use, atomic) with stable error codes and `device_pair_*` audit entries; vitest covering 9 cases (AUTH-02 server).
+- [x] 09-03-pairing-endpoints-PLAN.md — `POST /api/auth/pair-token` (auth + CSRF + rate-limited mint) and `POST /api/auth/pair-redeem` (public, single-use, atomic) with stable error codes and `device_pair_*` audit entries; vitest covering 9 cases (AUTH-02 server).
 - [ ] 09-04-client-pairing-ux-PLAN.md — `device-key.ts` + `QrCanvas.tsx` (uses `qrcode-generator@1.4.4` per D-15), LoginPanel "Add a device" / "Forget this device" panel, `?pair=<token>` redemption-on-mount with URL strip, German error copy (AUTH-01, AUTH-02 client).
 **UI hint**: yes
 
@@ -102,7 +102,7 @@ Plans:
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
-| 9. Device Recognition and Session-Bound Pairing | 0/4 | Not started | — |
+| 9. Device Recognition and Session-Bound Pairing | 3/4 | In progress | — |
 | 10. Admin Theme System, Backgrounds, and Copy Refresh | 0/5 | Not started | — |
 | 11. Admin Bulk User Import | 0/2 | Not started | — |
 | 12. Audio and Haptic Notification UX | 0/2 | Not started | — |
@@ -112,4 +112,4 @@ Plans:
 
 Next up:
 
-- Plan Phase 9 (`/gsd-plan-phase 9`) — auth/device-pairing
+- Execute 09-04-client-pairing-ux-PLAN.md (AUTH-01/AUTH-02 client) — device-key.ts, QrCanvas, LoginPanel "Add a device" panel, `?pair=<token>` redemption-on-mount, German error copy
