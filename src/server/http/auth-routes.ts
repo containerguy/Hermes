@@ -2,6 +2,7 @@ import { and, desc, eq, gt, isNull, lt } from "drizzle-orm";
 import { Router } from "express";
 import { randomUUID } from "node:crypto";
 import { z } from "zod";
+import { createCsrfToken, CSRF_HEADER, requireCsrf } from "../auth/csrf";
 import { getCurrentSession, publicUser } from "../auth/current-user";
 import { tryWriteAuditLog } from "../audit-log";
 import { checkRateLimit, recordRateLimitFailure } from "../auth/rate-limits";
@@ -88,6 +89,30 @@ async function sendIssuedLoginCode(
 
 export function createAuthRouter(context: DatabaseContext) {
   const router = Router();
+  const csrfExemptPaths = new Set(["/request-code", "/verify-code", "/register"]);
+
+  router.use((request, response, next) => {
+    if (
+      ["POST", "PATCH", "PUT", "DELETE"].includes(request.method) &&
+      !csrfExemptPaths.has(request.path)
+    ) {
+      if (!requireCsrf(context, request, response)) {
+        return;
+      }
+    }
+    next();
+  });
+
+  router.get("/csrf", (request, response) => {
+    const current = getCurrentSession(context, request);
+
+    if (!current) {
+      response.status(401).json({ error: "nicht_angemeldet" });
+      return;
+    }
+
+    response.json({ token: createCsrfToken(current.session.id), header: CSRF_HEADER });
+  });
 
   router.post("/request-code", async (request, response) => {
     const parsed = requestCodeSchema.safeParse(request.body);

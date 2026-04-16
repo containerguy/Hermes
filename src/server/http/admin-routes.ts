@@ -2,6 +2,7 @@ import { asc, desc, eq, isNull } from "drizzle-orm";
 import { Router } from "express";
 import { randomUUID } from "node:crypto";
 import { z } from "zod";
+import { requireCsrf } from "../auth/csrf";
 import { publicUser, requireAdmin, requireUser } from "../auth/current-user";
 import { listAuditLogs, tryWriteAuditLog } from "../audit-log";
 import {
@@ -87,6 +88,15 @@ export function createAdminRouter(context: DatabaseContext) {
       return;
     }
 
+    next();
+  });
+
+  router.use((request, response, next) => {
+    if (["POST", "PATCH", "PUT", "DELETE"].includes(request.method)) {
+      if (!requireCsrf(context, request, response)) {
+        return;
+      }
+    }
     next();
   });
 

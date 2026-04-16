@@ -5,6 +5,7 @@ import path from "node:path";
 import Database from "better-sqlite3";
 import request from "supertest";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { CSRF_HEADER } from "../auth/csrf";
 import { bootstrapAdmin } from "../db/bootstrap-admin";
 import { createHermesApp } from "../app";
 
@@ -21,6 +22,11 @@ async function login(agent: ReturnType<typeof request.agent>, username: string) 
     .expect(200);
 
   return response.body.user as { id: string; role: string };
+}
+
+async function fetchCsrf(agent: ReturnType<typeof request.agent>) {
+  const response = await agent.get("/api/auth/csrf").expect(200);
+  return response.body.token as string;
 }
 
 describe("app flow", () => {
@@ -123,6 +129,7 @@ describe("app flow", () => {
 
     const adminAgent = request.agent(started!.app);
     await login(adminAgent, "hauptadmin");
+    const csrf = await fetchCsrf(adminAgent);
 
     await adminAgent
       .get("/api/admin/rate-limits")
@@ -132,7 +139,7 @@ describe("app flow", () => {
         expect(ids).toContain(id);
       });
 
-    await adminAgent.delete(`/api/admin/rate-limits/${id}`).expect(200);
+    await adminAgent.delete(`/api/admin/rate-limits/${id}`).set(CSRF_HEADER, csrf).expect(200);
 
     await adminAgent
       .get("/api/admin/rate-limits")
@@ -184,7 +191,8 @@ describe("app flow", () => {
 
       const adminAgent = request.agent(started!.app);
       await login(adminAgent, "hauptadmin");
-      await adminAgent.delete(`/api/admin/rate-limits/${id}`).expect(200);
+      const csrf = await fetchCsrf(adminAgent);
+      await adminAgent.delete(`/api/admin/rate-limits/${id}`).set(CSRF_HEADER, csrf).expect(200);
 
       expect(errorSpy).toHaveBeenCalledWith("[Hermes] audit log failed", expect.any(Error));
     } finally {
@@ -208,10 +216,12 @@ describe("app flow", () => {
   it("supersedes older login challenges and cleans expired challenges", async () => {
     const adminAgent = request.agent(started!.app);
     await login(adminAgent, "hauptadmin");
+    const csrf = await fetchCsrf(adminAgent);
 
     await adminAgent
       .post("/api/admin/users")
       .send({ username: "spieler", email: "spieler@example.test", role: "user" })
+      .set(CSRF_HEADER, csrf)
       .expect(201);
 
     const sqlite = new Database(databasePath);
@@ -279,10 +289,12 @@ describe("app flow", () => {
   it("stores hashed session tokens, rejects legacy sessions, and revokes sessions after sensitive admin changes", async () => {
     const adminAgent = request.agent(started!.app);
     await login(adminAgent, "hauptadmin");
+    const adminCsrf = await fetchCsrf(adminAgent);
 
     const created = await adminAgent
       .post("/api/admin/users")
       .send({ username: "revokee", email: "revokee@example.test", role: "user" })
+      .set(CSRF_HEADER, adminCsrf)
       .expect(201);
 
     const userId = created.body.user.id as string;
@@ -339,7 +351,11 @@ describe("app flow", () => {
       });
 
     await userAgent.get("/api/auth/me").expect(200);
-    await adminAgent.patch(`/api/admin/users/${userId}`).send({ role: "manager" }).expect(200);
+    await adminAgent
+      .patch(`/api/admin/users/${userId}`)
+      .send({ role: "manager" })
+      .set(CSRF_HEADER, adminCsrf)
+      .expect(200);
     await userAgent.get("/api/auth/me").expect(401);
 
     await login(userAgent, "revokee");
@@ -347,18 +363,53 @@ describe("app flow", () => {
     await adminAgent
       .patch(`/api/admin/users/${userId}`)
       .send({ email: "revokee2@example.test" })
+      .set(CSRF_HEADER, adminCsrf)
       .expect(200);
     await userAgent.get("/api/auth/me").expect(401);
 
     await login(userAgent, "revokee");
     await userAgent.get("/api/auth/me").expect(200);
-    await adminAgent.delete(`/api/admin/users/${userId}`).expect(204);
+    await adminAgent.delete(`/api/admin/users/${userId}`).set(CSRF_HEADER, adminCsrf).expect(204);
     await userAgent.get("/api/auth/me").expect(401);
+  });
+
+  it("enforces CSRF on authenticated mutations and exempts public auth endpoints", async () => {
+    await request(started!.app).post("/api/auth/request-code").send({ username: "unbekannt-csrf" }).expect(202);
+
+    const adminAgent = request.agent(started!.app);
+    await login(adminAgent, "hauptadmin");
+
+    await adminAgent
+      .put("/api/admin/settings")
+      .send({ appName: "No CSRF" })
+      .expect(403)
+      .expect((response) => {
+        expect(response.body.error).toBe("csrf_token_ungueltig");
+      });
+
+    const csrf = await fetchCsrf(adminAgent);
+    await adminAgent.put("/api/admin/settings").set(CSRF_HEADER, csrf).send({ appName: "With CSRF" }).expect(200);
+
+    const sessionsResponse = await adminAgent.get("/api/auth/sessions").expect(200);
+    expect(sessionsResponse.body.sessions.length).toBeGreaterThan(0);
+
+    await adminAgent
+      .delete(`/api/auth/sessions/${sessionsResponse.body.sessions[0].id}`)
+      .expect(403)
+      .expect((response) => {
+        expect(response.body.error).toBe("csrf_token_ungueltig");
+      });
+
+    await adminAgent
+      .delete(`/api/auth/sessions/${sessionsResponse.body.sessions[0].id}`)
+      .set(CSRF_HEADER, csrf)
+      .expect(200);
   });
 
   it("logs in, manages roles, creates events and enforces participation capacity", async () => {
     const adminAgent = request.agent(started!.app);
     await login(adminAgent, "hauptadmin");
+    const adminCsrf = await fetchCsrf(adminAgent);
 
     const manager = await adminAgent
       .post("/api/admin/users")
@@ -367,6 +418,7 @@ describe("app flow", () => {
         email: "manager@example.test",
         role: "manager"
       })
+      .set(CSRF_HEADER, adminCsrf)
       .expect(201);
 
     expect(manager.body.user.phoneNumber).toMatch(/^user:/);
@@ -378,6 +430,7 @@ describe("app flow", () => {
         email: "spieler1@example.test",
         role: "user"
       })
+      .set(CSRF_HEADER, adminCsrf)
       .expect(201);
 
     await adminAgent
@@ -387,11 +440,13 @@ describe("app flow", () => {
         email: "spieler2@example.test",
         role: "user"
       })
+      .set(CSRF_HEADER, adminCsrf)
       .expect(201);
 
     await adminAgent
       .patch(`/api/admin/users/${manager.body.user.id}`)
       .send({ role: "manager" })
+      .set(CSRF_HEADER, adminCsrf)
       .expect(200);
 
     await adminAgent
@@ -407,11 +462,13 @@ describe("app flow", () => {
         themeAdminColor: "#2563eb",
         themeSurfaceColor: "#f6f8f4"
       })
+      .set(CSRF_HEADER, adminCsrf)
       .expect(200);
 
     const invite = await adminAgent
       .post("/api/admin/invite-codes")
       .send({ label: "Test LAN", code: "TESTLAN", maxUses: 5 })
+      .set(CSRF_HEADER, adminCsrf)
       .expect(201);
 
     const invitedAgent = request.agent(started!.app);
@@ -424,18 +481,23 @@ describe("app flow", () => {
       .post("/api/auth/verify-code")
       .send({ username: "invitee", code: "123456", deviceName: "phone" })
       .expect(200);
+    const invitedCsrf = await fetchCsrf(invitedAgent);
 
     const sessionsResponse = await invitedAgent.get("/api/auth/sessions").expect(200);
     expect(sessionsResponse.body.sessions).toHaveLength(1);
     await invitedAgent
       .delete(`/api/auth/sessions/${sessionsResponse.body.sessions[0].id}`)
+      .set(CSRF_HEADER, invitedCsrf)
       .expect(200)
       .expect((response) => {
         expect(response.body.revokedCurrent).toBe(true);
       });
 
     expect(invite.body.inviteCode.usedCount).toBe(0);
-    await adminAgent.delete(`/api/admin/users/${invited.body.user.id}`).expect(204);
+    await adminAgent
+      .delete(`/api/admin/users/${invited.body.user.id}`)
+      .set(CSRF_HEADER, adminCsrf)
+      .expect(204);
     await request(started!.app).post("/api/auth/request-code").send({ username: "invitee" }).expect(202);
 
     await request(started!.app)
@@ -446,7 +508,7 @@ describe("app flow", () => {
         expect(response.body.settings.themeAdminColor).toBe("#2563eb");
       });
 
-    await adminAgent.post("/api/admin/backup").expect(200);
+    await adminAgent.post("/api/admin/backup").set(CSRF_HEADER, adminCsrf).expect(200);
 
     const managerAgent = request.agent(started!.app);
     await login(managerAgent, "manager");
