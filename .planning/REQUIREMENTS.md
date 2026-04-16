@@ -26,12 +26,12 @@ These requirements define the next release milestone for the existing Hermes app
 ### Invite Registration
 
 - [x] **INV-01**: Public invite registration is throttled to reduce brute-force attempts against invite codes.
-- [ ] **INV-02**: Invite codes meet a documented minimum entropy level and are treated as credentials in docs and audit metadata.
+- [x] **INV-02**: Invite codes meet a documented minimum entropy level and are treated as credentials in docs and audit metadata.
 - [ ] **INV-03**: Invite `maxUses` enforcement is atomic, so concurrent registrations cannot oversubscribe a limited invite.
-- [ ] **INV-04**: Admin invite list and audit entries avoid unnecessary reusable invite-code disclosure while preserving operator usability.
-- [ ] **INV-05**: Admins can deactivate and reactivate invite codes without deleting their usage history.
-- [ ] **INV-06**: Admins can edit invite max uses and validity windows with validation that preserves already-used invite accounting.
-- [ ] **INV-07**: Admins can delete unused invite codes or clearly remove them from active planning without breaking historical audit context.
+- [x] **INV-04**: Admin invite list and audit entries avoid unnecessary reusable invite-code disclosure while preserving operator usability.
+- [x] **INV-05**: Admins can deactivate and reactivate invite codes without deleting their usage history.
+- [x] **INV-06**: Admins can edit invite max uses and validity windows with validation that preserves already-used invite accounting.
+- [x] **INV-07**: Admins can delete unused invite codes or clearly remove them from active planning without breaking historical audit context.
 
 ### Event Participation
 
@@ -116,12 +116,12 @@ Every v1 requirement maps to exactly one roadmap phase and remains pending until
 | PROF-02 | Phase 1: Auth, Profile, And Invite Hardening | Pending |
 | PROF-03 | Phase 1: Auth, Profile, And Invite Hardening | Pending |
 | INV-01 | Phase 1: Auth, Profile, And Invite Hardening | Complete |
-| INV-02 | Phase 1: Auth, Profile, And Invite Hardening | Pending |
+| INV-02 | Phase 1: Auth, Profile, And Invite Hardening | Complete |
 | INV-03 | Phase 2: Event And Invite Consistency | Pending |
-| INV-04 | Phase 1: Auth, Profile, And Invite Hardening | Pending |
-| INV-05 | Phase 1: Auth, Profile, And Invite Hardening | Pending |
-| INV-06 | Phase 1: Auth, Profile, And Invite Hardening | Pending |
-| INV-07 | Phase 1: Auth, Profile, And Invite Hardening | Pending |
+| INV-04 | Phase 1: Auth, Profile, And Invite Hardening | Complete |
+| INV-05 | Phase 1: Auth, Profile, And Invite Hardening | Complete |
+| INV-06 | Phase 1: Auth, Profile, And Invite Hardening | Complete |
+| INV-07 | Phase 1: Auth, Profile, And Invite Hardening | Complete |
 | EVT-01 | Phase 2: Event And Invite Consistency | Pending |
 | EVT-02 | Phase 2: Event And Invite Consistency | Pending |
 | EVT-03 | Phase 2: Event And Invite Consistency | Pending |
