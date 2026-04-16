@@ -3,15 +3,15 @@ gsd_state_version: 1.0
 milestone: v1.2
 milestone_name: Post-LAN Quality of Life
 status: executing
-stopped_at: Completed 09-01-schema-and-device-model-PLAN.md
-last_updated: "2026-04-16T20:14:23.620Z"
+stopped_at: Completed 09-02-same-device-recognition-PLAN.md
+last_updated: "2026-04-16T20:21:23.862Z"
 last_activity: 2026-04-16
 progress:
   total_phases: 5
   completed_phases: 0
   total_plans: 14
-  completed_plans: 1
-  percent: 7
+  completed_plans: 2
+  percent: 14
 ---
 
 # Project State
@@ -26,7 +26,7 @@ See: .planning/PROJECT.md (updated 2026-04-15)
 ## Current Position
 
 Phase: 09 (device-recognition-and-pairing) — EXECUTING
-Plan: 2 of 4
+Plan: 3 of 4
 Status: Ready to execute
 Last activity: 2026-04-16
 
@@ -82,6 +82,7 @@ Progress: [..........] 0% (0 of 14 plans executed)
 | Phase 02 P02 | 4m | 2 tasks | 2 files |
 | Phase 02 P03 | 6m | 3 tasks | 4 files |
 | Phase 09 P01 | 6min | 4 tasks | 6 files |
+| Phase 09 P02 | 3min | 2 tasks | 2 files |
 
 ## Accumulated Context
 
@@ -104,6 +105,8 @@ Recent decisions affecting current work:
 - [Phase 02]: 02-02: Return 409 { error: "event_voll", event } for capacity losers while keeping stable error code (D-09).
 - [Phase 09]: 09-01: device_key_hash lives on sessions (no separate device_keys table); pair_token_create RL = 10min/5 attempts/15min block.
 - [Phase 09]: 09-01: HMAC-SHA256 with HERMES_DEVICE_KEY_SECRET and HERMES_PAIR_TOKEN_SECRET env vars for all secret-adjacent hashes at rest; plain SHA-256 reserved for RL key redaction + session tokens.
+- [Phase 09]: 09-02: Recognition is deviceKey-first; signals fallback only reuses when exactly 1 non-revoked, non-key-bound candidate matches — ambiguity inserts a new row (T-09-10).
+- [Phase 09]: 09-02: auth.login_recognized vs auth.login distinguishes returning-device re-login; audit metadata never carries raw deviceKey (T-09-08).
 
 ### Pending Todos
 
@@ -125,6 +128,6 @@ Items acknowledged and carried forward from previous milestone close:
 
 ## Session Continuity
 
-Last session: 2026-04-16T20:14:23.609Z
-Stopped at: Completed 09-01-schema-and-device-model-PLAN.md
+Last session: 2026-04-16T20:21:16.255Z
+Stopped at: Completed 09-02-same-device-recognition-PLAN.md
 Resume file: None
