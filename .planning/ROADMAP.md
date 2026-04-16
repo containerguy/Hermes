@@ -13,7 +13,7 @@ Hermes already has the core LAN-party workflow in place. This milestone turns th
 - [ ] **Phase 1: Auth, Profile, And Invite Hardening** - Reduce login/invite abuse risk, protect credential-like data, and define account/session safety.
 - [x] **Phase 2: Event And Invite Consistency** - Make limited invite usage and event participation capacity transactionally correct. (completed 2026-04-16)
 - [x] **Phase 3: Backup And Restore Safety** - Make S3 snapshot restore validated, recoverable, audited, and visible to operators. (completed 2026-04-16)
-- [ ] **Phase 4: PWA And Realtime Reliability** - Improve notification guidance, push failure handling, and SSE resilience.
+- [x] **Phase 4: PWA And Realtime Reliability** - Improve notification guidance, push failure handling, and SSE resilience. (completed 2026-04-16)
 - [ ] **Phase 5: Frontend And Admin UI Modularization** - Split the client monolith and tighten responsive/admin UX without behavior drift.
 - [ ] **Phase 6: Release Verification And Documentation** - Add release-critical tests and align docs, env, Docker, and CI with the production contract.
 
@@ -90,9 +90,9 @@ Plans:
 **Plans**: 3 plans
 
 Plans:
-- [ ] 04-01: Add in-product PWA/push limitation messaging and safe client states for unsupported notification contexts.
-- [ ] 04-02: Harden service worker push parsing and server-side failed-subscription cleanup.
-- [ ] 04-03: Add SSE heartbeat/reconnect resilience and documentation for proxy timeout expectations.
+- [x] 04-01: Add in-product PWA/push limitation messaging and safe client states for unsupported notification contexts.
+- [x] 04-02: Harden service worker push parsing and server-side failed-subscription cleanup.
+- [x] 04-03: Add SSE heartbeat/reconnect resilience and documentation for proxy timeout expectations.
 
 ### Phase 5: Frontend And Admin UI Modularization
 **Goal**: The React frontend is split into focused modules so future admin/profile/event work can land with lower regression risk while preserving the current modern responsive design.
@@ -139,7 +139,7 @@ Phases execute in numeric order: 1 -> 2 -> 3 -> 4 -> 5 -> 6
 | 1. Auth, Profile, And Invite Hardening | 2/8 | In Progress|  |
 | 2. Event And Invite Consistency | 3/3 | Complete    | 2026-04-16 |
 | 3. Backup And Restore Safety | 3/3 | Complete   | 2026-04-16 |
-| 4. PWA And Realtime Reliability | 0/3 | Not started | - |
+| 4. PWA And Realtime Reliability | 3/3 | Complete   | 2026-04-16 |
 | 5. Frontend And Admin UI Modularization | 0/4 | Not started | - |
 | 6. Release Verification And Documentation | 0/3 | Not started | - |
 

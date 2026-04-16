@@ -50,10 +50,10 @@ These requirements define the next release milestone for the existing Hermes app
 
 ### Notifications And PWA
 
-- [ ] **PWA-01**: Notification settings explain secure-context, browser, OS, and PWA installation limitations directly in the product UI.
-- [ ] **PWA-02**: The service worker handles missing or malformed push payloads without throwing.
-- [ ] **PWA-03**: Repeatedly invalid or expired push subscriptions are cleaned up or marked inactive without breaking notification delivery to other devices.
-- [ ] **PWA-04**: Realtime event updates remain resilient across idle proxy connections or reconnects.
+- [x] **PWA-01**: Notification settings explain secure-context, browser, OS, and PWA installation limitations directly in the product UI.
+- [x] **PWA-02**: The service worker handles missing or malformed push payloads without throwing.
+- [x] **PWA-03**: Repeatedly invalid or expired push subscriptions are cleaned up or marked inactive without breaking notification delivery to other devices.
+- [x] **PWA-04**: Realtime event updates remain resilient across idle proxy connections or reconnects.
 
 ### Frontend Maintainability
 
@@ -131,10 +131,10 @@ Every v1 requirement maps to exactly one roadmap phase and remains pending until
 | BKP-04 | Phase 3: Backup And Restore Safety | Complete |
 | BKP-05 | Phase 3: Backup And Restore Safety | Complete |
 | BKP-06 | Phase 3: Backup And Restore Safety | Complete |
-| PWA-01 | Phase 4: PWA And Realtime Reliability | Pending |
-| PWA-02 | Phase 4: PWA And Realtime Reliability | Pending |
-| PWA-03 | Phase 4: PWA And Realtime Reliability | Pending |
-| PWA-04 | Phase 4: PWA And Realtime Reliability | Pending |
+| PWA-01 | Phase 4: PWA And Realtime Reliability | Complete |
+| PWA-02 | Phase 4: PWA And Realtime Reliability | Complete |
+| PWA-03 | Phase 4: PWA And Realtime Reliability | Complete |
+| PWA-04 | Phase 4: PWA And Realtime Reliability | Complete |
 | UI-01 | Phase 5: Frontend And Admin UI Modularization | Pending |
 | UI-02 | Phase 5: Frontend And Admin UI Modularization | Pending |
 | UI-03 | Phase 5: Frontend And Admin UI Modularization | Pending |
