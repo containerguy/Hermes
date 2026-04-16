@@ -3,15 +3,15 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
 status: executing
-stopped_at: Completed 01-auth-profile-and-invite-hardening-01-08-PLAN.md
-last_updated: "2026-04-16T10:06:37.736Z"
+stopped_at: Completed 01-06-PLAN.md
+last_updated: "2026-04-16T10:13:05.851Z"
 last_activity: 2026-04-16
 progress:
   total_phases: 6
-  completed_phases: 0
+  completed_phases: 1
   total_plans: 8
-  completed_plans: 7
-  percent: 88
+  completed_plans: 8
+  percent: 100
 ---
 
 # Project State
@@ -26,7 +26,7 @@ See: .planning/PROJECT.md (updated 2026-04-15)
 ## Current Position
 
 Phase: 01 (auth-profile-and-invite-hardening) — EXECUTING
-Plan: 7 of 8
+Plan: 8 of 8
 Status: Ready to execute
 Last activity: 2026-04-16
 
@@ -63,6 +63,7 @@ Progress: [----------] 0%
 | Phase 01 P01-03 | 40m | 4 tasks | 7 files |
 | Phase 01 P01-05 | 311s | 3 tasks | 2 files |
 | Phase 01-auth-profile-and-invite-hardening P01-08 | 25min | 1 tasks | 2 files |
+| Phase 01 P01-06 | 170s | 3 tasks | 5 files |
 
 ## Accumulated Context
 
@@ -81,6 +82,7 @@ Recent decisions affecting current work:
 - [Phase 01]: CSRF tokens via GET /api/auth/csrf and x-hermes-csrf header (HMAC-SHA256 over non-secret session id).
 - [Phase 01]: Legacy sessions without tokenHash are invalid and require re-login to avoid persisted replayable tokens.
 - [Phase 01-auth-profile-and-invite-hardening]: 01-08: AdminPanel zeigt aktive Rate-Limit-Sperren (nur blockierte Einträge) und erlaubt Clear + LAN-Allowlist Pflege.
+- [Phase 01]: Invite maxUses atomic concurrency (INV-03) remains deferred to Phase 2; Phase 1 must not claim it.
 
 ### Pending Todos
 
@@ -102,6 +104,6 @@ Items acknowledged and carried forward from previous milestone close:
 
 ## Session Continuity
 
-Last session: 2026-04-16T10:06:37.726Z
-Stopped at: Completed 01-auth-profile-and-invite-hardening-01-08-PLAN.md
+Last session: 2026-04-16T10:13:05.842Z
+Stopped at: Completed 01-06-PLAN.md
 Resume file: None
