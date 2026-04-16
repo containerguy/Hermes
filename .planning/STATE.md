@@ -96,6 +96,7 @@ Recent decisions affecting current work:
 
 - 2026-04-16 — Bulk import of users (`.planning/todos/pending/2026-04-16-bulk-import-of-users.md`)
 - 2026-04-16 — Recognize device on re-login (`.planning/todos/pending/2026-04-16-recognize-device-on-re-login.md`)
+- 2026-04-16 — Add device via session QR/link (`.planning/todos/pending/2026-04-16-add-device-via-session-qr-link.md`)
 
 ### Blockers/Concerns
 
