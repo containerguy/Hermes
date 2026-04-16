@@ -1096,7 +1096,7 @@ export function createAuthRouter(context: DatabaseContext) {
     const consumed = context.sqlite.transaction(() => {
       const claim = context.db
         .update(pairingTokens)
-        .set({ consumedAt: timestamp, consumedSessionId: newSessionId })
+        .set({ consumedAt: timestamp })
         .where(and(eq(pairingTokens.id, tokenRow.id), isNull(pairingTokens.consumedAt)))
         .run();
       if (claim.changes === 0) {
@@ -1116,6 +1116,11 @@ export function createAuthRouter(context: DatabaseContext) {
           deviceKeyHash,
           deviceSignals
         })
+        .run();
+      context.db
+        .update(pairingTokens)
+        .set({ consumedSessionId: newSessionId })
+        .where(eq(pairingTokens.id, tokenRow.id))
         .run();
       return true;
     })();
