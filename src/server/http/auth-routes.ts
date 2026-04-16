@@ -4,6 +4,7 @@ import { randomUUID } from "node:crypto";
 import { z } from "zod";
 import { createCsrfToken, CSRF_HEADER, requireCsrf } from "../auth/csrf";
 import { getCurrentSession, publicUser } from "../auth/current-user";
+import { deviceSignalsFingerprint, hashDeviceKey, normalizeDeviceSignals } from "../auth/device-key";
 import { resolveDeviceName, validateDeviceName } from "../auth/device-names";
 import { maskInviteCode, tryWriteAuditLog } from "../audit-log";
 import { checkRateLimit, recordRateLimitFailure } from "../auth/rate-limits";
@@ -27,7 +28,13 @@ const requestCodeSchema = z.object({
 
 const verifyCodeSchema = requestCodeSchema.extend({
   code: z.string().trim().regex(/^\d{6}$/),
-  deviceName: z.string().trim().max(120).optional()
+  deviceName: z.string().trim().max(120).optional(),
+  deviceKey: z
+    .string()
+    .trim()
+    .regex(/^[A-Za-z0-9_-]{22,44}$/)
+    .optional(),
+  pwa: z.boolean().optional()
 });
 
 const registerSchema = z.object({
@@ -504,6 +511,47 @@ export function createAuthRouter(context: DatabaseContext) {
       request.get("user-agent") ?? undefined
     );
 
+    const deviceKeyHash = parsed.data.deviceKey ? hashDeviceKey(parsed.data.deviceKey) : null;
+    const normalizedSignals = normalizeDeviceSignals({
+      userAgent: request.get("user-agent") ?? undefined,
+      pwa: parsed.data.pwa
+    });
+    const deviceSignals = deviceSignalsFingerprint(normalizedSignals);
+
+    let recognizedSession: typeof sessions.$inferSelect | undefined;
+    if (deviceKeyHash) {
+      recognizedSession = context.db
+        .select()
+        .from(sessions)
+        .where(
+          and(
+            eq(sessions.userId, user.id),
+            eq(sessions.deviceKeyHash, deviceKeyHash),
+            isNull(sessions.revokedAt)
+          )
+        )
+        .get();
+    }
+    if (!recognizedSession) {
+      const candidates = context.db
+        .select()
+        .from(sessions)
+        .where(
+          and(
+            eq(sessions.userId, user.id),
+            eq(sessions.deviceSignals, deviceSignals),
+            isNull(sessions.revokedAt),
+            isNull(sessions.deviceKeyHash)
+          )
+        )
+        .all();
+      // D-02 fallback: only reuse an existing session by signals when exactly one
+      // non-key-bound candidate matches; ambiguity falls through to a fresh insert.
+      if (candidates.length === 1) {
+        recognizedSession = candidates[0];
+      }
+    }
+
     context.sqlite.transaction(() => {
       context.db
         .update(loginChallenges)
@@ -511,31 +559,56 @@ export function createAuthRouter(context: DatabaseContext) {
         .where(eq(loginChallenges.id, challenge.id))
         .run();
 
-      context.db
-        .insert(sessions)
-        .values({
-          id: sessionId,
-          userId: user.id,
-          deviceName: resolvedDeviceName,
-          userAgent: request.get("user-agent") ?? null,
-          lastSeenAt: timestamp,
-          createdAt: timestamp,
-          tokenHash: sessionTokenHash,
-          revokedAt: null
-        })
-        .run();
+      if (recognizedSession) {
+        context.db
+          .update(sessions)
+          .set({
+            tokenHash: sessionTokenHash,
+            lastSeenAt: timestamp,
+            userAgent: request.get("user-agent") ?? null,
+            deviceName: resolvedDeviceName,
+            deviceKeyHash: deviceKeyHash ?? recognizedSession.deviceKeyHash ?? null,
+            deviceSignals
+          })
+          .where(eq(sessions.id, recognizedSession.id))
+          .run();
+      } else {
+        context.db
+          .insert(sessions)
+          .values({
+            id: sessionId,
+            userId: user.id,
+            deviceName: resolvedDeviceName,
+            userAgent: request.get("user-agent") ?? null,
+            lastSeenAt: timestamp,
+            createdAt: timestamp,
+            tokenHash: sessionTokenHash,
+            revokedAt: null,
+            deviceKeyHash,
+            deviceSignals
+          })
+          .run();
+      }
     })();
 
     tryWriteAuditLog(context, {
       actor: user,
-      action: "auth.login",
+      action: recognizedSession ? "auth.login_recognized" : "auth.login",
       entityType: "session",
-      entityId: sessionId,
-      summary: `${user.username} hat sich angemeldet.`,
+      entityId: recognizedSession?.id ?? sessionId,
+      summary: recognizedSession
+        ? `${user.username} hat sich von einem bekannten Gerät erneut angemeldet.`
+        : `${user.username} hat sich angemeldet.`,
       metadata: {
-        deviceName: resolvedDeviceName
+        deviceName: resolvedDeviceName,
+        deviceClass: normalizedSignals.deviceClass,
+        platform: normalizedSignals.platform,
+        browser: normalizedSignals.browser,
+        pwa: normalizedSignals.pwa,
+        recognized: Boolean(recognizedSession)
       }
     });
+    response.setHeader("Cache-Control", "no-store");
     setSessionCookie(response, sessionToken);
     response.json({ user: publicUser(user) });
   });
