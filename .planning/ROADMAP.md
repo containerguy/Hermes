@@ -82,7 +82,8 @@ Plans:
   1. All GitHub Actions used in `.github/workflows/docker-image.yml` are pinned to versions documented as Node 24-compatible by their maintainers.
   2. CI runs `npm ci`, `npm test`, `npm run build`, `npm audit --omit=dev`, and the Docker build/push job successfully on the updated workflow (verified by a green run on a PR branch).
   3. `.planning/codebase/INTEGRATIONS.md` is updated to reflect the pinned action versions used.
-**Plans**: TBD
+**Plans**: 1 plan
+- [ ] 13-01-PLAN.md — Pin 6 CI actions to Node-24-compatible majors, add FORCE_JAVASCRIPT_ACTIONS_TO_NODE24 env, update INTEGRATIONS.md, verify via green PR run.
 **UI hint**: no
 
 ## Progress
