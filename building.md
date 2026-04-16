@@ -20,6 +20,12 @@ npm install
 cp .env.example .env
 ```
 
+Hermes nutzt CSRF Tokens für mutierende, cookie-authentifizierte Requests. Für lokale Entwicklung gibt es einen Dev-Fallback; für produktive Deployments sollte ein eigenes Secret gesetzt werden:
+
+```env
+HERMES_CSRF_SECRET=change-me
+```
+
 S3/Wasabi ist in `.env.example` bereits auf diese Werte vorbereitet:
 
 ```env

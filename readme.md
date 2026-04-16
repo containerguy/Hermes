@@ -19,6 +19,8 @@ Admins sehen im Bereich `#admin` außerdem ein Audit-Log. Dort werden Login/Logo
 
 Admins können öffentliche Registrierung aktivieren und Invite-Codes für LAN-Partys erstellen. Neue User registrieren sich dann mit Invite-Code, Username und E-Mail-Adresse; danach wird der Login-Code per E-Mail verschickt.
 
+Invite-Codes sind dabei **credential-like**: Sie werden von Hermes generiert, sind für Admins sichtbar und sollten wie Zugangsdaten behandelt werden. Audit-Logs enthalten bewusst nur eine maskierte Variante (kein vollständiger Invite-Code in den Metadaten).
+
 ## Wo Werden Einstellungen Gespeichert?
 
 Hermes speichert Einstellungen in SQLite in der Tabelle `app_settings`.
@@ -91,6 +93,12 @@ cp .env.example .env
 npm run db:bootstrap-admin
 npm run build
 npm start
+```
+
+Für produktive Deployments sollte zusätzlich ein eigenes CSRF-Secret gesetzt werden (in `.env`):
+
+```env
+HERMES_CSRF_SECRET=change-me
 ```
 
 Die App läuft danach auf:
