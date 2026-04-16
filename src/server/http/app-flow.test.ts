@@ -146,11 +146,13 @@ describe("app flow", () => {
   it("does not block primary actions when audit logging fails (D-27)", async () => {
     const errorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
     const originalPrepare = Database.prototype.prepare;
-    const prepareSpy = vi.spyOn(Database.prototype, "prepare").mockImplementation(function (sql: string) {
+    const prepareSpy = vi
+      .spyOn(Database.prototype, "prepare")
+      .mockImplementation(function (this: unknown, sql: string) {
       if (typeof sql === "string" && sql.toLowerCase().includes("audit_logs")) {
         throw new Error("audit boom");
       }
-      return originalPrepare.call(this, sql);
+      return originalPrepare.call(this as never, sql);
     });
 
     try {
