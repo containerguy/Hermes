@@ -2,16 +2,16 @@
 gsd_state_version: 1.0
 milestone: v1.2
 milestone_name: Post-LAN Quality of Life
-status: executing
-stopped_at: Completed 09-03-pairing-endpoints-PLAN.md
-last_updated: "2026-04-16T20:31:32.000Z"
+status: verifying
+stopped_at: Completed 09-04-client-pairing-ux-PLAN.md
+last_updated: "2026-04-16T20:54:42.632Z"
 last_activity: 2026-04-16
 progress:
   total_phases: 5
-  completed_phases: 0
+  completed_phases: 1
   total_plans: 14
-  completed_plans: 3
-  percent: 21
+  completed_plans: 4
+  percent: 29
 ---
 
 # Project State
@@ -27,7 +27,7 @@ See: .planning/PROJECT.md (updated 2026-04-15)
 
 Phase: 09 (device-recognition-and-pairing) — EXECUTING
 Plan: 4 of 4
-Status: Ready to execute (09-04 client pairing UX)
+Status: Phase complete — ready for verification
 Last activity: 2026-04-16
 
 Progress: [==........] 21% (3 of 14 plans executed)
@@ -84,6 +84,7 @@ Progress: [==........] 21% (3 of 14 plans executed)
 | Phase 09 P01 | 6min | 4 tasks | 6 files |
 | Phase 09 P02 | 3min | 2 tasks | 2 files |
 | Phase 09 P03 | 8min | 3 tasks | 3 files |
+| Phase 09-device-recognition-and-pairing P04 | 15min | 4 tasks | 8 files |
 
 ## Accumulated Context
 
@@ -110,6 +111,8 @@ Recent decisions affecting current work:
 - [Phase 09]: 09-02: auth.login_recognized vs auth.login distinguishes returning-device re-login; audit metadata never carries raw deviceKey (T-09-08).
 - [Phase 09]: 09-03: /api/auth/pair-token is CSRF-gated + auth-required + rate-limited (pair_token_create, per-session AND per-user); /api/auth/pair-redeem is public + CSRF-exempt + single-use atomic; redeeming never revokes the origin session (D-10).
 - [Phase 09]: 09-03: Four stable pairing error codes (pair_token_invalid/expired/consumed/pair_origin_revoked) mapped with German messages in src/client/errors/errors.ts; T-09-15 (no per-IP RL on /pair-redeem) still open but mitigated by 256-bit entropy + 10-min TTL + single-use + device_pair_failed audit.
+- [Phase 09-device-recognition-and-pairing]: 09-04: qrcode-generator@1.4.4 adopted per D-15 (MIT, zero deps, ships .d.ts); 4 pair_* errorMessages realigned to plan copy so Task 4 test can assert 'Pairing-Code ist abgelaufen'.
+- [Phase 09-device-recognition-and-pairing]: 09-04: getPageFromHash widened to match hash-path (everything before '?') so #login?pair=<token> mounts LoginPanel and the redemption useEffect fires — Rule 3 blocking fix, minimal hunk in main.tsx that preserves pre-existing dirty manager-routing edits.
 
 ### Pending Todos
 
@@ -131,6 +134,6 @@ Items acknowledged and carried forward from previous milestone close:
 
 ## Session Continuity
 
-Last session: 2026-04-16T20:31:32.000Z
-Stopped at: Completed 09-03-pairing-endpoints-PLAN.md
+Last session: 2026-04-16T20:54:42.621Z
+Stopped at: Completed 09-04-client-pairing-ux-PLAN.md
 Resume file: None
