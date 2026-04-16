@@ -381,6 +381,99 @@ describe("app flow", () => {
       });
   });
 
+  it("supports invite lifecycle edit, deactivate, reactivate, and safe delete", async () => {
+    const adminAgent = request.agent(started!.app);
+    await login(adminAgent, "hauptadmin");
+    const csrf = await fetchCsrf(adminAgent);
+
+    await adminAgent
+      .put("/api/admin/settings")
+      .send({
+        appName: "Hermes Test",
+        defaultNotificationsEnabled: true,
+        eventAutoArchiveHours: 8,
+        publicRegistrationEnabled: true,
+        themePrimaryColor: "#0f766e",
+        themeLoginColor: "#be123c",
+        themeManagerColor: "#b7791f",
+        themeAdminColor: "#2563eb",
+        themeSurfaceColor: "#f6f8f4"
+      })
+      .set(CSRF_HEADER, csrf)
+      .expect(200);
+
+    const created = await adminAgent
+      .post("/api/admin/invite-codes")
+      .send({ label: "Lifecycle", maxUses: 3 })
+      .set(CSRF_HEADER, csrf)
+      .expect(201);
+
+    const invite = created.body.inviteCode as { id: string; code: string; label: string };
+
+    await adminAgent
+      .patch(`/api/admin/invite-codes/${invite.id}`)
+      .send({ label: "Lifecycle Updated" })
+      .set(CSRF_HEADER, csrf)
+      .expect(200)
+      .expect((response) => {
+        expect(response.body.inviteCode.label).toBe("Lifecycle Updated");
+      });
+
+    const invitedOne = request.agent(started!.app);
+    await invitedOne
+      .post("/api/auth/register")
+      .send({ inviteCode: invite.code, username: "life1", email: "life1@example.test" })
+      .expect(201);
+
+    const invitedTwo = request.agent(started!.app);
+    await invitedTwo
+      .post("/api/auth/register")
+      .send({ inviteCode: invite.code, username: "life2", email: "life2@example.test" })
+      .expect(201);
+
+    await adminAgent
+      .patch(`/api/admin/invite-codes/${invite.id}`)
+      .send({ maxUses: 1 })
+      .set(CSRF_HEADER, csrf)
+      .expect(409)
+      .expect((response) => {
+        expect(response.body.error).toBe("invite_max_uses_unter_used_count");
+      });
+
+    await adminAgent
+      .post(`/api/admin/invite-codes/${invite.id}/deactivate`)
+      .set(CSRF_HEADER, csrf)
+      .expect(200)
+      .expect((response) => {
+        expect(response.body.inviteCode.revokedAt).toBeTruthy();
+      });
+
+    await adminAgent
+      .post(`/api/admin/invite-codes/${invite.id}/reactivate`)
+      .set(CSRF_HEADER, csrf)
+      .expect(200)
+      .expect((response) => {
+        expect(response.body.inviteCode.revokedAt).toBeNull();
+      });
+
+    const unused = await adminAgent
+      .post("/api/admin/invite-codes")
+      .send({ label: "Unused" })
+      .set(CSRF_HEADER, csrf)
+      .expect(201);
+
+    const unusedInvite = unused.body.inviteCode as { id: string };
+    await adminAgent.delete(`/api/admin/invite-codes/${unusedInvite.id}`).set(CSRF_HEADER, csrf).expect(204);
+
+    await adminAgent
+      .delete(`/api/admin/invite-codes/${invite.id}`)
+      .set(CSRF_HEADER, csrf)
+      .expect(409)
+      .expect((response) => {
+        expect(response.body.error).toBe("invite_hat_nutzungen");
+      });
+  });
+
   it("stores hashed session tokens, rejects legacy sessions, and revokes sessions after sensitive admin changes", async () => {
     const adminAgent = request.agent(started!.app);
     await login(adminAgent, "hauptadmin");

@@ -41,6 +41,12 @@ const createInviteCodeSchema = z.object({
   expiresAt: z.string().datetime().nullable().optional()
 });
 
+const updateInviteCodeSchema = z.object({
+  label: z.string().trim().min(1).max(120).optional(),
+  maxUses: z.number().int().min(1).max(500).nullable().optional(),
+  expiresAt: z.string().datetime().nullable().optional()
+});
+
 const allowlistSchema = z.object({
   ipOrCidr: z.string().trim().min(1).max(80),
   note: z.string().trim().min(1).max(200).optional()
@@ -91,6 +97,13 @@ function serializeInviteCode(context: DatabaseContext, invite: typeof inviteCode
     ...invite,
     usedCount: row.count
   };
+}
+
+function getInviteUsedCount(context: DatabaseContext, inviteCodeId: string) {
+  const row = context.sqlite
+    .prepare("SELECT COUNT(*) AS count FROM invite_code_uses WHERE invite_code_id = ?")
+    .get(inviteCodeId) as { count: number };
+  return row.count;
 }
 
 export function createAdminRouter(context: DatabaseContext) {
@@ -473,6 +486,163 @@ export function createAdminRouter(context: DatabaseContext) {
     });
   });
 
+  router.patch("/invite-codes/:id", (request, response) => {
+    const admin = requireAdmin(context, request);
+    const parsed = updateInviteCodeSchema.safeParse(request.body);
+
+    if (!admin) {
+      response.status(403).json({ error: "admin_erforderlich" });
+      return;
+    }
+
+    if (!parsed.success) {
+      response.status(400).json({ error: "ungueltiger_invite_code" });
+      return;
+    }
+
+    const existing = context.db
+      .select()
+      .from(inviteCodes)
+      .where(eq(inviteCodes.id, request.params.id))
+      .get();
+
+    if (!existing) {
+      response.status(404).json({ error: "invite_code_nicht_gefunden" });
+      return;
+    }
+
+    const usedCount = getInviteUsedCount(context, existing.id);
+    if (
+      parsed.data.maxUses !== undefined &&
+      parsed.data.maxUses !== null &&
+      parsed.data.maxUses < usedCount
+    ) {
+      response.status(409).json({ error: "invite_max_uses_unter_used_count" });
+      return;
+    }
+
+    context.db
+      .update(inviteCodes)
+      .set({ ...parsed.data, updatedAt: nowIso() })
+      .where(eq(inviteCodes.id, existing.id))
+      .run();
+
+    const updated = context.db.select().from(inviteCodes).where(eq(inviteCodes.id, existing.id)).get();
+    tryWriteAuditLog(context, {
+      actor: admin,
+      action: "invite.update",
+      entityType: "invite_code",
+      entityId: existing.id,
+      summary: `${admin.username} hat Invite ${existing.label} aktualisiert.`,
+      metadata: {
+        inviteCodeId: existing.id,
+        inviteLabel: updated?.label ?? existing.label,
+        inviteMaskedCode: maskInviteCode(existing.code),
+        changes: parsed.data
+      }
+    });
+
+    response.json({
+      inviteCode: updated ? serializeInviteCode(context, updated) : undefined
+    });
+  });
+
+  router.post("/invite-codes/:id/deactivate", (request, response) => {
+    const admin = requireAdmin(context, request);
+    const invite = context.db
+      .select()
+      .from(inviteCodes)
+      .where(eq(inviteCodes.id, request.params.id))
+      .get();
+
+    if (!admin) {
+      response.status(403).json({ error: "admin_erforderlich" });
+      return;
+    }
+
+    if (!invite) {
+      response.status(404).json({ error: "invite_code_nicht_gefunden" });
+      return;
+    }
+
+    const timestamp = nowIso();
+    const revokedAt = invite.revokedAt ?? timestamp;
+    context.db
+      .update(inviteCodes)
+      .set({ revokedAt, updatedAt: timestamp })
+      .where(eq(inviteCodes.id, invite.id))
+      .run();
+
+    tryWriteAuditLog(context, {
+      actor: admin,
+      action: "invite.deactivate",
+      entityType: "invite_code",
+      entityId: invite.id,
+      summary: `${admin.username} hat Invite ${invite.label} deaktiviert.`,
+      metadata: {
+        inviteCodeId: invite.id,
+        inviteLabel: invite.label,
+        inviteMaskedCode: maskInviteCode(invite.code)
+      }
+    });
+
+    const updated = context.db.select().from(inviteCodes).where(eq(inviteCodes.id, invite.id)).get();
+    response.json({ inviteCode: updated ? serializeInviteCode(context, updated) : undefined });
+  });
+
+  router.post("/invite-codes/:id/reactivate", (request, response) => {
+    const admin = requireAdmin(context, request);
+    const invite = context.db
+      .select()
+      .from(inviteCodes)
+      .where(eq(inviteCodes.id, request.params.id))
+      .get();
+
+    if (!admin) {
+      response.status(403).json({ error: "admin_erforderlich" });
+      return;
+    }
+
+    if (!invite) {
+      response.status(404).json({ error: "invite_code_nicht_gefunden" });
+      return;
+    }
+
+    const now = nowIso();
+    if (invite.expiresAt && invite.expiresAt < now) {
+      response.status(409).json({ error: "invite_abgelaufen" });
+      return;
+    }
+
+    const usedCount = getInviteUsedCount(context, invite.id);
+    if (invite.maxUses !== null && usedCount >= invite.maxUses) {
+      response.status(409).json({ error: "invite_ausgeschoepft" });
+      return;
+    }
+
+    context.db
+      .update(inviteCodes)
+      .set({ revokedAt: null, updatedAt: nowIso() })
+      .where(eq(inviteCodes.id, invite.id))
+      .run();
+
+    tryWriteAuditLog(context, {
+      actor: admin,
+      action: "invite.reactivate",
+      entityType: "invite_code",
+      entityId: invite.id,
+      summary: `${admin.username} hat Invite ${invite.label} reaktiviert.`,
+      metadata: {
+        inviteCodeId: invite.id,
+        inviteLabel: invite.label,
+        inviteMaskedCode: maskInviteCode(invite.code)
+      }
+    });
+
+    const updated = context.db.select().from(inviteCodes).where(eq(inviteCodes.id, invite.id)).get();
+    response.json({ inviteCode: updated ? serializeInviteCode(context, updated) : undefined });
+  });
+
   router.delete("/invite-codes/:id", (request, response) => {
     const admin = requireAdmin(context, request);
     const invite = context.db
@@ -491,18 +661,20 @@ export function createAdminRouter(context: DatabaseContext) {
       return;
     }
 
-    context.db
-      .update(inviteCodes)
-      .set({ revokedAt: nowIso(), updatedAt: nowIso() })
-      .where(eq(inviteCodes.id, invite.id))
-      .run();
+    const usedCount = getInviteUsedCount(context, invite.id);
+    if (usedCount > 0) {
+      response.status(409).json({ error: "invite_hat_nutzungen" });
+      return;
+    }
+
+    context.db.delete(inviteCodes).where(eq(inviteCodes.id, invite.id)).run();
 
     tryWriteAuditLog(context, {
       actor: admin,
-      action: "invite.revoke",
+      action: "invite.delete_unused",
       entityType: "invite_code",
       entityId: invite.id,
-      summary: `${admin.username} hat Invite ${invite.label} deaktiviert.`,
+      summary: `${admin.username} hat Invite ${invite.label} gelöscht.`,
       metadata: {
         inviteCodeId: invite.id,
         inviteLabel: invite.label,
