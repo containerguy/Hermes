@@ -833,6 +833,111 @@ describe("app flow", () => {
       });
   });
 
+  it("derives useful default device names from user agent when omitted", async () => {
+    const adminAgent = request.agent(started!.app);
+    await login(adminAgent, "hauptadmin");
+    const adminCsrf = await fetchCsrf(adminAgent);
+
+    await adminAgent
+      .post("/api/admin/users")
+      .send({ username: "winuser", email: "winuser@example.test", role: "user" })
+      .set(CSRF_HEADER, adminCsrf)
+      .expect(201);
+
+    await adminAgent
+      .post("/api/admin/users")
+      .send({ username: "iphoneuser", email: "iphoneuser@example.test", role: "user" })
+      .set(CSRF_HEADER, adminCsrf)
+      .expect(201);
+
+    const windowsAgent = request.agent(started!.app);
+    await windowsAgent.post("/api/auth/request-code").send({ username: "winuser" }).expect(202);
+    await windowsAgent
+      .post("/api/auth/verify-code")
+      .set(
+        "User-Agent",
+        "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36"
+      )
+      .send({ username: "winuser", code: "123456" })
+      .expect(200);
+
+    const windowsSessions = await windowsAgent.get("/api/auth/sessions").expect(200);
+    expect(windowsSessions.body.sessions[0].deviceName).toBe("Windows-PC");
+
+    const iphoneAgent = request.agent(started!.app);
+    await iphoneAgent.post("/api/auth/request-code").send({ username: "iphoneuser" }).expect(202);
+    await iphoneAgent
+      .post("/api/auth/verify-code")
+      .set(
+        "User-Agent",
+        "Mozilla/5.0 (iPhone; CPU iPhone OS 17_4 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.4 Mobile/15E148 Safari/604.1"
+      )
+      .send({ username: "iphoneuser", code: "123456" })
+      .expect(200);
+
+    const iphoneSessions = await iphoneAgent.get("/api/auth/sessions").expect(200);
+    expect(iphoneSessions.body.sessions[0].deviceName).toBe("iPhone");
+  });
+
+  it("allows session renames only for the owning user", async () => {
+    const adminAgent = request.agent(started!.app);
+    await login(adminAgent, "hauptadmin");
+    const adminCsrf = await fetchCsrf(adminAgent);
+
+    await adminAgent
+      .post("/api/admin/users")
+      .send({ username: "owner1", email: "owner1@example.test", role: "user" })
+      .set(CSRF_HEADER, adminCsrf)
+      .expect(201);
+
+    await adminAgent
+      .post("/api/admin/users")
+      .send({ username: "owner2", email: "owner2@example.test", role: "user" })
+      .set(CSRF_HEADER, adminCsrf)
+      .expect(201);
+
+    const agentOne = request.agent(started!.app);
+    await login(agentOne, "owner1");
+    const csrfOne = await fetchCsrf(agentOne);
+
+    const agentTwo = request.agent(started!.app);
+    await login(agentTwo, "owner2");
+    const csrfTwo = await fetchCsrf(agentTwo);
+
+    const sessionsOne = await agentOne.get("/api/auth/sessions").expect(200);
+    const sessionsTwo = await agentTwo.get("/api/auth/sessions").expect(200);
+
+    const sessionOneId = sessionsOne.body.sessions[0].id as string;
+    const sessionTwoId = sessionsTwo.body.sessions[0].id as string;
+
+    await agentOne
+      .patch(`/api/auth/sessions/${sessionOneId}`)
+      .set(CSRF_HEADER, csrfOne)
+      .send({ deviceName: "My Laptop" })
+      .expect(200)
+      .expect((response) => {
+        expect(response.body.session.deviceName).toBe("My Laptop");
+      });
+
+    await agentOne
+      .patch(`/api/auth/sessions/${sessionTwoId}`)
+      .set(CSRF_HEADER, csrfOne)
+      .send({ deviceName: "Hacked" })
+      .expect(404)
+      .expect((response) => {
+        expect(response.body.error).toBe("session_nicht_gefunden");
+      });
+
+    await agentTwo
+      .patch(`/api/auth/sessions/${sessionTwoId}`)
+      .set(CSRF_HEADER, csrfTwo)
+      .send({ deviceName: "Tablet" })
+      .expect(200)
+      .expect((response) => {
+        expect(response.body.session.deviceName).toBe("Tablet");
+      });
+  });
+
   it("logs in, manages roles, creates events and enforces participation capacity", async () => {
     const adminAgent = request.agent(started!.app);
     await login(adminAgent, "hauptadmin");

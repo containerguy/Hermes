@@ -4,6 +4,7 @@ import { randomUUID } from "node:crypto";
 import { z } from "zod";
 import { createCsrfToken, CSRF_HEADER, requireCsrf } from "../auth/csrf";
 import { getCurrentSession, publicUser } from "../auth/current-user";
+import { resolveDeviceName, validateDeviceName } from "../auth/device-names";
 import { tryWriteAuditLog } from "../audit-log";
 import { checkRateLimit, recordRateLimitFailure } from "../auth/rate-limits";
 import {
@@ -401,6 +402,10 @@ export function createAuthRouter(context: DatabaseContext) {
     const sessionId = createSessionId();
     const sessionToken = createSessionToken();
     const sessionTokenHash = hashSessionToken(sessionToken);
+    const resolvedDeviceName = resolveDeviceName(
+      parsed.data.deviceName,
+      request.get("user-agent") ?? undefined
+    );
 
     context.sqlite.transaction(() => {
       context.db
@@ -414,7 +419,7 @@ export function createAuthRouter(context: DatabaseContext) {
         .values({
           id: sessionId,
           userId: user.id,
-          deviceName: parsed.data.deviceName ?? null,
+          deviceName: resolvedDeviceName,
           userAgent: request.get("user-agent") ?? null,
           lastSeenAt: timestamp,
           createdAt: timestamp,
@@ -431,7 +436,7 @@ export function createAuthRouter(context: DatabaseContext) {
       entityId: sessionId,
       summary: `${user.username} hat sich angemeldet.`,
       metadata: {
-        deviceName: parsed.data.deviceName ?? null
+        deviceName: resolvedDeviceName
       }
     });
     setSessionCookie(response, sessionToken);
@@ -650,6 +655,68 @@ export function createAuthRouter(context: DatabaseContext) {
         createdAt: session.createdAt,
         current: session.id === current.session.id
       }))
+    });
+  });
+
+  router.patch("/sessions/:id", (request, response) => {
+    const current = getCurrentSession(context, request);
+
+    if (!current) {
+      response.status(401).json({ error: "nicht_angemeldet" });
+      return;
+    }
+
+    const parsed = z.object({ deviceName: z.string() }).safeParse(request.body);
+    if (!parsed.success) {
+      response.status(400).json({ error: "ungueltiger_geraetename" });
+      return;
+    }
+
+    const validated = validateDeviceName(parsed.data.deviceName);
+    if (!validated.ok) {
+      response.status(400).json({ error: validated.error });
+      return;
+    }
+
+    const target = context.db
+      .select()
+      .from(sessions)
+      .where(and(eq(sessions.id, request.params.id), eq(sessions.userId, current.user.id), isNull(sessions.revokedAt)))
+      .get();
+
+    if (!target) {
+      response.status(404).json({ error: "session_nicht_gefunden" });
+      return;
+    }
+
+    context.db
+      .update(sessions)
+      .set({ deviceName: validated.name })
+      .where(eq(sessions.id, target.id))
+      .run();
+
+    const updated = context.db.select().from(sessions).where(eq(sessions.id, target.id)).get();
+
+    tryWriteAuditLog(context, {
+      actor: current.user,
+      action: "auth.session_rename",
+      entityType: "session",
+      entityId: target.id,
+      summary: `${current.user.username} hat ein Gerät umbenannt.`,
+      metadata: { deviceName: validated.name, current: target.id === current.session.id }
+    });
+
+    response.json({
+      session: updated
+        ? {
+            id: updated.id,
+            deviceName: updated.deviceName,
+            userAgent: updated.userAgent,
+            lastSeenAt: updated.lastSeenAt,
+            createdAt: updated.createdAt,
+            current: updated.id === current.session.id
+          }
+        : undefined
     });
   });
 
