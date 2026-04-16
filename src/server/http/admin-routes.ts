@@ -253,15 +253,30 @@ export function createAdminRouter(context: DatabaseContext) {
       return;
     }
 
+    const shouldRevokeSessions =
+      (parsed.data.role !== undefined && parsed.data.role !== existing.role) ||
+      (parsed.data.email !== undefined && parsed.data.email !== existing.email);
+
     try {
-      context.db
-        .update(users)
-        .set({
-          ...parsed.data,
-          updatedAt: nowIso()
-        })
-        .where(eq(users.id, existing.id))
-        .run();
+      const updatedAt = nowIso();
+      context.sqlite.transaction(() => {
+        context.db
+          .update(users)
+          .set({
+            ...parsed.data,
+            updatedAt
+          })
+          .where(eq(users.id, existing.id))
+          .run();
+
+        if (shouldRevokeSessions) {
+          context.db
+            .update(sessions)
+            .set({ revokedAt: updatedAt })
+            .where(eq(sessions.userId, existing.id))
+            .run();
+        }
+      })();
     } catch (error) {
       console.error("[Hermes] Failed to update user", error);
       response.status(409).json({ error: "user_update_konflikt" });

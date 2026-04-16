@@ -6,9 +6,10 @@ import { getCurrentSession, publicUser } from "../auth/current-user";
 import { tryWriteAuditLog } from "../audit-log";
 import { checkRateLimit, recordRateLimitFailure } from "../auth/rate-limits";
 import {
+  createSessionId,
   createSessionToken,
   clearSessionCookie,
-  SESSION_COOKIE,
+  hashSessionToken,
   setSessionCookie
 } from "../auth/sessions";
 import { generateOtp, hashOtp, verifyOtp } from "../auth/otp";
@@ -333,7 +334,9 @@ export function createAuthRouter(context: DatabaseContext) {
       return;
     }
 
+    const sessionId = createSessionId();
     const sessionToken = createSessionToken();
+    const sessionTokenHash = hashSessionToken(sessionToken);
 
     context.sqlite.transaction(() => {
       context.db
@@ -345,12 +348,13 @@ export function createAuthRouter(context: DatabaseContext) {
       context.db
         .insert(sessions)
         .values({
-          id: sessionToken,
+          id: sessionId,
           userId: user.id,
           deviceName: parsed.data.deviceName ?? null,
           userAgent: request.get("user-agent") ?? null,
           lastSeenAt: timestamp,
           createdAt: timestamp,
+          tokenHash: sessionTokenHash,
           revokedAt: null
         })
         .run();
@@ -360,7 +364,7 @@ export function createAuthRouter(context: DatabaseContext) {
       actor: user,
       action: "auth.login",
       entityType: "session",
-      entityId: sessionToken,
+      entityId: sessionId,
       summary: `${user.username} hat sich angemeldet.`,
       metadata: {
         deviceName: parsed.data.deviceName ?? null
@@ -450,14 +454,13 @@ export function createAuthRouter(context: DatabaseContext) {
   });
 
   router.post("/logout", (request, response) => {
-    const token = request.cookies?.[SESSION_COOKIE];
     const current = getCurrentSession(context, request);
 
-    if (token) {
+    if (current) {
       context.db
         .update(sessions)
         .set({ revokedAt: nowIso() })
-        .where(eq(sessions.id, token))
+        .where(eq(sessions.id, current.session.id))
         .run();
     }
 
@@ -466,7 +469,7 @@ export function createAuthRouter(context: DatabaseContext) {
         actor: current.user,
         action: "auth.logout",
         entityType: "session",
-        entityId: token,
+        entityId: current.session.id,
         summary: `${current.user.username} hat sich abgemeldet.`
       });
     }

@@ -1,6 +1,6 @@
 import { and, eq, isNull } from "drizzle-orm";
 import type { Request } from "express";
-import { SESSION_COOKIE } from "./sessions";
+import { hashSessionToken, SESSION_COOKIE } from "./sessions";
 import type { DatabaseContext } from "../db/client";
 import { sessions, users } from "../db/schema";
 
@@ -27,11 +27,12 @@ export function getCurrentSession(context: DatabaseContext, request: Request) {
     return undefined;
   }
 
+  const tokenHash = hashSessionToken(token);
   const result = context.db
     .select({ session: sessions, user: users })
     .from(sessions)
     .innerJoin(users, eq(sessions.userId, users.id))
-    .where(and(eq(sessions.id, token), isNull(sessions.revokedAt)))
+    .where(and(eq(sessions.tokenHash, tokenHash), isNull(sessions.revokedAt)))
     .get();
 
   if (!result || result.user.deletedAt) {

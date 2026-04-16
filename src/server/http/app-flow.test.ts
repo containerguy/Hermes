@@ -276,6 +276,86 @@ describe("app flow", () => {
       });
   });
 
+  it("stores hashed session tokens, rejects legacy sessions, and revokes sessions after sensitive admin changes", async () => {
+    const adminAgent = request.agent(started!.app);
+    await login(adminAgent, "hauptadmin");
+
+    const created = await adminAgent
+      .post("/api/admin/users")
+      .send({ username: "revokee", email: "revokee@example.test", role: "user" })
+      .expect(201);
+
+    const userId = created.body.user.id as string;
+
+    const userAgent = request.agent(started!.app);
+    await userAgent.post("/api/auth/request-code").send({ username: "revokee" }).expect(202);
+    const verify = await userAgent
+      .post("/api/auth/verify-code")
+      .send({ username: "revokee", code: "123456", deviceName: "test" })
+      .expect(200);
+
+    expect(verify.body.user.id).toBe(userId);
+
+    const cookieHeader = (verify.headers["set-cookie"] ?? []) as string[];
+    const sessionCookie = cookieHeader.find((value) => value.startsWith("hermes_session="));
+    expect(sessionCookie).toBeTruthy();
+
+    const rawCookieToken = (sessionCookie ?? "").split(";", 1)[0]?.split("=", 2)[1] ?? "";
+    expect(rawCookieToken.length).toBeGreaterThan(10);
+
+    const sqlite = new Database(databasePath);
+    const sessionIds = sqlite
+      .prepare("SELECT id FROM sessions WHERE user_id = ?")
+      .all(userId)
+      .map((row) => (row as { id: string }).id);
+    expect(sessionIds).not.toContain(rawCookieToken);
+
+    const legacyId = "legacy-session-token";
+    const timestamp = new Date().toISOString();
+    sqlite
+      .prepare(
+        `
+        INSERT INTO sessions (
+          id,
+          user_id,
+          device_name,
+          user_agent,
+          last_seen_at,
+          created_at,
+          token_hash,
+          revoked_at
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+      `
+      )
+      .run(legacyId, userId, "legacy", "ua", timestamp, timestamp, null, null);
+    sqlite.close();
+
+    await request(started!.app)
+      .get("/api/auth/me")
+      .set("Cookie", `hermes_session=${legacyId}`)
+      .expect(401)
+      .expect((response) => {
+        expect(response.body.error).toBe("nicht_angemeldet");
+      });
+
+    await userAgent.get("/api/auth/me").expect(200);
+    await adminAgent.patch(`/api/admin/users/${userId}`).send({ role: "manager" }).expect(200);
+    await userAgent.get("/api/auth/me").expect(401);
+
+    await login(userAgent, "revokee");
+    await userAgent.get("/api/auth/me").expect(200);
+    await adminAgent
+      .patch(`/api/admin/users/${userId}`)
+      .send({ email: "revokee2@example.test" })
+      .expect(200);
+    await userAgent.get("/api/auth/me").expect(401);
+
+    await login(userAgent, "revokee");
+    await userAgent.get("/api/auth/me").expect(200);
+    await adminAgent.delete(`/api/admin/users/${userId}`).expect(204);
+    await userAgent.get("/api/auth/me").expect(401);
+  });
+
   it("logs in, manages roles, creates events and enforces participation capacity", async () => {
     const adminAgent = request.agent(started!.app);
     await login(adminAgent, "hauptadmin");
