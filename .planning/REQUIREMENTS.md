@@ -58,9 +58,9 @@ These requirements define the next release milestone for the existing Hermes app
 ### Frontend Maintainability
 
 - [x] **UI-01**: Shared client API helpers, DTO types, and error mapping are extracted from `src/main.tsx`.
-- [ ] **UI-02**: Event board and event creation UI are extracted into focused modules without changing user-visible behavior.
+- [x] **UI-02**: Event board and event creation UI are extracted into focused modules without changing user-visible behavior.
 - [ ] **UI-03**: Login, profile, device/session management, invite registration, and push setup are extracted into focused modules.
-- [ ] **UI-04**: Admin user/settings/theme/invite/audit/backup/restore UI is split into focused modules before additional admin UX expansion.
+- [x] **UI-04**: Admin user/settings/theme/invite/audit/backup/restore UI is split into focused modules before additional admin UX expansion.
 - [ ] **UI-05**: Existing responsive styling and admin-controlled theme behavior remain intact after extraction.
 - [ ] **UI-06**: The admin area uses a modular submenu or page structure so each major admin function has a clear dedicated view.
 - [ ] **UI-07**: Event action buttons remain usable and correctly sized on narrow smartphone and small browser widths.
@@ -136,9 +136,9 @@ Every v1 requirement maps to exactly one roadmap phase and remains pending until
 | PWA-03 | Phase 4: PWA And Realtime Reliability | Complete |
 | PWA-04 | Phase 4: PWA And Realtime Reliability | Complete |
 | UI-01 | Phase 5: Frontend And Admin UI Modularization | Complete |
-| UI-02 | Phase 5: Frontend And Admin UI Modularization | Pending |
+| UI-02 | Phase 5: Frontend And Admin UI Modularization | Complete |
 | UI-03 | Phase 5: Frontend And Admin UI Modularization | Pending |
-| UI-04 | Phase 5: Frontend And Admin UI Modularization | Pending |
+| UI-04 | Phase 5: Frontend And Admin UI Modularization | Complete |
 | UI-05 | Phase 5: Frontend And Admin UI Modularization | Pending |
 | UI-06 | Phase 5: Frontend And Admin UI Modularization | Pending |
 | UI-07 | Phase 5: Frontend And Admin UI Modularization | Pending |

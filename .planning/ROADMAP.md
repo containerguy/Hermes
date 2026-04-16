@@ -108,7 +108,7 @@ Plans:
 
 Plans:
 - [x] 05-01: Extract shared client API helpers, DTO types, and error mapping.
-- [ ] 05-02: Extract event board and event creation modules with behavior-preserving state refreshes.
+- [x] 05-02: Extract event board and event creation modules with behavior-preserving state refreshes.
 - [ ] 05-03: Extract auth, invite registration, profile, sessions/devices, and push setup modules.
 - [ ] 05-04: Extract admin modules and responsive navigation/layout fixes for the admin area and event actions.
 
@@ -140,7 +140,7 @@ Phases execute in numeric order: 1 -> 2 -> 3 -> 4 -> 5 -> 6
 | 2. Event And Invite Consistency | 3/3 | Complete    | 2026-04-16 |
 | 3. Backup And Restore Safety | 3/3 | Complete   | 2026-04-16 |
 | 4. PWA And Realtime Reliability | 3/3 | Complete   | 2026-04-16 |
-| 5. Frontend And Admin UI Modularization | 1/4 | In Progress|  |
+| 5. Frontend And Admin UI Modularization | 2/4 | In Progress|  |
 | 6. Release Verification And Documentation | 0/3 | Not started | - |
 
 ## Coverage
