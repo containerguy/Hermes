@@ -128,7 +128,10 @@ export const pushSubscriptions = sqliteTable(
     p256dh: text("p256dh").notNull(),
     auth: text("auth").notNull(),
     createdAt: text("created_at").notNull(),
-    revokedAt: text("revoked_at")
+    revokedAt: text("revoked_at"),
+    failureCount: integer("failure_count").notNull().default(0),
+    lastFailureAt: text("last_failure_at"),
+    lastSuccessAt: text("last_success_at")
   },
   (table) => [uniqueIndex("push_subscriptions_endpoint_unique").on(table.endpoint)]
 );
