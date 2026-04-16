@@ -99,6 +99,7 @@ Recent decisions affecting current work:
 - 2026-04-16 — Add device via session QR/link (`.planning/todos/pending/2026-04-16-add-device-via-session-qr-link.md`)
 - 2026-04-16 — Update GitHub Actions for Node 24 (`.planning/todos/pending/2026-04-16-update-github-actions-for-node-24.md`)
 - 2026-04-16 — Gaming themes and modern copy (`.planning/todos/pending/2026-04-16-gaming-themes-and-modern-copy.md`)
+- 2026-04-16 — Audio and haptic notifications (`.planning/todos/pending/2026-04-16-audio-and-haptic-notifications.md`)
 
 ### Blockers/Concerns
 
