@@ -685,6 +685,154 @@ describe("app flow", () => {
       });
   });
 
+  it("supports profile display-name updates and confirmed email changes", async () => {
+    const logSpy = vi.spyOn(console, "log").mockImplementation(() => {});
+    try {
+      const adminAgent = request.agent(started!.app);
+      await login(adminAgent, "hauptadmin");
+      const adminCsrf = await fetchCsrf(adminAgent);
+
+      const created = await adminAgent
+        .post("/api/admin/users")
+        .send({ username: "profile-user", email: "profile-user@example.test", role: "user" })
+        .set(CSRF_HEADER, adminCsrf)
+        .expect(201);
+
+      const agent = request.agent(started!.app);
+      await login(agent, "profile-user");
+      const csrf = await fetchCsrf(agent);
+
+      await agent
+        .patch("/api/auth/profile")
+        .set(CSRF_HEADER, csrf)
+        .send({ displayName: "Display Name" })
+        .expect(200)
+        .expect((response) => {
+          expect(response.body.user.displayName).toBe("Display Name");
+        });
+
+      logSpy.mockClear();
+      await agent
+        .post("/api/auth/email-change")
+        .set(CSRF_HEADER, csrf)
+        .send({ newEmail: "profile-new@example.test" })
+        .expect(202);
+
+      const emailChangeLog = logSpy.mock.calls
+        .map((call) => String(call[0] ?? ""))
+        .find((line) => line.includes("Email change code"));
+      expect(emailChangeLog).toBeTruthy();
+      expect(emailChangeLog?.includes("<profile-new@example.test>")).toBe(true);
+
+      logSpy.mockClear();
+      await request(started!.app).post("/api/auth/request-code").send({ username: "profile-user" }).expect(202);
+      const loginLog = logSpy.mock.calls
+        .map((call) => String(call[0] ?? ""))
+        .find((line) => line.includes("Login code for profile-user"));
+      expect(loginLog).toBeTruthy();
+      expect(loginLog?.includes("<profile-user@example.test>")).toBe(true);
+
+      await agent
+        .post("/api/auth/email-change/verify")
+        .set(CSRF_HEADER, csrf)
+        .send({ code: "000000" })
+        .expect(401)
+        .expect((response) => {
+          expect(response.body.error).toBe("code_abgelehnt");
+        });
+
+      await agent
+        .post("/api/auth/email-change/verify")
+        .set(CSRF_HEADER, csrf)
+        .send({ code: "123456" })
+        .expect(200)
+        .expect((response) => {
+          expect(response.body.user.email).toBe("profile-new@example.test");
+        });
+
+      await agent.get("/api/auth/me").expect(401);
+
+      await adminAgent
+        .get("/api/admin/audit-log?limit=50")
+        .expect(200)
+        .expect((response) => {
+          const emailChange = (response.body.auditLogs as Array<{ action: string; metadata: unknown }>).find(
+            (entry) => entry.action === "user.email_change_confirm"
+          );
+          expect(emailChange).toBeTruthy();
+
+          const profileUpdate = (response.body.auditLogs as Array<{ action: string; metadata: unknown }>).find(
+            (entry) => entry.action === "user.profile_update"
+          );
+          expect(profileUpdate).toBeTruthy();
+
+          const metadataString = JSON.stringify({
+            emailChange: emailChange?.metadata ?? null,
+            profileUpdate: profileUpdate?.metadata ?? null
+          });
+          expect(metadataString.includes("123456")).toBe(false);
+        });
+
+      expect(created.body.user.displayName).toBe("profile-user");
+    } finally {
+      logSpy.mockRestore();
+    }
+  });
+
+  it("rejects expired or consumed email-change challenges", async () => {
+    const adminAgent = request.agent(started!.app);
+    await login(adminAgent, "hauptadmin");
+    const adminCsrf = await fetchCsrf(adminAgent);
+
+    const created = await adminAgent
+      .post("/api/admin/users")
+      .send({ username: "challenge-user", email: "challenge-user@example.test", role: "user" })
+      .set(CSRF_HEADER, adminCsrf)
+      .expect(201);
+
+    const userId = created.body.user.id as string;
+
+    const agent = request.agent(started!.app);
+    await login(agent, "challenge-user");
+    const csrf = await fetchCsrf(agent);
+
+    await agent
+      .post("/api/auth/email-change")
+      .set(CSRF_HEADER, csrf)
+      .send({ newEmail: "challenge-new@example.test" })
+      .expect(202);
+
+    const sqlite = new Database(databasePath);
+    sqlite
+      .prepare("UPDATE email_change_challenges SET expires_at = ?, consumed_at = NULL WHERE user_id = ?")
+      .run(new Date(Date.now() - 60_000).toISOString(), userId);
+    sqlite.close();
+
+    await agent
+      .post("/api/auth/email-change/verify")
+      .set(CSRF_HEADER, csrf)
+      .send({ code: "123456" })
+      .expect(401)
+      .expect((response) => {
+        expect(response.body.error).toBe("code_abgelehnt");
+      });
+
+    const sqlite2 = new Database(databasePath);
+    sqlite2
+      .prepare("UPDATE email_change_challenges SET expires_at = ?, consumed_at = ? WHERE user_id = ?")
+      .run(new Date(Date.now() + 10 * 60_000).toISOString(), new Date().toISOString(), userId);
+    sqlite2.close();
+
+    await agent
+      .post("/api/auth/email-change/verify")
+      .set(CSRF_HEADER, csrf)
+      .send({ code: "123456" })
+      .expect(401)
+      .expect((response) => {
+        expect(response.body.error).toBe("code_abgelehnt");
+      });
+  });
+
   it("logs in, manages roles, creates events and enforces participation capacity", async () => {
     const adminAgent = request.agent(started!.app);
     await login(adminAgent, "hauptadmin");
