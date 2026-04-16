@@ -606,6 +606,85 @@ describe("app flow", () => {
       .expect(200);
   });
 
+  it("rejects duplicate active emails for admin create, admin update, and invite registration", async () => {
+    const adminAgent = request.agent(started!.app);
+    await login(adminAgent, "hauptadmin");
+    const adminCsrf = await fetchCsrf(adminAgent);
+
+    await adminAgent
+      .post("/api/admin/users")
+      .send({ username: "dup1", email: "duplicate@example.test", role: "user" })
+      .set(CSRF_HEADER, adminCsrf)
+      .expect(201);
+
+    await adminAgent
+      .post("/api/admin/users")
+      .send({ username: "dup2", email: "duplicate@example.test", role: "user" })
+      .set(CSRF_HEADER, adminCsrf)
+      .expect(409)
+      .expect((response) => {
+        expect(response.body.error).toBe("email_existiert_bereits");
+      });
+
+    const createdA = await adminAgent
+      .post("/api/admin/users")
+      .send({ username: "emailA", email: "emailA@example.test", role: "user" })
+      .set(CSRF_HEADER, adminCsrf)
+      .expect(201);
+
+    const createdB = await adminAgent
+      .post("/api/admin/users")
+      .send({ username: "emailB", email: "emailB@example.test", role: "user" })
+      .set(CSRF_HEADER, adminCsrf)
+      .expect(201);
+
+    await adminAgent
+      .patch(`/api/admin/users/${createdB.body.user.id as string}`)
+      .send({ email: createdA.body.user.email as string })
+      .set(CSRF_HEADER, adminCsrf)
+      .expect(409)
+      .expect((response) => {
+        expect(response.body.error).toBe("email_existiert_bereits");
+      });
+
+    await adminAgent
+      .put("/api/admin/settings")
+      .send({
+        appName: "Hermes Test",
+        defaultNotificationsEnabled: true,
+        eventAutoArchiveHours: 8,
+        publicRegistrationEnabled: true,
+        themePrimaryColor: "#0f766e",
+        themeLoginColor: "#be123c",
+        themeManagerColor: "#b7791f",
+        themeAdminColor: "#2563eb",
+        themeSurfaceColor: "#f6f8f4"
+      })
+      .set(CSRF_HEADER, adminCsrf)
+      .expect(200);
+
+    const inviteResponse = await adminAgent
+      .post("/api/admin/invite-codes")
+      .send({ label: "Dup Email Invite" })
+      .set(CSRF_HEADER, adminCsrf)
+      .expect(201);
+
+    const inviteCode = (inviteResponse.body.inviteCode as { code: string }).code;
+
+    await request(started!.app)
+      .post("/api/auth/register")
+      .send({ inviteCode, username: "dup-invite-1", email: "invite-dup@example.test" })
+      .expect(201);
+
+    await request(started!.app)
+      .post("/api/auth/register")
+      .send({ inviteCode, username: "dup-invite-2", email: "invite-dup@example.test" })
+      .expect(409)
+      .expect((response) => {
+        expect(response.body.error).toBe("email_existiert_bereits");
+      });
+  });
+
   it("logs in, manages roles, creates events and enforces participation capacity", async () => {
     const adminAgent = request.agent(started!.app);
     await login(adminAgent, "hauptadmin");

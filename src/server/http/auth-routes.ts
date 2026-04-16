@@ -16,6 +16,7 @@ import {
 import { generateOtp, hashOtp, verifyOtp } from "../auth/otp";
 import type { DatabaseContext } from "../db/client";
 import { inviteCodes, inviteCodeUses, loginChallenges, sessions, users } from "../db/schema";
+import { ensureActiveEmailAvailable } from "../domain/users";
 import { sendLoginCode } from "../mail/mailer";
 import { readSettings } from "../settings";
 
@@ -227,6 +228,13 @@ export function createAuthRouter(context: DatabaseContext) {
       return;
     }
 
+    const emailCheck = ensureActiveEmailAvailable(context, parsed.data.email);
+    if (!emailCheck.ok) {
+      recordRateLimitFailure(context, { scope: "invite_register", key: registerKey });
+      response.status(409).json({ error: emailCheck.error });
+      return;
+    }
+
     const timestamp = nowIso();
     const normalizedCode = normalizeInviteCode(parsed.data.inviteCode);
     const invite = context.db
@@ -263,6 +271,7 @@ export function createAuthRouter(context: DatabaseContext) {
             id: userId,
             phoneNumber: fallbackPhoneNumber(userId),
             username: parsed.data.username,
+            displayName: parsed.data.username,
             email: parsed.data.email,
             role: "user",
             notificationsEnabled: settings.defaultNotificationsEnabled,

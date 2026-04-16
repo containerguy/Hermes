@@ -14,13 +14,14 @@ import {
 } from "../auth/rate-limits";
 import type { DatabaseContext } from "../db/client";
 import { inviteCodes, participations, pushSubscriptions, sessions, users } from "../db/schema";
-import { userRoleSchema } from "../domain/users";
+import { ensureActiveEmailAvailable, userRoleSchema } from "../domain/users";
 import { persistDatabaseSnapshot, restoreDatabaseSnapshotIntoLive } from "../storage/s3-storage";
 import { readSettings, settingsSchema, writeSettings } from "../settings";
 
 const createUserSchema = z.object({
   phoneNumber: z.string().trim().min(3).max(40).optional(),
   username: z.string().trim().min(1).max(80),
+  displayName: z.string().trim().min(1).max(80).optional(),
   email: z.string().trim().email().max(160),
   role: userRoleSchema.default("user")
 });
@@ -28,6 +29,7 @@ const createUserSchema = z.object({
 const updateUserSchema = z.object({
   phoneNumber: z.string().trim().min(3).max(40).optional(),
   username: z.string().trim().min(1).max(80).optional(),
+  displayName: z.string().trim().min(1).max(80).optional(),
   email: z.string().trim().email().max(160).optional(),
   role: userRoleSchema.optional(),
   notificationsEnabled: z.boolean().optional()
@@ -242,6 +244,12 @@ export function createAdminRouter(context: DatabaseContext) {
       return;
     }
 
+    const emailCheck = ensureActiveEmailAvailable(context, parsed.data.email);
+    if (!emailCheck.ok) {
+      response.status(409).json({ error: emailCheck.error });
+      return;
+    }
+
     const timestamp = nowIso();
     const id = randomUUID();
 
@@ -252,6 +260,7 @@ export function createAdminRouter(context: DatabaseContext) {
           id,
           phoneNumber: parsed.data.phoneNumber ?? fallbackPhoneNumber(id),
           username: parsed.data.username,
+          displayName: parsed.data.displayName ?? parsed.data.username,
           email: parsed.data.email,
           role: parsed.data.role,
           notificationsEnabled: readSettings(context).defaultNotificationsEnabled,
@@ -275,6 +284,7 @@ export function createAdminRouter(context: DatabaseContext) {
       summary: `${admin.username} hat User ${parsed.data.username} angelegt.`,
       metadata: {
         username: parsed.data.username,
+        displayName: parsed.data.displayName ?? parsed.data.username,
         email: parsed.data.email,
         role: parsed.data.role
       }
@@ -295,6 +305,16 @@ export function createAdminRouter(context: DatabaseContext) {
     if (!existing) {
       response.status(404).json({ error: "user_nicht_gefunden" });
       return;
+    }
+
+    if (parsed.data.email !== undefined) {
+      const emailCheck = ensureActiveEmailAvailable(context, parsed.data.email, {
+        excludeUserId: existing.id
+      });
+      if (!emailCheck.ok) {
+        response.status(409).json({ error: emailCheck.error });
+        return;
+      }
     }
 
     const shouldRevokeSessions =

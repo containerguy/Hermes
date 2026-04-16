@@ -13,6 +13,7 @@ export function publicUser(user: typeof users.$inferSelect) {
     id: user.id,
     phoneNumber: user.phoneNumber,
     username: user.username,
+    displayName: user.displayName,
     email: user.email,
     role: user.role,
     notificationsEnabled: user.notificationsEnabled,
