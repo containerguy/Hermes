@@ -4,7 +4,7 @@ import os from "node:os";
 import path from "node:path";
 import Database from "better-sqlite3";
 import request from "supertest";
-import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { bootstrapAdmin } from "../db/bootstrap-admin";
 import { createHermesApp } from "../app";
 
@@ -141,6 +141,54 @@ describe("app flow", () => {
         const ids = (response.body.rateLimits as Array<{ id: string }>).map((entry) => entry.id);
         expect(ids).not.toContain(id);
       });
+  });
+
+  it("does not block primary actions when audit logging fails (D-27)", async () => {
+    const errorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+    const originalPrepare = Database.prototype.prepare;
+    const prepareSpy = vi.spyOn(Database.prototype, "prepare").mockImplementation(function (sql: string) {
+      if (typeof sql === "string" && sql.toLowerCase().includes("audit_logs")) {
+        throw new Error("audit boom");
+      }
+      return originalPrepare.call(this, sql);
+    });
+
+    try {
+      await request(started!.app).post("/api/auth/request-code").send({ username: "unbekannt" }).expect(202);
+
+      const sqlite = new Database(databasePath);
+      const timestamp = new Date().toISOString();
+      const id = randomUUID();
+      const key = createHash("sha256").update("audit-fail-key").digest("hex");
+      const blockedUntil = new Date(Date.now() + 10 * 60 * 1000).toISOString();
+      sqlite
+        .prepare(
+          `
+          INSERT INTO rate_limit_entries (
+            id,
+            scope,
+            key,
+            attempt_count,
+            window_started_at,
+            last_attempt_at,
+            blocked_until,
+            created_at,
+            updated_at
+          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+        `
+        )
+        .run(id, "login_request", key, 10, timestamp, timestamp, blockedUntil, timestamp, timestamp);
+      sqlite.close();
+
+      const adminAgent = request.agent(started!.app);
+      await login(adminAgent, "hauptadmin");
+      await adminAgent.delete(`/api/admin/rate-limits/${id}`).expect(200);
+
+      expect(errorSpy).toHaveBeenCalledWith("[Hermes] audit log failed", expect.any(Error));
+    } finally {
+      prepareSpy.mockRestore();
+      errorSpy.mockRestore();
+    }
   });
 
   it("returns a generic success response for unknown login-code requests without creating challenges", async () => {

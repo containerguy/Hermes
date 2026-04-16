@@ -31,6 +31,14 @@ export function writeAuditLog(context: DatabaseContext, input: AuditLogInput) {
     .run();
 }
 
+export function tryWriteAuditLog(context: DatabaseContext, input: AuditLogInput) {
+  try {
+    writeAuditLog(context, input);
+  } catch (error) {
+    console.error("[Hermes] audit log failed", error);
+  }
+}
+
 export function listAuditLogs(context: DatabaseContext, limit = 100) {
   return context.db
     .select()

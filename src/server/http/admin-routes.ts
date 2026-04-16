@@ -3,7 +3,7 @@ import { Router } from "express";
 import { randomUUID } from "node:crypto";
 import { z } from "zod";
 import { publicUser, requireAdmin, requireUser } from "../auth/current-user";
-import { listAuditLogs, writeAuditLog } from "../audit-log";
+import { listAuditLogs, tryWriteAuditLog } from "../audit-log";
 import {
   addRateLimitAllowlist,
   clearRateLimitBlock,
@@ -108,7 +108,7 @@ export function createAdminRouter(context: DatabaseContext) {
   router.get("/rate-limits", (request, response) => {
     const admin = requireAdmin(context, request);
     const entries = listRateLimitEntries(context);
-    writeAuditLog(context, {
+    tryWriteAuditLog(context, {
       actor: admin,
       action: "rate_limits.list",
       entityType: "rate_limit_entries",
@@ -122,7 +122,7 @@ export function createAdminRouter(context: DatabaseContext) {
   router.delete("/rate-limits/:id", (request, response) => {
     const admin = requireAdmin(context, request);
     clearRateLimitBlock(context, request.params.id);
-    writeAuditLog(context, {
+    tryWriteAuditLog(context, {
       actor: admin,
       action: "rate_limits.clear",
       entityType: "rate_limit_entry",
@@ -135,7 +135,7 @@ export function createAdminRouter(context: DatabaseContext) {
   router.get("/rate-limits/allowlist", (request, response) => {
     const admin = requireAdmin(context, request);
     const allowlist = listRateLimitAllowlist(context);
-    writeAuditLog(context, {
+    tryWriteAuditLog(context, {
       actor: admin,
       action: "rate_limits.allowlist_list",
       entityType: "rate_limit_allowlist",
@@ -159,7 +159,7 @@ export function createAdminRouter(context: DatabaseContext) {
       note: parsed.data.note ?? null
     });
 
-    writeAuditLog(context, {
+    tryWriteAuditLog(context, {
       actor: admin,
       action: "rate_limits.allowlist_add",
       entityType: "rate_limit_allowlist",
@@ -174,7 +174,7 @@ export function createAdminRouter(context: DatabaseContext) {
   router.delete("/rate-limits/allowlist/:id", (request, response) => {
     const admin = requireAdmin(context, request);
     deleteRateLimitAllowlist(context, request.params.id);
-    writeAuditLog(context, {
+    tryWriteAuditLog(context, {
       actor: admin,
       action: "rate_limits.allowlist_delete",
       entityType: "rate_limit_allowlist",
@@ -223,7 +223,7 @@ export function createAdminRouter(context: DatabaseContext) {
     }
 
     const created = context.db.select().from(users).where(eq(users.id, id)).get();
-    writeAuditLog(context, {
+    tryWriteAuditLog(context, {
       actor: admin,
       action: "user.create",
       entityType: "user",
@@ -270,7 +270,7 @@ export function createAdminRouter(context: DatabaseContext) {
 
     const updated = context.db.select().from(users).where(eq(users.id, existing.id)).get();
     const admin = requireAdmin(context, request);
-    writeAuditLog(context, {
+    tryWriteAuditLog(context, {
       actor: admin,
       action: "user.update",
       entityType: "user",
@@ -332,7 +332,7 @@ export function createAdminRouter(context: DatabaseContext) {
         .run();
     })();
 
-    writeAuditLog(context, {
+    tryWriteAuditLog(context, {
       actor: admin,
       action: "user.delete",
       entityType: "user",
@@ -398,7 +398,7 @@ export function createAdminRouter(context: DatabaseContext) {
     }
 
     const created = context.db.select().from(inviteCodes).where(eq(inviteCodes.id, id)).get();
-    writeAuditLog(context, {
+    tryWriteAuditLog(context, {
       actor: admin,
       action: "invite.create",
       entityType: "invite_code",
@@ -435,7 +435,7 @@ export function createAdminRouter(context: DatabaseContext) {
       .where(eq(inviteCodes.id, invite.id))
       .run();
 
-    writeAuditLog(context, {
+    tryWriteAuditLog(context, {
       actor: admin,
       action: "invite.revoke",
       entityType: "invite_code",
@@ -462,7 +462,7 @@ export function createAdminRouter(context: DatabaseContext) {
     }
 
     writeSettings(context, settingsSchema.parse({ ...readSettings(context), ...parsed.data }), admin.id);
-    writeAuditLog(context, {
+    tryWriteAuditLog(context, {
       actor: admin,
       action: "settings.update",
       entityType: "settings",
@@ -478,7 +478,7 @@ export function createAdminRouter(context: DatabaseContext) {
 
     try {
       await persistDatabaseSnapshot(context.sqlite);
-      writeAuditLog(context, {
+      tryWriteAuditLog(context, {
         actor: admin,
         action: "storage.backup",
         entityType: "storage",
@@ -497,7 +497,7 @@ export function createAdminRouter(context: DatabaseContext) {
 
     try {
       await restoreDatabaseSnapshotIntoLive(context.sqlite);
-      writeAuditLog(context, {
+      tryWriteAuditLog(context, {
         action: "storage.restore",
         entityType: "storage",
         entityId: "s3",

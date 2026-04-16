@@ -3,7 +3,7 @@ import { Router } from "express";
 import { randomUUID } from "node:crypto";
 import { z } from "zod";
 import { getCurrentSession, publicUser } from "../auth/current-user";
-import { writeAuditLog } from "../audit-log";
+import { tryWriteAuditLog } from "../audit-log";
 import { checkRateLimit, recordRateLimitFailure } from "../auth/rate-limits";
 import {
   createSessionToken,
@@ -121,7 +121,7 @@ export function createAuthRouter(context: DatabaseContext) {
       .get();
 
     if (!user) {
-      writeAuditLog(context, {
+      tryWriteAuditLog(context, {
         action: "auth.request_unknown",
         entityType: "user",
         entityId: null,
@@ -266,7 +266,7 @@ export function createAuthRouter(context: DatabaseContext) {
       return;
     }
 
-    writeAuditLog(context, {
+    tryWriteAuditLog(context, {
       actor: created,
       action: "auth.register",
       entityType: "user",
@@ -356,7 +356,7 @@ export function createAuthRouter(context: DatabaseContext) {
         .run();
     })();
 
-    writeAuditLog(context, {
+    tryWriteAuditLog(context, {
       actor: user,
       action: "auth.login",
       entityType: "session",
@@ -433,7 +433,7 @@ export function createAuthRouter(context: DatabaseContext) {
       .where(eq(sessions.id, target.id))
       .run();
 
-    writeAuditLog(context, {
+    tryWriteAuditLog(context, {
       actor: current.user,
       action: "auth.session_revoke",
       entityType: "session",
@@ -462,7 +462,7 @@ export function createAuthRouter(context: DatabaseContext) {
     }
 
     if (current) {
-      writeAuditLog(context, {
+      tryWriteAuditLog(context, {
         actor: current.user,
         action: "auth.logout",
         entityType: "session",
