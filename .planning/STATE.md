@@ -2,7 +2,7 @@
 gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
-status: verifying
+status: complete
 stopped_at: Milestone v1.0 complete
 last_updated: "2026-04-16T17:05:30.000Z"
 last_activity: 2026-04-16
