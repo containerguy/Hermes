@@ -476,20 +476,63 @@ function EventBoard({
       return undefined;
     }
 
-    setLiveState("connecting");
-    const source = new EventSource("/api/realtime/events", { withCredentials: true });
+    let closed = false;
+    let retryMs = 1_000;
+    let reconnectTimer: number | null = null;
+    let source: EventSource | null = null;
+
+    function scheduleReconnect() {
+      if (closed || reconnectTimer !== null) {
+        return;
+      }
+
+      reconnectTimer = window.setTimeout(() => {
+        reconnectTimer = null;
+        retryMs = Math.min(retryMs * 2, 15_000);
+        connect();
+      }, retryMs);
+    }
+
+    function connect() {
+      if (closed) {
+        return;
+      }
+
+      setLiveState("connecting");
+      source?.close();
+      source = new EventSource("/api/realtime/events", { withCredentials: true });
+
+      source.onopen = () => {
+        retryMs = 1_000;
+        setLiveState("live");
+      };
+
+      source.onerror = () => {
+        setLiveState("polling");
+        source?.close();
+        scheduleReconnect();
+      };
+
+      source.addEventListener("heartbeat", () => {
+        setLiveState("live");
+      });
+
+      source.addEventListener("events_changed", () => {
+        loadEvents().catch(() => setLiveState("polling"));
+      });
+    }
+
     const poll = window.setInterval(() => {
       loadEvents().catch(() => setLiveState("polling"));
     }, 30_000);
-
-    source.onopen = () => setLiveState("live");
-    source.onerror = () => setLiveState("polling");
-    source.addEventListener("events_changed", () => {
-      loadEvents().catch(() => setLiveState("polling"));
-    });
+    connect();
 
     return () => {
-      source.close();
+      closed = true;
+      source?.close();
+      if (reconnectTimer !== null) {
+        window.clearTimeout(reconnectTimer);
+      }
       window.clearInterval(poll);
     };
   }, [currentUser?.id]);

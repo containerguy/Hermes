@@ -168,6 +168,10 @@ Browser erlauben Push Notifications nur in einem Secure Context. `http://localho
 
 Hermes setzt bei Push-Benachrichtigungen eine Vibrationssequenz und nutzt `requireInteraction` für neue Runden. Ob das Smartphone vibriert oder einen Ton abspielt, entscheidet trotzdem das Betriebssystem, der Browser und die App-/PWA-Installation. Eigene Benachrichtigungstöne können Web Push Benachrichtigungen auf iOS/Android nicht zuverlässig erzwingen.
 
+## Realtime (SSE)
+
+Hermes nutzt für Live-Updates **Server-Sent Events (SSE)**. Die Verbindung sendet Heartbeats und der Client verbindet sich bei Fehlern automatisch neu. Trotzdem können Reverse-Proxies oder Load-Balancer Idle-Timeouts erzwingen — Hermes fällt dann zusätzlich auf Polling zurück.
+
 ## Backup, Restore Und Reset
 
 S3 ist das primäre persistente Snapshot-Backend. Admins können im Adminbereich aktiv ein Backup nach S3 starten oder den aktuellen Datenstand aus dem S3-Snapshot wiederherstellen.

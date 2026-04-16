@@ -75,6 +75,10 @@ Die WebApp nutzt Hash-Seiten, die im gebauten Bundle direkt erreichbar sind:
 - `/#manager`
 - `/#admin`
 
+## Realtime (SSE) Hinweise
+
+Hermes nutzt SSE (Server-Sent Events) für Live-Updates. In produktiven Deployments sollten Reverse-Proxies/Load-Balancer SSE-Verbindungen nicht zu aggressiv wegen Idle-Timeouts trennen. Hermes sendet Heartbeats und verbindet sich im Client automatisch neu; zusätzlich läuft ein Polling-Fallback.
+
 Bei UI-Änderungen sollte mindestens `npm run build` ausgeführt werden, damit TypeScript und Vite die React-Seiten prüfen.
 
 ## Tests
