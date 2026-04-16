@@ -245,7 +245,7 @@ Wenn `HERMES_S3_RESTORE_MODE=if-missing` gesetzt ist, wird beim nächsten Start 
 ```bash
 npm test
 npm run build
-npm audit
+npm audit --omit=dev
 ```
 
 Der Playwright-Test ist vorbereitet:
@@ -255,3 +255,15 @@ npm run test:e2e
 ```
 
 Falls Chromium wegen fehlender Systembibliotheken nicht startet, müssen die Playwright OS-Abhängigkeiten auf dem Host installiert werden.
+
+## Release-Checklist (Operator)
+
+- Reverse Proxy / TLS ist **operator-owned** (Hermes liefert kein TLS, nur HTTP)
+- `HERMES_COOKIE_SECURE=true` sobald Hermes hinter HTTPS läuft
+- SMTP konfiguriert (und `HERMES_MAIL_MODE=smtp`), `HERMES_MAIL_FROM` gesetzt
+- VAPID Keys generiert und gesetzt (`HERMES_VAPID_*`)
+- S3 Snapshot-Storage konfiguriert (`HERMES_STORAGE_BACKEND=s3`, Bucket/Endpoint/Region/Key)
+- Credentials-Quelle geklärt (Env oder `HERMES_S3_CREDS_FILE`), `s3.creds` bleibt lokal/Secret
+- **Single-Writer**: genau eine schreibende Hermes-Instanz
+- Backup-Status im Admin UI geprüft (letztes Success/Failure + Location)
+- Restore/Rollback verstanden: Recovery-Key wird bei Restore ausgegeben, Rollback via Recovery-Snapshot möglich

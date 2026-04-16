@@ -85,7 +85,7 @@ Bei UI-Änderungen sollte mindestens `npm run build` ausgeführt werden, damit T
 
 ```bash
 npm test
-npm audit
+npm audit --omit=dev
 ```
 
 Browser-E2E:
