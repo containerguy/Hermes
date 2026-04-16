@@ -1,5 +1,5 @@
 import fs from "node:fs";
-import { randomUUID } from "node:crypto";
+import { createHash, randomUUID } from "node:crypto";
 import os from "node:os";
 import path from "node:path";
 import Database from "better-sqlite3";
@@ -90,6 +90,54 @@ describe("app flow", () => {
     const buildServer = packageJson.scripts?.["build:server"] ?? "";
     expect(buildServer).toContain("cp src/server/db/migrations/*.sql dist-server/migrations/");
     expect(buildServer).toContain("cp src/server/db/migrations/*.sql dist-server/db/migrations/");
+  });
+
+  it("lets admins list and clear persisted rate-limit blocks", async () => {
+    const sqlite = new Database(databasePath);
+    const timestamp = new Date().toISOString();
+    const id = randomUUID();
+    const key = createHash("sha256").update("test-key").digest("hex");
+    const blockedUntil = new Date(Date.now() + 10 * 60 * 1000).toISOString();
+
+    sqlite
+      .prepare(
+        `
+        INSERT INTO rate_limit_entries (
+          id,
+          scope,
+          key,
+          attempt_count,
+          window_started_at,
+          last_attempt_at,
+          blocked_until,
+          created_at,
+          updated_at
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+      `
+      )
+      .run(id, "login_request", key, 10, timestamp, timestamp, blockedUntil, timestamp, timestamp);
+    sqlite.close();
+
+    const adminAgent = request.agent(started!.app);
+    await login(adminAgent, "hauptadmin");
+
+    await adminAgent
+      .get("/api/admin/rate-limits")
+      .expect(200)
+      .expect((response) => {
+        const ids = (response.body.rateLimits as Array<{ id: string }>).map((entry) => entry.id);
+        expect(ids).toContain(id);
+      });
+
+    await adminAgent.delete(`/api/admin/rate-limits/${id}`).expect(200);
+
+    await adminAgent
+      .get("/api/admin/rate-limits")
+      .expect(200)
+      .expect((response) => {
+        const ids = (response.body.rateLimits as Array<{ id: string }>).map((entry) => entry.id);
+        expect(ids).not.toContain(id);
+      });
   });
 
   it("logs in, manages roles, creates events and enforces participation capacity", async () => {

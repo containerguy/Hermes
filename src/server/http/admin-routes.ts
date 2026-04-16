@@ -4,6 +4,13 @@ import { randomUUID } from "node:crypto";
 import { z } from "zod";
 import { publicUser, requireAdmin, requireUser } from "../auth/current-user";
 import { listAuditLogs, writeAuditLog } from "../audit-log";
+import {
+  addRateLimitAllowlist,
+  clearRateLimitBlock,
+  deleteRateLimitAllowlist,
+  listRateLimitAllowlist,
+  listRateLimitEntries
+} from "../auth/rate-limits";
 import type { DatabaseContext } from "../db/client";
 import { inviteCodes, participations, pushSubscriptions, sessions, users } from "../db/schema";
 import { userRoleSchema } from "../domain/users";
@@ -30,6 +37,11 @@ const createInviteCodeSchema = z.object({
   label: z.string().trim().min(1).max(120),
   maxUses: z.number().int().min(1).max(500).nullable().optional(),
   expiresAt: z.string().datetime().nullable().optional()
+});
+
+const allowlistSchema = z.object({
+  ipOrCidr: z.string().trim().min(1).max(80),
+  note: z.string().trim().min(1).max(200).optional()
 });
 
 function nowIso() {
@@ -91,6 +103,85 @@ export function createAdminRouter(context: DatabaseContext) {
   router.get("/audit-log", (request, response) => {
     const limit = Number(request.query.limit ?? "100");
     response.json({ auditLogs: listAuditLogs(context, limit) });
+  });
+
+  router.get("/rate-limits", (request, response) => {
+    const admin = requireAdmin(context, request);
+    const entries = listRateLimitEntries(context);
+    writeAuditLog(context, {
+      actor: admin,
+      action: "rate_limits.list",
+      entityType: "rate_limit_entries",
+      entityId: null,
+      summary: `${admin?.username ?? "Admin"} hat Rate-Limits angezeigt.`,
+      metadata: { count: entries.length }
+    });
+    response.json({ rateLimits: entries });
+  });
+
+  router.delete("/rate-limits/:id", (request, response) => {
+    const admin = requireAdmin(context, request);
+    clearRateLimitBlock(context, request.params.id);
+    writeAuditLog(context, {
+      actor: admin,
+      action: "rate_limits.clear",
+      entityType: "rate_limit_entry",
+      entityId: request.params.id,
+      summary: `${admin?.username ?? "Admin"} hat ein Rate-Limit gelöscht.`
+    });
+    response.json({ ok: true });
+  });
+
+  router.get("/rate-limits/allowlist", (request, response) => {
+    const admin = requireAdmin(context, request);
+    const allowlist = listRateLimitAllowlist(context);
+    writeAuditLog(context, {
+      actor: admin,
+      action: "rate_limits.allowlist_list",
+      entityType: "rate_limit_allowlist",
+      entityId: null,
+      summary: `${admin?.username ?? "Admin"} hat die Rate-Limit-Allowlist angezeigt.`,
+      metadata: { count: allowlist.length }
+    });
+    response.json({ allowlist });
+  });
+
+  router.post("/rate-limits/allowlist", (request, response) => {
+    const admin = requireAdmin(context, request);
+    const parsed = allowlistSchema.safeParse(request.body);
+    if (!parsed.success) {
+      response.status(400).json({ error: "ungueltiger_allowlist_eintrag" });
+      return;
+    }
+
+    const id = addRateLimitAllowlist(context, {
+      ipOrCidr: parsed.data.ipOrCidr,
+      note: parsed.data.note ?? null
+    });
+
+    writeAuditLog(context, {
+      actor: admin,
+      action: "rate_limits.allowlist_add",
+      entityType: "rate_limit_allowlist",
+      entityId: id,
+      summary: `${admin?.username ?? "Admin"} hat einen Allowlist-Eintrag hinzugefügt.`,
+      metadata: { note: parsed.data.note ?? null }
+    });
+
+    response.status(201).json({ ok: true, id });
+  });
+
+  router.delete("/rate-limits/allowlist/:id", (request, response) => {
+    const admin = requireAdmin(context, request);
+    deleteRateLimitAllowlist(context, request.params.id);
+    writeAuditLog(context, {
+      actor: admin,
+      action: "rate_limits.allowlist_delete",
+      entityType: "rate_limit_allowlist",
+      entityId: request.params.id,
+      summary: `${admin?.username ?? "Admin"} hat einen Allowlist-Eintrag gelöscht.`
+    });
+    response.json({ ok: true });
   });
 
   router.post("/users", (request, response) => {
