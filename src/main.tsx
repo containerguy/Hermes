@@ -6,6 +6,7 @@ type User = {
   id: string;
   phoneNumber: string;
   username: string;
+  displayName: string;
   email: string;
   role: "user" | "manager" | "admin";
   notificationsEnabled: boolean;
@@ -742,6 +743,10 @@ function LoginPanel({
   const [step, setStep] = useState<"request" | "verify">("request");
   const [mode, setMode] = useState<"login" | "register">("login");
   const [sessions, setSessions] = useState<UserSession[]>([]);
+  const [sessionNames, setSessionNames] = useState<Record<string, string>>({});
+  const [displayNameDraft, setDisplayNameDraft] = useState("");
+  const [emailDraft, setEmailDraft] = useState("");
+  const [emailVerifyCode, setEmailVerifyCode] = useState("");
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
@@ -754,11 +759,28 @@ function LoginPanel({
 
     const result = await requestJson<{ sessions: UserSession[] }>("/api/auth/sessions");
     setSessions(result.sessions);
+    setSessionNames(
+      Object.fromEntries(
+        result.sessions.map((session) => [session.id, session.deviceName || "Unbenanntes Gerät"])
+      )
+    );
   }
 
   useEffect(() => {
     loadSessions().catch(() => undefined);
   }, [currentUser?.id]);
+
+  useEffect(() => {
+    if (!currentUser) {
+      setDisplayNameDraft("");
+      setEmailDraft("");
+      setEmailVerifyCode("");
+      return;
+    }
+
+    setDisplayNameDraft(currentUser.displayName || currentUser.username);
+    setEmailDraft(currentUser.email);
+  }, [currentUser?.id, currentUser?.displayName, currentUser?.email, currentUser?.username]);
 
   async function requestCode(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -861,6 +883,87 @@ function LoginPanel({
     }
   }
 
+  async function updateProfile(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    setBusy(true);
+    setError("");
+    setMessage("");
+
+    try {
+      const result = await requestJson<{ user: User }>("/api/auth/profile", {
+        method: "PATCH",
+        body: JSON.stringify({ displayName: displayNameDraft })
+      });
+      onUserUpdated(result.user);
+      setMessage("Profil gespeichert.");
+    } catch (caught) {
+      setError(getErrorMessage(caught));
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function requestEmailChange(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    setBusy(true);
+    setError("");
+    setMessage("");
+
+    try {
+      await requestJson<{ ok: true }>("/api/auth/email-change", {
+        method: "POST",
+        body: JSON.stringify({ newEmail: emailDraft })
+      });
+      setMessage("Bestätigungscode wurde an die neue E-Mail-Adresse versendet.");
+    } catch (caught) {
+      setError(getErrorMessage(caught));
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function verifyEmailChange(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    setBusy(true);
+    setError("");
+    setMessage("");
+
+    try {
+      await requestJson<{ user: User }>("/api/auth/email-change/verify", {
+        method: "POST",
+        body: JSON.stringify({ code: emailVerifyCode })
+      });
+      clearCsrfToken();
+      onLoggedOut();
+      setStep("request");
+      setEmailVerifyCode("");
+      setMessage("E-Mail bestätigt. Bitte erneut einloggen.");
+    } catch (caught) {
+      setError(getErrorMessage(caught));
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function renameSession(sessionId: string) {
+    setBusy(true);
+    setError("");
+    setMessage("");
+
+    try {
+      await requestJson<{ session?: UserSession }>(`/api/auth/sessions/${sessionId}`, {
+        method: "PATCH",
+        body: JSON.stringify({ deviceName: sessionNames[sessionId] ?? "" })
+      });
+      await loadSessions();
+      setMessage("Gerätename gespeichert.");
+    } catch (caught) {
+      setError(getErrorMessage(caught));
+    } finally {
+      setBusy(false);
+    }
+  }
+
   async function enableNotifications() {
     setBusy(true);
     setError("");
@@ -927,8 +1030,12 @@ function LoginPanel({
     return (
       <section className="login-panel" id="login" aria-label="Aktuelle Anmeldung">
         <p className="eyebrow">Profil</p>
-        <h2>{currentUser.username}</h2>
+        <h2>{currentUser.displayName || currentUser.username}</h2>
         <dl className="account-list">
+          <div>
+            <dt>Login</dt>
+            <dd>{currentUser.username}</dd>
+          </div>
           <div>
             <dt>Rolle</dt>
             <dd>{currentUser.role}</dd>
@@ -938,6 +1045,63 @@ function LoginPanel({
             <dd>{currentUser.email}</dd>
           </div>
         </dl>
+
+        <section className="device-panel" aria-label="Profilverwaltung">
+          <div className="section-title-row">
+            <div>
+              <p className="eyebrow">Profil</p>
+              <h2>Profil und E-Mail.</h2>
+            </div>
+          </div>
+
+          <form onSubmit={updateProfile} className="admin-form">
+            <label>
+              Anzeigename (frei wählbar)
+              <input
+                value={displayNameDraft}
+                onChange={(event) => setDisplayNameDraft(event.target.value)}
+                required
+              />
+            </label>
+            <button type="submit" disabled={busy}>
+              Anzeigename speichern
+            </button>
+          </form>
+
+          <form onSubmit={requestEmailChange} className="admin-form">
+            <label>
+              Neue E-Mail-Adresse
+              <input
+                type="email"
+                value={emailDraft}
+                onChange={(event) => setEmailDraft(event.target.value)}
+                required
+              />
+            </label>
+            <button type="submit" disabled={busy}>
+              Bestätigungscode senden
+            </button>
+          </form>
+
+          <form onSubmit={verifyEmailChange} className="admin-form">
+            <label>
+              Bestätigungscode
+              <input
+                autoComplete="one-time-code"
+                inputMode="numeric"
+                maxLength={6}
+                pattern="[0-9]{6}"
+                value={emailVerifyCode}
+                onChange={(event) => setEmailVerifyCode(event.target.value)}
+                required
+              />
+            </label>
+            <button type="submit" disabled={busy}>
+              E-Mail bestätigen
+            </button>
+          </form>
+        </section>
+
         {message ? <p className="notice">{message}</p> : null}
         {error ? <p className="error">{error}</p> : null}
         <div className="action-row">
@@ -965,23 +1129,41 @@ function LoginPanel({
             {sessions.map((session) => (
               <article className="device-row" key={session.id}>
                 <div>
-                  <strong>
-                    {session.deviceName || "Unbenanntes Gerät"}
-                    {session.current ? " · aktuell" : ""}
-                  </strong>
+                  <strong>{session.current ? "Aktuelles Gerät" : "Gerät"}</strong>
+                  <label>
+                    Name
+                    <input
+                      value={sessionNames[session.id] ?? session.deviceName ?? ""}
+                      onChange={(event) =>
+                        setSessionNames({ ...sessionNames, [session.id]: event.target.value })
+                      }
+                      disabled={busy}
+                      required
+                    />
+                  </label>
                   <span>{session.userAgent || "Kein User-Agent gespeichert"}</span>
                   <time dateTime={session.lastSeenAt}>
                     Zuletzt aktiv: {new Date(session.lastSeenAt).toLocaleString("de-DE")}
                   </time>
                 </div>
-                <button
-                  type="button"
-                  className="secondary"
-                  onClick={() => revokeSession(session.id)}
-                  disabled={busy}
-                >
-                  Abmelden
-                </button>
+                <div className="device-actions">
+                  <button
+                    type="button"
+                    className="secondary"
+                    onClick={() => renameSession(session.id)}
+                    disabled={busy}
+                  >
+                    Name speichern
+                  </button>
+                  <button
+                    type="button"
+                    className="secondary"
+                    onClick={() => revokeSession(session.id)}
+                    disabled={busy}
+                  >
+                    Abmelden
+                  </button>
+                </div>
               </article>
             ))}
             {sessions.length === 0 ? (

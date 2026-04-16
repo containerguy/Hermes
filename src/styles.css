@@ -704,6 +704,15 @@ dd {
   background: var(--surface);
 }
 
+.device-actions {
+  display: grid;
+  gap: 8px;
+}
+
+.device-actions button {
+  width: 100%;
+}
+
 .device-row div,
 .invite-row div {
   display: grid;
