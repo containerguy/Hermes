@@ -16,6 +16,11 @@ export const errorMessages: Record<string, string> = {
   invite_code_nicht_gefunden: "Invite-Code nicht gefunden.",
   invite_max_uses_unter_used_count:
     "Max. Nutzungen kann nicht unter die bereits genutzte Anzahl gesetzt werden.",
+  pair_origin_revoked:
+    "Die Quelle dieses Pairing-Links ist nicht mehr aktiv. Bitte lass einen neuen Link erstellen.",
+  pair_token_consumed: "Dieser Pairing-Link wurde bereits benutzt. Bitte fordere einen neuen an.",
+  pair_token_expired: "Dieser Pairing-Link ist abgelaufen. Bitte fordere einen neuen an.",
+  pair_token_invalid: "Der Pairing-Link ist ungültig. Bitte fordere einen neuen an.",
   permission_abgelehnt: "Benachrichtigung wurde vom Browser abgelehnt.",
   push_nicht_konfiguriert: "Push ist serverseitig noch nicht konfiguriert. VAPID Keys fehlen.",
   push_nicht_unterstuetzt:

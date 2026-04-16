@@ -67,6 +67,20 @@ const emailChangeVerifySchema = z.object({
   code: z.string().trim().regex(/^\d{6}$/)
 });
 
+const pairRedeemSchema = z.object({
+  token: z
+    .string()
+    .trim()
+    .regex(/^[A-Za-z0-9_-]{32,128}$/),
+  deviceName: z.string().trim().max(120).optional(),
+  deviceKey: z
+    .string()
+    .trim()
+    .regex(/^[A-Za-z0-9_-]{22,44}$/)
+    .optional(),
+  pwa: z.boolean().optional()
+});
+
 function nowIso() {
   return new Date().toISOString();
 }
@@ -147,7 +161,7 @@ async function sendIssuedLoginCode(
 
 export function createAuthRouter(context: DatabaseContext) {
   const router = Router();
-  const csrfExemptPaths = new Set(["/request-code", "/verify-code", "/register"]);
+  const csrfExemptPaths = new Set(["/request-code", "/verify-code", "/register", "/pair-redeem"]);
 
   router.use((request, response, next) => {
     if (
@@ -1008,6 +1022,129 @@ export function createAuthRouter(context: DatabaseContext) {
 
     response.setHeader("Cache-Control", "no-store");
     response.status(201).json({ token, expiresAt });
+  });
+
+  router.post("/pair-redeem", (request, response) => {
+    const parsed = pairRedeemSchema.safeParse(request.body);
+    if (!parsed.success) {
+      response.status(400).json({ error: "pair_token_invalid" });
+      return;
+    }
+
+    const tokenHash = hashPairingToken(parsed.data.token);
+    const timestamp = nowIso();
+
+    const tokenRow = context.db
+      .select()
+      .from(pairingTokens)
+      .where(eq(pairingTokens.tokenHash, tokenHash))
+      .get();
+    if (!tokenRow) {
+      tryWriteAuditLog(context, {
+        action: "device_pair_failed",
+        entityType: "pairing_token",
+        entityId: null,
+        summary: "Pairing-Redemption mit unbekanntem Token abgelehnt.",
+        metadata: { reason: "pair_token_invalid", sourceIp: request.ip ?? null }
+      });
+      response.status(400).json({ error: "pair_token_invalid" });
+      return;
+    }
+    if (tokenRow.consumedAt) {
+      response.status(400).json({ error: "pair_token_consumed" });
+      return;
+    }
+    if (tokenRow.expiresAt <= timestamp) {
+      response.status(400).json({ error: "pair_token_expired" });
+      return;
+    }
+
+    const origin = context.db
+      .select()
+      .from(sessions)
+      .where(and(eq(sessions.id, tokenRow.originSessionId), isNull(sessions.revokedAt)))
+      .get();
+    if (!origin) {
+      response.status(401).json({ error: "pair_origin_revoked" });
+      return;
+    }
+
+    const user = context.db
+      .select()
+      .from(users)
+      .where(and(eq(users.id, tokenRow.userId), isNull(users.deletedAt)))
+      .get();
+    if (!user) {
+      response.status(401).json({ error: "pair_origin_revoked" });
+      return;
+    }
+
+    const newSessionId = createSessionId();
+    const newSessionToken = createSessionToken();
+    const newSessionTokenHash = hashSessionToken(newSessionToken);
+    const resolvedDeviceName = resolveDeviceName(
+      parsed.data.deviceName,
+      request.get("user-agent") ?? undefined
+    );
+    const deviceKeyHash = parsed.data.deviceKey ? hashDeviceKey(parsed.data.deviceKey) : null;
+    const normalizedSignals = normalizeDeviceSignals({
+      userAgent: request.get("user-agent") ?? undefined,
+      pwa: parsed.data.pwa
+    });
+    const deviceSignals = deviceSignalsFingerprint(normalizedSignals);
+
+    const consumed = context.sqlite.transaction(() => {
+      const claim = context.db
+        .update(pairingTokens)
+        .set({ consumedAt: timestamp, consumedSessionId: newSessionId })
+        .where(and(eq(pairingTokens.id, tokenRow.id), isNull(pairingTokens.consumedAt)))
+        .run();
+      if (claim.changes === 0) {
+        return false;
+      }
+      context.db
+        .insert(sessions)
+        .values({
+          id: newSessionId,
+          userId: user.id,
+          deviceName: resolvedDeviceName,
+          userAgent: request.get("user-agent") ?? null,
+          lastSeenAt: timestamp,
+          createdAt: timestamp,
+          tokenHash: newSessionTokenHash,
+          revokedAt: null,
+          deviceKeyHash,
+          deviceSignals
+        })
+        .run();
+      return true;
+    })();
+
+    if (!consumed) {
+      response.status(400).json({ error: "pair_token_consumed" });
+      return;
+    }
+
+    tryWriteAuditLog(context, {
+      actor: user,
+      action: "device_pair_redeemed",
+      entityType: "session",
+      entityId: newSessionId,
+      summary: `${user.username} hat ein neues Gerät über Pairing verbunden.`,
+      metadata: {
+        originSessionId: tokenRow.originSessionId,
+        newSessionId,
+        deviceName: resolvedDeviceName,
+        deviceClass: normalizedSignals.deviceClass,
+        platform: normalizedSignals.platform,
+        browser: normalizedSignals.browser,
+        pwa: normalizedSignals.pwa
+      }
+    });
+
+    response.setHeader("Cache-Control", "no-store");
+    setSessionCookie(response, newSessionToken);
+    response.status(201).json({ user: publicUser(user) });
   });
 
   router.post("/logout", (request, response) => {
