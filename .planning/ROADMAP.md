@@ -49,7 +49,13 @@ Plans:
   1. Multiple built-in gaming theme presets are available, selectable in AdminPanel, and applied client-side via CSS variables; admin can also create/edit a custom theme that persists across reloads.
   2. Admin can pick the background image from a list of presets sourced from the existing S3 bucket under a Hermes-specific prefix (image generation itself is out of scope — THEME-03); readability is preserved (overlay/blur/contrast as needed).
   3. UI text across Events, Login/Profile, Manager, and Admin views has been revised to the agreed "modern, concise, clear" voice with no loss of technical specificity, and existing tests still pass.
-**Plans**: TBD
+**Plans:** 5 plans
+Plans:
+- [ ] 10-01-theme-tokens-and-presets-PLAN.md — Introduce `--hermes-*` CSS variable namespace in styles.css, ship ≥3 built-in presets (default/neon-cyber/retro-arcade) in src/client/theme/presets.ts, extract applyTheme from main.tsx, and extend AppSettings types (THEME-01 client infra).
+- [ ] 10-02-settings-endpoints-and-s3-listing-PLAN.md — Migration 0010 seeds new settings keys, settingsSchema adds sanitized themeRecordSchema + activeBackgroundKey basename-regex, admin theme CRUD + background listing/select endpoints audit via `settings_theme_updated`/`settings_background_updated`, S3 listing + streaming helpers locked to `themes/backgrounds/` prefix with path-traversal rejection (THEME-01, THEME-02 server).
+- [ ] 10-03-admin-theme-editor-ui-PLAN.md — ThemeEditor component with live preview + client-side token sanitization, mounted in AdminPanel as a new "themes" section; adds new error-code mappings (THEME-01 admin UI).
+- [ ] 10-04-background-picker-and-renderer-PLAN.md — BackgroundPicker component with empty-state + traversal-rejection, new "Hintergrund" section in AdminPanel, fixed full-viewport .app-background layer + readability overlay in main.tsx/styles.css (THEME-02 admin UI + renderer).
+- [ ] 10-05-copy-refresh-sweep-PLAN.md — Revoice every user-facing string across Events, Manager, Login/Profile, Admin (including new Themes/Hintergrund surfaces) + error-message text refresh (keyset unchanged per D-17); test fixtures updated atomically (COPY-01).
 **UI hint**: yes
 
 ### Phase 11: Admin Bulk User Import
@@ -60,7 +66,10 @@ Plans:
   1. AdminPanel exposes a CSV/JSON import flow with paste-or-upload, preview, validation errors per row, and a dry-run option.
   2. Admin-only server endpoint validates with Zod, rejects duplicates on username/email, applies defaults (e.g. `notificationsEnabled`), and writes all rows in one DB transaction (or none on failure).
   3. Each import emits an aggregated `user_bulk_import` audit entry (counts of created/skipped/failed) without leaking PII into logs.
-**Plans**: TBD
+**Plans:** 2 plans
+Plans:
+- [ ] 11-01-bulk-import-server-PLAN.md — `POST /api/admin/users/bulk-import` with Zod schema, case-insensitive duplicate detection, single-transaction all-or-nothing write, 1 MB / 1000-row caps, aggregated PII-free `user_bulk_import` audit entry, and Vitest HTTP coverage (ADM-02 server).
+- [ ] 11-02-bulk-import-admin-ui-PLAN.md — AdminPanel "Bulk-Import" section with paste/upload input, client-side CSV/JSON parser, always-on preview with in-batch duplicate markers, Dry-Run/Confirm actions, per-row result view with one-shot CSV/JSON download (ADM-02 client, depends on 11-01).
 **UI hint**: yes
 
 ### Phase 12: Audio and Haptic Notification UX
@@ -91,8 +100,8 @@ Plans:
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
 | 9. Device Recognition and Session-Bound Pairing | 0/4 | Not started | — |
-| 10. Admin Theme System, Backgrounds, and Copy Refresh | 0/0 | Not started | — |
-| 11. Admin Bulk User Import | 0/0 | Not started | — |
+| 10. Admin Theme System, Backgrounds, and Copy Refresh | 0/5 | Not started | — |
+| 11. Admin Bulk User Import | 0/2 | Not started | — |
 | 12. Audio and Haptic Notification UX | 0/0 | Not started | — |
 | 13. CI Node 24 Readiness | 0/0 | Not started | — |
 
