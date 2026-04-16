@@ -28,12 +28,12 @@ During the LAN party, everyone can quickly see which game round is viable, when 
 - ✓ App can run as a Dockerized single-instance Node/Express app with local SQLite — existing
 - ✓ App can persist/restore SQLite snapshots with S3-compatible Wasabi storage — existing
 - ✓ GitHub Actions builds/tests/audits and builds/publishes Docker images to GHCR — existing
+- ✓ Auth + invite registration hardening (throttling, non-enumerating responses, safer invite lifecycle) — Validated in Phase 1
+- ✓ Concurrent invite usage + event participation capacity consistency — Validated in Phase 2
 
 ### Active
 
-- [ ] Harden authentication and invite registration against abuse, including rate limits and less user-enumerating responses.
 - [ ] Make backup/restore safer with pre-restore backup, restore validation, and clearer operator recovery flow.
-- [ ] Improve data consistency for concurrent participation and invite usage.
 - [ ] Improve mobile/PWA notification reliability and document OS/browser limitations clearly in-product.
 - [ ] Split the large frontend monolith into smaller components or modules before further UI growth.
 - [ ] Increase test coverage around restore, invite limits, session/device revocation, push payload handling, and admin destructive actions.
@@ -112,4 +112,4 @@ This document evolves at phase transitions and milestone boundaries.
 4. Update Context with current state
 
 ---
-*Last updated: 2026-04-15 after initialization*
+*Last updated: 2026-04-16 after Phase 2 completion*
