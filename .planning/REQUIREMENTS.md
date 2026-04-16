@@ -61,10 +61,10 @@ These requirements define the next release milestone for the existing Hermes app
 - [x] **UI-02**: Event board and event creation UI are extracted into focused modules without changing user-visible behavior.
 - [x] **UI-03**: Login, profile, device/session management, invite registration, and push setup are extracted into focused modules.
 - [x] **UI-04**: Admin user/settings/theme/invite/audit/backup/restore UI is split into focused modules before additional admin UX expansion.
-- [ ] **UI-05**: Existing responsive styling and admin-controlled theme behavior remain intact after extraction.
-- [ ] **UI-06**: The admin area uses a modular submenu or page structure so each major admin function has a clear dedicated view.
-- [ ] **UI-07**: Event action buttons remain usable and correctly sized on narrow smartphone and small browser widths.
-- [ ] **UI-08**: The site header is compact enough that primary content is visible without excessive vertical offset on desktop and mobile.
+- [x] **UI-05**: Existing responsive styling and admin-controlled theme behavior remain intact after extraction.
+- [x] **UI-06**: The admin area uses a modular submenu or page structure so each major admin function has a clear dedicated view.
+- [x] **UI-07**: Event action buttons remain usable and correctly sized on narrow smartphone and small browser widths.
+- [x] **UI-08**: The site header is compact enough that primary content is visible without excessive vertical offset on desktop and mobile.
 
 ### Testing And Release Readiness
 
@@ -139,10 +139,10 @@ Every v1 requirement maps to exactly one roadmap phase and remains pending until
 | UI-02 | Phase 5: Frontend And Admin UI Modularization | Complete |
 | UI-03 | Phase 5: Frontend And Admin UI Modularization | Complete |
 | UI-04 | Phase 5: Frontend And Admin UI Modularization | Complete |
-| UI-05 | Phase 5: Frontend And Admin UI Modularization | Pending |
-| UI-06 | Phase 5: Frontend And Admin UI Modularization | Pending |
-| UI-07 | Phase 5: Frontend And Admin UI Modularization | Pending |
-| UI-08 | Phase 5: Frontend And Admin UI Modularization | Pending |
+| UI-05 | Phase 5: Frontend And Admin UI Modularization | Complete |
+| UI-06 | Phase 5: Frontend And Admin UI Modularization | Complete |
+| UI-07 | Phase 5: Frontend And Admin UI Modularization | Complete |
+| UI-08 | Phase 5: Frontend And Admin UI Modularization | Complete |
 | REL-01 | Phase 6: Release Verification And Documentation | Pending |
 | REL-02 | Phase 6: Release Verification And Documentation | Pending |
 | REL-03 | Phase 6: Release Verification And Documentation | Pending |

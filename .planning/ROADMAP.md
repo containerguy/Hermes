@@ -14,7 +14,7 @@ Hermes already has the core LAN-party workflow in place. This milestone turns th
 - [x] **Phase 2: Event And Invite Consistency** - Make limited invite usage and event participation capacity transactionally correct. (completed 2026-04-16)
 - [x] **Phase 3: Backup And Restore Safety** - Make S3 snapshot restore validated, recoverable, audited, and visible to operators. (completed 2026-04-16)
 - [x] **Phase 4: PWA And Realtime Reliability** - Improve notification guidance, push failure handling, and SSE resilience. (completed 2026-04-16)
-- [ ] **Phase 5: Frontend And Admin UI Modularization** - Split the client monolith and tighten responsive/admin UX without behavior drift.
+- [x] **Phase 5: Frontend And Admin UI Modularization** - Split the client monolith and tighten responsive/admin UX without behavior drift. (completed 2026-04-16)
 - [ ] **Phase 6: Release Verification And Documentation** - Add release-critical tests and align docs, env, Docker, and CI with the production contract.
 
 ## Phase Details
@@ -110,7 +110,7 @@ Plans:
 - [x] 05-01: Extract shared client API helpers, DTO types, and error mapping.
 - [x] 05-02: Extract event board and event creation modules with behavior-preserving state refreshes.
 - [x] 05-03: Extract auth, invite registration, profile, sessions/devices, and push setup modules.
-- [ ] 05-04: Extract admin modules and responsive navigation/layout fixes for the admin area and event actions.
+- [x] 05-04: Extract admin modules and responsive navigation/layout fixes for the admin area and event actions.
 
 ### Phase 6: Release Verification And Documentation
 **Goal**: Hermes has release-critical automated coverage and operator docs for the Docker/S3/PWA production contract before handoff.
@@ -140,7 +140,7 @@ Phases execute in numeric order: 1 -> 2 -> 3 -> 4 -> 5 -> 6
 | 2. Event And Invite Consistency | 3/3 | Complete    | 2026-04-16 |
 | 3. Backup And Restore Safety | 3/3 | Complete   | 2026-04-16 |
 | 4. PWA And Realtime Reliability | 3/3 | Complete   | 2026-04-16 |
-| 5. Frontend And Admin UI Modularization | 3/4 | In Progress|  |
+| 5. Frontend And Admin UI Modularization | 4/4 | Complete   | 2026-04-16 |
 | 6. Release Verification And Documentation | 0/3 | Not started | - |
 
 ## Coverage
