@@ -3,15 +3,15 @@ gsd_state_version: 1.0
 milestone: v1.2
 milestone_name: Post-LAN Quality of Life
 status: executing
-stopped_at: v1.2 planning complete — 14 plans across 5 phases, all verified; ready to execute
-last_updated: "2026-04-16T20:07:12.127Z"
-last_activity: 2026-04-16 -- Phase 09 execution started
+stopped_at: Completed 09-01-schema-and-device-model-PLAN.md
+last_updated: "2026-04-16T20:14:23.620Z"
+last_activity: 2026-04-16
 progress:
   total_phases: 5
   completed_phases: 0
   total_plans: 14
-  completed_plans: 0
-  percent: 0
+  completed_plans: 1
+  percent: 7
 ---
 
 # Project State
@@ -26,9 +26,9 @@ See: .planning/PROJECT.md (updated 2026-04-15)
 ## Current Position
 
 Phase: 09 (device-recognition-and-pairing) — EXECUTING
-Plan: 1 of 4
-Status: Executing Phase 09
-Last activity: 2026-04-16 -- Phase 09 execution started
+Plan: 2 of 4
+Status: Ready to execute
+Last activity: 2026-04-16
 
 Progress: [..........] 0% (0 of 14 plans executed)
 
@@ -81,6 +81,7 @@ Progress: [..........] 0% (0 of 14 plans executed)
 | Phase 02 P01 | 3m | 2 tasks | 2 files |
 | Phase 02 P02 | 4m | 2 tasks | 2 files |
 | Phase 02 P03 | 6m | 3 tasks | 4 files |
+| Phase 09 P01 | 6min | 4 tasks | 6 files |
 
 ## Accumulated Context
 
@@ -101,6 +102,8 @@ Recent decisions affecting current work:
 - [Phase 01-auth-profile-and-invite-hardening]: 01-08: AdminPanel zeigt aktive Rate-Limit-Sperren (nur blockierte Einträge) und erlaubt Clear + LAN-Allowlist Pflege.
 - [Phase 01]: Invite maxUses atomic concurrency (INV-03) remains deferred to Phase 2; Phase 1 must not claim it.
 - [Phase 02]: 02-02: Return 409 { error: "event_voll", event } for capacity losers while keeping stable error code (D-09).
+- [Phase 09]: 09-01: device_key_hash lives on sessions (no separate device_keys table); pair_token_create RL = 10min/5 attempts/15min block.
+- [Phase 09]: 09-01: HMAC-SHA256 with HERMES_DEVICE_KEY_SECRET and HERMES_PAIR_TOKEN_SECRET env vars for all secret-adjacent hashes at rest; plain SHA-256 reserved for RL key redaction + session tokens.
 
 ### Pending Todos
 
@@ -122,6 +125,6 @@ Items acknowledged and carried forward from previous milestone close:
 
 ## Session Continuity
 
-Last session: 2026-04-16T21:30:00.000Z
-Stopped at: v1.2 planning complete — 14 plans across 5 phases, all verified; ready to execute
-Resume file: .planning/phases/09-device-recognition-and-pairing/09-01-schema-and-device-model-PLAN.md
+Last session: 2026-04-16T20:14:23.609Z
+Stopped at: Completed 09-01-schema-and-device-model-PLAN.md
+Resume file: None

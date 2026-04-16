@@ -10,8 +10,8 @@ These requirements promote captured backlog todos into formal phases. Scope cove
 
 ### Auth — Device Friction
 
-- [ ] **AUTH-01**: When a user re-logs in from the same device, Hermes recognizes the device and updates the existing session entry instead of creating a duplicate session. Recognition uses low-entropy signals (platform, browser family, mobile/desktop, PWA flag) and/or a Hermes-specific local device key. No invasive fingerprinting (no Canvas/WebGL).
-- [ ] **AUTH-02**: An authenticated user can pair an additional device (smartphone/PC) without requesting another email one-time code. Pairing is via a session-bound, short-TTL (≤10 min), one-time, rate-limited token delivered as a link/QR. The original session must remain active for the token to be redeemable; redemption creates a new session bound to the same user. `device_paired` audit log entries omit secrets.
+- [x] **AUTH-01**: When a user re-logs in from the same device, Hermes recognizes the device and updates the existing session entry instead of creating a duplicate session. Recognition uses low-entropy signals (platform, browser family, mobile/desktop, PWA flag) and/or a Hermes-specific local device key. No invasive fingerprinting (no Canvas/WebGL).
+- [x] **AUTH-02**: An authenticated user can pair an additional device (smartphone/PC) without requesting another email one-time code. Pairing is via a session-bound, short-TTL (≤10 min), one-time, rate-limited token delivered as a link/QR. The original session must remain active for the token to be redeemable; redemption creates a new session bound to the same user. `device_paired` audit log entries omit secrets.
 
 ### Admin — Theming, Copy, and Onboarding
 
@@ -51,8 +51,8 @@ Every v1.2 requirement maps to exactly one roadmap phase and remains pending unt
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| AUTH-01 | Phase 9 | Pending |
-| AUTH-02 | Phase 9 | Pending |
+| AUTH-01 | Phase 9 | Complete |
+| AUTH-02 | Phase 9 | Complete |
 | THEME-01 | Phase 10 | Pending |
 | THEME-02 | Phase 10 | Pending |
 | COPY-01 | Phase 10 | Pending |
