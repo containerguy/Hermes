@@ -27,7 +27,7 @@ These requirements define the next release milestone for the existing Hermes app
 
 - [x] **INV-01**: Public invite registration is throttled to reduce brute-force attempts against invite codes.
 - [x] **INV-02**: Invite codes meet a documented minimum entropy level and are treated as credentials in docs and audit metadata.
-- [ ] **INV-03**: Invite `maxUses` enforcement is atomic, so concurrent registrations cannot oversubscribe a limited invite.
+- [x] **INV-03**: Invite `maxUses` enforcement is atomic, so concurrent registrations cannot oversubscribe a limited invite.
 - [x] **INV-04**: Admin invite list and audit entries avoid unnecessary reusable invite-code disclosure while preserving operator usability.
 - [x] **INV-05**: Admins can deactivate and reactivate invite codes without deleting their usage history.
 - [x] **INV-06**: Admins can edit invite max uses and validity windows with validation that preserves already-used invite accounting.
@@ -117,7 +117,7 @@ Every v1 requirement maps to exactly one roadmap phase and remains pending until
 | PROF-03 | Phase 1: Auth, Profile, And Invite Hardening | Complete |
 | INV-01 | Phase 1: Auth, Profile, And Invite Hardening | Complete |
 | INV-02 | Phase 1: Auth, Profile, And Invite Hardening | Complete |
-| INV-03 | Phase 2: Event And Invite Consistency | Pending |
+| INV-03 | Phase 2: Event And Invite Consistency | Complete |
 | INV-04 | Phase 1: Auth, Profile, And Invite Hardening | Complete |
 | INV-05 | Phase 1: Auth, Profile, And Invite Hardening | Complete |
 | INV-06 | Phase 1: Auth, Profile, And Invite Hardening | Complete |

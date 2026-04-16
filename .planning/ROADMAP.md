@@ -55,7 +55,7 @@ Plans:
 **Plans**: 3 plans
 
 Plans:
-- [ ] 02-01: Move invite consumption into an atomic SQLite transaction or constraint-backed write path.
+- [x] 02-01: Move invite consumption into an atomic SQLite transaction or constraint-backed write path.
 - [ ] 02-02: Move event participation capacity enforcement into an atomic SQLite transaction or constraint-backed write path.
 - [ ] 02-03: Verify realtime, push, audit, and lifecycle behavior around successful and rejected participation changes.
 
@@ -137,7 +137,7 @@ Phases execute in numeric order: 1 -> 2 -> 3 -> 4 -> 5 -> 6
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
 | 1. Auth, Profile, And Invite Hardening | 2/8 | In Progress|  |
-| 2. Event And Invite Consistency | 0/3 | Not started | - |
+| 2. Event And Invite Consistency | 1/3 | In Progress|  |
 | 3. Backup And Restore Safety | 0/3 | Not started | - |
 | 4. PWA And Realtime Reliability | 0/3 | Not started | - |
 | 5. Frontend And Admin UI Modularization | 0/4 | Not started | - |
