@@ -416,6 +416,62 @@ describe("app flow", () => {
       });
   });
 
+  it("enforces invite maxUses atomically under concurrent registration (INV-03)", async () => {
+    const adminAgent = request.agent(started!.app);
+    await login(adminAgent, "hauptadmin");
+    const csrf = await fetchCsrf(adminAgent);
+
+    await adminAgent
+      .put("/api/admin/settings")
+      .send({
+        appName: "Hermes Test",
+        defaultNotificationsEnabled: true,
+        eventAutoArchiveHours: 8,
+        publicRegistrationEnabled: true,
+        themePrimaryColor: "#0f766e",
+        themeLoginColor: "#be123c",
+        themeManagerColor: "#b7791f",
+        themeAdminColor: "#2563eb",
+        themeSurfaceColor: "#f6f8f4"
+      })
+      .set(CSRF_HEADER, csrf)
+      .expect(200);
+
+    const created = await adminAgent
+      .post("/api/admin/invite-codes")
+      .send({ label: "Concurrent", maxUses: 1 })
+      .set(CSRF_HEADER, csrf)
+      .expect(201);
+
+    const invite = created.body.inviteCode as { id: string; code: string };
+
+    const req1 = request(started!.app)
+      .post("/api/auth/register")
+      .send({ inviteCode: invite.code, username: "concurrent1", email: "concurrent1@example.test" });
+    const req2 = request(started!.app)
+      .post("/api/auth/register")
+      .send({ inviteCode: invite.code, username: "concurrent2", email: "concurrent2@example.test" });
+
+    const [res1, res2] = await Promise.all([req1, req2]);
+    const statuses = [res1.status, res2.status].sort((a, b) => a - b);
+    expect(statuses).toEqual([201, 403]);
+
+    const loser = res1.status === 403 ? res1 : res2;
+    expect(loser.body).toEqual({ error: "invite_ausgeschoepft" });
+
+    const winner = res1.status === 201 ? res1 : res2;
+    expect(winner.body.codeSent).toBe(true);
+    expect(winner.body.user).toBeTruthy();
+
+    const sqlite = new Database(databasePath);
+    const uses = sqlite.prepare("SELECT COUNT(*) AS count FROM invite_code_uses WHERE invite_code_id = ?").get(
+      invite.id
+    ) as { count: number };
+    sqlite.close();
+
+    expect(uses.count).toBe(1);
+  });
+
   it("supports invite lifecycle edit, deactivate, reactivate, and safe delete", async () => {
     // Note: INV-03 atomic maxUses concurrency is deferred to Phase 2; these tests assert single-request behavior only.
     const adminAgent = request.agent(started!.app);
