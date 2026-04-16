@@ -3,15 +3,15 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
 status: executing
-stopped_at: Completed 01-02-PLAN.md
-last_updated: "2026-04-16T09:28:04.888Z"
+stopped_at: Completed 01-07-PLAN.md
+last_updated: "2026-04-16T09:35:50.556Z"
 last_activity: 2026-04-16
 progress:
   total_phases: 6
   completed_phases: 0
   total_plans: 8
-  completed_plans: 2
-  percent: 25
+  completed_plans: 3
+  percent: 38
 ---
 
 # Project State
@@ -26,7 +26,7 @@ See: .planning/PROJECT.md (updated 2026-04-15)
 ## Current Position
 
 Phase: 01 (auth-profile-and-invite-hardening) — EXECUTING
-Plan: 2 of 8
+Plan: 3 of 8
 Status: Ready to execute
 Last activity: 2026-04-16
 
@@ -58,6 +58,7 @@ Progress: [----------] 0%
 
 *Updated after each plan completion*
 | Phase 01 P01-02 | 10m | 3 tasks | 5 files |
+| Phase 01 P01-07 | 5m | 2 tasks | 6 files |
 
 ## Accumulated Context
 
@@ -73,6 +74,8 @@ Recent decisions affecting current work:
 - [Phase 01]: Persistierte Rate-Limits (Entries + Allowlist) sind per Admin-API list-/löschbar.
 - [Phase 01]: Login-Code-Requests antworten generisch (202 ok) für syntaktisch valide Usernames (kein Enumeration-Leak).
 - [Phase 01]: Audit-Logging ist best-effort und blockiert keine primären Aktionen (D-27).
+- [Phase 01]: CSRF tokens via GET /api/auth/csrf and x-hermes-csrf header (HMAC-SHA256 over non-secret session id).
+- [Phase 01]: Legacy sessions without tokenHash are invalid and require re-login to avoid persisted replayable tokens.
 
 ### Pending Todos
 
@@ -94,6 +97,6 @@ Items acknowledged and carried forward from previous milestone close:
 
 ## Session Continuity
 
-Last session: 2026-04-16T09:28:04.878Z
-Stopped at: Completed 01-02-PLAN.md
+Last session: 2026-04-16T09:35:50.546Z
+Stopped at: Completed 01-07-PLAN.md
 Resume file: None

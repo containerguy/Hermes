@@ -12,9 +12,9 @@ These requirements define the next release milestone for the existing Hermes app
 - [x] **AUTH-01**: Login-code requests return a generic success-shaped response that does not reveal whether a username exists.
 - [x] **AUTH-02**: Login-code request and verification endpoints enforce practical rate limits by username and request source.
 - [x] **AUTH-03**: Expired or superseded login challenges are cleaned up and indexed so repeated login attempts do not grow the database unbounded.
-- [ ] **AUTH-04**: Session tokens are not stored as reusable raw bearer tokens in persisted SQLite data or S3 snapshots.
-- [ ] **AUTH-05**: Security-sensitive user changes, such as deletion or role changes, have defined session invalidation behavior and test coverage.
-- [ ] **AUTH-06**: Mutating cookie-authenticated admin routes have an explicit CSRF decision that is implemented or documented with rationale.
+- [x] **AUTH-04**: Session tokens are not stored as reusable raw bearer tokens in persisted SQLite data or S3 snapshots.
+- [x] **AUTH-05**: Security-sensitive user changes, such as deletion or role changes, have defined session invalidation behavior and test coverage.
+- [x] **AUTH-06**: Mutating cookie-authenticated admin routes have an explicit CSRF decision that is implemented or documented with rationale.
 - [ ] **AUTH-07**: Each email address can belong to only one active account, enforced consistently for admin-created users, invite registration, and profile email changes.
 
 ### User Profile And Devices
@@ -108,9 +108,9 @@ Every v1 requirement maps to exactly one roadmap phase and remains pending until
 | AUTH-01 | Phase 1: Auth, Profile, And Invite Hardening | Complete |
 | AUTH-02 | Phase 1: Auth, Profile, And Invite Hardening | Complete |
 | AUTH-03 | Phase 1: Auth, Profile, And Invite Hardening | Complete |
-| AUTH-04 | Phase 1: Auth, Profile, And Invite Hardening | Pending |
-| AUTH-05 | Phase 1: Auth, Profile, And Invite Hardening | Pending |
-| AUTH-06 | Phase 1: Auth, Profile, And Invite Hardening | Pending |
+| AUTH-04 | Phase 1: Auth, Profile, And Invite Hardening | Complete |
+| AUTH-05 | Phase 1: Auth, Profile, And Invite Hardening | Complete |
+| AUTH-06 | Phase 1: Auth, Profile, And Invite Hardening | Complete |
 | AUTH-07 | Phase 1: Auth, Profile, And Invite Hardening | Pending |
 | PROF-01 | Phase 1: Auth, Profile, And Invite Hardening | Pending |
 | PROF-02 | Phase 1: Auth, Profile, And Invite Hardening | Pending |
