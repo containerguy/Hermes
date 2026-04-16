@@ -137,15 +137,26 @@ const defaultSettings: AppSettings = {
 const errorMessages: Record<string, string> = {
   admin_erforderlich: "Adminrechte erforderlich.",
   backup_fehlgeschlagen: "Backup konnte nicht erstellt werden. Prüfe S3-Konfiguration und Logs.",
+  csrf_token_ungueltig: "Sicherheitsprüfung fehlgeschlagen. Bitte Seite neu laden und erneut versuchen.",
+  device_name_ungueltig: "Der Gerätename ist ungültig.",
+  email_code_abgelehnt: "Der Bestätigungscode wurde abgelehnt.",
+  email_existiert_bereits: "Diese E-Mail-Adresse wird bereits verwendet.",
   eigener_user_nicht_loeschbar: "Der eigene Admin-User kann nicht gelöscht werden.",
+  invite_abgelaufen: "Dieser Invite-Code ist abgelaufen und kann nicht reaktiviert werden.",
   invite_ausgeschoepft: "Dieser Invite-Code ist bereits ausgeschöpft.",
+  invite_code_custom_deaktiviert:
+    "Eigene Invite-Codes sind deaktiviert. Hermes erstellt sichere Codes automatisch.",
   invite_code_existiert: "Dieser Invite-Code existiert bereits.",
+  invite_hat_nutzungen: "Dieser Invite-Code hat bereits Nutzungen und kann nicht gelöscht werden.",
   invite_ungueltig: "Dieser Invite-Code ist ungültig oder abgelaufen.",
   invite_code_nicht_gefunden: "Invite-Code nicht gefunden.",
+  invite_max_uses_unter_used_count:
+    "Max. Nutzungen kann nicht unter die bereits genutzte Anzahl gesetzt werden.",
   permission_abgelehnt: "Benachrichtigung wurde vom Browser abgelehnt.",
   push_nicht_konfiguriert: "Push ist serverseitig noch nicht konfiguriert. VAPID Keys fehlen.",
   push_nicht_unterstuetzt:
     "Push wird in diesem Browser oder Kontext nicht unterstützt. Auf LAN-HTTP-Adressen braucht Web Push normalerweise HTTPS; localhost ist die Ausnahme.",
+  rate_limit_aktiv: "Zu viele Versuche. Bitte warte kurz und probiere es erneut.",
   request_failed: "Anfrage fehlgeschlagen.",
   registrierung_deaktiviert: "Öffentliche Registrierung ist derzeit deaktiviert.",
   registrierung_fehlgeschlagen: "Registrierung fehlgeschlagen.",
@@ -156,6 +167,7 @@ const errorMessages: Record<string, string> = {
   ungueltige_registrierung: "Registrierungsdaten sind ungültig.",
   ungueltige_settings: "Einstellungen sind ungültig.",
   ungueltiger_invite_code: "Invite-Code ist ungültig.",
+  ungueltiger_profilname: "Der Profilname ist ungültig.",
   ungueltiger_user: "Userdaten sind ungültig.",
   user_existiert_bereits: "Username oder E-Mail existiert bereits.",
   user_update_konflikt: "User konnte wegen eines Konflikts nicht gespeichert werden."
@@ -180,11 +192,72 @@ function getPageFromHash(): PageId {
   return route?.id ?? "events";
 }
 
+let csrfToken: string | null = null;
+let csrfInFlight: Promise<string> | null = null;
+
+function clearCsrfToken() {
+  csrfToken = null;
+  csrfInFlight = null;
+}
+
+function shouldAttachCsrf(url: string, options?: RequestInit) {
+  const method = (options?.method ?? "GET").toUpperCase();
+  if (method === "GET" || method === "HEAD") {
+    return false;
+  }
+
+  if (!url.startsWith("/api/")) {
+    return false;
+  }
+
+  const csrfExempt = ["/api/auth/request-code", "/api/auth/verify-code", "/api/auth/register"];
+  return !csrfExempt.some((path) => url.startsWith(path));
+}
+
+async function getCsrfToken() {
+  if (csrfToken) {
+    return csrfToken;
+  }
+
+  if (!csrfInFlight) {
+    csrfInFlight = fetch("/api/auth/csrf", { credentials: "include" })
+      .then(async (response) => {
+        if (!response.ok) {
+          throw new Error("csrf_token_ungueltig");
+        }
+        return (await response.json()) as { token?: string };
+      })
+      .then((body) => {
+        if (!body.token) {
+          throw new Error("csrf_token_ungueltig");
+        }
+        csrfToken = body.token;
+        return body.token;
+      })
+      .finally(() => {
+        csrfInFlight = null;
+      });
+  }
+
+  return csrfInFlight;
+}
+
+function primeCsrfToken() {
+  getCsrfToken().catch(() => undefined);
+}
+
 async function requestJson<T>(url: string, options?: RequestInit): Promise<T> {
+  const csrfHeader: Record<string, string> = {};
+  if (shouldAttachCsrf(url, options)) {
+    const token = await getCsrfToken();
+    csrfHeader["X-Hermes-CSRF"] = token;
+  }
+
   const response = await fetch(url, {
     credentials: "include",
     headers: {
       "Content-Type": "application/json",
+      ...csrfHeader,
       ...(options?.headers ?? {})
     },
     ...options
@@ -192,6 +265,9 @@ async function requestJson<T>(url: string, options?: RequestInit): Promise<T> {
 
   if (!response.ok) {
     const body = (await response.json().catch(() => ({}))) as { error?: string };
+    if (response.status === 401) {
+      clearCsrfToken();
+    }
     throw new Error(body.error ?? "request_failed");
   }
 
@@ -716,6 +792,7 @@ function LoginPanel({
         body: JSON.stringify({ username, code, deviceName })
       });
       onLoggedIn(result.user);
+      primeCsrfToken();
       setCode("");
       setMessage("Angemeldet.");
     } catch (caught) {
@@ -751,6 +828,7 @@ function LoginPanel({
     setBusy(true);
     setError("");
     await requestJson<void>("/api/auth/logout", { method: "POST" }).catch(() => undefined);
+    clearCsrfToken();
     onLoggedOut();
     setStep("request");
     setMessage("Abgemeldet.");
@@ -768,6 +846,7 @@ function LoginPanel({
       });
 
       if (result.revokedCurrent) {
+        clearCsrfToken();
         onLoggedOut();
         setMessage("Dieses Gerät wurde abgemeldet.");
         return;
@@ -1622,8 +1701,14 @@ function App() {
 
   useEffect(() => {
     requestJson<{ user: User }>("/api/auth/me")
-      .then((result) => setCurrentUser(result.user))
-      .catch(() => setCurrentUser(null));
+      .then((result) => {
+        setCurrentUser(result.user);
+        primeCsrfToken();
+      })
+      .catch(() => {
+        clearCsrfToken();
+        setCurrentUser(null);
+      });
   }, []);
 
   useEffect(() => {
