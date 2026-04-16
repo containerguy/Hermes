@@ -30,13 +30,17 @@ Hermes already has the core LAN-party workflow in place. This milestone turns th
   3. Active email uniqueness is enforced across admin-created users, invite registration, and profile changes.
   4. Users can manage display name, confirmed email changes, and device names with validation and audit coverage.
   5. Invite administration supports credential-safe display, deactivate/reactivate, edit, and unused-code removal without losing historical audit context.
-**Plans**: 4 plans
+**Plans**: 8 plans
 
 Plans:
-- [ ] 01-01: Harden login challenges, generic auth responses, throttling, cleanup, and CSRF/session-token decisions.
-- [ ] 01-02: Implement profile display-name, device-name, and confirmed email-change flows with validation and audit events.
-- [ ] 01-03: Harden invite registration and admin invite lifecycle, including entropy, disclosure, deactivate/reactivate, edit, and unused delete behavior.
-- [ ] 01-04: Align schema/migrations and focused API tests for auth, profile, invite, and session invalidation behavior.
+- [x] 01-01: Create Phase 1 schema foundations and migration coverage before dependent code lands.
+- [ ] 01-02: Harden auth entry points with generic login responses and persisted throttling; add admin rate-limit operations APIs.
+- [ ] 01-03: Implement profile, confirmed email-change, active-email uniqueness, and device/session backend behavior.
+- [ ] 01-04: Harden invite registration and admin invite lifecycle with generated-only high-entropy codes and masked audit metadata.
+- [ ] 01-05: Wire profile, invite lifecycle, and CSRF-aware client requests into the existing UI.
+- [ ] 01-06: Complete Phase 1 regression coverage, docs/env updates, and final validation.
+- [ ] 01-07: Split out hashed-token sessions, sensitive session revocation, and CSRF enforcement.
+- [ ] 01-08: Split out the admin rate-limit operations UI for LAN lockout recovery.
 
 ### Phase 2: Event And Invite Consistency
 **Goal**: Capacity-sensitive writes cannot oversubscribe invite max uses or event max players, and event/invite side effects remain consistent after success and failure.
@@ -132,7 +136,7 @@ Phases execute in numeric order: 1 -> 2 -> 3 -> 4 -> 5 -> 6
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
-| 1. Auth, Profile, And Invite Hardening | 0/4 | Not started | - |
+| 1. Auth, Profile, And Invite Hardening | 0/6 | Not started | - |
 | 2. Event And Invite Consistency | 0/3 | Not started | - |
 | 3. Backup And Restore Safety | 0/3 | Not started | - |
 | 4. PWA And Realtime Reliability | 0/3 | Not started | - |
@@ -144,5 +148,4 @@ Phases execute in numeric order: 1 -> 2 -> 3 -> 4 -> 5 -> 6
 - v1 requirements mapped: 44 / 44
 - Unmapped v1 requirements: 0
 - Total planned phases: 6
-- Total planned phase plans: 20
-
+- Total planned phase plans: 22
