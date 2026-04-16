@@ -20,7 +20,9 @@ import {
   getStorageBackend,
   persistDatabaseSnapshot,
   readBackupStatus,
-  restoreDatabaseSnapshotIntoLive
+  RestoreValidationError,
+  restoreDatabaseSnapshotIntoLive,
+  toSafeRestoreDiagnostics
 } from "../storage/s3-storage";
 import { readSettings, settingsSchema, writeSettings } from "../settings";
 
@@ -784,17 +786,27 @@ export function createAdminRouter(context: DatabaseContext) {
     const admin = requireAdmin(context, request);
 
     try {
-      await restoreDatabaseSnapshotIntoLive(context.sqlite);
+      const result = await restoreDatabaseSnapshotIntoLive(context.sqlite);
       tryWriteAuditLog(context, {
         action: "storage.restore",
         entityType: "storage",
         entityId: "s3",
         summary: `${admin?.username ?? "Admin"} hat ein S3-Restore ausgeführt.`
       });
-      response.json({ ok: true, message: "restore_abgeschlossen" });
+      response.json({
+        ok: true,
+        message: "restore_abgeschlossen",
+        recovery: result?.recovery ?? null,
+        restoredFrom: result?.restoredFrom ?? null
+      });
     } catch (error) {
       console.error("[Hermes] Failed to restore admin backup", error);
-      response.status(500).json({ error: "restore_fehlgeschlagen" });
+      const diagnostics = toSafeRestoreDiagnostics(error);
+      if (error instanceof RestoreValidationError) {
+        response.status(400).json({ error: "restore_fehlgeschlagen", diagnostics });
+        return;
+      }
+      response.status(500).json({ error: "restore_fehlgeschlagen", diagnostics });
     }
   });
 

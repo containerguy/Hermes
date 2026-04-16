@@ -1,8 +1,15 @@
 import fs from "node:fs";
+import { randomUUID } from "node:crypto";
 import os from "node:os";
 import path from "node:path";
-import type Database from "better-sqlite3";
-import { GetObjectCommand, PutObjectCommand, S3Client } from "@aws-sdk/client-s3";
+import Database from "better-sqlite3";
+import {
+  DeleteObjectCommand,
+  GetObjectCommand,
+  ListObjectsV2Command,
+  PutObjectCommand,
+  S3Client
+} from "@aws-sdk/client-s3";
 import { getDatabasePath } from "../env";
 
 type S3Credentials = {
@@ -27,6 +34,31 @@ export type BackupStatusRow = {
   location: S3LocationDetails | null;
   updatedAt: string;
 };
+
+export type RestoreDiagnostics = {
+  kind: "validation_failed" | "copy_failed" | "recovery_failed";
+  summary: string;
+  snapshot?: { bucket: string; key: string; region: string; endpoint: string };
+  recovery?: { id: string; key: string };
+  missingTables?: string[];
+  columnMismatches?: Array<{ table: string; missingInSnapshot: string[]; extraInSnapshot: string[] }>;
+  foreignKeyFailures?: Array<{ table: string; rowid: number; parent: string; fkid: number }>;
+  migrations?: {
+    liveLatest?: string | null;
+    snapshotLatest?: string | null;
+    liveCount?: number;
+    snapshotCount?: number;
+  };
+};
+
+export class RestoreValidationError extends Error {
+  diagnostics: RestoreDiagnostics;
+
+  constructor(message: string, diagnostics: RestoreDiagnostics) {
+    super(message);
+    this.diagnostics = diagnostics;
+  }
+}
 
 let snapshotTimer: NodeJS.Timeout | undefined;
 
@@ -234,6 +266,62 @@ export function toSafeBackupFailureSummary(error: unknown) {
   return truncate(cleaned, 240);
 }
 
+function toSafeRestoreSummary(error: unknown) {
+  if (!error) {
+    return "Restore fehlgeschlagen.";
+  }
+
+  const name = error instanceof Error ? error.name : "";
+  const message = error instanceof Error ? error.message : "";
+  const code =
+    typeof (error as { code?: unknown } | null | undefined)?.code === "string"
+      ? ((error as { code: string }).code as string)
+      : "";
+
+  const parts = [name, code, message].filter(Boolean).join(": ");
+  const summarized = parts || "Restore fehlgeschlagen.";
+  const cleaned = summarized.replace(/\s+/g, " ").trim();
+  if (looksSensitive(cleaned)) {
+    return "Restore fehlgeschlagen. Details wurden aus Sicherheitsgründen entfernt.";
+  }
+  return truncate(cleaned, 240);
+}
+
+function capList<T>(items: T[] | undefined, max = 20) {
+  if (!items) return undefined;
+  if (items.length <= max) return items;
+  return items.slice(0, max);
+}
+
+function sanitizeDiagnostics(input: RestoreDiagnostics): RestoreDiagnostics {
+  const safeSummary = looksSensitive(input.summary)
+    ? "Restore fehlgeschlagen. Details wurden aus Sicherheitsgründen entfernt."
+    : truncate(input.summary.replace(/\s+/g, " ").trim(), 240);
+
+  return {
+    ...input,
+    summary: safeSummary,
+    missingTables: capList(input.missingTables, 20),
+    columnMismatches: capList(input.columnMismatches, 20)?.map((entry) => ({
+      table: entry.table,
+      missingInSnapshot: capList(entry.missingInSnapshot, 20) ?? [],
+      extraInSnapshot: capList(entry.extraInSnapshot, 20) ?? []
+    })),
+    foreignKeyFailures: capList(input.foreignKeyFailures, 20)
+  };
+}
+
+export function toSafeRestoreDiagnostics(error: unknown): RestoreDiagnostics {
+  if (error instanceof RestoreValidationError) {
+    return sanitizeDiagnostics(error.diagnostics);
+  }
+
+  return sanitizeDiagnostics({
+    kind: "copy_failed",
+    summary: toSafeRestoreSummary(error)
+  });
+}
+
 export function readBackupStatus(sqlite: Database.Database): BackupStatusRow | null {
   const row = sqlite
     .prepare(
@@ -415,6 +503,201 @@ async function downloadSnapshotToFile(targetPath: string) {
   return { bucket, key };
 }
 
+function listTableNames(db: Database.Database) {
+  return db
+    .prepare("SELECT name FROM sqlite_master WHERE type = 'table' ORDER BY name")
+    .all()
+    .map((row) => (row as { name: string }).name);
+}
+
+function readColumns(db: Database.Database, table: string) {
+  return db
+    .prepare(`SELECT name FROM pragma_table_info(${quoteIdentifier(table)}) ORDER BY cid`)
+    .all()
+    .map((row) => (row as { name: string }).name);
+}
+
+function readLatestMigration(db: Database.Database) {
+  const row = db
+    .prepare("SELECT name FROM schema_migrations ORDER BY name DESC LIMIT 1")
+    .get() as { name?: string } | undefined;
+  return row?.name ?? null;
+}
+
+function readMigrationCount(db: Database.Database) {
+  const row = db.prepare("SELECT COUNT(*) AS count FROM schema_migrations").get() as { count?: number } | undefined;
+  return Number(row?.count ?? 0);
+}
+
+function validateSnapshotBeforeRestore(input: {
+  sqlite: Database.Database;
+  snapshotDb: Database.Database;
+  snapshotLocation: S3LocationDetails & { bucket: string; key: string };
+}) {
+  const missingTables: string[] = [];
+  const snapshotTables = new Set(listTableNames(input.snapshotDb));
+  for (const table of restorableTables) {
+    if (!snapshotTables.has(table)) {
+      missingTables.push(table);
+    }
+  }
+
+  const diagnosticsBase: RestoreDiagnostics = {
+    kind: "validation_failed",
+    summary: "Snapshot ist nicht kompatibel.",
+    snapshot: {
+      bucket: input.snapshotLocation.bucket,
+      key: input.snapshotLocation.key,
+      region: input.snapshotLocation.region,
+      endpoint: input.snapshotLocation.endpoint
+    }
+  };
+
+  if (missingTables.length > 0) {
+    throw new RestoreValidationError("Snapshot missing tables", {
+      ...diagnosticsBase,
+      summary: "Snapshot fehlt erwartete Tabellen.",
+      missingTables
+    });
+  }
+
+  let liveLatest: string | null = null;
+  let snapshotLatest: string | null = null;
+  let liveCount = 0;
+  let snapshotCount = 0;
+  try {
+    liveLatest = readLatestMigration(input.sqlite);
+    snapshotLatest = readLatestMigration(input.snapshotDb);
+    liveCount = readMigrationCount(input.sqlite);
+    snapshotCount = readMigrationCount(input.snapshotDb);
+  } catch (error) {
+    throw new RestoreValidationError("Snapshot migrations unreadable", {
+      ...diagnosticsBase,
+      summary: "Snapshot enthält keine gültigen Migrationen (schema_migrations).",
+      migrations: { liveLatest, snapshotLatest, liveCount, snapshotCount }
+    });
+  }
+
+  if (liveLatest !== snapshotLatest) {
+    throw new RestoreValidationError("Migration mismatch", {
+      ...diagnosticsBase,
+      summary: "Snapshot hat eine andere Schema-Version als die Live-Datenbank.",
+      migrations: { liveLatest, snapshotLatest, liveCount, snapshotCount }
+    });
+  }
+
+  const mismatches: Array<{ table: string; missingInSnapshot: string[]; extraInSnapshot: string[] }> = [];
+  for (const table of restorableTables) {
+    const liveColumns = new Set(readColumns(input.sqlite, table));
+    const snapshotColumns = new Set(readColumns(input.snapshotDb, table));
+    const missingInSnapshot = [...liveColumns].filter((col) => !snapshotColumns.has(col));
+    const extraInSnapshot = [...snapshotColumns].filter((col) => !liveColumns.has(col));
+    if (missingInSnapshot.length > 0) {
+      mismatches.push({ table, missingInSnapshot, extraInSnapshot });
+    }
+  }
+
+  if (mismatches.length > 0) {
+    throw new RestoreValidationError("Column mismatch", {
+      ...diagnosticsBase,
+      summary: "Snapshot fehlt erwartete Spalten.",
+      columnMismatches: mismatches,
+      migrations: { liveLatest, snapshotLatest, liveCount, snapshotCount }
+    });
+  }
+
+  input.snapshotDb.pragma("foreign_keys = ON");
+  const fkFailures = input.snapshotDb
+    .prepare("PRAGMA foreign_key_check;")
+    .all() as Array<{ table: string; rowid: number; parent: string; fkid: number }>;
+  if (fkFailures.length > 0) {
+    throw new RestoreValidationError("Snapshot foreign keys invalid", {
+      ...diagnosticsBase,
+      summary: "Snapshot hat Foreign-Key Fehler.",
+      foreignKeyFailures: fkFailures,
+      migrations: { liveLatest, snapshotLatest, liveCount, snapshotCount }
+    });
+  }
+
+  const integrity = input.snapshotDb.prepare("PRAGMA integrity_check;").get() as { integrity_check?: string } | undefined;
+  const integrityValue = String(integrity?.integrity_check ?? "");
+  if (integrityValue && integrityValue !== "ok") {
+    throw new RestoreValidationError("Snapshot integrity check failed", {
+      ...diagnosticsBase,
+      summary: "Snapshot integrity_check ist fehlgeschlagen."
+    });
+  }
+}
+
+function makeRecoveryKey(recoveryId: string) {
+  const timestamp = new Date().toISOString().replace(/:/g, "-").replace(/\.\d{3}Z$/, "Z");
+  return `recoveries/${timestamp}-${recoveryId}.sqlite`;
+}
+
+async function cleanupOldRecoveries(client: S3Client, bucket: string, keep = 10) {
+  try {
+    const listed = await client.send(
+      new ListObjectsV2Command({
+        Bucket: bucket,
+        Prefix: "recoveries/"
+      })
+    );
+    const objects = (listed.Contents ?? [])
+      .filter((entry) => entry.Key && entry.LastModified)
+      .map((entry) => ({ key: entry.Key as string, lastModified: entry.LastModified as Date }))
+      .sort((a, b) => b.lastModified.getTime() - a.lastModified.getTime());
+
+    const toDelete = objects.slice(keep);
+    for (const entry of toDelete) {
+      await client.send(new DeleteObjectCommand({ Bucket: bucket, Key: entry.key }));
+    }
+  } catch (error) {
+    console.error("[Hermes] Failed to cleanup old restore recoveries", error);
+  }
+}
+
+async function createRecoverySnapshot(
+  sqlite: Database.Database,
+  databasePath = getDatabasePath()
+): Promise<{ id: string; key: string; location: Omit<S3LocationDetails, "key"> & { bucket: string } }> {
+  if (!isS3StorageEnabled()) {
+    throw new Error("S3 storage is not enabled.");
+  }
+
+  const recoveryId = randomUUID().replace(/-/g, "").slice(0, 10);
+  const recoveryKey = makeRecoveryKey(recoveryId);
+
+  sqlite.pragma("wal_checkpoint(TRUNCATE)");
+  const { bucket, region, endpoint, client } = createS3Client();
+  await client.send(
+    new PutObjectCommand({
+      Bucket: bucket,
+      Key: recoveryKey,
+      Body: fs.createReadStream(databasePath),
+      ContentType: "application/vnd.sqlite3"
+    })
+  );
+
+  try {
+    sqlite
+      .prepare(
+        `
+        INSERT INTO storage_restore_recoveries (id, key, bucket, region, endpoint, created_at)
+        VALUES (?, ?, ?, ?, ?, ?)
+      `
+      )
+      .run(recoveryId, recoveryKey, bucket, region, endpoint, new Date().toISOString());
+  } catch (error) {
+    console.error("[Hermes] Failed to persist recovery metadata", error);
+  }
+
+  return {
+    id: recoveryId,
+    key: recoveryKey,
+    location: { bucket, region, endpoint }
+  };
+}
+
 export async function restoreDatabaseFromStorageIfNeeded(databasePath = getDatabasePath()) {
   if (!isS3StorageEnabled()) {
     return;
@@ -450,40 +733,109 @@ export async function restoreDatabaseFromStorageIfNeeded(databasePath = getDatab
 
 export async function restoreDatabaseSnapshotIntoLive(sqlite: Database.Database) {
   if (!isS3StorageEnabled()) {
-    throw new Error("S3 storage is not enabled.");
+    throw new RestoreValidationError("Storage disabled", {
+      kind: "validation_failed",
+      summary: "S3 Snapshot Storage ist deaktiviert."
+    });
   }
 
   const tempDirectory = fs.mkdtempSync(path.join(os.tmpdir(), "hermes-restore-"));
   const tempPath = path.join(tempDirectory, "snapshot.sqlite");
+  const snapshotLocation = readS3LocationConfig();
 
   try {
-    const { bucket, key } = await downloadSnapshotToFile(tempPath);
+    let restoredFrom: { bucket: string; key: string } | null = null;
+    try {
+      restoredFrom = await downloadSnapshotToFile(tempPath);
+    } catch (error) {
+      throw new RestoreValidationError("Snapshot download failed", {
+        kind: "validation_failed",
+        summary: toSafeRestoreSummary(error),
+        snapshot: {
+          bucket: snapshotLocation.bucket,
+          key: snapshotLocation.key,
+          region: snapshotLocation.region,
+          endpoint: snapshotLocation.endpoint
+        }
+      });
+    }
+
+    const snapshotDb = new Database(tempPath, { readonly: true });
+    try {
+      validateSnapshotBeforeRestore({
+        sqlite,
+        snapshotDb,
+        snapshotLocation: { ...snapshotLocation, bucket: restoredFrom.bucket, key: restoredFrom.key }
+      });
+    } finally {
+      snapshotDb.close();
+    }
+
+    let recovery: { id: string; key: string } | null = null;
+    try {
+      const created = await createRecoverySnapshot(sqlite);
+      recovery = { id: created.id, key: created.key };
+      cleanupOldRecoveries(createS3Client().client, created.location.bucket, 10).catch(() => undefined);
+    } catch (error) {
+      throw new RestoreValidationError("Recovery snapshot failed", {
+        kind: "recovery_failed",
+        summary: toSafeRestoreSummary(error),
+        snapshot: {
+          bucket: snapshotLocation.bucket,
+          key: snapshotLocation.key,
+          region: snapshotLocation.region,
+          endpoint: snapshotLocation.endpoint
+        }
+      });
+    }
+
     const attachedName = "restore_snapshot";
     sqlite.prepare(`ATTACH DATABASE ? AS ${quoteIdentifier(attachedName)}`).run(tempPath);
-
     try {
       sqlite.pragma("foreign_keys = OFF");
       sqlite.transaction(() => {
         for (const table of restorableTables) {
           const quotedTable = quoteIdentifier(table);
           const sourceTable = `${quoteIdentifier(attachedName)}.${quotedTable}`;
-          const exists = sqlite
-            .prepare(
-              `SELECT name FROM ${quoteIdentifier(attachedName)}.sqlite_master WHERE type = 'table' AND name = ?`
-            )
-            .get(table);
-
-          if (!exists) {
-            continue;
-          }
-
+          const columns = readColumns(sqlite, table);
+          const quotedColumns = columns.map(quoteIdentifier).join(", ");
           sqlite.exec(`DELETE FROM ${quotedTable};`);
-          sqlite.exec(`INSERT INTO ${quotedTable} SELECT * FROM ${sourceTable};`);
+          sqlite.exec(
+            `INSERT INTO ${quotedTable} (${quotedColumns}) SELECT ${quotedColumns} FROM ${sourceTable};`
+          );
         }
       })();
+
       sqlite.pragma("foreign_keys = ON");
-      sqlite.exec("PRAGMA foreign_key_check;");
-      console.log(`[Hermes] Restored live SQLite data from s3://${bucket}/${key}`);
+      const fkFailures = sqlite
+        .prepare("PRAGMA foreign_key_check;")
+        .all() as Array<{ table: string; rowid: number; parent: string; fkid: number }>;
+      if (fkFailures.length > 0) {
+        throw new RestoreValidationError("Live foreign key check failed after restore", {
+          kind: "copy_failed",
+          summary: "Restore hat Foreign-Key Fehler erzeugt.",
+          recovery: recovery ?? undefined,
+          foreignKeyFailures: fkFailures
+        });
+      }
+
+      console.log(
+        `[Hermes] Restored live SQLite data from s3://${restoredFrom.bucket}/${restoredFrom.key}`
+      );
+
+      return {
+        restoredFrom: restoredFrom,
+        recovery: recovery ?? undefined
+      };
+    } catch (error) {
+      if (error instanceof RestoreValidationError) {
+        throw error;
+      }
+      throw new RestoreValidationError("Restore copy failed", {
+        kind: "copy_failed",
+        summary: toSafeRestoreSummary(error),
+        recovery: recovery ?? undefined
+      });
     } finally {
       sqlite.prepare(`DETACH DATABASE ${quoteIdentifier(attachedName)}`).run();
       sqlite.pragma("foreign_keys = ON");

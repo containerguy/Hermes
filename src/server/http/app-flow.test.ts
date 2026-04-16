@@ -700,6 +700,24 @@ describe("app flow", () => {
     );
   });
 
+  it("hard-blocks restore when storage is disabled and returns safe structured diagnostics (BKP-02)", async () => {
+    const adminAgent = request.agent(started!.app);
+    await login(adminAgent, "hauptadmin");
+    const csrf = await fetchCsrf(adminAgent);
+
+    const response = await adminAgent
+      .post("/api/admin/restore")
+      .set(CSRF_HEADER, csrf)
+      .expect(400);
+
+    expect(response.body.error).toBe("restore_fehlgeschlagen");
+    expect(response.body.diagnostics).toBeTruthy();
+    const diagnosticsString = JSON.stringify(response.body.diagnostics ?? {});
+    for (const forbidden of ["stack", "authorization", "cookie", "x-amz-", "x-amzn-", "accessKey", "secretKey", "token"]) {
+      expect(diagnosticsString.toLowerCase().includes(forbidden.toLowerCase())).toBe(false);
+    }
+  });
+
   it("enforces active email uniqueness (email_existiert_bereits) across admin create/update and invite registration", async () => {
     const adminAgent = request.agent(started!.app);
     await login(adminAgent, "hauptadmin");

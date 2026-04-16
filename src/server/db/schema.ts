@@ -222,6 +222,15 @@ export const storageBackupStatus = sqliteTable("storage_backup_status", {
   updatedAt: text("updated_at").notNull()
 });
 
+export const storageRestoreRecoveries = sqliteTable("storage_restore_recoveries", {
+  id: text("id").primaryKey(),
+  key: text("key").notNull(),
+  bucket: text("bucket"),
+  region: text("region"),
+  endpoint: text("endpoint"),
+  createdAt: text("created_at").notNull()
+});
+
 export const inviteCodes = sqliteTable(
   "invite_codes",
   {
