@@ -30,14 +30,14 @@ During the LAN party, everyone can quickly see which game round is viable, when 
 - ✓ GitHub Actions builds/tests/audits and builds/publishes Docker images to GHCR — existing
 - ✓ Auth + invite registration hardening (throttling, non-enumerating responses, safer invite lifecycle) — Validated in Phase 1
 - ✓ Concurrent invite usage + event participation capacity consistency — Validated in Phase 2
+- ✓ Backup/restore safety (status visibility, validation-first restore, pre-restore recovery snapshots, safe diagnostics) — v1.0 (Phases 3, 6)
+- ✓ PWA/push reliability (in-product limitations, SW hardening, failing subscription cleanup) — v1.0 (Phases 4, 6)
+- ✓ Frontend modularization (split modules for events/login/admin) — v1.0 (Phase 5)
+- ✓ Release verification + deployment contract docs — v1.0 (Phase 6)
 
 ### Active
 
-- [ ] Make backup/restore safer with pre-restore backup, restore validation, and clearer operator recovery flow.
-- [ ] Improve mobile/PWA notification reliability and document OS/browser limitations clearly in-product.
-- [ ] Split the large frontend monolith into smaller components or modules before further UI growth.
-- [ ] Increase test coverage around restore, invite limits, session/device revocation, push payload handling, and admin destructive actions.
-- [ ] Prepare a production deployment checklist for TLS, secure cookies, SMTP, VAPID, S3 credentials, and single-instance operation.
+- [ ] (Next milestone) Decide on post-LAN priorities (e.g. usability polish, ops tooling, feature expansion).
 
 ### Out of Scope
 
@@ -112,4 +112,4 @@ This document evolves at phase transitions and milestone boundaries.
 4. Update Context with current state
 
 ---
-*Last updated: 2026-04-16 after Phase 2 completion*
+*Last updated: 2026-04-16 after v1.0 milestone completion*
