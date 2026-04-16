@@ -2,134 +2,22 @@ import React, { FormEvent, useEffect, useState } from "react";
 import { createRoot } from "react-dom/client";
 import "./styles.css";
 
-type User = {
-  id: string;
-  phoneNumber: string;
-  username: string;
-  displayName: string;
-  email: string;
-  role: "user" | "manager" | "admin";
-  notificationsEnabled: boolean;
-  deletedAt?: string | null;
-};
-
-type AppSettings = {
-  appName: string;
-  defaultNotificationsEnabled: boolean;
-  eventAutoArchiveHours: number;
-  publicRegistrationEnabled: boolean;
-  themePrimaryColor: string;
-  themeLoginColor: string;
-  themeManagerColor: string;
-  themeAdminColor: string;
-  themeSurfaceColor: string;
-};
-
-type StorageLocationDetails = {
-  bucket: string;
-  key: string;
-  region: string;
-  endpoint: string;
-};
-
-type StorageBackupStatus = {
-  lastSuccessAt: string | null;
-  lastFailureAt: string | null;
-  failureCode: string | null;
-  failureSummary: string | null;
-};
-
-type RestoreDiagnostics = {
-  kind: "validation_failed" | "copy_failed" | "recovery_failed";
-  summary: string;
-  snapshot?: { bucket: string; key: string; region: string; endpoint: string };
-  recovery?: { id: string; key: string };
-  missingTables?: string[];
-  columnMismatches?: Array<{ table: string; missingInSnapshot: string[]; extraInSnapshot: string[] }>;
-  foreignKeyFailures?: Array<{ table: string; rowid: number; parent: string; fkid: number }>;
-  migrations?: {
-    liveLatest?: string | null;
-    snapshotLatest?: string | null;
-    liveCount?: number;
-    snapshotCount?: number;
-  };
-};
-
-type RestoreRecovery = { id: string; key: string };
-
-type StorageInfo = {
-  backend: "s3" | "disabled";
-  location: StorageLocationDetails | null;
-  backupStatus: StorageBackupStatus | null;
-};
-
-type GameEvent = {
-  id: string;
-  gameTitle: string;
-  startMode: "now" | "scheduled";
-  startsAt: string;
-  minPlayers: number;
-  maxPlayers: number;
-  serverHost: string | null;
-  connectionInfo: string | null;
-  status: "open" | "ready" | "running" | "cancelled" | "archived";
-  createdByUserId: string;
-  createdByUsername: string;
-  joinedCount: number;
-  myParticipation: "joined" | "declined" | null;
-};
-
-type AuditLogEntry = {
-  id: string;
-  actorUserId: string | null;
-  actorUsername: string | null;
-  action: string;
-  entityType: string;
-  entityId: string | null;
-  summary: string;
-  metadata: unknown;
-  createdAt: string;
-};
-
-type UserSession = {
-  id: string;
-  deviceName: string | null;
-  userAgent: string | null;
-  lastSeenAt: string;
-  createdAt: string;
-  current: boolean;
-};
-
-type InviteCode = {
-  id: string;
-  code: string;
-  label: string;
-  maxUses: number | null;
-  expiresAt: string | null;
-  revokedAt: string | null;
-  createdAt: string;
-  usedCount: number;
-};
-
-type RateLimitEntry = {
-  id: string;
-  scope: string;
-  key: string;
-  attemptCount: number;
-  windowStartedAt: string;
-  lastAttemptAt: string;
-  blockedUntil: string | null;
-  createdAt: string;
-  updatedAt: string;
-};
-
-type RateLimitAllowlistEntry = {
-  id: string;
-  ipOrCidr: string;
-  note: string | null;
-  createdAt: string;
-  updatedAt: string;
-};
+import type {
+  AppSettings,
+  AuditLogEntry,
+  GameEvent,
+  InviteCode,
+  RateLimitAllowlistEntry,
+  RateLimitEntry,
+  RestoreDiagnostics,
+  RestoreRecovery,
+  StorageInfo,
+  User,
+  UserSession
+} from "./client/types/core";
+import { requestJson } from "./client/api/request";
+import { clearCsrfToken, primeCsrfToken } from "./client/api/csrf";
+import { ApiError, errorMessages, getErrorMessage } from "./client/errors/errors";
 
 type Route = {
   id: PageId;
@@ -193,62 +81,6 @@ const defaultSettings: AppSettings = {
   themeSurfaceColor: "#f6f8f4"
 };
 
-const errorMessages: Record<string, string> = {
-  admin_erforderlich: "Adminrechte erforderlich.",
-  backup_fehlgeschlagen: "Backup konnte nicht erstellt werden. Prüfe S3-Konfiguration und Logs.",
-  csrf_token_ungueltig: "Sicherheitsprüfung fehlgeschlagen. Bitte Seite neu laden und erneut versuchen.",
-  device_name_ungueltig: "Der Gerätename ist ungültig.",
-  email_code_abgelehnt: "Der Bestätigungscode wurde abgelehnt.",
-  email_existiert_bereits: "Diese E-Mail-Adresse wird bereits verwendet.",
-  eigener_user_nicht_loeschbar: "Der eigene Admin-User kann nicht gelöscht werden.",
-  invite_abgelaufen: "Dieser Invite-Code ist abgelaufen und kann nicht reaktiviert werden.",
-  invite_ausgeschoepft: "Dieser Invite-Code ist bereits ausgeschöpft.",
-  invite_code_custom_deaktiviert:
-    "Eigene Invite-Codes sind deaktiviert. Hermes erstellt sichere Codes automatisch.",
-  invite_code_existiert: "Dieser Invite-Code existiert bereits.",
-  invite_hat_nutzungen: "Dieser Invite-Code hat bereits Nutzungen und kann nicht gelöscht werden.",
-  invite_ungueltig: "Dieser Invite-Code ist ungültig oder abgelaufen.",
-  invite_code_nicht_gefunden: "Invite-Code nicht gefunden.",
-  invite_max_uses_unter_used_count:
-    "Max. Nutzungen kann nicht unter die bereits genutzte Anzahl gesetzt werden.",
-  permission_abgelehnt: "Benachrichtigung wurde vom Browser abgelehnt.",
-  push_nicht_konfiguriert: "Push ist serverseitig noch nicht konfiguriert. VAPID Keys fehlen.",
-  push_nicht_unterstuetzt:
-    "Push wird in diesem Browser oder Kontext nicht unterstützt. Auf LAN-HTTP-Adressen braucht Web Push normalerweise HTTPS; localhost ist die Ausnahme.",
-  rate_limit_aktiv: "Zu viele Versuche. Bitte warte kurz und probiere es erneut.",
-  request_failed: "Anfrage fehlgeschlagen.",
-  registrierung_deaktiviert: "Öffentliche Registrierung ist derzeit deaktiviert.",
-  registrierung_fehlgeschlagen: "Registrierung fehlgeschlagen.",
-  restore_fehlgeschlagen: "Restore konnte nicht ausgeführt werden. Prüfe S3-Konfiguration und Logs.",
-  teilnahme_fehlgeschlagen: "Teilnahme konnte gerade nicht gespeichert werden. Bitte erneut versuchen.",
-  session_nicht_gefunden: "Gerät nicht gefunden.",
-  secure_context_erforderlich:
-    "Push benötigt HTTPS oder localhost. Über eine normale HTTP-LAN-Adresse deaktivieren Browser Web Push.",
-  ungueltige_registrierung: "Registrierungsdaten sind ungültig.",
-  ungueltige_settings: "Einstellungen sind ungültig.",
-  ungueltiger_invite_code: "Invite-Code ist ungültig.",
-  ungueltiger_profilname: "Der Profilname ist ungültig.",
-  ungueltiger_user: "Userdaten sind ungültig.",
-  user_existiert_bereits: "Username oder E-Mail existiert bereits.",
-  user_update_konflikt: "User konnte wegen eines Konflikts nicht gespeichert werden."
-};
-
-class ApiError extends Error {
-  status: number;
-  body: unknown;
-
-  constructor(input: { code: string; status: number; body: unknown }) {
-    super(input.code);
-    this.status = input.status;
-    this.body = input.body;
-  }
-}
-
-function getErrorMessage(caught: unknown) {
-  const code = caught instanceof Error ? caught.message : "request_failed";
-  return errorMessages[code] ?? code;
-}
-
 function applyTheme(settings: AppSettings) {
   const root = document.documentElement;
   root.style.setProperty("--teal", settings.themePrimaryColor);
@@ -261,96 +93,6 @@ function applyTheme(settings: AppSettings) {
 function getPageFromHash(): PageId {
   const route = routes.find((item) => item.path === window.location.hash);
   return route?.id ?? "events";
-}
-
-let csrfToken: string | null = null;
-let csrfInFlight: Promise<string> | null = null;
-
-function clearCsrfToken() {
-  csrfToken = null;
-  csrfInFlight = null;
-}
-
-function shouldAttachCsrf(url: string, options?: RequestInit) {
-  const method = (options?.method ?? "GET").toUpperCase();
-  if (method === "GET" || method === "HEAD") {
-    return false;
-  }
-
-  if (!url.startsWith("/api/")) {
-    return false;
-  }
-
-  const csrfExempt = ["/api/auth/request-code", "/api/auth/verify-code", "/api/auth/register"];
-  return !csrfExempt.some((path) => url.startsWith(path));
-}
-
-async function getCsrfToken() {
-  if (csrfToken) {
-    return csrfToken;
-  }
-
-  if (!csrfInFlight) {
-    csrfInFlight = fetch("/api/auth/csrf", { credentials: "include" })
-      .then(async (response) => {
-        if (!response.ok) {
-          throw new Error("csrf_token_ungueltig");
-        }
-        return (await response.json()) as { token?: string };
-      })
-      .then((body) => {
-        if (!body.token) {
-          throw new Error("csrf_token_ungueltig");
-        }
-        csrfToken = body.token;
-        return body.token;
-      })
-      .finally(() => {
-        csrfInFlight = null;
-      });
-  }
-
-  return csrfInFlight;
-}
-
-function primeCsrfToken() {
-  getCsrfToken().catch(() => undefined);
-}
-
-async function requestJson<T>(url: string, options?: RequestInit): Promise<T> {
-  const csrfHeader: Record<string, string> = {};
-  if (shouldAttachCsrf(url, options)) {
-    const token = await getCsrfToken();
-    csrfHeader["X-Hermes-CSRF"] = token;
-  }
-
-  const response = await fetch(url, {
-    credentials: "include",
-    headers: {
-      "Content-Type": "application/json",
-      ...csrfHeader,
-      ...(options?.headers ?? {})
-    },
-    ...options
-  });
-
-  if (!response.ok) {
-    const body = (await response.json().catch(() => ({}))) as { error?: string };
-    if (response.status === 401) {
-      clearCsrfToken();
-    }
-    throw new ApiError({
-      code: body.error ?? "request_failed",
-      status: response.status,
-      body
-    });
-  }
-
-  if (response.status === 204) {
-    return undefined as T;
-  }
-
-  return response.json() as Promise<T>;
 }
 
 function toDatetimeLocal(value: string) {
