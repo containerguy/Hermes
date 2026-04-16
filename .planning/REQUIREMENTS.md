@@ -15,7 +15,7 @@ These requirements focus on UI/UX correctness and polish without changing core d
 
 ### Event Lifecycle (Operator UX)
 
-- [ ] **EVT-04**: Managers/Admins can delete events **only after** they are cancelled or archived; deletion removes the event from the board and is captured in the audit log.
+- [ ] **EVT-04**: Admins can soft-delete events **only after** they are cancelled or archived; deletion removes the event from the board and is captured in the audit log.
 
 ## Future Requirements (deferred)
 
@@ -36,7 +36,7 @@ Every v1.1 requirement maps to exactly one roadmap phase and remains pending unt
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| UI-09 | (TBD) | Pending |
-| UI-10 | (TBD) | Pending |
-| EVT-04 | (TBD) | Pending |
+| UI-09 | Phase 7 | Pending |
+| UI-10 | Phase 7 | Pending |
+| EVT-04 | Phase 8 | Pending |
 
