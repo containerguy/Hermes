@@ -5,7 +5,7 @@ import { z } from "zod";
 import { createCsrfToken, CSRF_HEADER, requireCsrf } from "../auth/csrf";
 import { getCurrentSession, publicUser } from "../auth/current-user";
 import { resolveDeviceName, validateDeviceName } from "../auth/device-names";
-import { tryWriteAuditLog } from "../audit-log";
+import { maskInviteCode, tryWriteAuditLog } from "../audit-log";
 import { checkRateLimit, recordRateLimitFailure } from "../auth/rate-limits";
 import {
   createSessionId,
@@ -71,6 +71,25 @@ function getInviteRegisterRateLimitKey(input: { sourceIp?: string; inviteCode?: 
   const ip = input.sourceIp ?? "";
   const normalized = input.inviteCode ? normalizeInviteCode(input.inviteCode) : "";
   return `ip:${ip}|invite:${normalized}`;
+}
+
+class InviteExhaustedError extends Error {
+  constructor() {
+    super("invite_exhausted");
+  }
+}
+
+class InviteInvalidError extends Error {
+  constructor() {
+    super("invite_invalid");
+  }
+}
+
+function isSqliteBusyOrLocked(error: unknown) {
+  if (!error || typeof error !== "object") return false;
+  const code = (error as { code?: unknown }).code;
+  if (typeof code !== "string") return false;
+  return code.startsWith("SQLITE_BUSY") || code.startsWith("SQLITE_LOCKED");
 }
 
 function issueLoginChallenge(context: DatabaseContext, user: typeof users.$inferSelect) {
@@ -265,83 +284,146 @@ export function createAuthRouter(context: DatabaseContext) {
       return;
     }
 
-    const uses = context.db
-      .select()
-      .from(inviteCodeUses)
-      .where(eq(inviteCodeUses.inviteCodeId, invite.id))
-      .all();
-
-    if (invite.maxUses !== null && uses.length >= invite.maxUses) {
-      recordRateLimitFailure(context, { scope: "invite_register", key: registerKey });
-      response.status(403).json({ error: "invite_ausgeschoepft" });
-      return;
-    }
-
     const userId = randomUUID();
 
-    try {
-      context.sqlite.transaction(() => {
-        context.db
-          .insert(users)
-          .values({
-            id: userId,
-            phoneNumber: fallbackPhoneNumber(userId),
-            username: parsed.data.username,
-            displayName: parsed.data.username,
-            email: parsed.data.email,
-            role: "user",
-            notificationsEnabled: settings.defaultNotificationsEnabled,
-            createdByUserId: invite.createdByUserId,
-            deletedAt: null,
-            createdAt: timestamp,
-            updatedAt: timestamp
-          })
-          .run();
+    const registerInvitedUser = () => {
+      return context.sqlite
+        .transaction(() => {
+          const freshInvite = context.db
+            .select()
+            .from(inviteCodes)
+            .where(eq(inviteCodes.id, invite.id))
+            .get();
 
-        context.db
-          .insert(inviteCodeUses)
-          .values({
-            id: randomUUID(),
-            inviteCodeId: invite.id,
-            userId,
-            usedAt: timestamp
-          })
-          .run();
-      })();
+          if (!freshInvite || freshInvite.revokedAt || (freshInvite.expiresAt && freshInvite.expiresAt < timestamp)) {
+            throw new InviteInvalidError();
+          }
+
+          const usesRow = context.sqlite
+            .prepare("SELECT COUNT(*) AS count FROM invite_code_uses WHERE invite_code_id = ?")
+            .get(freshInvite.id) as { count: number };
+
+          if (freshInvite.maxUses !== null && usesRow.count >= freshInvite.maxUses) {
+            throw new InviteExhaustedError();
+          }
+
+          context.db
+            .insert(users)
+            .values({
+              id: userId,
+              phoneNumber: fallbackPhoneNumber(userId),
+              username: parsed.data.username,
+              displayName: parsed.data.username,
+              email: parsed.data.email,
+              role: "user",
+              notificationsEnabled: settings.defaultNotificationsEnabled,
+              createdByUserId: freshInvite.createdByUserId,
+              deletedAt: null,
+              createdAt: timestamp,
+              updatedAt: timestamp
+            })
+            .run();
+
+          context.db
+            .insert(inviteCodeUses)
+            .values({
+              id: randomUUID(),
+              inviteCodeId: freshInvite.id,
+              userId,
+              usedAt: timestamp
+            })
+            .run();
+
+          const remainingUses =
+            freshInvite.maxUses === null ? null : Math.max(0, freshInvite.maxUses - (usesRow.count + 1));
+
+          return { remainingUses };
+        })
+        .immediate();
+    };
+
+    try {
+      let result: { remainingUses: number | null } | undefined;
+      try {
+        result = registerInvitedUser();
+      } catch (error) {
+        if (isSqliteBusyOrLocked(error)) {
+          result = registerInvitedUser();
+        } else {
+          throw error;
+        }
+      }
+
+      const created = context.db.select().from(users).where(eq(users.id, userId)).get();
+
+      if (!created) {
+        response.status(500).json({ error: "registrierung_fehlgeschlagen" });
+        return;
+      }
+
+      const issued = issueLoginChallenge(context, created);
+
+      try {
+        await sendIssuedLoginCode(context, created, issued);
+      } catch (error) {
+        console.error("[Hermes] Failed to send registration login code", error);
+        response.status(502).json({ error: "mailversand_fehlgeschlagen" });
+        return;
+      }
+
+      tryWriteAuditLog(context, {
+        actor: created,
+        action: "auth.register",
+        entityType: "user",
+        entityId: created.id,
+        summary: `${created.username} hat sich mit Invite ${invite.label} registriert.`,
+        metadata: { inviteCodeId: invite.id, inviteLabel: invite.label }
+      });
+
+      const responseBody: Record<string, unknown> = {
+        user: publicUser(created),
+        codeSent: true
+      };
+      if (typeof result?.remainingUses === "number") {
+        responseBody.remainingUses = result.remainingUses;
+      }
+
+      response.status(201).json({
+        ...responseBody
+      });
+      return;
     } catch (error) {
+      if (error instanceof InviteInvalidError) {
+        recordRateLimitFailure(context, { scope: "invite_register", key: registerKey });
+        response.status(403).json({ error: "invite_ungueltig" });
+        return;
+      }
+
+      if (error instanceof InviteExhaustedError) {
+        tryWriteAuditLog(context, {
+          action: "auth.register_rejected",
+          entityType: "invite_code",
+          entityId: invite.id,
+          summary: `Registrierung mit ausgeschöpftem Invite abgelehnt.`,
+          metadata: {
+            inviteCodeId: invite.id,
+            inviteLabel: invite.label,
+            maskedInviteCode: maskInviteCode(normalizedCode),
+            username: parsed.data.username,
+            sourceIp: request.ip ?? null
+          }
+        });
+
+        recordRateLimitFailure(context, { scope: "invite_register", key: registerKey });
+        response.status(403).json({ error: "invite_ausgeschoepft" });
+        return;
+      }
+
       console.error("[Hermes] Failed to register invited user", error);
       recordRateLimitFailure(context, { scope: "invite_register", key: registerKey });
       response.status(409).json({ error: "user_existiert_bereits" });
       return;
     }
-
-    const created = context.db.select().from(users).where(eq(users.id, userId)).get();
-
-    if (!created) {
-      response.status(500).json({ error: "registrierung_fehlgeschlagen" });
-      return;
-    }
-
-    const issued = issueLoginChallenge(context, created);
-
-    try {
-      await sendIssuedLoginCode(context, created, issued);
-    } catch (error) {
-      console.error("[Hermes] Failed to send registration login code", error);
-      response.status(502).json({ error: "mailversand_fehlgeschlagen" });
-      return;
-    }
-
-    tryWriteAuditLog(context, {
-      actor: created,
-      action: "auth.register",
-      entityType: "user",
-      entityId: created.id,
-      summary: `${created.username} hat sich mit Invite ${invite.label} registriert.`,
-      metadata: { inviteCodeId: invite.id, inviteLabel: invite.label }
-    });
-
-    response.status(201).json({ user: publicUser(created), codeSent: true });
   });
 
   router.post("/verify-code", (request, response) => {
