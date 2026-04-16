@@ -25,6 +25,28 @@ function nowIso() {
   return new Date().toISOString();
 }
 
+class EventCapacityError extends Error {
+  joinedCount: number;
+  maxPlayers: number;
+
+  constructor(input: { joinedCount: number; maxPlayers: number }) {
+    super("event_voll");
+    this.joinedCount = input.joinedCount;
+    this.maxPlayers = input.maxPlayers;
+  }
+}
+
+function isSqliteBusyOrLocked(error: unknown) {
+  const code = (error as { code?: unknown } | null | undefined)?.code;
+  if (typeof code !== "string") return false;
+  return (
+    code === "SQLITE_BUSY" ||
+    code.startsWith("SQLITE_BUSY_") ||
+    code === "SQLITE_LOCKED" ||
+    code.startsWith("SQLITE_LOCKED_")
+  );
+}
+
 function readAutoArchiveHours(context: DatabaseContext) {
   const row = context.db
     .select()
@@ -341,43 +363,97 @@ export function createEventRouter(context: DatabaseContext) {
       return;
     }
 
-    const existing = context.db
-      .select()
-      .from(participations)
-      .where(and(eq(participations.eventId, event.id), eq(participations.userId, actor.id)))
-      .get();
-    const alreadyJoined = existing?.status === "joined";
+    const timestamp = nowIso();
+    const transaction = context.sqlite.transaction(() => {
+      const existing = context.db
+        .select()
+        .from(participations)
+        .where(and(eq(participations.eventId, event.id), eq(participations.userId, actor.id)))
+        .get();
+      const alreadyJoined = existing?.status === "joined";
 
-    if (parsed.data.status === "joined" && !alreadyJoined && countJoined(context, event.id) >= event.maxPlayers) {
-      response.status(409).json({ error: "event_voll" });
-      return;
+      if (parsed.data.status === "joined" && !alreadyJoined) {
+        const joinedCount = countJoined(context, event.id);
+        if (joinedCount >= event.maxPlayers) {
+          throw new EventCapacityError({ joinedCount, maxPlayers: event.maxPlayers });
+        }
+      }
+
+      context.db
+        .insert(participations)
+        .values({
+          id: existing?.id ?? randomUUID(),
+          eventId: event.id,
+          userId: actor.id,
+          status: parsed.data.status,
+          createdAt: existing?.createdAt ?? timestamp,
+          updatedAt: timestamp
+        })
+        .onConflictDoUpdate({
+          target: [participations.eventId, participations.userId],
+          set: {
+            status: parsed.data.status,
+            updatedAt: timestamp
+          }
+        })
+        .run();
+
+      const previousStatus = event.status;
+      const nextStatus = recalculateEventStatus(context, event);
+      const updated = context.db.select().from(gameEvents).where(eq(gameEvents.id, event.id)).get();
+
+      return {
+        existingStatus: existing?.status ?? null,
+        previousStatus,
+        nextStatus,
+        updated
+      };
+    });
+
+    let transactionResult: {
+      existingStatus: string | null;
+      previousStatus: string;
+      nextStatus: string;
+      updated: typeof gameEvents.$inferSelect | undefined;
+    };
+
+    try {
+      transactionResult = transaction.immediate();
+    } catch (error) {
+      if (error instanceof EventCapacityError) {
+        const refreshed = context.db.select().from(gameEvents).where(eq(gameEvents.id, event.id)).get();
+        response.status(409).json({
+          error: "event_voll",
+          event: refreshed ? serializeEvent(context, refreshed, actor.id) : undefined
+        });
+        return;
+      }
+
+      if (isSqliteBusyOrLocked(error)) {
+        try {
+          transactionResult = transaction.immediate();
+        } catch (retryError) {
+          if (retryError instanceof EventCapacityError) {
+            const refreshed = context.db.select().from(gameEvents).where(eq(gameEvents.id, event.id)).get();
+            response.status(409).json({
+              error: "event_voll",
+              event: refreshed ? serializeEvent(context, refreshed, actor.id) : undefined
+            });
+            return;
+          }
+
+          if (isSqliteBusyOrLocked(retryError)) {
+            throw retryError;
+          }
+
+          throw retryError;
+        }
+      } else {
+        throw error;
+      }
     }
 
-    const timestamp = nowIso();
-
-    context.db
-      .insert(participations)
-      .values({
-        id: existing?.id ?? randomUUID(),
-        eventId: event.id,
-        userId: actor.id,
-        status: parsed.data.status,
-        createdAt: existing?.createdAt ?? timestamp,
-        updatedAt: timestamp
-      })
-      .onConflictDoUpdate({
-        target: [participations.eventId, participations.userId],
-        set: {
-          status: parsed.data.status,
-          updatedAt: timestamp
-        }
-      })
-      .run();
-
-    const previousStatus = event.status;
-    const nextStatus = recalculateEventStatus(context, event);
-
-    const updated = context.db.select().from(gameEvents).where(eq(gameEvents.id, event.id)).get();
+    const { existingStatus, previousStatus, nextStatus, updated } = transactionResult;
     writeAuditLog(context, {
       actor,
       action: "participation.set",
@@ -389,7 +465,7 @@ export function createEventRouter(context: DatabaseContext) {
           : `${actor.username} ist bei ${event.gameTitle} nicht dabei.`,
       metadata: {
         participation: parsed.data.status,
-        previousParticipation: existing?.status ?? null
+        previousParticipation: existingStatus
       }
     });
     broadcastEventsChanged("participation_updated");
