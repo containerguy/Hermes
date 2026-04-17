@@ -28,6 +28,13 @@ function fromDatetimeLocal(value: string) {
   return new Date(value).toISOString();
 }
 
+function parseGameCatalogDraft(source: string): string[] {
+  return source
+    .split("\n")
+    .map((line) => line.trim())
+    .filter(Boolean);
+}
+
 const defaultSettings: AppSettings = {
   appName: "Hermes",
   defaultNotificationsEnabled: true,
@@ -72,6 +79,7 @@ export function AdminPanel({
     Record<string, { label: string; maxUses: string; expiresAt: string }>
   >({});
   const [settings, setSettings] = useState<AppSettings>(defaultSettings);
+  const [gameCatalogDraft, setGameCatalogDraft] = useState("");
   const [storage, setStorage] = useState<StorageInfo | null>(null);
   const [restoreDiagnostics, setRestoreDiagnostics] = useState<RestoreDiagnostics | null>(null);
   const [restoreRecovery, setRestoreRecovery] = useState<RestoreRecovery | null>(null);
@@ -120,6 +128,7 @@ export function AdminPanel({
     ]);
     setUsers(userResult.users);
     setSettings(settingsResult.settings);
+    setGameCatalogDraft(settingsResult.settings.gameCatalog.join("\n"));
     setStorage(settingsResult.storage ?? null);
     setAuditLogs(auditResult.auditLogs);
     setInviteCodes(inviteResult.inviteCodes);
@@ -464,11 +473,16 @@ export function AdminPanel({
     setMessage("");
 
     try {
+      const payload: AppSettings = {
+        ...settings,
+        gameCatalog: parseGameCatalogDraft(gameCatalogDraft)
+      };
       const result = await requestJson<{ settings: AppSettings }>("/api/admin/settings", {
         method: "PUT",
-        body: JSON.stringify(settings)
+        body: JSON.stringify(payload)
       });
       setSettings(result.settings);
+      setGameCatalogDraft(result.settings.gameCatalog.join("\n"));
       onSettingsChanged(result.settings);
       setMessage("Einstellungen gespeichert.");
     } catch (caught) {
@@ -853,23 +867,16 @@ export function AdminPanel({
         <label>
           Spielkatalog für neue Runden (ein Titel pro Zeile)
           <textarea
-            value={settings.gameCatalog.join("\n")}
-            onChange={(event) =>
-              setSettings({
-                ...settings,
-                gameCatalog: event.target.value
-                  .split("\n")
-                  .map((line) => line.trim())
-                  .filter(Boolean)
-              })
-            }
+            value={gameCatalogDraft}
+            onChange={(event) => setGameCatalogDraft(event.target.value)}
             rows={6}
             placeholder={"Counter-Strike 2\nLeague of Legends"}
           />
         </label>
         <p className="muted">
           Diese Liste erscheint Managern als Auswahl beim Anlegen einer Runde. Leer lassen, wenn nur
-          freie Titel genutzt werden sollen.
+          freie Titel genutzt werden sollen. Beim Speichern werden leere Zeilen verworfen und
+          überflüssige Leerzeichen am Zeilenanfang und -ende entfernt.
         </p>
         <button type="submit">Einstellungen speichern</button>
       </form>

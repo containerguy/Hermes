@@ -144,9 +144,8 @@ export function EventBoard({
     serverHost: "",
     connectionInfo: ""
   });
-  const [gameTitleMode, setGameTitleMode] = useState<"catalog" | "custom">(() =>
-    gameCatalog.length > 0 ? "catalog" : "custom"
-  );
+  /** null = noch keine Wahl: mit Katalog standardmäßig „Aus Liste“, sonst Freitext */
+  const [gameTitleSource, setGameTitleSource] = useState<"catalog" | "custom" | null>(null);
   const [editedStartsAt, setEditedStartsAt] = useState<Record<string, string>>({});
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
@@ -177,16 +176,20 @@ export function EventBoard({
     loadEvents().catch(() => undefined);
   }, [currentUser?.id]);
 
-  useEffect(() => {
-    if (gameCatalog.length === 0) {
-      setGameTitleMode("custom");
-    }
-  }, [gameCatalog.length]);
-
   const resolvedCatalog = Array.from(
     new Set(gameCatalog.map((title) => title.trim()).filter(Boolean))
   );
-  const gameTitleFromCatalog = resolvedCatalog.length > 0 ? gameTitleMode === "catalog" : false;
+  const catalogAvailable = resolvedCatalog.length > 0;
+  const gameTitleMode: "catalog" | "custom" = catalogAvailable
+    ? gameTitleSource ?? "catalog"
+    : "custom";
+  const gameTitleFromCatalog = gameTitleMode === "catalog";
+
+  useEffect(() => {
+    if (!catalogAvailable) {
+      setGameTitleSource(null);
+    }
+  }, [catalogAvailable]);
 
   useEffect(() => {
     if (!compactTouchShell) {
@@ -416,10 +419,10 @@ export function EventBoard({
 
   function switchGameTitleMode(next: "catalog" | "custom") {
     if (next === "custom") {
-      setGameTitleMode("custom");
+      setGameTitleSource("custom");
       return;
     }
-    setGameTitleMode("catalog");
+    setGameTitleSource("catalog");
     if (!resolvedCatalog.includes(eventDraft.gameTitle)) {
       setEventDraft((draft) => ({ ...draft, gameTitle: "" }));
     }
@@ -657,11 +660,16 @@ export function EventBoard({
       <div className="game-title-field">
         <label>
           Spiel
-          {resolvedCatalog.length > 0 ? (
-            <div className="game-title-mode-toggle">
+          {catalogAvailable ? (
+            <div
+              className="game-title-mode-toggle"
+              role="group"
+              aria-label="Spieltitel: Katalog oder Freitext"
+            >
               <button
                 type="button"
                 className={`secondary${gameTitleFromCatalog ? " mode-active" : ""}`}
+                aria-pressed={gameTitleFromCatalog}
                 onClick={() => switchGameTitleMode("catalog")}
               >
                 Aus Liste
@@ -669,6 +677,7 @@ export function EventBoard({
               <button
                 type="button"
                 className={`secondary${!gameTitleFromCatalog ? " mode-active" : ""}`}
+                aria-pressed={!gameTitleFromCatalog}
                 onClick={() => switchGameTitleMode("custom")}
               >
                 Eigener Titel
