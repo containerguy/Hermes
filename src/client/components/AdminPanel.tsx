@@ -32,6 +32,10 @@ const defaultSettings: AppSettings = {
   defaultNotificationsEnabled: true,
   eventAutoArchiveHours: 8,
   publicRegistrationEnabled: false,
+  shellStartTitle: "",
+  shellStartDescription: "",
+  shellEventsEmptyTitle: "",
+  shellEventsEmptyBody: "",
   themePrimaryColor: "#0f766e",
   themeLoginColor: "#be123c",
   themeManagerColor: "#b7791f",
@@ -556,7 +560,16 @@ export function AdminPanel({
         Änderungsverlauf der LAN-Runde, ohne die Routing- oder Login-Flows zu verändern.
       </p>
 
-      <form onSubmit={createUser} className="admin-form">
+      <nav className="admin-subnav" aria-label="Admin Bereiche">
+        <a href="#admin-users">Benutzer</a>
+        <a href="#admin-betrieb">Betrieb</a>
+        <a href="#admin-sicherheit">Sicherheit</a>
+        <a href="#admin-invites">Invites</a>
+        <a href="#admin-audit">Audit</a>
+      </nav>
+
+      <div className="admin-section">
+      <form id="admin-users" onSubmit={createUser} className="admin-form">
         <label>
           Username
           <input
@@ -721,8 +734,10 @@ export function AdminPanel({
           </div>
         ))}
       </div>
+      </div>
 
-      <form onSubmit={saveSettings} className="admin-form">
+      <div className="admin-section">
+      <form id="admin-betrieb" onSubmit={saveSettings} className="admin-form">
         <label>
           App-Name
           <input
@@ -772,6 +787,56 @@ export function AdminPanel({
             }
           />
           Öffentliche Registrierung per Invite-Code erlauben
+        </label>
+        <p className="muted">
+          Shell-Texte für Startseite und leeres Event-Board. Leer lassen, um die eingebauten
+          Standardtexte zu nutzen.
+        </p>
+        <label>
+          Start · Hero-Überschrift (optional)
+          <input
+            value={settings.shellStartTitle}
+            onChange={(event) =>
+              setSettings({ ...settings, shellStartTitle: event.target.value })
+            }
+            maxLength={240}
+            placeholder="Von der Idee bis zum Server-Join an einem Ort."
+          />
+        </label>
+        <label>
+          Start · Hero-Beschreibung (optional)
+          <textarea
+            value={settings.shellStartDescription}
+            onChange={(event) =>
+              setSettings({ ...settings, shellStartDescription: event.target.value })
+            }
+            maxLength={2000}
+            rows={4}
+            placeholder="Sieh auf einen Blick, welche Runde tragfähig ist …"
+          />
+        </label>
+        <label>
+          Events-Board · Leerzustand Überschrift (optional)
+          <input
+            value={settings.shellEventsEmptyTitle}
+            onChange={(event) =>
+              setSettings({ ...settings, shellEventsEmptyTitle: event.target.value })
+            }
+            maxLength={240}
+            placeholder="Noch keine Runden im Board."
+          />
+        </label>
+        <label>
+          Events-Board · Leerzustand Text (optional)
+          <textarea
+            value={settings.shellEventsEmptyBody}
+            onChange={(event) =>
+              setSettings({ ...settings, shellEventsEmptyBody: event.target.value })
+            }
+            maxLength={2000}
+            rows={3}
+            placeholder="Sobald ein Manager eine Runde vorbereitet …"
+          />
         </label>
         <p className="muted">
           Diese fünf Farben werden serverseitig gespeichert und steuern die Shell-Akzente für Events,
@@ -945,8 +1010,14 @@ export function AdminPanel({
           </div>
         ) : null}
       </section>
+      </div>
 
-      <section className="rate-limit-panel" aria-label="Rate-Limit Betrieb">
+      <div className="admin-section">
+      <section
+        id="admin-sicherheit"
+        className="rate-limit-panel"
+        aria-label="Rate-Limit Betrieb"
+      >
         <div className="section-title-row">
           <div>
             <p className="eyebrow">Rate-Limits</p>
@@ -1058,8 +1129,10 @@ export function AdminPanel({
           ) : null}
         </div>
       </section>
+      </div>
 
-      <section className="invite-panel" aria-label="Invite-Codes">
+      <div className="admin-section">
+      <section id="admin-invites" className="invite-panel" aria-label="Invite-Codes">
         <p className="eyebrow">Invites</p>
         <h2>LAN-Party Invite-Codes.</h2>
         <p className="muted">
@@ -1218,8 +1291,10 @@ export function AdminPanel({
           ) : null}
         </div>
       </section>
+      </div>
 
-      <section className="audit-panel" aria-label="Audit-Log">
+      <div className="admin-section">
+      <section id="admin-audit" className="audit-panel" aria-label="Audit-Log">
         <div className="section-title-row">
           <div>
             <p className="eyebrow">Audit</p>
@@ -1251,6 +1326,7 @@ export function AdminPanel({
           ) : null}
         </div>
       </section>
+      </div>
     </section>
   );
 }

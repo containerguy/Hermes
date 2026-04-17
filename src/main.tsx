@@ -58,6 +58,10 @@ const defaultSettings: AppSettings = {
   defaultNotificationsEnabled: true,
   eventAutoArchiveHours: 8,
   publicRegistrationEnabled: false,
+  shellStartTitle: "",
+  shellStartDescription: "",
+  shellEventsEmptyTitle: "",
+  shellEventsEmptyBody: "",
   themePrimaryColor: "#0f766e",
   themeLoginColor: "#be123c",
   themeManagerColor: "#b7791f",
@@ -91,8 +95,20 @@ function getPageFromHash(): PageId {
   if (hashPath === "#manager") {
     return "events";
   }
+  if (hashPath === "#admin" || hashPath.startsWith("#admin-")) {
+    return "admin";
+  }
   const route = routes.find((item) => item.path === hashPath);
   return route?.id ?? "events";
+}
+
+function applyShellStartHero(route: Route, settings: AppSettings): Route {
+  if (route.id !== "events") {
+    return route;
+  }
+  const title = settings.shellStartTitle.trim() || route.title;
+  const description = settings.shellStartDescription.trim() || route.description;
+  return { ...route, title, description };
 }
 
 function PageHeader({
@@ -196,6 +212,8 @@ function App() {
     currentUser && (displayRoute.id === "events" || displayRoute.id === "admin")
   );
 
+  const heroRoute = applyShellStartHero(displayRoute, appSettings);
+
   function renderActivePage() {
     if (activePage === "login") {
       return (
@@ -223,7 +241,14 @@ function App() {
       );
     }
 
-    return <EventBoard currentUser={currentUser} mode={eventBoardMode} />;
+    return (
+      <EventBoard
+        currentUser={currentUser}
+        mode={eventBoardMode}
+        emptyBoardTitle={appSettings.shellEventsEmptyTitle}
+        emptyBoardBody={appSettings.shellEventsEmptyBody}
+      />
+    );
   }
 
   return (
@@ -278,7 +303,7 @@ function App() {
       </header>
       <div className="page-shell">
         <PageHeader
-          route={displayRoute}
+          route={heroRoute}
           currentUser={currentUser}
           appName={appSettings.appName}
           omitSessionAside={omitHeroSessionAside}

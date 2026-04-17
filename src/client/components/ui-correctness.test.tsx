@@ -135,6 +135,10 @@ describe("ui correctness structure contracts", () => {
       defaultNotificationsEnabled: true,
       eventAutoArchiveHours: 8,
       publicRegistrationEnabled: false,
+      shellStartTitle: "",
+      shellStartDescription: "",
+      shellEventsEmptyTitle: "",
+      shellEventsEmptyBody: "",
       themePrimaryColor: "#0f766e",
       themeLoginColor: "#be123c",
       themeManagerColor: "#b7791f",
@@ -197,8 +201,7 @@ describe("ui correctness structure contracts", () => {
     expect(auditPanel?.querySelector(".section-title-row")).toBeTruthy();
     expect(auditPanel?.querySelector(".audit-list")).toBeTruthy();
 
-    const colorHelp = rendered.container.querySelector('.admin-form .muted');
-    expect(colorHelp?.textContent).toContain("fünf Farben werden serverseitig gespeichert");
+    expect(rendered.container.textContent).toContain("fünf Farben werden serverseitig gespeichert");
     expect(rendered.container.textContent).toContain(
       "Änderungen wirken sofort in der Shell und bleiben der zentrale Theme-Vertrag"
     );

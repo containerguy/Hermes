@@ -14,6 +14,11 @@ export type AppSettings = {
   defaultNotificationsEnabled: boolean;
   eventAutoArchiveHours: number;
   publicRegistrationEnabled: boolean;
+  /** Leer = Client-Standardtext für den Start-Hero */
+  shellStartTitle: string;
+  shellStartDescription: string;
+  shellEventsEmptyTitle: string;
+  shellEventsEmptyBody: string;
   themePrimaryColor: string;
   themeLoginColor: string;
   themeManagerColor: string;

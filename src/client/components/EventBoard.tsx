@@ -45,13 +45,23 @@ function getEventStatusClass(event: GameEvent) {
   return event.status;
 }
 
+const defaultEmptyBoardTitle = "Noch keine Runden im Board.";
+const defaultEmptyBoardBody =
+  "Sobald ein Manager eine Runde vorbereitet, tauchen Spiel, Startfenster und Join-Hinweise hier auf.";
+
 export function EventBoard({
   currentUser,
-  mode = "events"
+  mode = "events",
+  emptyBoardTitle = "",
+  emptyBoardBody = ""
 }: {
   currentUser: User | null;
   mode?: "events" | "manager";
+  emptyBoardTitle?: string;
+  emptyBoardBody?: string;
 }) {
+  const resolvedEmptyTitle = emptyBoardTitle.trim() || defaultEmptyBoardTitle;
+  const resolvedEmptyBody = emptyBoardBody.trim() || defaultEmptyBoardBody;
   const [events, setEvents] = useState<GameEvent[]>([]);
   const [eventDraft, setEventDraft] = useState({
     gameTitle: "",
@@ -556,10 +566,8 @@ export function EventBoard({
         {events.length === 0 ? (
           <article className="event-card">
             <p className="eyebrow">Events</p>
-            <h2>Noch keine Runden im Board.</h2>
-            <p className="muted">
-              Sobald ein Manager eine Runde vorbereitet, tauchen Spiel, Startfenster und Join-Hinweise hier auf.
-            </p>
+            <h2>{resolvedEmptyTitle}</h2>
+            <p className="muted">{resolvedEmptyBody}</p>
           </article>
         ) : null}
       </div>

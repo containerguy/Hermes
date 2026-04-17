@@ -9,6 +9,14 @@ export const settingsSchema = z.object({
   defaultNotificationsEnabled: z.boolean(),
   eventAutoArchiveHours: z.number().int().min(1).max(72),
   publicRegistrationEnabled: z.boolean(),
+  /** Leer = eingebaute Start-Hero-Überschrift aus dem Client */
+  shellStartTitle: z.string().max(240),
+  /** Leer = eingebaute Start-Hero-Beschreibung */
+  shellStartDescription: z.string().max(2000),
+  /** Leer = eingebauter Leerzustand-Titel im Event-Board */
+  shellEventsEmptyTitle: z.string().max(240),
+  /** Leer = eingebauter Leerzustand-Fließtext */
+  shellEventsEmptyBody: z.string().max(2000),
   themePrimaryColor: colorSchema,
   themeLoginColor: colorSchema,
   themeManagerColor: colorSchema,
@@ -23,6 +31,10 @@ export const defaultSettings: HermesSettings = {
   defaultNotificationsEnabled: true,
   eventAutoArchiveHours: 8,
   publicRegistrationEnabled: false,
+  shellStartTitle: "",
+  shellStartDescription: "",
+  shellEventsEmptyTitle: "",
+  shellEventsEmptyBody: "",
   themePrimaryColor: "#0f766e",
   themeLoginColor: "#be123c",
   themeManagerColor: "#b7791f",
