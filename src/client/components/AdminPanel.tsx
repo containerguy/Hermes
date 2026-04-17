@@ -800,8 +800,9 @@ export function AdminPanel({
           Öffentliche Registrierung per Invite-Code erlauben
         </label>
         <p className="muted">
-          Shell-Texte für Startseite und leeres Event-Board. Leer lassen, um die eingebauten
-          Standardtexte zu nutzen.
+          Shell-Texte für Startseite und leeres Event-Board. Überschrift und Leerzustand: leer lassen
+          für die eingebauten Standardtexte. Start-Beschreibung: leer lassen, wenn unter der
+          Überschrift kein Absatz erscheinen soll (kompakter Hero, sinnvoll für die installierte App).
         </p>
         <label>
           Start · Hero-Überschrift (optional)
@@ -870,62 +871,6 @@ export function AdminPanel({
           Diese Liste erscheint Managern als Auswahl beim Anlegen einer Runde. Leer lassen, wenn nur
           freie Titel genutzt werden sollen.
         </p>
-        <p className="muted">
-          Diese fünf Farben werden serverseitig gespeichert und steuern die Shell-Akzente für Events,
-          Login, Manager, Admin und die gemeinsame Oberfläche auf allen Geräten.
-        </p>
-        <p className="muted">
-          Änderungen wirken sofort in der Shell und bleiben der zentrale Theme-Vertrag für Desktop
-          und Smartphone.
-        </p>
-        <div className="color-grid" aria-label="Designfarben">
-          <label>
-            Primärfarbe
-            <input
-              type="color"
-              value={settings.themePrimaryColor}
-              onChange={(event) =>
-                setSettings({ ...settings, themePrimaryColor: event.target.value })
-              }
-            />
-          </label>
-          <label>
-            Loginfarbe
-            <input
-              type="color"
-              value={settings.themeLoginColor}
-              onChange={(event) => setSettings({ ...settings, themeLoginColor: event.target.value })}
-            />
-          </label>
-          <label>
-            Managerfarbe
-            <input
-              type="color"
-              value={settings.themeManagerColor}
-              onChange={(event) =>
-                setSettings({ ...settings, themeManagerColor: event.target.value })
-              }
-            />
-          </label>
-          <label>
-            Adminfarbe
-            <input
-              type="color"
-              value={settings.themeAdminColor}
-              onChange={(event) => setSettings({ ...settings, themeAdminColor: event.target.value })}
-            />
-          </label>
-          <label>
-            Hintergrund
-            <input
-              type="color"
-              value={settings.themeSurfaceColor}
-              onChange={(event) =>
-                setSettings({ ...settings, themeSurfaceColor: event.target.value })
-              }
-            />
-          </label>
-        </div>
         <button type="submit">Einstellungen speichern</button>
       </form>
 
@@ -1040,6 +985,78 @@ export function AdminPanel({
           </div>
         ) : null}
       </section>
+        </>
+      ) : null}
+
+      {adminSection === "design" ? (
+        <>
+          <header className="admin-section-head">
+            <p className="eyebrow">Design</p>
+            <h2>Shell-Farben und Theme</h2>
+          </header>
+          <form id="admin-design" onSubmit={saveSettings} className="admin-form">
+            <p className="muted">
+              Diese fünf Farben werden serverseitig gespeichert und steuern die Shell-Akzente für
+              Events, Login, Manager, Admin und die gemeinsame Oberfläche auf allen Geräten.
+            </p>
+            <p className="muted">
+              Änderungen wirken sofort in der Shell und bleiben der zentrale Theme-Vertrag für Desktop
+              und Smartphone.
+            </p>
+            <div className="color-grid" aria-label="Designfarben">
+              <label>
+                Primärfarbe
+                <input
+                  type="color"
+                  value={settings.themePrimaryColor}
+                  onChange={(event) =>
+                    setSettings({ ...settings, themePrimaryColor: event.target.value })
+                  }
+                />
+              </label>
+              <label>
+                Loginfarbe
+                <input
+                  type="color"
+                  value={settings.themeLoginColor}
+                  onChange={(event) =>
+                    setSettings({ ...settings, themeLoginColor: event.target.value })
+                  }
+                />
+              </label>
+              <label>
+                Managerfarbe
+                <input
+                  type="color"
+                  value={settings.themeManagerColor}
+                  onChange={(event) =>
+                    setSettings({ ...settings, themeManagerColor: event.target.value })
+                  }
+                />
+              </label>
+              <label>
+                Adminfarbe
+                <input
+                  type="color"
+                  value={settings.themeAdminColor}
+                  onChange={(event) =>
+                    setSettings({ ...settings, themeAdminColor: event.target.value })
+                  }
+                />
+              </label>
+              <label>
+                Hintergrund
+                <input
+                  type="color"
+                  value={settings.themeSurfaceColor}
+                  onChange={(event) =>
+                    setSettings({ ...settings, themeSurfaceColor: event.target.value })
+                  }
+                />
+              </label>
+            </div>
+            <button type="submit">Einstellungen speichern</button>
+          </form>
         </>
       ) : null}
 

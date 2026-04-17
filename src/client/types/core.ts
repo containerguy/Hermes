@@ -16,6 +16,7 @@ export type AppSettings = {
   publicRegistrationEnabled: boolean;
   /** Leer = Client-Standardtext für den Start-Hero */
   shellStartTitle: string;
+  /** Leer = kein Beschreibungsabsatz unter der Start-Überschrift */
   shellStartDescription: string;
   shellEventsEmptyTitle: string;
   shellEventsEmptyBody: string;
@@ -28,7 +29,7 @@ export type AppSettings = {
   themeSurfaceColor: string;
 };
 
-export type AdminSection = "users" | "betrieb" | "sicherheit" | "invites" | "audit";
+export type AdminSection = "users" | "betrieb" | "design" | "sicherheit" | "invites" | "audit";
 
 export type BulkImportFormat = "csv" | "json";
 

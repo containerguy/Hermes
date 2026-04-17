@@ -88,12 +88,13 @@ test("admin creates users, manager creates an event, user joins", async ({ page 
   await eventForm.getByLabel("Min").fill("1");
   await eventForm.getByLabel("Max").fill("2");
   await eventForm.getByRole("button", { name: "Event anlegen" }).click();
-  await expect(page.getByRole("heading", { name: "Browser Game" })).toBeVisible();
+  await expect(page.getByText("Browser Game")).toBeVisible();
 
   await page.goto(`${baseUrl}/#login`);
   await page.getByRole("button", { name: "Logout" }).click();
   await login(page, "spieler");
   await page.goto(`${baseUrl}/#events`);
+  await page.getByRole("button", { name: /Details aufklappen/ }).click();
   await page.getByRole("button", { name: "Dabei", exact: true }).click();
   await expect(page.getByText("1 / 2")).toBeVisible();
 });

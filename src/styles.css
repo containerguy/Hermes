@@ -275,6 +275,17 @@ label {
     border-top-width: 4px;
   }
 
+  .page-hero--no-description {
+    padding: clamp(7px, 1.6vw, 11px);
+    margin-bottom: clamp(5px, 1.1vw, 9px);
+    gap: 8px;
+    border-top-width: 3px;
+  }
+
+  .page-hero--no-description .hero-copy .eyebrow {
+    margin-bottom: 2px;
+  }
+
   .page-hero h1 {
     font-size: clamp(0.95rem, 2vw + 0.45rem, 1.28rem);
     line-height: 1.22;
@@ -317,6 +328,23 @@ label {
 .page-hero--single {
   grid-template-columns: minmax(0, 1fr);
   align-items: start;
+}
+
+/* Start-Hero ohne Admin-Beschreibung: kein Leerraum für fehlenden Absatz */
+.page-hero--no-description {
+  padding: clamp(12px, 2vw, 18px);
+  margin-bottom: clamp(8px, 1.5vw, 14px);
+  align-items: start;
+}
+
+.page-hero--no-description .hero-copy {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+
+.page-hero--no-description .hero-copy h1 {
+  margin-bottom: 0;
 }
 
 .hero-login {
@@ -463,6 +491,50 @@ h2 {
   grid-template-columns: repeat(auto-fill, minmax(158px, 1fr));
   gap: 10px;
   align-content: start;
+}
+
+.event-board--expandable.events-board .event-list--expandable {
+  grid-template-columns: 1fr;
+}
+
+.event-list--expandable:not(.event-list--compact) {
+  gap: 16px;
+}
+
+.event-expandable {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  min-width: 0;
+}
+
+.event-expandable:has(.event-expanded-panel) .event-compact-tile {
+  border-bottom-left-radius: 0;
+  border-bottom-right-radius: 0;
+  box-shadow: none;
+}
+
+.event-expanded-panel {
+  margin-top: -1px;
+}
+
+.event-card--expanded-follow {
+  border-top-left-radius: 0;
+  border-top-right-radius: 0;
+  margin-top: 0;
+}
+
+.event-header--expanded-follow {
+  margin-bottom: 4px;
+}
+
+.event-compact-chevron {
+  flex-shrink: 0;
+  align-self: center;
+  font-size: 0.65rem;
+  color: var(--muted);
+  line-height: 1;
+  padding: 2px;
 }
 
 .event-compact-primary-action {
@@ -1211,6 +1283,7 @@ dd {
 
 #admin-users,
 #admin-betrieb,
+#admin-design,
 #admin-sicherheit,
 #admin-invites,
 #admin-audit {
@@ -1494,12 +1567,69 @@ dd {
 
 @media (max-width: 680px) {
   .topbar {
-    align-items: flex-start;
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 12px;
+  }
+
+  .brand {
+    flex: 1 1 100%;
     flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 4px;
+    text-align: center;
+  }
+
+  .brand-mark {
+    width: 32px;
+    height: 32px;
+  }
+
+  .brand > span {
+    display: block;
+    font-size: 0.72rem;
+    font-weight: 800;
+    line-height: 1.2;
+    letter-spacing: 0.02em;
+    color: var(--muted);
+    max-width: min(18rem, 100%);
+  }
+
+  .topbar-end {
+    flex: 1 1 100%;
+    margin-left: 0;
+    justify-content: space-between;
+    gap: 6px;
+    flex-wrap: nowrap;
+    align-items: center;
   }
 
   .nav-links {
+    gap: 4px;
+    flex-wrap: nowrap;
+    flex: 1 1 auto;
+    min-width: 0;
     justify-content: flex-start;
+  }
+
+  .nav-links a {
+    padding: 0 8px;
+    min-height: 34px;
+    font-size: 0.82rem;
+  }
+
+  .profile-nav-trigger {
+    flex-shrink: 0;
+    padding: 0 8px 0 4px;
+    min-height: 34px;
+    gap: 6px;
+  }
+
+  .profile-nav-label {
+    font-size: 0.82rem;
   }
 
   .page-hero,

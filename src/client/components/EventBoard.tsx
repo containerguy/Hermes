@@ -1,4 +1,4 @@
-import React, { FormEvent, Fragment, useEffect, useState } from "react";
+import React, { FormEvent, useEffect, useState } from "react";
 import type { GameEvent, User } from "../types/core";
 import { requestJson } from "../api/request";
 import { ApiError, getErrorMessage } from "../errors/errors";
@@ -154,7 +154,7 @@ export function EventBoard({
     "offline"
   );
   const compactTouchShell = useCompactTouchShell();
-  const [selectedEventId, setSelectedEventId] = useState<string | null>(null);
+  const [expandedEventId, setExpandedEventId] = useState<string | null>(null);
   const [createFlowOpen, setCreateFlowOpen] = useState(false);
 
   const canCreate = currentUser?.role === "manager" || currentUser?.role === "admin";
@@ -190,16 +190,15 @@ export function EventBoard({
 
   useEffect(() => {
     if (!compactTouchShell) {
-      setSelectedEventId(null);
       setCreateFlowOpen(false);
     }
   }, [compactTouchShell]);
 
   useEffect(() => {
-    if (selectedEventId && !events.some((entry) => entry.id === selectedEventId)) {
-      setSelectedEventId(null);
+    if (expandedEventId && !events.some((entry) => entry.id === expandedEventId)) {
+      setExpandedEventId(null);
     }
-  }, [events, selectedEventId]);
+  }, [events, expandedEventId]);
 
   useEffect(() => {
     if (!currentUser) {
@@ -458,22 +457,13 @@ export function EventBoard({
           ? "Polling aktiv"
           : "Offline";
 
-  function renderFullEventCard(event: GameEvent) {
+  function renderEventExpandedContent(event: GameEvent) {
     const selfStatus = myParticipationLabel(event.myParticipation);
     const gapHint = minPlayersGapHint(event);
     const startAbsolute = new Date(event.startsAt).toLocaleString("de-DE");
     const pct = capacityPercent(event);
     return (
-      <article className={`event-card event-${getEventStatusClass(event)}`}>
-        <div className="event-header">
-          <div>
-            <p className="eyebrow">{event.startMode === "now" ? "Sofort" : "Geplant"}</p>
-            <h2>{event.gameTitle}</h2>
-          </div>
-          <span className={`status-pill status-${getEventStatusClass(event)}`}>
-            {getEventStatusLabel(event)}
-          </span>
-        </div>
+      <>
         {selfStatus && event.myParticipation ? (
           <p className={`event-self-status event-self-${event.myParticipation}`} role="status">
             {selfStatus}
@@ -587,7 +577,70 @@ export function EventBoard({
             </button>
           </div>
         ) : null}
-      </article>
+      </>
+    );
+  }
+
+  function renderEventExpandableRow(event: GameEvent) {
+    const pct = capacityPercent(event);
+    const expanded = expandedEventId === event.id;
+    const panelId = `event-expand-${event.id}`;
+    return (
+      <div className="event-expandable" key={event.id}>
+        <button
+          type="button"
+          className={`event-compact-tile event-tile-${getEventStatusClass(event)}`}
+          aria-expanded={expanded}
+          aria-controls={panelId}
+          id={`event-tile-${event.id}`}
+          onClick={() => {
+            setExpandedEventId(expanded ? null : event.id);
+            setCreateFlowOpen(false);
+          }}
+          aria-label={`${event.gameTitle}, ${getEventStatusLabel(event)}. Details ${expanded ? "einklappen" : "aufklappen"}.`}
+        >
+          <img src="/icon.svg" alt="" className="event-compact-icon" width={36} height={36} />
+          <div className="event-compact-tile-body">
+            <span className="event-compact-title">{event.gameTitle}</span>
+            <div className="event-compact-track" aria-hidden="true">
+              <div className="event-compact-fill" style={{ width: `${pct}%` }} />
+            </div>
+            <div className="event-compact-meta">
+              <span className="event-compact-count">
+                {event.joinedCount}/{event.maxPlayers}
+              </span>
+              <span className={`status-pill status-${getEventStatusClass(event)}`}>
+                {getEventStatusLabel(event)}
+              </span>
+            </div>
+          </div>
+          <span className="event-compact-chevron" aria-hidden="true">
+            {expanded ? "\u25BC" : "\u25B6"}
+          </span>
+        </button>
+        {expanded ? (
+          <div
+            className="event-expanded-panel"
+            id={panelId}
+            role="region"
+            aria-labelledby={`event-tile-${event.id}`}
+            aria-label={`Details: ${event.gameTitle}`}
+          >
+            <article className={`event-card event-${getEventStatusClass(event)} event-card--expanded-follow`}>
+              <div className="event-header event-header--expanded-follow">
+                <div>
+                  <p className="eyebrow">{event.startMode === "now" ? "Sofort" : "Geplant"}</p>
+                  <h2>{event.gameTitle}</h2>
+                </div>
+                <span className={`status-pill status-${getEventStatusClass(event)}`}>
+                  {getEventStatusLabel(event)}
+                </span>
+              </div>
+              {renderEventExpandedContent(event)}
+            </article>
+          </div>
+        ) : null}
+      </div>
     );
   }
 
@@ -726,117 +779,11 @@ export function EventBoard({
     </div>
   );
 
-  if (compactTouchShell) {
-    const selectedEvent = selectedEventId ? events.find((entry) => entry.id === selectedEventId) : undefined;
-    return (
-      <section
-        className={`event-board ${mode === "manager" ? "manager-board" : "events-board"} event-board--compact`}
-        aria-label="Events"
-      >
-        {boardToolbar}
-        {mode === "manager" && !canCreate ? (
-          <div className="access-panel compact" aria-label="Manager Hinweis">
-            <p className="eyebrow">Manager</p>
-            <h2>Keine Managerrechte.</h2>
-            <p className="muted">
-              Neue Runden können nur Manager und Admins anlegen. Als Spieler kannst du hier weiter
-              bestehende Runden verfolgen.
-            </p>
-          </div>
-        ) : null}
-        {message ? <p className="notice">{message}</p> : null}
-        {error ? <p className="error">{error}</p> : null}
-        {showCreateForm && !createFlowOpen ? (
-          <div className="event-compact-primary-action">
-            <button
-              type="button"
-              onClick={() => {
-                setCreateFlowOpen(true);
-                setSelectedEventId(null);
-              }}
-            >
-              Neues Event
-            </button>
-          </div>
-        ) : null}
-        {showCreateForm && createFlowOpen ? (
-          <div className="event-overlay-panel" role="region" aria-label="Neues Event anlegen">
-            <div className="event-overlay-toolbar">
-              <button type="button" className="secondary" onClick={() => setCreateFlowOpen(false)}>
-                Zurück zur Übersicht
-              </button>
-            </div>
-            {newEventForm}
-          </div>
-        ) : null}
-        {!createFlowOpen ? (
-          <>
-            <div className="event-list event-list--compact">
-              {events.map((event) => {
-                const pct = capacityPercent(event);
-                return (
-                  <button
-                    key={event.id}
-                    type="button"
-                    className={`event-compact-tile event-tile-${getEventStatusClass(event)}`}
-                    onClick={() => {
-                      setSelectedEventId(event.id);
-                      setCreateFlowOpen(false);
-                    }}
-                    aria-label={`${event.gameTitle}, ${getEventStatusLabel(event)}`}
-                  >
-                    <img src="/icon.svg" alt="" className="event-compact-icon" width={36} height={36} />
-                    <div className="event-compact-tile-body">
-                      <span className="event-compact-title">{event.gameTitle}</span>
-                      <div className="event-compact-track" aria-hidden="true">
-                        <div className="event-compact-fill" style={{ width: `${pct}%` }} />
-                      </div>
-                      <div className="event-compact-meta">
-                        <span className="event-compact-count">
-                          {event.joinedCount}/{event.maxPlayers}
-                        </span>
-                        <span className={`status-pill status-${getEventStatusClass(event)}`}>
-                          {getEventStatusLabel(event)}
-                        </span>
-                      </div>
-                    </div>
-                  </button>
-                );
-              })}
-              {events.length === 0 ? (
-                <div className="event-compact-empty event-card">
-                  <p className="eyebrow">Events</p>
-                  <h2>{resolvedEmptyTitle}</h2>
-                  <p className="muted">{resolvedEmptyBody}</p>
-                </div>
-              ) : null}
-            </div>
-            {selectedEvent ? (
-              <div
-                className="event-overlay-panel event-overlay-panel--detail"
-                role="dialog"
-                aria-modal="true"
-                aria-label={selectedEvent.gameTitle}
-              >
-                <div className="event-overlay-toolbar">
-                  <button type="button" className="secondary" onClick={() => setSelectedEventId(null)}>
-                    Zurück zur Übersicht
-                  </button>
-                </div>
-                {renderFullEventCard(selectedEvent)}
-              </div>
-            ) : null}
-          </>
-        ) : null}
-      </section>
-    );
-  }
+  const managerCreateOverlay = showCreateForm && compactTouchShell && createFlowOpen;
+  const boardClassName = `event-board ${mode === "manager" ? "manager-board" : "events-board"} event-board--expandable${compactTouchShell ? " event-board--compact" : ""}`;
 
   return (
-    <section
-      className={`event-board ${mode === "manager" ? "manager-board" : "events-board"}`}
-      aria-label="Events"
-    >
+    <section className={boardClassName} aria-label="Events">
       {boardToolbar}
       {mode === "manager" && !canCreate ? (
         <div className="access-panel compact" aria-label="Manager Hinweis">
@@ -848,24 +795,56 @@ export function EventBoard({
           </p>
         </div>
       ) : null}
-
       {message ? <p className="notice">{message}</p> : null}
       {error ? <p className="error">{error}</p> : null}
-
-      <div className="event-list">
-        {events.map((event) => (
-          <Fragment key={event.id}>{renderFullEventCard(event)}</Fragment>
-        ))}
-        {events.length === 0 ? (
-          <article className="event-card">
-            <p className="eyebrow">Events</p>
-            <h2>{resolvedEmptyTitle}</h2>
-            <p className="muted">{resolvedEmptyBody}</p>
-          </article>
-        ) : null}
-      </div>
-
-      {showCreateForm ? newEventForm : null}
+      {showCreateForm && compactTouchShell && !createFlowOpen ? (
+        <div className="event-compact-primary-action">
+          <button
+            type="button"
+            onClick={() => {
+              setCreateFlowOpen(true);
+              setExpandedEventId(null);
+            }}
+          >
+            Neues Event
+          </button>
+        </div>
+      ) : null}
+      {showCreateForm && compactTouchShell && createFlowOpen ? (
+        <div className="event-overlay-panel" role="region" aria-label="Neues Event anlegen">
+          <div className="event-overlay-toolbar">
+            <button type="button" className="secondary" onClick={() => setCreateFlowOpen(false)}>
+              Zurück zur Übersicht
+            </button>
+          </div>
+          {newEventForm}
+        </div>
+      ) : null}
+      {!managerCreateOverlay ? (
+        <>
+          <div
+            className={`event-list event-list--expandable${compactTouchShell ? " event-list--compact" : ""}`}
+          >
+            {events.map((event) => renderEventExpandableRow(event))}
+            {events.length === 0 ? (
+              compactTouchShell ? (
+                <div className="event-compact-empty event-card">
+                  <p className="eyebrow">Events</p>
+                  <h2>{resolvedEmptyTitle}</h2>
+                  <p className="muted">{resolvedEmptyBody}</p>
+                </div>
+              ) : (
+                <article className="event-card">
+                  <p className="eyebrow">Events</p>
+                  <h2>{resolvedEmptyTitle}</h2>
+                  <p className="muted">{resolvedEmptyBody}</p>
+                </article>
+              )
+            ) : null}
+          </div>
+          {showCreateForm && !compactTouchShell ? newEventForm : null}
+        </>
+      ) : null}
     </section>
   );
 }

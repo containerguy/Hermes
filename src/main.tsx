@@ -94,6 +94,7 @@ const adminSectionBySlug: Record<string, AdminSection> = {
   "": "users",
   users: "users",
   betrieb: "betrieb",
+  design: "design",
   sicherheit: "sicherheit",
   invites: "invites",
   audit: "audit"
@@ -102,6 +103,7 @@ const adminSectionBySlug: Record<string, AdminSection> = {
 const legacyAdminHashToSection: Record<string, AdminSection> = {
   users: "users",
   betrieb: "betrieb",
+  design: "design",
   sicherheit: "sicherheit",
   invites: "invites",
   audit: "audit"
@@ -140,7 +142,8 @@ function applyShellStartHero(route: Route, settings: AppSettings): Route {
     return route;
   }
   const title = settings.shellStartTitle.trim() || route.title;
-  const description = settings.shellStartDescription.trim() || route.description;
+  const customDescription = settings.shellStartDescription.trim();
+  const description = customDescription.length > 0 ? customDescription : "";
   return { ...route, title, description };
 }
 
@@ -153,15 +156,16 @@ function PageHeader({
   currentUser: User | null;
   omitSessionAside: boolean;
 }) {
+  const hasHeroDescription = Boolean(route.description.trim());
   return (
     <section
-      className={`page-hero hero-${route.id}${omitSessionAside ? " page-hero--single" : ""}`}
+      className={`page-hero hero-${route.id}${omitSessionAside ? " page-hero--single" : ""}${!hasHeroDescription ? " page-hero--no-description" : ""}`}
       aria-labelledby={`${route.id}-title`}
     >
       <div className="hero-copy">
         <p className="eyebrow">{route.eyebrow}</p>
         <h1 id={`${route.id}-title`}>{route.title}</h1>
-        <p>{route.description}</p>
+        {hasHeroDescription ? <p>{route.description}</p> : null}
       </div>
       {omitSessionAside ? null : (
         <aside className="hero-status" aria-label="Status">
@@ -338,6 +342,7 @@ function App() {
               [
                 ["users", "Benutzer"],
                 ["betrieb", "Betrieb"],
+                ["design", "Design"],
                 ["sicherheit", "Sicherheit"],
                 ["invites", "Invites"],
                 ["audit", "Audit"]

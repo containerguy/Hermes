@@ -106,6 +106,14 @@ describe("ui correctness structure contracts", () => {
     const rendered = await renderIntoDocument(<EventBoard currentUser={currentUser} mode="events" />);
 
     expect(rendered.container.textContent).toContain("1 Runde im Board");
+
+    const expandTile = rendered.container.querySelector(".event-compact-tile") as HTMLButtonElement | null;
+    expect(expandTile).toBeTruthy();
+    await act(async () => {
+      expandTile!.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+      await flushMicrotasks();
+    });
+
     expect(rendered.container.textContent).toContain("Server- und Join-Hinweise fehlen noch");
     expect(rendered.container.querySelector(".event-capacity-track")).toBeTruthy();
     expect(rendered.container.textContent).toContain("Runde von");

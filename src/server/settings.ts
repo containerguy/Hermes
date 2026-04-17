@@ -11,7 +11,7 @@ export const settingsSchema = z.object({
   publicRegistrationEnabled: z.boolean(),
   /** Leer = eingebaute Start-Hero-Überschrift aus dem Client */
   shellStartTitle: z.string().max(240),
-  /** Leer = eingebaute Start-Hero-Beschreibung */
+  /** Leer = kein Beschreibungsabsatz im Start-Hero */
   shellStartDescription: z.string().max(2000),
   /** Leer = eingebauter Leerzustand-Titel im Event-Board */
   shellEventsEmptyTitle: z.string().max(240),
