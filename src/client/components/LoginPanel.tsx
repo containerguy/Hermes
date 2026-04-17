@@ -115,16 +115,11 @@ export function LoginPanel({
 
     setRedeemStatus("redeeming");
     const deviceContext = getDeviceContext();
-    const deviceName =
-      typeof navigator !== "undefined" && navigator.userAgent
-        ? navigator.userAgent.slice(0, 80)
-        : "Verbundenes Gerät";
 
     requestJson<{ user: User }>("/api/auth/pair-redeem", {
       method: "POST",
       body: JSON.stringify({
         token: pair,
-        deviceName,
         deviceKey: deviceContext.deviceKey,
         pwa: deviceContext.pwa
       })
@@ -484,7 +479,11 @@ export function LoginPanel({
           <div className="section-title-row">
             <div>
               <p className="eyebrow">Profil</p>
-              <h2>Profil und E-Mail.</h2>
+              <h2>Profil und E-Mail aktuell halten.</h2>
+              <p className="muted">
+                Passe Anzeigename und Mailadresse hier an, damit Einmalcodes und Teilnehmerlisten
+                auf allen Geräten konsistent bleiben.
+              </p>
             </div>
           </div>
 
@@ -542,13 +541,21 @@ export function LoginPanel({
           <div className="section-title-row">
             <div>
               <p className="eyebrow">Notifications</p>
-              <h2>Voraussetzungen.</h2>
+              <h2>Push vor dem Match testen.</h2>
             </div>
           </div>
           <p className="muted">
-            Push braucht <strong>HTTPS</strong> (oder <strong>localhost</strong>), Browser-Unterstützung und eine
-            aktivierte OS-Permission. Auf Smartphones funktioniert es oft am zuverlässigsten, wenn Hermes als{" "}
-            <strong>PWA installiert</strong> ist.
+            Hermes sendet <strong>Standard-Browser-Benachrichtigungen</strong>. Eigene Klingeltöne
+            oder garantiertes Audio kann Hermes nicht erzwingen.
+          </p>
+          <p className="muted">
+            Push braucht <strong>HTTPS</strong> (oder <strong>localhost</strong>), Browser-APIs und
+            eine aktivierte OS-Permission. Auf unterstützten Smartphones ist Zustellung und Haptik
+            meist zuverlässiger, wenn Hermes als <strong className="pwa-install">PWA installiert</strong> ist.
+          </p>
+          <p className="muted">
+            Wenn einer der Checks unten fehlt, bleiben Einladungen und Statuswechsel lokal sichtbar,
+            aber dieses Gerät bekommt keine Push-Hinweise.
           </p>
           <dl className="account-list">
             <div>
@@ -586,9 +593,10 @@ export function LoginPanel({
           <div className="section-title-row">
             <div>
               <p className="eyebrow">Pairing</p>
-              <h2>Add a device</h2>
+              <h2>Weiteres Gerät verbinden.</h2>
               <p className="muted">
-                Generiere einen Pairing-Code für ein weiteres Gerät.
+                Erzeuge einen kurzlebigen Pairing-Link, um Hermes auf Smartphone, Tablet oder
+                Zweit-PC ohne erneutes Tippen des Einmalcodes zu öffnen.
               </p>
             </div>
             {pairingToken ? (
@@ -652,7 +660,11 @@ export function LoginPanel({
           <div className="section-title-row">
             <div>
               <p className="eyebrow">Geräte</p>
-              <h2>Angemeldete Geräte.</h2>
+              <h2>Angemeldete Geräte im Blick behalten.</h2>
+              <p className="muted">
+                Benenne Sessions sinnvoll um, entferne alte Geräte und prüfe bei Bedarf, wo dein
+                Konto zuletzt aktiv war.
+              </p>
             </div>
             <button type="button" className="secondary" onClick={() => loadSessions()} disabled={busy}>
               Aktualisieren
@@ -731,6 +743,13 @@ export function LoginPanel({
             ? "Einmalcode anfordern."
             : "Code eingeben."}
       </h2>
+      <p className="muted">
+        {mode === "register"
+          ? "Lege dein Konto mit Invite-Code, Username und E-Mail an. Danach bekommst du direkt einen Einmalcode für den ersten Login."
+          : step === "request"
+            ? "Gib deinen Username ein. Hermes schickt den Einmalcode an die hinterlegte E-Mail-Adresse."
+            : "Trage den Code aus der Mail ein und gib diesem Gerät optional einen Namen für die Geräteübersicht."}
+      </p>
       {mode === "register" ? (
         <form onSubmit={registerUser}>
           <label>

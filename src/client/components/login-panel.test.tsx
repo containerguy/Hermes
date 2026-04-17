@@ -84,6 +84,76 @@ afterEach(() => {
 });
 
 describe("LoginPanel pairing redemption", () => {
+  it("renders refreshed login helper copy for request and verify states", async () => {
+    const { requestJson } = await import("../api/request");
+    const requestJsonMock = requestJson as unknown as ReturnType<typeof vi.fn>;
+
+    requestJsonMock.mockResolvedValue({});
+
+    const rendered = await renderIntoDocument(
+      <LoginPanel
+        currentUser={null}
+        settings={{ ...defaultSettings, publicRegistrationEnabled: true }}
+        onLoggedIn={vi.fn()}
+        onLoggedOut={vi.fn()}
+        onUserUpdated={vi.fn()}
+      />
+    );
+
+    expect(rendered.container.textContent || "").toContain(
+      "Gib deinen Username ein. Hermes schickt den Einmalcode an die hinterlegte E-Mail-Adresse."
+    );
+
+    const loginForm = rendered.container.querySelector("form");
+    await act(async () => {
+      loginForm?.dispatchEvent(new Event("submit", { bubbles: true, cancelable: true }));
+      await flushMicrotasks();
+    });
+
+    expect(rendered.container.textContent || "").toContain(
+      "Trage den Code aus der Mail ein und gib diesem Gerät optional einen Namen"
+    );
+    expect(rendered.container.textContent || "").toContain("Code wurde per E-Mail versendet.");
+
+    await rendered.cleanup();
+  });
+
+  it("renders refreshed authenticated profile helper copy and safe empty session state", async () => {
+    const { requestJson } = await import("../api/request");
+    const requestJsonMock = requestJson as unknown as ReturnType<typeof vi.fn>;
+
+    requestJsonMock.mockImplementation(async (path: string) => {
+      if (path === "/api/auth/sessions") {
+        return { sessions: [] };
+      }
+      return {};
+    });
+
+    const rendered = await renderIntoDocument(
+      <LoginPanel
+        currentUser={redeemedUser}
+        settings={defaultSettings}
+        onLoggedIn={vi.fn()}
+        onLoggedOut={vi.fn()}
+        onUserUpdated={vi.fn()}
+      />
+    );
+
+    const text = rendered.container.textContent || "";
+    expect(text).toContain("Profil und E-Mail aktuell halten.");
+    expect(text).toContain("Push vor dem Match testen.");
+    expect(text).toContain("Hermes sendet Standard-Browser-Benachrichtigungen.");
+    expect(text).toContain("Eigene Klingeltöne oder garantiertes Audio kann Hermes nicht erzwingen.");
+    expect(text).toContain("Push braucht HTTPS");
+    expect(text).toContain("Auf unterstützten Smartphones ist Zustellung und Haptik meist zuverlässiger");
+    expect(text).toContain("Weiteres Gerät verbinden.");
+    expect(text).toContain("Angemeldete Geräte im Blick behalten.");
+    expect(text).toContain("Keine Geräte geladen.");
+    expect(text).toContain("Aktualisieren lädt deine aktiven Sessions.");
+
+    await rendered.cleanup();
+  });
+
   it("redeems token from URL hash on mount and strips ?pair from the hash", async () => {
     window.location.hash = "#login?pair=PAIR_TOKEN_TEST_VALUE_AAAAAAAAAAAA";
 
@@ -123,13 +193,15 @@ describe("LoginPanel pairing redemption", () => {
 
     const redeemBody = JSON.parse(
       (redeemCalls[0][1] as RequestInit).body as string
-    ) as { token: string; deviceKey: string };
+    ) as { token: string; deviceKey: string; deviceName?: string; pwa?: boolean };
     expect(redeemBody.token).toBe("PAIR_TOKEN_TEST_VALUE_AAAAAAAAAAAA");
     expect(typeof redeemBody.deviceKey).toBe("string");
     expect(redeemBody.deviceKey.length).toBeGreaterThanOrEqual(22);
+    expect(redeemBody.deviceName).toBeUndefined();
+    expect(typeof redeemBody.pwa).toBe("boolean");
 
-    expect(window.location.hash).not.toContain("pair=");
-    expect(window.location.hash).toContain("#login");
+     expect(window.location.hash).not.toContain("pair=");
+     expect(window.location.hash).toContain("#login");
 
     await rendered.cleanup();
   });

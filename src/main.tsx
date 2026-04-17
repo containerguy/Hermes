@@ -1,25 +1,14 @@
-import React, { FormEvent, useEffect, useState } from "react";
+import React, { useEffect, useState } from "react";
 import { createRoot } from "react-dom/client";
 import "./styles.css";
 
 import type {
   AppSettings,
-  AuditLogEntry,
-  GameEvent,
-  InviteCode,
-  RateLimitAllowlistEntry,
-  RateLimitEntry,
-  RestoreDiagnostics,
-  RestoreRecovery,
-  StorageInfo,
-  User,
-  UserSession
+  User
 } from "./client/types/core";
 import { requestJson } from "./client/api/request";
 import { clearCsrfToken, primeCsrfToken } from "./client/api/csrf";
-import { ApiError, errorMessages, getErrorMessage } from "./client/errors/errors";
 import { EventBoard } from "./client/components/EventBoard";
-import { ManagerPage } from "./client/components/ManagerPage";
 import { LoginPage } from "./client/components/LoginPage";
 import { AdminPanel } from "./client/components/AdminPanel";
 
@@ -32,44 +21,35 @@ type Route = {
   description: string;
 };
 
-type PageId = "events" | "login" | "manager" | "admin";
+type PageId = "events" | "login" | "admin";
 
 const routes: Route[] = [
   {
     id: "events",
     path: "#events",
-    label: "Events",
-    eyebrow: "LAN-Abstimmung",
-    title: "Was startet als Nächstes?",
+    label: "Start",
+    eyebrow: "Spielrunden im Blick",
+    title: "Von der Idee bis zum Server-Join an einem Ort.",
     description:
-      "Spielrunden sammeln Zusagen, zeigen sofort die Spielerzahl und halten Startzeit sowie Serverdaten an einem Ort."
+      "Sieh auf einen Blick, welche Runde tragfähig ist, und triff deine Wahl. Mit Manager- oder Adminrechten legst du neue Runden hier direkt an — ohne zweite Oberfläche."
   },
   {
     id: "login",
     path: "#login",
     label: "Login",
-    eyebrow: "Einmalcode",
-    title: "Username und Mailcode.",
+    eyebrow: "Mailcode statt Passwort",
+    title: "Schnell anmelden und auf mehreren Geräten bereit sein.",
     description:
-      "Der Login ist für mehrere Geräte vorbereitet, damit Smartphone und PC parallel aktiv bleiben können."
-  },
-  {
-    id: "manager",
-    path: "#manager",
-    label: "Manager",
-    eyebrow: "Eventsteuerung",
-    title: "Neue Runden ohne Umwege anlegen.",
-    description:
-      "Manager können Spiel, Startzeit, min/max Spieler und optionale Verbindungsdaten vorbereiten."
+      "Username eingeben, Einmalcode aus der Mail bestätigen und Smartphone sowie PC parallel mit derselben Session nutzen."
   },
   {
     id: "admin",
     path: "#admin",
     label: "Admin",
-    eyebrow: "Betrieb",
-    title: "User, Manager und Einstellungen.",
+    eyebrow: "Betrieb & Theme",
+    title: "Rollen, Einstellungen und Shell-Farben bleiben zentral verwaltet.",
     description:
-      "Der Haupt-Admin verwaltet Rollen und persistente Einstellungen für Mail, Benachrichtigungen und Betrieb."
+      "Der Adminbereich hält Benutzer, Benachrichtigungen und die fünf backend-gespeisten Themefarben in einer gemeinsamen Konfiguration."
   }
 ];
 
@@ -92,23 +72,40 @@ function applyTheme(settings: AppSettings) {
   root.style.setProperty("--amber", settings.themeManagerColor);
   root.style.setProperty("--blue", settings.themeAdminColor);
   root.style.setProperty("--surface", settings.themeSurfaceColor);
+  root.style.setProperty("--surface-strong", `${settings.themeSurfaceColor}f2`);
 }
 
 function getPageFromHash(): PageId {
   const rawHash = window.location.hash || "";
   const queryStart = rawHash.indexOf("?");
   const hashPath = queryStart >= 0 ? rawHash.slice(0, queryStart) : rawHash;
+  if (hashPath === "#manager") {
+    return "events";
+  }
   const route = routes.find((item) => item.path === hashPath);
   return route?.id ?? "events";
 }
 
-function PageHeader({ route, currentUser }: { route: Route; currentUser: User | null }) {
+function PageHeader({
+  route,
+  currentUser,
+  appName
+}: {
+  route: Route;
+  currentUser: User | null;
+  appName: string;
+}) {
   return (
     <section className={`page-hero hero-${route.id}`} aria-labelledby={`${route.id}-title`}>
       <div className="hero-copy">
         <p className="eyebrow">{route.eyebrow}</p>
         <h1 id={`${route.id}-title`}>{route.title}</h1>
         <p>{route.description}</p>
+        <div className="hero-highlights" aria-label="Bereichsfokus">
+          <span>{appName}</span>
+          <span>{route.label}</span>
+          <span>{currentUser ? "Session aktiv" : "Gastmodus"}</span>
+        </div>
       </div>
       <aside className="hero-status" aria-label="Status">
         <img src="/icon.svg" alt="" />
@@ -167,12 +164,15 @@ function App() {
       ? {
           ...activeRoute,
           label: "Profil",
-          eyebrow: "Profil",
-          title: "Profil und Geräte.",
+          eyebrow: "Profil & Geräte",
+          title: "Deine Anmeldung, Geräte und Benachrichtigungen im Griff.",
           description:
-            "Verwalte deine Anmeldung, Notifications und alle Geräte, die mit deinem Account aktiv sind."
+            "Verwalte deine aktive Session, Notification-Einstellungen und alle Geräte, die parallel mit deinem Account verbunden sind."
         }
       : activeRoute;
+
+  const eventBoardMode =
+    currentUser?.role === "manager" || currentUser?.role === "admin" ? "manager" : "events";
 
   function renderActivePage() {
     if (activePage === "login") {
@@ -185,10 +185,6 @@ function App() {
           onUserUpdated={setCurrentUser}
         />
       );
-    }
-
-    if (activePage === "manager") {
-      return <ManagerPage currentUser={currentUser} />;
     }
 
     if (activePage === "admin") {
@@ -205,7 +201,7 @@ function App() {
       );
     }
 
-    return <EventBoard currentUser={currentUser} mode="events" />;
+    return <EventBoard currentUser={currentUser} mode={eventBoardMode} />;
   }
 
   return (
@@ -229,7 +225,7 @@ function App() {
         </nav>
       </header>
       <div className="page-shell">
-        <PageHeader route={displayRoute} currentUser={currentUser} />
+        <PageHeader route={displayRoute} currentUser={currentUser} appName={appSettings.appName} />
         {renderActivePage()}
       </div>
     </main>

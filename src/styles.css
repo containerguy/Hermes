@@ -319,8 +319,8 @@ h2 {
   gap: 14px;
   border: 1px solid var(--line);
   border-radius: 8px;
-  padding: 14px;
-  background: var(--paper);
+  padding: 14px 16px;
+  background: linear-gradient(180deg, var(--paper) 0%, var(--surface-strong) 100%);
 }
 
 .board-toolbar > div {
@@ -356,7 +356,7 @@ h2 {
 .auth-visual {
   border: 1px solid var(--line);
   border-radius: 8px;
-  background: var(--paper);
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.98) 0%, var(--paper) 68%, var(--surface-strong) 100%);
   box-shadow: var(--shadow);
 }
 
@@ -377,7 +377,7 @@ h2 {
 
 .form-title {
   display: grid;
-  gap: 2px;
+  gap: 6px;
   margin-bottom: 4px;
 }
 
@@ -456,7 +456,12 @@ h2 {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 12px;
-  margin: 24px 0;
+  margin: 24px 0 18px;
+}
+
+.event-join-hint {
+  min-height: 48px;
+  margin: 0;
 }
 
 .event-stats div,
@@ -519,6 +524,11 @@ dd {
 
 .login-panel {
   border-top: 8px solid var(--rose);
+}
+
+.login-panel > .muted,
+.admin-intro {
+  margin-top: 12px;
 }
 
 .login-panel form,
@@ -637,6 +647,7 @@ dd {
   gap: 14px;
   flex-wrap: wrap;
   min-width: 0;
+  padding-bottom: 2px;
 }
 
 .section-title-row > div {
@@ -661,7 +672,7 @@ dd {
   border: 1px solid var(--line);
   border-radius: 8px;
   padding: 12px;
-  background: var(--surface);
+  background: linear-gradient(180deg, var(--paper) 0%, var(--surface) 100%);
 }
 
 .audit-row time,
@@ -716,6 +727,14 @@ dd {
   margin-top: 18px;
   border-top: 1px solid var(--line);
   padding-top: 18px;
+}
+
+.device-panel > .muted,
+.invite-panel > .muted,
+.admin-ops > .muted,
+.rate-limit-panel > .muted,
+.audit-panel .section-title-row .muted {
+  margin: 0;
 }
 
 .invite-panel {

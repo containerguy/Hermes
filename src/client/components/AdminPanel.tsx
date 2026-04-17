@@ -2,6 +2,10 @@ import React, { FormEvent, useEffect, useState } from "react";
 import type {
   AppSettings,
   AuditLogEntry,
+  BulkImportCommitResponse,
+  BulkImportFormat,
+  BulkImportPreviewResponse,
+  BulkImportResult,
   InviteCode,
   RateLimitAllowlistEntry,
   RateLimitEntry,
@@ -35,6 +39,14 @@ const defaultSettings: AppSettings = {
   themeSurfaceColor: "#f6f8f4"
 };
 
+function summarizeBulkImportIssues(result: BulkImportResult) {
+  if (result.issues.length === 0) {
+    return "Keine blockierenden Konflikte erkannt.";
+  }
+
+  return `${result.blockingIssueCount} blockierende Probleme erkannt.`;
+}
+
 export function AdminPanel({
   currentUser,
   onSettingsChanged
@@ -60,6 +72,12 @@ export function AdminPanel({
     email: "",
     role: "user" as User["role"]
   });
+  const [bulkImportDraft, setBulkImportDraft] = useState<{ format: BulkImportFormat; source: string }>({
+    format: "csv",
+    source: ""
+  });
+  const [bulkImportPreview, setBulkImportPreview] = useState<BulkImportResult | null>(null);
+  const [bulkImportBusy, setBulkImportBusy] = useState(false);
   const [newInvite, setNewInvite] = useState({
     label: "",
     maxUses: "",
@@ -210,6 +228,58 @@ export function AdminPanel({
       setMessage("User gespeichert.");
     } catch (caught) {
       setError(getErrorMessage(caught));
+    }
+  }
+
+  async function previewBulkImport(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    setBulkImportBusy(true);
+    setError("");
+    setMessage("");
+
+    try {
+      const result = await requestJson<BulkImportPreviewResponse>("/api/admin/users/import/preview", {
+        method: "POST",
+        body: JSON.stringify(bulkImportDraft)
+      });
+      setBulkImportPreview(result.import);
+      setMessage(
+        result.import.hasBlockingIssues
+          ? "Import-Vorschau geladen. Bitte blockierende Probleme erst auflösen."
+          : "Import-Vorschau geladen. Commit kann jetzt ausgeführt werden."
+      );
+    } catch (caught) {
+      setBulkImportPreview(null);
+      setError(getErrorMessage(caught));
+    } finally {
+      setBulkImportBusy(false);
+    }
+  }
+
+  async function commitBulkImport() {
+    setBulkImportBusy(true);
+    setError("");
+    setMessage("");
+
+    try {
+      const result = await requestJson<BulkImportCommitResponse>("/api/admin/users/import/commit", {
+        method: "POST",
+        body: JSON.stringify(bulkImportDraft)
+      });
+      setBulkImportPreview(result.import);
+      setBulkImportDraft({ format: bulkImportDraft.format, source: "" });
+      await loadAdminData();
+      setMessage(`${result.importedCount} User per Bulk-Import angelegt.`);
+    } catch (caught) {
+      if (caught instanceof ApiError && caught.body && typeof caught.body === "object") {
+        const importResult = (caught.body as { import?: BulkImportResult }).import;
+        if (importResult) {
+          setBulkImportPreview(importResult);
+        }
+      }
+      setError(getErrorMessage(caught));
+    } finally {
+      setBulkImportBusy(false);
     }
   }
 
@@ -473,11 +543,18 @@ export function AdminPanel({
   }
 
   const activeRateLimits = getActiveRateLimitEntries();
+  const bulkImportCanCommit = Boolean(
+    bulkImportPreview && !bulkImportPreview.hasBlockingIssues && bulkImportPreview.acceptedRows > 0
+  );
 
   return (
     <section id="admin" className="admin-panel" aria-label="Adminbereich">
       <p className="eyebrow">Admin</p>
       <h2>User, Manager und Einstellungen.</h2>
+      <p className="muted admin-intro">
+        Verwalte hier Zugänge, Theme-Farben, Invite-Codes, Betriebszustand und den letzten
+        Änderungsverlauf der LAN-Runde, ohne die Routing- oder Login-Flows zu verändern.
+      </p>
 
       <form onSubmit={createUser} className="admin-form">
         <label>
@@ -510,6 +587,113 @@ export function AdminPanel({
         </label>
         <button type="submit">User anlegen</button>
       </form>
+
+      <section className="invite-panel" aria-label="Bulk User Import">
+        <p className="eyebrow">Bulk Import</p>
+        <h2>User aus CSV oder JSON importieren.</h2>
+        <p className="muted">
+          Hermes prüft jede Zeile serverseitig gegen denselben Admin-Contract wie Einzel-User.
+          Vorschau zeigt blockierende Konflikte, Commit bleibt gesperrt bis der letzte Preview-Lauf sauber ist.
+        </p>
+        <form onSubmit={previewBulkImport} className="admin-form" aria-label="Bulk Import Formular">
+          <label>
+            Format
+            <select
+              aria-label="Importformat"
+              value={bulkImportDraft.format}
+              onChange={(event) => {
+                setBulkImportDraft({
+                  format: event.target.value as BulkImportFormat,
+                  source: bulkImportDraft.source
+                });
+                setBulkImportPreview(null);
+              }}
+            >
+              <option value="csv">CSV</option>
+              <option value="json">JSON</option>
+            </select>
+          </label>
+          <label>
+            Importdaten
+            <textarea
+              aria-label="Importdaten"
+              value={bulkImportDraft.source}
+              onChange={(event) => {
+                setBulkImportDraft({ ...bulkImportDraft, source: event.target.value });
+                setBulkImportPreview(null);
+              }}
+              rows={8}
+              placeholder={
+                bulkImportDraft.format === "csv"
+                  ? "username,email,role\nanna,anna@example.test,user"
+                  : '[{"username":"anna","email":"anna@example.test","role":"user"}]'
+              }
+              required
+            />
+          </label>
+          <div className="action-row">
+            <button type="submit" disabled={bulkImportBusy || bulkImportDraft.source.trim().length === 0}>
+              Vorschau laden
+            </button>
+            <button
+              type="button"
+              className="secondary"
+              onClick={() => void commitBulkImport()}
+              disabled={bulkImportBusy || !bulkImportCanCommit}
+            >
+              Import committen
+            </button>
+          </div>
+        </form>
+
+        {bulkImportPreview ? (
+          <div className="device-list" aria-label="Bulk Import Vorschau">
+            <article className="device-row">
+              <div>
+                <strong>Preview Zusammenfassung</strong>
+                <span>Format: {bulkImportPreview.format.toUpperCase()}</span>
+                <span>Zeilen gesamt: {bulkImportPreview.totalRows}</span>
+                <span>Gültige Kandidaten: {bulkImportPreview.acceptedRows}</span>
+                <span>{summarizeBulkImportIssues(bulkImportPreview)}</span>
+              </div>
+            </article>
+
+            <article className="device-row" aria-label="Blockierende Probleme">
+              <div>
+                <strong>Blockierende Probleme</strong>
+                {bulkImportPreview.issues.length > 0 ? (
+                  <ul>
+                    {bulkImportPreview.issues.map((issue, index) => (
+                      <li key={`${issue.row}-${issue.field}-${index}`}>
+                        Zeile {issue.row}: {issue.message}
+                      </li>
+                    ))}
+                  </ul>
+                ) : (
+                  <span>Keine blockierenden Konflikte erkannt.</span>
+                )}
+              </div>
+            </article>
+
+            <article className="device-row" aria-label="Import Kandidaten">
+              <div>
+                <strong>Importierbare User</strong>
+                {bulkImportPreview.validCandidates.length > 0 ? (
+                  <ul>
+                    {bulkImportPreview.validCandidates.map((candidate) => (
+                      <li key={`${candidate.username}-${candidate.email}`}>
+                        {candidate.username} · {candidate.email} · {candidate.role}
+                      </li>
+                    ))}
+                  </ul>
+                ) : (
+                  <span>Noch keine importierbaren User in dieser Vorschau.</span>
+                )}
+              </div>
+            </article>
+          </div>
+        ) : null}
+      </section>
 
       <div className="admin-list" aria-label="Userliste">
         {users.map((user) => (
@@ -589,6 +773,14 @@ export function AdminPanel({
           />
           Öffentliche Registrierung per Invite-Code erlauben
         </label>
+        <p className="muted">
+          Diese fünf Farben werden serverseitig gespeichert und steuern die Shell-Akzente für Events,
+          Login, Manager, Admin und die gemeinsame Oberfläche auf allen Geräten.
+        </p>
+        <p className="muted">
+          Änderungen wirken sofort in der Shell und bleiben der zentrale Theme-Vertrag für Desktop
+          und Smartphone.
+        </p>
         <div className="color-grid" aria-label="Designfarben">
           <label>
             Primärfarbe
@@ -648,6 +840,10 @@ export function AdminPanel({
         <p className="muted">
           Backup schreibt den aktuellen SQLite-Snapshot nach S3. Restore ersetzt die aktiven Daten
           durch den Snapshot aus S3.
+        </p>
+        <p className="muted">
+          Nutze Restore nur bewusst zwischen Spielrunden und prüfe danach direkt Users, Events und
+          die aktuelle Session.
         </p>
         {storage?.backend === "disabled" ? (
           <p className="muted">S3 Snapshot Storage ist deaktiviert (HERMES_STORAGE_BACKEND ≠ s3).</p>
@@ -1028,6 +1224,10 @@ export function AdminPanel({
           <div>
             <p className="eyebrow">Audit</p>
             <h2>Letzte Aktionen.</h2>
+            <p className="muted">
+              Das Audit-Log hilft dir beim Nachvollziehen von Änderungen, wenn Invite-, User- oder
+              Restore-Aktionen später geprüft werden müssen.
+            </p>
           </div>
           <button type="button" className="secondary" onClick={() => loadAdminData()}>
             Aktualisieren
@@ -1054,4 +1254,3 @@ export function AdminPanel({
     </section>
   );
 }
-

@@ -313,14 +313,26 @@ export function EventBoard({
       <div className="access-panel" aria-label="Login Hinweis">
         <img src="/icon.svg" alt="" />
         <p className="eyebrow">Login</p>
-        <h2>Einloggen und Runden sehen.</h2>
-        <p className="muted">Events, Serverdaten und Startzeiten sind nach dem Login verfügbar.</p>
+        <h2>Einloggen und aktuelle Runden prüfen.</h2>
+        <p className="muted">
+          Nach dem Login siehst du sofort, welche Runde startet, wer schon dabei ist und welche
+          Server- oder Join-Hinweise hinterlegt wurden.
+        </p>
         <a className="text-link" href="#login">
           Zum Login
         </a>
       </div>
     );
   }
+
+  const liveStateLabel =
+    liveState === "live"
+      ? "Live verbunden"
+      : liveState === "connecting"
+        ? "Verbinde…"
+        : liveState === "polling"
+          ? "Polling aktiv"
+          : "Offline";
 
   return (
     <section
@@ -329,11 +341,9 @@ export function EventBoard({
     >
       <div className="board-toolbar">
         <div>
-          <span className={`live-state live-${liveState}`}>
-            {liveState === "live" ? "Live verbunden" : "Polling aktiv"}
-          </span>
+          <span className={`live-state live-${liveState}`}>{liveStateLabel}</span>
           <span className="toolbar-hint">
-            {events.length === 1 ? "1 Runde" : `${events.length} Runden`}
+            {events.length === 1 ? "1 Runde im Board" : `${events.length} Runden im Board`}
           </span>
         </div>
         <button type="button" className="secondary" onClick={() => loadEvents()}>
@@ -344,7 +354,10 @@ export function EventBoard({
         <div className="access-panel compact" aria-label="Manager Hinweis">
           <p className="eyebrow">Manager</p>
           <h2>Keine Managerrechte.</h2>
-          <p className="muted">Neue Runden können Manager und Admins anlegen.</p>
+          <p className="muted">
+            Neue Runden können nur Manager und Admins anlegen. Als Spieler kannst du hier weiter
+            bestehende Runden verfolgen.
+          </p>
         </div>
       ) : null}
       {showCreateForm ? (
@@ -352,6 +365,10 @@ export function EventBoard({
           <div className="form-title">
             <p className="eyebrow">Neue Runde</p>
             <h2>Spielrunde vorbereiten.</h2>
+            <p className="muted">
+              Lege Spiel, Startfenster und optionale Join-Hinweise einmal sauber an, damit alle im
+              Board dieselben Informationen sehen.
+            </p>
           </div>
           <label>
             Spiel
@@ -469,10 +486,14 @@ export function EventBoard({
               </div>
             </dl>
             {event.serverHost || event.connectionInfo ? (
-              <p className="muted">
+              <p className="muted event-join-hint">
                 {[event.serverHost, event.connectionInfo].filter(Boolean).join(" | ")}
               </p>
-            ) : null}
+            ) : (
+              <p className="muted event-join-hint">
+                Server- und Join-Hinweise fehlen noch. Frag kurz im LAN nach, bevor ihr startet.
+              </p>
+            )}
             {event.status !== "archived" && event.status !== "cancelled" ? (
               <div className="action-row">
                 <button
@@ -535,8 +556,10 @@ export function EventBoard({
         {events.length === 0 ? (
           <article className="event-card">
             <p className="eyebrow">Events</p>
-            <h2>Keine Runden offen.</h2>
-            <p className="muted">Sobald ein Manager etwas anlegt, erscheint es hier.</p>
+            <h2>Noch keine Runden im Board.</h2>
+            <p className="muted">
+              Sobald ein Manager eine Runde vorbereitet, tauchen Spiel, Startfenster und Join-Hinweise hier auf.
+            </p>
           </article>
         ) : null}
       </div>

@@ -33,3 +33,21 @@ pnpm-debug.log*
 .DS_Store
 .idea/
 .vscode/
+
+# ── GSD baseline (auto-generated) ──
+.gsd
+.gsd-id
+.bg-shell/
+Thumbs.db
+*.swp
+*.swo
+*~
+*.code-workspace
+__pycache__/
+*.pyc
+.venv/
+venv/
+target/
+vendor/
+.cache/
+tmp/

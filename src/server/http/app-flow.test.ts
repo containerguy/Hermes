@@ -865,6 +865,283 @@ describe("app flow", () => {
       });
   });
 
+  it("previews bulk user imports for CSV and JSON without writing users", async () => {
+    const adminAgent = request.agent(started!.app);
+    await login(adminAgent, "hauptadmin");
+    const csrf = await fetchCsrf(adminAgent);
+
+    const csvSource = [
+      "username,email,displayName,role",
+      "bulkcsv1,bulkcsv1@example.test,Bulk CSV One,user",
+      "bulkcsv2,bulkcsv2@example.test,,manager"
+    ].join("\n");
+
+    await adminAgent
+      .post("/api/admin/users/import/preview")
+      .set(CSRF_HEADER, csrf)
+      .send({ format: "csv", source: csvSource })
+      .expect(200)
+      .expect((response) => {
+        expect(response.body.import.totalRows).toBe(2);
+        expect(response.body.import.acceptedRows).toBe(2);
+        expect(response.body.import.hasBlockingIssues).toBe(false);
+        expect(response.body.import.validCandidates).toHaveLength(2);
+        expect(response.body.import.validCandidates[1].role).toBe("manager");
+      });
+
+    const jsonSource = JSON.stringify([
+      {
+        username: "bulkjson1",
+        email: "bulkjson1@example.test",
+        displayName: "Bulk Json One",
+        role: "user"
+      }
+    ]);
+
+    await adminAgent
+      .post("/api/admin/users/import/preview")
+      .set(CSRF_HEADER, csrf)
+      .send({ format: "json", source: jsonSource })
+      .expect(200)
+      .expect((response) => {
+        expect(response.body.import.totalRows).toBe(1);
+        expect(response.body.import.acceptedRows).toBe(1);
+        expect(response.body.import.validCandidates[0].username).toBe("bulkjson1");
+      });
+
+    await adminAgent
+      .get("/api/admin/users")
+      .expect(200)
+      .expect((response) => {
+        const usernames = (response.body.users as Array<{ username: string }>).map((user) => user.username);
+        expect(usernames).not.toContain("bulkcsv1");
+        expect(usernames).not.toContain("bulkjson1");
+      });
+  });
+
+  it("reports bulk import validation, intra-file duplicate, and active-user conflict issues", async () => {
+    const adminAgent = request.agent(started!.app);
+    await login(adminAgent, "hauptadmin");
+    const csrf = await fetchCsrf(adminAgent);
+
+    await adminAgent
+      .post("/api/admin/users")
+      .send({ username: "existing-import-user", email: "existing-import@example.test", role: "user" })
+      .set(CSRF_HEADER, csrf)
+      .expect(201);
+
+    const csvSource = [
+      "username,email,displayName,role",
+      "broken,,Broken,user",
+      "dup,dup1@example.test,Dup One,user",
+      "dup,dup2@example.test,Dup Two,user",
+      "existing-import-user,new-address@example.test,Existing,user",
+      "fresh,fresh@example.test,Fresh,user"
+    ].join("\n");
+
+    await adminAgent
+      .post("/api/admin/users/import/preview")
+      .set(CSRF_HEADER, csrf)
+      .send({ format: "csv", source: csvSource })
+      .expect(200)
+      .expect((response) => {
+        expect(response.body.import.totalRows).toBe(5);
+        expect(response.body.import.acceptedRows).toBe(2);
+        expect(response.body.import.hasBlockingIssues).toBe(true);
+        const issues = response.body.import.issues as Array<{
+          code: string;
+          field: string;
+          row: number;
+          conflictWithRow?: number;
+        }>;
+        expect(issues.some((issue) => issue.code === "ungueltige_import_zeile" && issue.field === "email" && issue.row === 2)).toBe(true);
+        expect(
+          issues.some(
+            (issue) =>
+              issue.code === "doppelte_dateiwerte" &&
+              issue.field === "username" &&
+              issue.row === 4 &&
+              issue.conflictWithRow === 3
+          )
+        ).toBe(true);
+        expect(
+          issues.some(
+            (issue) =>
+              issue.code === "bestehender_user_konflikt" &&
+              issue.field === "username" &&
+              issue.row === 5
+          )
+        ).toBe(true);
+      });
+  });
+
+  it("commits a bulk user import transactionally and writes one aggregated audit entry", async () => {
+    const adminAgent = request.agent(started!.app);
+    await login(adminAgent, "hauptadmin");
+    const csrf = await fetchCsrf(adminAgent);
+
+    const source = JSON.stringify([
+      {
+        username: "imported-a",
+        email: "imported-a@example.test",
+        displayName: "Imported A",
+        role: "user"
+      },
+      {
+        username: "imported-b",
+        email: "imported-b@example.test",
+        role: "manager"
+      }
+    ]);
+
+    await adminAgent
+      .post("/api/admin/users/import/commit")
+      .set(CSRF_HEADER, csrf)
+      .send({ format: "json", source })
+      .expect(201)
+      .expect((response) => {
+        expect(response.body.importedCount).toBe(2);
+        expect(response.body.users).toHaveLength(2);
+        expect(response.body.users[0].phoneNumber).toMatch(/^user:/);
+      });
+
+    await adminAgent
+      .get("/api/admin/users")
+      .expect(200)
+      .expect((response) => {
+        const users = response.body.users as Array<{ username: string; notificationsEnabled: boolean }>;
+        const imported = users.filter((user) => ["imported-a", "imported-b"].includes(user.username));
+        expect(imported).toHaveLength(2);
+        expect(imported.every((user) => user.notificationsEnabled === true)).toBe(true);
+      });
+
+    await adminAgent
+      .get("/api/admin/audit-log?limit=50")
+      .expect(200)
+      .expect((response) => {
+        const entries = (response.body.auditLogs as Array<{ action: string; summary: string; metadata: unknown }>).filter(
+          (entry) => entry.action === "user_bulk_import"
+        );
+        expect(entries).toHaveLength(1);
+        expect(entries[0]?.summary).toContain("2 User");
+        const metadataString = JSON.stringify(entries[0]?.metadata ?? {});
+        expect(metadataString).toContain("imported-a");
+        expect(metadataString).not.toContain(source);
+      });
+  });
+
+  it("rejects blocked bulk imports on commit and preserves all-or-nothing semantics", async () => {
+    const adminAgent = request.agent(started!.app);
+    await login(adminAgent, "hauptadmin");
+    const csrf = await fetchCsrf(adminAgent);
+
+    await adminAgent
+      .post("/api/admin/users")
+      .send({ username: "existing-bulk", email: "existing-bulk@example.test", role: "user" })
+      .set(CSRF_HEADER, csrf)
+      .expect(201);
+
+    const source = [
+      "username,email,displayName,role",
+      "will-import,will-import@example.test,Will Import,user",
+      "existing-bulk,other@example.test,Existing,user"
+    ].join("\n");
+
+    await adminAgent
+      .post("/api/admin/users/import/commit")
+      .set(CSRF_HEADER, csrf)
+      .send({ format: "csv", source })
+      .expect(409)
+      .expect((response) => {
+        expect(response.body.error).toBe("import_blockiert");
+        expect(response.body.import.hasBlockingIssues).toBe(true);
+      });
+
+    await adminAgent
+      .get("/api/admin/users")
+      .expect(200)
+      .expect((response) => {
+        const usernames = (response.body.users as Array<{ username: string }>).map((user) => user.username);
+        expect(usernames).not.toContain("will-import");
+      });
+
+    await adminAgent
+      .get("/api/admin/audit-log?limit=50")
+      .expect(200)
+      .expect((response) => {
+        const entries = (response.body.auditLogs as Array<{ action: string }>).filter(
+          (entry) => entry.action === "user_bulk_import"
+        );
+        expect(entries).toHaveLength(0);
+      });
+  });
+
+  it("keeps settings validation strict for theme colors and archive window", async () => {
+    const adminAgent = request.agent(started!.app);
+    await login(adminAgent, "hauptadmin");
+    const csrf = await fetchCsrf(adminAgent);
+
+    await adminAgent
+      .put("/api/admin/settings")
+      .send({
+        appName: "Hermes Test",
+        defaultNotificationsEnabled: true,
+        eventAutoArchiveHours: 0,
+        publicRegistrationEnabled: true,
+        themePrimaryColor: "teal",
+        themeLoginColor: "#be123c",
+        themeManagerColor: "#b7791f",
+        themeAdminColor: "#2563eb",
+        themeSurfaceColor: "#f6f8f4"
+      })
+      .set(CSRF_HEADER, csrf)
+      .expect(400)
+      .expect((response) => {
+        expect(response.body.error).toBe("ungueltige_settings");
+      });
+  });
+
+  it("round-trips backend-owned theme settings through admin save and public bootstrap", async () => {
+    const adminAgent = request.agent(started!.app);
+    await login(adminAgent, "hauptadmin");
+    const csrf = await fetchCsrf(adminAgent);
+
+    const updatedSettings = {
+      appName: "Hermes HQ",
+      defaultNotificationsEnabled: false,
+      eventAutoArchiveHours: 12,
+      publicRegistrationEnabled: true,
+      themePrimaryColor: "#112233",
+      themeLoginColor: "#aa3355",
+      themeManagerColor: "#cc8800",
+      themeAdminColor: "#2255ee",
+      themeSurfaceColor: "#f0ede6"
+    };
+
+    await adminAgent
+      .put("/api/admin/settings")
+      .send(updatedSettings)
+      .set(CSRF_HEADER, csrf)
+      .expect(200)
+      .expect((response) => {
+        expect(response.body.settings).toEqual(updatedSettings);
+      });
+
+    await adminAgent
+      .get("/api/admin/settings")
+      .expect(200)
+      .expect((response) => {
+        expect(response.body.settings).toEqual(updatedSettings);
+      });
+
+    await request(started!.app)
+      .get("/api/settings")
+      .expect(200)
+      .expect((response) => {
+        expect(response.body.settings).toEqual(updatedSettings);
+      });
+  });
+
   it("supports profile display name updates and confirmed email change", async () => {
     const logSpy = vi.spyOn(console, "log").mockImplementation(() => {});
     try {
@@ -1042,7 +1319,7 @@ describe("app flow", () => {
       .expect(200);
 
     const windowsSessions = await windowsAgent.get("/api/auth/sessions").expect(200);
-    expect(windowsSessions.body.sessions[0].deviceName).toBe("Windows-PC");
+    expect(windowsSessions.body.sessions[0].deviceName).toBe("Windows-Desktop · Chrome");
 
     const iphoneAgent = request.agent(started!.app);
     await iphoneAgent.post("/api/auth/request-code").send({ username: "iphoneuser" }).expect(202);
@@ -1056,7 +1333,7 @@ describe("app flow", () => {
       .expect(200);
 
     const iphoneSessions = await iphoneAgent.get("/api/auth/sessions").expect(200);
-    expect(iphoneSessions.body.sessions[0].deviceName).toBe("iPhone");
+    expect(iphoneSessions.body.sessions[0].deviceName).toBe("iPhone · Safari");
   });
 
   it("enforces session rename ownership", async () => {

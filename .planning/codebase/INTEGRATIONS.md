@@ -64,10 +64,17 @@ Hermes is mostly self-contained: the active application state lives in local SQL
 - Workflow: `.github/workflows/docker-image.yml`.
 - Triggers: pull requests to `main`, pushes to `main`, tags matching `v*`, and manual `workflow_dispatch`.
 - Verification job: installs with `npm ci`, runs `npm test`, runs `npm run build`, and audits production dependencies.
-- Docker job: uses `docker/setup-buildx-action`, `docker/login-action`, `docker/metadata-action`, and `docker/build-push-action`.
+- Actions are pinned to Node-24-ready major versions: `actions/checkout@v5`, `actions/setup-node@v5`, `docker/setup-buildx-action@v4`, `docker/login-action@v4`, `docker/metadata-action@v6`, and `docker/build-push-action@v7`.
+- Docker job uses the pinned Docker actions above to build metadata and image artifacts.
 - Registry: images publish to GitHub Container Registry as `ghcr.io/containerguy/hermes` except on pull request builds.
 - Tags: workflow metadata produces `latest` on the default branch, branch tags, version tags, and `sha-` commit tags.
 - Permissions: workflow grants `contents: read` and `packages: write` for package publishing.
+
+## CI Node 24 Migration
+
+- Rationale: GitHub-hosted JavaScript actions are migrating from Node 20 to Node 24; proactive action pinning avoids a release-day CI break.
+- Early opt-in: workflow-level `FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true` is enabled to fail fast on incompatible JavaScript actions during PR validation.
+- Date context: GitHub runtime migration target window is June 2026; Hermes adopts compatibility pins ahead of that window.
 
 ## Docker Runtime Integrations
 

@@ -7,6 +7,9 @@ export const errorMessages: Record<string, string> = {
   email_code_abgelehnt: "Der Bestätigungscode wurde abgelehnt.",
   email_existiert_bereits: "Diese E-Mail-Adresse wird bereits verwendet.",
   eigener_user_nicht_loeschbar: "Der eigene Admin-User kann nicht gelöscht werden.",
+  import_blockiert: "Der Import hat blockierende Probleme. Bitte Vorschau prüfen und Daten korrigieren.",
+  import_konnte_nicht_gespeichert_werden:
+    "Der Bulk-Import konnte nicht gespeichert werden. Bitte Vorschau erneut laden und später noch einmal versuchen.",
   invite_abgelaufen: "Dieser Invite-Code ist abgelaufen und kann nicht reaktiviert werden.",
   invite_ausgeschoepft: "Dieser Invite-Code ist bereits ausgeschöpft.",
   invite_code_custom_deaktiviert:
@@ -37,6 +40,7 @@ export const errorMessages: Record<string, string> = {
     "Push benötigt HTTPS oder localhost. Über eine normale HTTP-LAN-Adresse deaktivieren Browser Web Push.",
   ungueltige_registrierung: "Registrierungsdaten sind ungültig.",
   ungueltige_settings: "Einstellungen sind ungültig.",
+  ungueltiger_import: "Importdaten sind ungültig. Bitte Format und Inhalt prüfen.",
   ungueltiger_invite_code: "Invite-Code ist ungültig.",
   ungueltiger_profilname: "Der Profilname ist ungültig.",
   ungueltiger_user: "Userdaten sind ungültig.",
@@ -59,4 +63,3 @@ export function getErrorMessage(caught: unknown) {
   const code = caught instanceof Error ? caught.message : "request_failed";
   return errorMessages[code] ?? code;
 }
-

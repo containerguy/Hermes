@@ -21,6 +21,53 @@ export type AppSettings = {
   themeSurfaceColor: string;
 };
 
+export type BulkImportFormat = "csv" | "json";
+
+export type BulkImportIssueCode =
+  | "ungueltige_import_daten"
+  | "ungueltige_import_zeile"
+  | "doppelte_dateiwerte"
+  | "bestehender_user_konflikt";
+
+export type BulkImportIssueField = "source" | "username" | "email" | "row";
+
+export type BulkImportCandidate = {
+  phoneNumber?: string;
+  username: string;
+  displayName?: string;
+  email: string;
+  role: User["role"];
+};
+
+export type BulkImportIssue = {
+  row: number;
+  code: BulkImportIssueCode;
+  field: BulkImportIssueField;
+  message: string;
+  value?: string;
+  conflictWithRow?: number;
+};
+
+export type BulkImportResult = {
+  format: BulkImportFormat;
+  totalRows: number;
+  acceptedRows: number;
+  blockingIssueCount: number;
+  hasBlockingIssues: boolean;
+  validCandidates: BulkImportCandidate[];
+  issues: BulkImportIssue[];
+};
+
+export type BulkImportPreviewResponse = {
+  import: BulkImportResult;
+};
+
+export type BulkImportCommitResponse = {
+  importedCount: number;
+  users: User[];
+  import: BulkImportResult;
+};
+
 export type StorageLocationDetails = {
   bucket: string;
   key: string;
@@ -126,4 +173,3 @@ export type RateLimitAllowlistEntry = {
   createdAt: string;
   updatedAt: string;
 };
-

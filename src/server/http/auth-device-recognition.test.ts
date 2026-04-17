@@ -14,6 +14,8 @@ const DEVICE_KEY_A = "AAAAAAAAAAAAAAAAAAAAAA";
 const DEVICE_KEY_B = "BBBBBBBBBBBBBBBBBBBBBB";
 const CHROME_WINDOWS_UA =
   "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36";
+const ANDROID_CHROME_UA =
+  "Mozilla/5.0 (Linux; Android 14; Pixel 8) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.0.0 Mobile Safari/537.36";
 
 let started: StartedApp | undefined;
 let databasePath: string;
@@ -112,6 +114,51 @@ describe("auth device recognition", () => {
     expect(recognizedLog).toBeTruthy();
     const combined = `${recognizedLog?.summary ?? ""}|${recognizedLog?.metadata ?? ""}`;
     expect(combined.includes(DEVICE_KEY_A)).toBe(false);
+  });
+
+  it("derives a human-meaningful Windows label when a recognized session is reused without manual rename", async () => {
+    const agent = request.agent(started!.app);
+
+    await requestCode(agent, "hauptadmin");
+    await agent
+      .post("/api/auth/verify-code")
+      .set("User-Agent", CHROME_WINDOWS_UA)
+      .send({
+        username: "hauptadmin",
+        code: "123456",
+        deviceKey: DEVICE_KEY_A
+      })
+      .expect(200);
+
+    expect(countActiveSessionsForAdmin()).toBe(1);
+
+    await requestCode(agent, "hauptadmin");
+    await agent
+      .post("/api/auth/verify-code")
+      .set("User-Agent", CHROME_WINDOWS_UA)
+      .send({
+        username: "hauptadmin",
+        code: "123456",
+        deviceKey: DEVICE_KEY_A
+      })
+      .expect(200);
+
+    const sqlite = openDb();
+    const row = sqlite
+      .prepare(
+        "SELECT device_name, device_key_hash FROM sessions WHERE user_id = (SELECT id FROM users WHERE username = ?) AND revoked_at IS NULL"
+      )
+      .get("hauptadmin") as { device_name: string; device_key_hash: string | null };
+
+    const recognizedLog = sqlite
+      .prepare("SELECT summary, metadata FROM audit_logs WHERE action = ? ORDER BY created_at DESC LIMIT 1")
+      .get("auth.login_recognized") as { summary: string; metadata: string | null } | undefined;
+    sqlite.close();
+
+    expect(row.device_name).toBe("Windows-Desktop · Chrome");
+    expect(row.device_key_hash).not.toBeNull();
+    expect(recognizedLog).toBeTruthy();
+    expect(`${recognizedLog?.summary ?? ""}|${recognizedLog?.metadata ?? ""}`).not.toContain(DEVICE_KEY_A);
   });
 
   it("fallback by signals (no deviceKey, same User-Agent) reuses the existing session", async () => {

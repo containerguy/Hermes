@@ -32,6 +32,9 @@ function openDb() {
   return new Database(databasePath);
 }
 
+const ANDROID_CHROME_UA =
+  "Mozilla/5.0 (Linux; Android 14; Pixel 8) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.0.0 Mobile Safari/537.36";
+
 function getAdminId() {
   const sqlite = openDb();
   const row = sqlite.prepare("SELECT id FROM users WHERE username = ?").get("hauptadmin") as
@@ -160,6 +163,42 @@ describe("auth device pairing", () => {
     for (const row of [...created, ...redeemed]) {
       expect(JSON.stringify(row)).not.toContain(token);
     }
+  });
+
+  it("pair redemption derives a human-meaningful Android label when no manual device name is submitted", async () => {
+    const agentA = request.agent(started!.app);
+    const admin = await login(agentA, "hauptadmin");
+    const csrf = await fetchCsrf(agentA);
+
+    const mint = await agentA
+      .post("/api/auth/pair-token")
+      .set(CSRF_HEADER, csrf)
+      .send({})
+      .expect(201);
+    const token = mint.body.token as string;
+
+    await request.agent(started!.app)
+      .post("/api/auth/pair-redeem")
+      .set("User-Agent", ANDROID_CHROME_UA)
+      .send({ token, deviceKey: "BBBBBBBBBBBBBBBBBBBBBB" })
+      .expect(201);
+
+    const sqlite = openDb();
+    const sessionRows = sqlite
+      .prepare(
+        "SELECT id, device_name, revoked_at FROM sessions WHERE user_id = ? ORDER BY created_at ASC"
+      )
+      .all(admin.id) as Array<{ id: string; device_name: string; revoked_at: string | null }>;
+
+    const redeemed = sqlite
+      .prepare("SELECT metadata FROM audit_logs WHERE action = ? AND actor_user_id = ? ORDER BY created_at DESC LIMIT 1")
+      .get("device_pair_redeemed", admin.id) as { metadata: string | null } | undefined;
+    sqlite.close();
+
+    expect(sessionRows).toHaveLength(2);
+    expect(sessionRows[1]?.revoked_at).toBeNull();
+    expect(sessionRows[1]?.device_name).toBe("Android-Smartphone · Chrome");
+    expect(redeemed?.metadata ?? "").not.toContain(token);
   });
 
   it("double-redemption returns pair_token_consumed", async () => {

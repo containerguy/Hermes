@@ -105,6 +105,9 @@ describe("ui correctness structure contracts", () => {
 
     const rendered = await renderIntoDocument(<EventBoard currentUser={currentUser} mode="events" />);
 
+    expect(rendered.container.textContent).toContain("1 Runde im Board");
+    expect(rendered.container.textContent).toContain("Server- und Join-Hinweise fehlen noch");
+
     const actionRow = rendered.container.querySelector(".action-row");
     expect(actionRow).toBeTruthy();
     expect(actionRow?.textContent).toContain("Dabei");
@@ -193,6 +196,16 @@ describe("ui correctness structure contracts", () => {
     expect(auditPanel).toBeTruthy();
     expect(auditPanel?.querySelector(".section-title-row")).toBeTruthy();
     expect(auditPanel?.querySelector(".audit-list")).toBeTruthy();
+
+    const colorHelp = rendered.container.querySelector('.admin-form .muted');
+    expect(colorHelp?.textContent).toContain("fünf Farben werden serverseitig gespeichert");
+    expect(rendered.container.textContent).toContain(
+      "Änderungen wirken sofort in der Shell und bleiben der zentrale Theme-Vertrag"
+    );
+    expect(rendered.container.textContent).toContain(
+      "Das Audit-Log hilft dir beim Nachvollziehen von Änderungen"
+    );
+    expect(rendered.container.querySelector('.color-grid input[type="color"]')).toBeTruthy();
 
     await rendered.cleanup();
   });
