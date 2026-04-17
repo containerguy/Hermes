@@ -458,28 +458,20 @@ export function LoginPanel({
     const pushSupport = getPushSupport();
     return (
       <section className="login-panel" id="login" aria-label="Aktuelle Anmeldung">
-        <p className="eyebrow">Profil</p>
-        <h2>{currentUser.displayName || currentUser.username}</h2>
-        <dl className="account-list">
-          <div>
-            <dt>Login</dt>
-            <dd>{currentUser.username}</dd>
-          </div>
-          <div>
-            <dt>Rolle</dt>
-            <dd>{currentUser.role}</dd>
-          </div>
-          <div>
-            <dt>E-Mail</dt>
-            <dd>{currentUser.email}</dd>
-          </div>
-        </dl>
+        <header className="login-panel-intro">
+          <p className="eyebrow">Einstellungen</p>
+          <h2>Profil und Benachrichtigungen</h2>
+          <p className="muted">
+            Zuerst bearbeitbare Daten und Push — danach Geräteliste und Pairing. Login, Rolle und
+            E-Mail findest du unten in der Konto-Übersicht.
+          </p>
+        </header>
 
-        <section className="device-panel" aria-label="Profilverwaltung">
+        <section className="device-panel" aria-label="Profil bearbeiten">
           <div className="section-title-row">
             <div>
               <p className="eyebrow">Profil</p>
-              <h2>Profil und E-Mail aktuell halten.</h2>
+              <h3>Profil und E-Mail aktuell halten.</h3>
               <p className="muted">
                 Passe Anzeigename und Mailadresse hier an, damit Einmalcodes und Teilnehmerlisten
                 auf allen Geräten konsistent bleiben.
@@ -586,76 +578,6 @@ export function LoginPanel({
             Deaktivieren
           </button>
         </div>
-        <button type="button" className="secondary" onClick={logout} disabled={busy}>
-          Logout
-        </button>
-        <section className="device-panel" aria-label="Gerät hinzufügen">
-          <div className="section-title-row">
-            <div>
-              <p className="eyebrow">Pairing</p>
-              <h2>Weiteres Gerät verbinden.</h2>
-              <p className="muted">
-                Erzeuge einen kurzlebigen Pairing-Link, um Hermes auf Smartphone, Tablet oder
-                Zweit-PC ohne erneutes Tippen des Einmalcodes zu öffnen.
-              </p>
-            </div>
-            {pairingToken ? (
-              <button
-                type="button"
-                className="secondary"
-                onClick={clearPairingToken}
-                disabled={busy}
-              >
-                Schließen
-              </button>
-            ) : null}
-          </div>
-          {pairingToken ? (
-            (() => {
-              const pairUrl = `${window.location.origin}${window.location.pathname}#login?pair=${pairingToken}`;
-              return (
-                <div className="pair-token-panel">
-                  <QrCanvas
-                    payload={pairUrl}
-                    pixelSize={256}
-                    label="Pairing QR-Code"
-                  />
-                  <a
-                    href={pairUrl}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="pair-link"
-                  >
-                    {pairUrl}
-                  </a>
-                  {pairingExpiresAt ? (
-                    <time dateTime={pairingExpiresAt} className="pair-expires">
-                      Gültig bis {new Date(pairingExpiresAt).toLocaleString("de-DE")}
-                    </time>
-                  ) : null}
-                  <div className="action-row">
-                    <button
-                      type="button"
-                      onClick={mintPairingToken}
-                      disabled={busy}
-                    >
-                      Neuen Code erzeugen
-                    </button>
-                  </div>
-                </div>
-              );
-            })()
-          ) : (
-            <div className="action-row">
-              <button type="button" onClick={mintPairingToken} disabled={busy}>
-                Pairing-Code erzeugen
-              </button>
-            </div>
-          )}
-          {redeemStatus === "done" ? (
-            <p className="notice">Gerät erfolgreich verbunden.</p>
-          ) : null}
-        </section>
         <section className="device-panel" aria-label="Angemeldete Geräte">
           <div className="section-title-row">
             <div>
@@ -729,6 +651,94 @@ export function LoginPanel({
             ) : null}
           </div>
         </section>
+        <section className="device-panel" aria-label="Gerät hinzufügen">
+          <div className="section-title-row">
+            <div>
+              <p className="eyebrow">Pairing</p>
+              <h2>Weiteres Gerät verbinden.</h2>
+              <p className="muted">
+                Erzeuge einen kurzlebigen Pairing-Link, um Hermes auf Smartphone, Tablet oder
+                Zweit-PC ohne erneutes Tippen des Einmalcodes zu öffnen.
+              </p>
+            </div>
+            {pairingToken ? (
+              <button
+                type="button"
+                className="secondary"
+                onClick={clearPairingToken}
+                disabled={busy}
+              >
+                Schließen
+              </button>
+            ) : null}
+          </div>
+          {pairingToken ? (
+            (() => {
+              const pairUrl = `${window.location.origin}${window.location.pathname}#login?pair=${pairingToken}`;
+              return (
+                <div className="pair-token-panel">
+                  <QrCanvas
+                    payload={pairUrl}
+                    pixelSize={256}
+                    label="Pairing QR-Code"
+                  />
+                  <a
+                    href={pairUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="pair-link"
+                  >
+                    {pairUrl}
+                  </a>
+                  {pairingExpiresAt ? (
+                    <time dateTime={pairingExpiresAt} className="pair-expires">
+                      Gültig bis {new Date(pairingExpiresAt).toLocaleString("de-DE")}
+                    </time>
+                  ) : null}
+                  <div className="action-row">
+                    <button
+                      type="button"
+                      onClick={mintPairingToken}
+                      disabled={busy}
+                    >
+                      Neuen Code erzeugen
+                    </button>
+                  </div>
+                </div>
+              );
+            })()
+          ) : (
+            <div className="action-row">
+              <button type="button" onClick={mintPairingToken} disabled={busy}>
+                Pairing-Code erzeugen
+              </button>
+            </div>
+          )}
+          {redeemStatus === "done" ? (
+            <p className="notice">Gerät erfolgreich verbunden.</p>
+          ) : null}
+        </section>
+        <section className="device-panel account-summary-panel" aria-label="Konto-Übersicht">
+          <p className="eyebrow">Konto</p>
+          <h3>Angemeldet als {currentUser.displayName || currentUser.username}</h3>
+          <dl className="account-list">
+            <div>
+              <dt>Login</dt>
+              <dd>{currentUser.username}</dd>
+            </div>
+            <div>
+              <dt>Rolle</dt>
+              <dd>{currentUser.role}</dd>
+            </div>
+            <div>
+              <dt>E-Mail</dt>
+              <dd>{currentUser.email}</dd>
+            </div>
+          </dl>
+        </section>
+        <button type="button" className="secondary" onClick={logout} disabled={busy}>
+          Logout
+        </button>
       </section>
     );
   }

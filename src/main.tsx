@@ -75,6 +75,15 @@ function applyTheme(settings: AppSettings) {
   root.style.setProperty("--surface-strong", `${settings.themeSurfaceColor}f2`);
 }
 
+function profileInitials(user: User): string {
+  const base = (user.displayName || user.username).trim();
+  const parts = base.split(/\s+/).filter(Boolean);
+  if (parts.length >= 2) {
+    return `${parts[0].slice(0, 1)}${parts[1].slice(0, 1)}`.toUpperCase();
+  }
+  return base.slice(0, 2).toUpperCase() || "?";
+}
+
 function getPageFromHash(): PageId {
   const rawHash = window.location.hash || "";
   const queryStart = rawHash.indexOf("?");
@@ -89,14 +98,19 @@ function getPageFromHash(): PageId {
 function PageHeader({
   route,
   currentUser,
-  appName
+  appName,
+  omitSessionAside
 }: {
   route: Route;
   currentUser: User | null;
   appName: string;
+  omitSessionAside: boolean;
 }) {
   return (
-    <section className={`page-hero hero-${route.id}`} aria-labelledby={`${route.id}-title`}>
+    <section
+      className={`page-hero hero-${route.id}${omitSessionAside ? " page-hero--single" : ""}`}
+      aria-labelledby={`${route.id}-title`}
+    >
       <div className="hero-copy">
         <p className="eyebrow">{route.eyebrow}</p>
         <h1 id={`${route.id}-title`}>{route.title}</h1>
@@ -104,20 +118,24 @@ function PageHeader({
         <div className="hero-highlights" aria-label="Bereichsfokus">
           <span>{appName}</span>
           <span>{route.label}</span>
-          <span>{currentUser ? "Session aktiv" : "Gastmodus"}</span>
+          {!omitSessionAside ? (
+            <span>{currentUser ? "Session aktiv" : "Gastmodus"}</span>
+          ) : null}
         </div>
       </div>
-      <aside className="hero-status" aria-label="Status">
-        <img src="/icon.svg" alt="" />
-        <div>
-          <span>Session</span>
-          <strong>{currentUser ? currentUser.username : "Gast"}</strong>
-        </div>
-        <div>
-          <span>Rolle</span>
-          <strong>{currentUser?.role ?? "Login offen"}</strong>
-        </div>
-      </aside>
+      {omitSessionAside ? null : (
+        <aside className="hero-status" aria-label="Status">
+          <img src="/icon.svg" alt="" />
+          <div>
+            <span>Session</span>
+            <strong>{currentUser ? currentUser.username : "Gast"}</strong>
+          </div>
+          <div>
+            <span>Rolle</span>
+            <strong>{currentUser?.role ?? "Login offen"}</strong>
+          </div>
+        </aside>
+      )}
     </section>
   );
 }
@@ -174,6 +192,10 @@ function App() {
   const eventBoardMode =
     currentUser?.role === "manager" || currentUser?.role === "admin" ? "manager" : "events";
 
+  const omitHeroSessionAside = Boolean(
+    currentUser && (displayRoute.id === "events" || displayRoute.id === "admin")
+  );
+
   function renderActivePage() {
     if (activePage === "login") {
       return (
@@ -211,21 +233,56 @@ function App() {
           <img className="brand-mark" src="/icon.svg" alt="" />
           <span>{appSettings.appName}</span>
         </a>
-        <nav className="nav-links">
-          {routes.map((route) => (
-            <a
-              href={route.path}
-              key={route.path}
-              className={activePage === route.id ? "active" : undefined}
-              aria-current={activePage === route.id ? "page" : undefined}
-            >
-              {route.id === "login" && currentUser ? "Profil" : route.label}
-            </a>
-          ))}
-        </nav>
+        <div className="topbar-end">
+          <nav className="nav-links" aria-label="Bereiche">
+            {routes
+              .filter((route) => route.id !== "login")
+              .map((route) => (
+                <a
+                  href={route.path}
+                  key={route.path}
+                  className={activePage === route.id ? "active" : undefined}
+                  aria-current={activePage === route.id ? "page" : undefined}
+                >
+                  {route.label}
+                </a>
+              ))}
+          </nav>
+          <a
+            href="#login"
+            className={`profile-nav-trigger${activePage === "login" ? " active" : ""}`}
+            aria-current={activePage === "login" ? "page" : undefined}
+            aria-label={
+              currentUser
+                ? `Profil, angemeldet als ${currentUser.username}`
+                : "Zum Login"
+            }
+          >
+            {currentUser ? (
+              <span className="profile-avatar" aria-hidden="true">
+                {profileInitials(currentUser)}
+              </span>
+            ) : (
+              <span className="profile-avatar profile-avatar--guest" aria-hidden="true">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                  <path
+                    d="M12 12a4 4 0 1 0-4-4 4 4 0 0 0 4 4Zm0 2c-4.42 0-8 2.24-8 5v1h16v-1c0-2.76-3.58-5-8-5Z"
+                    fill="currentColor"
+                  />
+                </svg>
+              </span>
+            )}
+            <span className="profile-nav-label">{currentUser ? "Profil" : "Login"}</span>
+          </a>
+        </div>
       </header>
       <div className="page-shell">
-        <PageHeader route={displayRoute} currentUser={currentUser} appName={appSettings.appName} />
+        <PageHeader
+          route={displayRoute}
+          currentUser={currentUser}
+          appName={appSettings.appName}
+          omitSessionAside={omitHeroSessionAside}
+        />
         {renderActivePage()}
       </div>
     </main>
