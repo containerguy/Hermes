@@ -107,6 +107,9 @@ describe("ui correctness structure contracts", () => {
 
     expect(rendered.container.textContent).toContain("1 Runde im Board");
     expect(rendered.container.textContent).toContain("Server- und Join-Hinweise fehlen noch");
+    expect(rendered.container.querySelector(".event-capacity-track")).toBeTruthy();
+    expect(rendered.container.textContent).toContain("Runde von");
+    expect(rendered.container.textContent).toContain("manager");
 
     const actionRow = rendered.container.querySelector(".action-row");
     expect(actionRow).toBeTruthy();

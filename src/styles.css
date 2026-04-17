@@ -485,6 +485,141 @@ h2 {
   gap: 16px;
 }
 
+.event-meta-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 10px 16px;
+  margin-top: 12px;
+  padding-top: 12px;
+  border-top: 1px solid var(--line);
+}
+
+.event-organizer {
+  font-size: 0.88rem;
+  color: var(--muted);
+  font-weight: 800;
+}
+
+.event-organizer strong {
+  color: var(--ink);
+  font-weight: 900;
+}
+
+.event-relative-start {
+  font-size: 0.88rem;
+  font-weight: 900;
+  color: var(--teal);
+}
+
+.event-self-status {
+  margin: 12px 0 0;
+  padding: 8px 12px;
+  border-radius: 8px;
+  font-weight: 800;
+  font-size: 0.88rem;
+}
+
+.event-self-joined {
+  background: #dff5e8;
+  color: var(--green);
+  border: 1px solid rgba(15, 118, 110, 0.25);
+}
+
+.event-self-declined {
+  background: #fff5f5;
+  color: #9f1239;
+  border: 1px solid rgba(190, 18, 60, 0.2);
+}
+
+.event-capacity-block {
+  margin: 16px 0 0;
+}
+
+.event-capacity-track {
+  height: 10px;
+  border-radius: 999px;
+  background: var(--surface-strong);
+  overflow: hidden;
+  border: 1px solid var(--line);
+}
+
+.event-capacity-fill {
+  height: 100%;
+  border-radius: 999px;
+  background: linear-gradient(90deg, var(--teal), #0d9488);
+  transition: width 0.25s ease;
+}
+
+.event-full .event-capacity-fill {
+  background: linear-gradient(90deg, var(--blue), #1d4ed8);
+}
+
+.event-cancelled .event-capacity-fill,
+.event-archived .event-capacity-fill {
+  background: var(--line);
+  opacity: 0.75;
+}
+
+.event-capacity-caption {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px 12px;
+  margin-top: 8px;
+}
+
+.event-capacity-count {
+  font-weight: 900;
+  font-size: 0.95rem;
+  color: var(--ink);
+}
+
+.event-capacity-hint {
+  font-size: 0.82rem;
+  font-weight: 800;
+  color: var(--muted);
+}
+
+.event-stats--pair {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  margin-top: 18px;
+}
+
+.event-connection-details {
+  display: grid;
+  gap: 10px;
+  margin-top: 16px;
+  padding: 12px 14px;
+  border-radius: 8px;
+  background: var(--surface);
+  border: 1px solid var(--line);
+}
+
+.event-conn-line {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+}
+
+.event-conn-label {
+  font-size: 0.72rem;
+  font-weight: 900;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.event-conn-value {
+  font-weight: 800;
+  font-size: 0.92rem;
+  color: var(--ink);
+  overflow-wrap: anywhere;
+  word-break: break-word;
+}
+
 .status-pill {
   flex: 0 0 auto;
   border-radius: 999px;

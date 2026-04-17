@@ -45,6 +45,55 @@ function getEventStatusClass(event: GameEvent) {
   return event.status;
 }
 
+const startRelativeFormatter = new Intl.RelativeTimeFormat("de", { numeric: "auto" });
+
+function formatStartRelative(iso: string): string {
+  const startMs = new Date(iso).getTime();
+  const diffSec = Math.round((startMs - Date.now()) / 1000);
+  const abs = Math.abs(diffSec);
+  if (abs < 60) {
+    return startRelativeFormatter.format(diffSec, "second");
+  }
+  if (abs < 3600) {
+    return startRelativeFormatter.format(Math.round(diffSec / 60), "minute");
+  }
+  if (abs < 172_800) {
+    return startRelativeFormatter.format(Math.round(diffSec / 3600), "hour");
+  }
+  return startRelativeFormatter.format(Math.round(diffSec / 86_400), "day");
+}
+
+function capacityPercent(event: GameEvent): number {
+  if (event.maxPlayers <= 0) {
+    return 0;
+  }
+  return Math.min(100, Math.round((event.joinedCount / event.maxPlayers) * 100));
+}
+
+function minPlayersGapHint(event: GameEvent): string | null {
+  if (event.status === "archived" || event.status === "cancelled") {
+    return null;
+  }
+  const gap = event.minPlayers - event.joinedCount;
+  if (gap <= 0) {
+    return "Mindestspielerzahl erreicht";
+  }
+  if (gap === 1) {
+    return "Noch 1 Spieler bis zur Mindestzahl";
+  }
+  return `Noch ${gap} Spieler bis zur Mindestzahl`;
+}
+
+function myParticipationLabel(status: GameEvent["myParticipation"]): string | null {
+  if (status === "joined") {
+    return "Du bist dabei";
+  }
+  if (status === "declined") {
+    return "Du hast abgesagt";
+  }
+  return null;
+}
+
 const defaultEmptyBoardTitle = "Noch keine Runden im Board.";
 const defaultEmptyBoardBody =
   "Sobald ein Manager eine Runde vorbereitet, tauchen Spiel, Startfenster und Join-Hinweise hier auf.";
@@ -468,7 +517,12 @@ export function EventBoard({
       {error ? <p className="error">{error}</p> : null}
 
       <div className="event-list">
-        {events.map((event) => (
+        {events.map((event) => {
+          const selfStatus = myParticipationLabel(event.myParticipation);
+          const gapHint = minPlayersGapHint(event);
+          const startAbsolute = new Date(event.startsAt).toLocaleString("de-DE");
+          const pct = capacityPercent(event);
+          return (
           <article className={`event-card event-${getEventStatusClass(event)}`} key={event.id}>
             <div className="event-header">
               <div>
@@ -479,26 +533,71 @@ export function EventBoard({
                 {getEventStatusLabel(event)}
               </span>
             </div>
-            <dl className="event-stats">
-              <div>
-                <dt>Dabei</dt>
-                <dd>
-                  {event.joinedCount} / {event.maxPlayers}
-                </dd>
+            {selfStatus && event.myParticipation ? (
+              <p
+                className={`event-self-status event-self-${event.myParticipation}`}
+                role="status"
+              >
+                {selfStatus}
+              </p>
+            ) : null}
+            <div className="event-meta-row">
+              <span className="event-organizer">
+                Runde von <strong>{event.createdByUsername}</strong>
+              </span>
+              <time
+                className="event-relative-start"
+                dateTime={event.startsAt}
+                title={startAbsolute}
+              >
+                {formatStartRelative(event.startsAt)}
+              </time>
+            </div>
+            <div className="event-capacity-block">
+              <div
+                className="event-capacity-track"
+                role="progressbar"
+                aria-valuemin={0}
+                aria-valuemax={event.maxPlayers}
+                aria-valuenow={event.joinedCount}
+                aria-label={`Belegung: ${event.joinedCount} von ${event.maxPlayers} Plätzen`}
+              >
+                <div className="event-capacity-fill" style={{ width: `${pct}%` }} />
               </div>
+              <div className="event-capacity-caption">
+                <span className="event-capacity-count">
+                  {event.joinedCount} / {event.maxPlayers} Spieler
+                </span>
+                {gapHint ? <span className="event-capacity-hint">{gapHint}</span> : null}
+              </div>
+            </div>
+            <dl className="event-stats event-stats--pair">
               <div>
                 <dt>Minimum</dt>
                 <dd>{event.minPlayers}</dd>
               </div>
               <div>
-                <dt>Start</dt>
-                <dd>{new Date(event.startsAt).toLocaleString("de-DE")}</dd>
+                <dt>Start (lokal)</dt>
+                <dd>
+                  <time dateTime={event.startsAt}>{startAbsolute}</time>
+                </dd>
               </div>
             </dl>
             {event.serverHost || event.connectionInfo ? (
-              <p className="muted event-join-hint">
-                {[event.serverHost, event.connectionInfo].filter(Boolean).join(" | ")}
-              </p>
+              <div className="event-connection-details">
+                {event.serverHost ? (
+                  <div className="event-conn-line">
+                    <span className="event-conn-label">Server</span>
+                    <span className="event-conn-value">{event.serverHost}</span>
+                  </div>
+                ) : null}
+                {event.connectionInfo ? (
+                  <div className="event-conn-line">
+                    <span className="event-conn-label">Join / Hinweis</span>
+                    <span className="event-conn-value">{event.connectionInfo}</span>
+                  </div>
+                ) : null}
+              </div>
             ) : (
               <p className="muted event-join-hint">
                 Server- und Join-Hinweise fehlen noch. Frag kurz im LAN nach, bevor ihr startet.
@@ -562,7 +661,8 @@ export function EventBoard({
               </div>
             ) : null}
           </article>
-        ))}
+          );
+        })}
         {events.length === 0 ? (
           <article className="event-card">
             <p className="eyebrow">Events</p>
