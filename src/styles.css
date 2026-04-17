@@ -257,8 +257,12 @@ label {
   box-shadow: var(--shadow);
 }
 
-/* Installierte PWA: weniger dominant, kompakter Hero (u. a. kleinere Hauptüberschrift). */
-@media (display-mode: standalone) {
+/*
+ * Kompakter Shell-Hero (u. a. Admin „Betrieb & Theme“, Start): installierte PWA
+ * und schmale Viewports — verhindert, dass globale h1-Regeln (z. B. 680px) den Titel
+ * wieder aufblähen.
+ */
+@media (display-mode: standalone), (max-width: 768px) {
   .page-shell {
     padding: clamp(12px, 3vw, 22px) 0 clamp(26px, 5vw, 44px);
   }
@@ -294,6 +298,19 @@ label {
   .page-hero .hero-status img {
     width: 44px;
     height: 44px;
+  }
+
+  .admin-panel .eyebrow {
+    font-size: 0.68rem;
+  }
+
+  .admin-panel h2 {
+    font-size: clamp(1.02rem, 2.6vw, 1.2rem);
+    line-height: 1.2;
+  }
+
+  .admin-section-head h2 {
+    font-size: clamp(1rem, 2.5vw, 1.12rem);
   }
 }
 
