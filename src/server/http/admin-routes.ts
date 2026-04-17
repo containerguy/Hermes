@@ -277,7 +277,13 @@ function parseBulkImportRows(format: BulkImportFormat, source: string) {
 
 function toIssueMessage(issue: z.ZodIssue) {
   if (issue.code === "invalid_type") {
-    return `Erwartet ${issue.expected}, erhalten ${issue.received}.`;
+    const got =
+      "input" in issue && issue.input !== undefined
+        ? typeof issue.input === "object" && issue.input !== null
+          ? JSON.stringify(issue.input)
+          : String(issue.input)
+        : "unbekannt";
+    return `Erwartet ${issue.expected}, erhalten ${got}.`;
   }
   return issue.message;
 }

@@ -40,7 +40,7 @@ async function login(agent: ReturnType<typeof request.agent>, username: string) 
     .send({ username, code: "123456", deviceName: "test" })
     .expect(200);
 
-  return response.body.user as { id: string; role: string };
+  return response.body.user as { id: string; role: string; username: string };
 }
 
 async function fetchCsrf(agent: ReturnType<typeof request.agent>) {

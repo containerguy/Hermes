@@ -59,7 +59,11 @@ function setupPushHarness() {
     expect(waited).toBeTruthy();
     await waited;
 
-    const [title, options] = showNotification.mock.lastCall as [string, NotificationOptions];
+    const last = showNotification.mock.calls.at(-1) as unknown as
+      | [string, NotificationOptions]
+      | undefined;
+    expect(last).toBeDefined();
+    const [title, options] = last!;
     return { title, options };
   };
 
