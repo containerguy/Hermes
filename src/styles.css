@@ -257,6 +257,46 @@ label {
   box-shadow: var(--shadow);
 }
 
+/* Installierte PWA: weniger dominant, kompakter Hero (u. a. kleinere Hauptüberschrift). */
+@media (display-mode: standalone) {
+  .page-shell {
+    padding: clamp(12px, 3vw, 22px) 0 clamp(26px, 5vw, 44px);
+  }
+
+  .page-hero {
+    padding: clamp(10px, 2vw, 14px);
+    margin-bottom: clamp(8px, 1.5vw, 12px);
+    gap: 10px;
+    grid-template-columns: minmax(0, 1fr) minmax(140px, 200px);
+    border-top-width: 4px;
+  }
+
+  .page-hero h1 {
+    font-size: clamp(0.95rem, 2vw + 0.45rem, 1.28rem);
+    line-height: 1.22;
+  }
+
+  .page-hero .eyebrow {
+    font-size: 0.65rem;
+    margin-bottom: 6px;
+  }
+
+  .page-hero .hero-copy p:not(.eyebrow) {
+    font-size: 0.86rem;
+    line-height: 1.45;
+  }
+
+  .page-hero .hero-status {
+    gap: 10px;
+    padding-left: 14px;
+  }
+
+  .page-hero .hero-status img {
+    width: 44px;
+    height: 44px;
+  }
+}
+
 .page-hero--single {
   grid-template-columns: minmax(0, 1fr);
   align-items: start;
