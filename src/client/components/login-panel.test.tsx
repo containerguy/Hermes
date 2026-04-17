@@ -61,9 +61,10 @@ const defaultSettings: AppSettings = {
   shellEventsEmptyBody: "",
   themePrimaryColor: "#0f766e",
   themeLoginColor: "#be123c",
-  themeManagerColor: "#b7791f",
+   themeManagerColor: "#b7791f",
   themeAdminColor: "#2563eb",
-  themeSurfaceColor: "#f6f8f4"
+  themeSurfaceColor: "#f6f8f4",
+  gameCatalog: []
 };
 
 const redeemedUser: User = {

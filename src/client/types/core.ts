@@ -19,12 +19,16 @@ export type AppSettings = {
   shellStartDescription: string;
   shellEventsEmptyTitle: string;
   shellEventsEmptyBody: string;
+  /** Zentrale Spieltitel für Manager-Dropdown (Event anlegen) */
+  gameCatalog: string[];
   themePrimaryColor: string;
   themeLoginColor: string;
   themeManagerColor: string;
   themeAdminColor: string;
   themeSurfaceColor: string;
 };
+
+export type AdminSection = "users" | "betrieb" | "sicherheit" | "invites" | "audit";
 
 export type BulkImportFormat = "csv" | "json";
 

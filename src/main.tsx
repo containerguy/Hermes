@@ -3,6 +3,7 @@ import { createRoot } from "react-dom/client";
 import "./styles.css";
 
 import type {
+  AdminSection,
   AppSettings,
   User
 } from "./client/types/core";
@@ -66,7 +67,8 @@ const defaultSettings: AppSettings = {
   themeLoginColor: "#be123c",
   themeManagerColor: "#b7791f",
   themeAdminColor: "#2563eb",
-  themeSurfaceColor: "#f6f8f4"
+  themeSurfaceColor: "#f6f8f4",
+  gameCatalog: []
 };
 
 function applyTheme(settings: AppSettings) {
@@ -88,18 +90,49 @@ function profileInitials(user: User): string {
   return base.slice(0, 2).toUpperCase() || "?";
 }
 
-function getPageFromHash(): PageId {
+const adminSectionBySlug: Record<string, AdminSection> = {
+  "": "users",
+  users: "users",
+  betrieb: "betrieb",
+  sicherheit: "sicherheit",
+  invites: "invites",
+  audit: "audit"
+};
+
+const legacyAdminHashToSection: Record<string, AdminSection> = {
+  users: "users",
+  betrieb: "betrieb",
+  sicherheit: "sicherheit",
+  invites: "invites",
+  audit: "audit"
+};
+
+function parseHashRoute(): { page: PageId; adminSection: AdminSection } {
   const rawHash = window.location.hash || "";
   const queryStart = rawHash.indexOf("?");
   const hashPath = queryStart >= 0 ? rawHash.slice(0, queryStart) : rawHash;
+
   if (hashPath === "#manager") {
-    return "events";
+    return { page: "events", adminSection: "users" };
   }
-  if (hashPath === "#admin" || hashPath.startsWith("#admin-")) {
-    return "admin";
+
+  const legacy = hashPath.match(/^#admin-([a-z]+)$/);
+  if (legacy) {
+    const section = legacyAdminHashToSection[legacy[1] ?? ""];
+    if (section) {
+      return { page: "admin", adminSection: section };
+    }
   }
+
+  if (hashPath === "#admin" || hashPath.startsWith("#admin/")) {
+    const sub = hashPath === "#admin" ? "" : hashPath.slice("#admin/".length);
+    const slug = sub.split("/")[0] ?? "";
+    const section = adminSectionBySlug[slug] ?? "users";
+    return { page: "admin", adminSection: section };
+  }
+
   const route = routes.find((item) => item.path === hashPath);
-  return route?.id ?? "events";
+  return { page: route?.id ?? "events", adminSection: "users" };
 }
 
 function applyShellStartHero(route: Route, settings: AppSettings): Route {
@@ -114,12 +147,10 @@ function applyShellStartHero(route: Route, settings: AppSettings): Route {
 function PageHeader({
   route,
   currentUser,
-  appName,
   omitSessionAside
 }: {
   route: Route;
   currentUser: User | null;
-  appName: string;
   omitSessionAside: boolean;
 }) {
   return (
@@ -131,13 +162,6 @@ function PageHeader({
         <p className="eyebrow">{route.eyebrow}</p>
         <h1 id={`${route.id}-title`}>{route.title}</h1>
         <p>{route.description}</p>
-        <div className="hero-highlights" aria-label="Bereichsfokus">
-          <span>{appName}</span>
-          <span>{route.label}</span>
-          {!omitSessionAside ? (
-            <span>{currentUser ? "Session aktiv" : "Gastmodus"}</span>
-          ) : null}
-        </div>
       </div>
       {omitSessionAside ? null : (
         <aside className="hero-status" aria-label="Status">
@@ -158,7 +182,9 @@ function PageHeader({
 
 function App() {
   const [currentUser, setCurrentUser] = useState<User | null>(null);
-  const [activePage, setActivePage] = useState<PageId>(() => getPageFromHash());
+  const initialRoute = parseHashRoute();
+  const [activePage, setActivePage] = useState<PageId>(() => initialRoute.page);
+  const [adminSection, setAdminSection] = useState<AdminSection>(() => initialRoute.adminSection);
   const [appSettings, setAppSettings] = useState<AppSettings>(defaultSettings);
 
   useEffect(() => {
@@ -184,7 +210,9 @@ function App() {
 
   useEffect(() => {
     function syncHash() {
-      setActivePage(getPageFromHash());
+      const next = parseHashRoute();
+      setActivePage(next.page);
+      setAdminSection(next.adminSection);
     }
 
     window.addEventListener("hashchange", syncHash);
@@ -232,6 +260,7 @@ function App() {
         <section className="admin-stage" aria-label="Admin Arbeitsbereich">
           <AdminPanel
             currentUser={currentUser}
+            adminSection={adminSection}
             onSettingsChanged={(settings) => {
               setAppSettings(settings);
               applyTheme(settings);
@@ -247,6 +276,7 @@ function App() {
         mode={eventBoardMode}
         emptyBoardTitle={appSettings.shellEventsEmptyTitle}
         emptyBoardBody={appSettings.shellEventsEmptyBody}
+        gameCatalog={appSettings.gameCatalog}
       />
     );
   }
@@ -254,7 +284,7 @@ function App() {
   return (
     <main className={`app-shell page-${activePage}`}>
       <header className="topbar" aria-label="Hauptnavigation">
-        <a className="brand" href="#events" aria-label="Hermes Start">
+        <a className="brand" href="#events" aria-label="Zur Startseite">
           <img className="brand-mark" src="/icon.svg" alt="" />
           <span>{appSettings.appName}</span>
         </a>
@@ -301,11 +331,34 @@ function App() {
           </a>
         </div>
       </header>
+      {activePage === "admin" && currentUser?.role === "admin" ? (
+        <div className="admin-nav-bar">
+          <nav className="admin-top-subnav" aria-label="Admin Unterseiten">
+            {(
+              [
+                ["users", "Benutzer"],
+                ["betrieb", "Betrieb"],
+                ["sicherheit", "Sicherheit"],
+                ["invites", "Invites"],
+                ["audit", "Audit"]
+              ] as const
+            ).map(([slug, label]) => (
+              <a
+                key={slug}
+                href={`#admin/${slug}`}
+                className={adminSection === slug ? "active" : undefined}
+                aria-current={adminSection === slug ? "page" : undefined}
+              >
+                {label}
+              </a>
+            ))}
+          </nav>
+        </div>
+      ) : null}
       <div className="page-shell">
         <PageHeader
           route={heroRoute}
           currentUser={currentUser}
-          appName={appSettings.appName}
           omitSessionAside={omitHeroSessionAside}
         />
         {renderActivePage()}

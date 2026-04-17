@@ -56,7 +56,8 @@ const defaultSettings: AppSettings = {
   themeLoginColor: "#be123c",
   themeManagerColor: "#b7791f",
   themeAdminColor: "#2563eb",
-  themeSurfaceColor: "#f6f8f4"
+  themeSurfaceColor: "#f6f8f4",
+  gameCatalog: []
 };
 
 const adminUser: User = {
@@ -160,7 +161,11 @@ describe("AdminPanel bulk import UX", () => {
     installAdminDataMock();
 
     const rendered = await renderIntoDocument(
-      <AdminPanel currentUser={adminUser} onSettingsChanged={() => undefined} />
+      <AdminPanel
+        currentUser={adminUser}
+        adminSection="users"
+        onSettingsChanged={() => undefined}
+      />
     );
 
     expect(rendered.container.textContent || "").toContain("User aus CSV oder JSON importieren");
@@ -185,7 +190,11 @@ describe("AdminPanel bulk import UX", () => {
     });
 
     const rendered = await renderIntoDocument(
-      <AdminPanel currentUser={adminUser} onSettingsChanged={() => undefined} />
+      <AdminPanel
+        currentUser={adminUser}
+        adminSection="users"
+        onSettingsChanged={() => undefined}
+      />
     );
 
     const textarea = rendered.container.querySelector('textarea[aria-label="Importdaten"]') as HTMLTextAreaElement;
@@ -241,7 +250,11 @@ describe("AdminPanel bulk import UX", () => {
     });
 
     const rendered = await renderIntoDocument(
-      <AdminPanel currentUser={adminUser} onSettingsChanged={() => undefined} />
+      <AdminPanel
+        currentUser={adminUser}
+        adminSection="users"
+        onSettingsChanged={() => undefined}
+      />
     );
 
     const textarea = rendered.container.querySelector('textarea[aria-label="Importdaten"]') as HTMLTextAreaElement;
@@ -367,7 +380,11 @@ describe("AdminPanel bulk import UX", () => {
     });
 
     const rendered = await renderIntoDocument(
-      <AdminPanel currentUser={adminUser} onSettingsChanged={() => undefined} />
+      <AdminPanel
+        currentUser={adminUser}
+        adminSection="users"
+        onSettingsChanged={() => undefined}
+      />
     );
 
     const textarea = rendered.container.querySelector('textarea[aria-label="Importdaten"]') as HTMLTextAreaElement;

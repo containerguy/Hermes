@@ -142,6 +142,7 @@ describe("ui correctness structure contracts", () => {
       shellStartDescription: "",
       shellEventsEmptyTitle: "",
       shellEventsEmptyBody: "",
+      gameCatalog: [],
       themePrimaryColor: "#0f766e",
       themeLoginColor: "#be123c",
       themeManagerColor: "#b7791f",
@@ -196,7 +197,11 @@ describe("ui correctness structure contracts", () => {
     };
 
     const rendered = await renderIntoDocument(
-      <AdminPanel currentUser={currentUser} onSettingsChanged={() => undefined} />
+      <AdminPanel
+        currentUser={currentUser}
+        adminSection="audit"
+        onSettingsChanged={() => undefined}
+      />
     );
 
     const auditPanel = rendered.container.querySelector('section[aria-label="Audit-Log"]');
@@ -204,14 +209,9 @@ describe("ui correctness structure contracts", () => {
     expect(auditPanel?.querySelector(".section-title-row")).toBeTruthy();
     expect(auditPanel?.querySelector(".audit-list")).toBeTruthy();
 
-    expect(rendered.container.textContent).toContain("fünf Farben werden serverseitig gespeichert");
-    expect(rendered.container.textContent).toContain(
-      "Änderungen wirken sofort in der Shell und bleiben der zentrale Theme-Vertrag"
-    );
     expect(rendered.container.textContent).toContain(
       "Das Audit-Log hilft dir beim Nachvollziehen von Änderungen"
     );
-    expect(rendered.container.querySelector('.color-grid input[type="color"]')).toBeTruthy();
 
     await rendered.cleanup();
   });

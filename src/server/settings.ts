@@ -17,6 +17,7 @@ export const settingsSchema = z.object({
   shellEventsEmptyTitle: z.string().max(240),
   /** Leer = eingebauter Leerzustand-Fließtext */
   shellEventsEmptyBody: z.string().max(2000),
+  gameCatalog: z.array(z.string().trim().min(1).max(160)).max(100),
   themePrimaryColor: colorSchema,
   themeLoginColor: colorSchema,
   themeManagerColor: colorSchema,
@@ -35,6 +36,7 @@ export const defaultSettings: HermesSettings = {
   shellStartDescription: "",
   shellEventsEmptyTitle: "",
   shellEventsEmptyBody: "",
+  gameCatalog: [],
   themePrimaryColor: "#0f766e",
   themeLoginColor: "#be123c",
   themeManagerColor: "#b7791f",

@@ -1115,6 +1115,7 @@ describe("app flow", () => {
       shellStartDescription: "Passe den Hero-Text zentral an.",
       shellEventsEmptyTitle: "Noch keine Partie",
       shellEventsEmptyBody: "Managers können hier Runden anlegen.",
+      gameCatalog: [] as string[],
       themePrimaryColor: "#112233",
       themeLoginColor: "#aa3355",
       themeManagerColor: "#cc8800",

@@ -1,4 +1,4 @@
-import React, { FormEvent, useEffect, useState } from "react";
+import React, { FormEvent, Fragment, useEffect, useState } from "react";
 import type { GameEvent, User } from "../types/core";
 import { requestJson } from "../api/request";
 import { ApiError, getErrorMessage } from "../errors/errors";
@@ -98,16 +98,39 @@ const defaultEmptyBoardTitle = "Noch keine Runden im Board.";
 const defaultEmptyBoardBody =
   "Sobald ein Manager eine Runde vorbereitet, tauchen Spiel, Startfenster und Join-Hinweise hier auf.";
 
+/** Kompakte Kachel-Ansicht für schmale Viewports und installierte PWA (display-mode: standalone). */
+function useCompactTouchShell() {
+  const [compact, setCompact] = useState(false);
+  useEffect(() => {
+    if (typeof window.matchMedia !== "function") {
+      return;
+    }
+    try {
+      const mq = window.matchMedia("(max-width: 768px), (display-mode: standalone)");
+      const apply = () => setCompact(mq.matches);
+      apply();
+      mq.addEventListener("change", apply);
+      return () => mq.removeEventListener("change", apply);
+    } catch {
+      setCompact(false);
+    }
+    return undefined;
+  }, []);
+  return compact;
+}
+
 export function EventBoard({
   currentUser,
   mode = "events",
   emptyBoardTitle = "",
-  emptyBoardBody = ""
+  emptyBoardBody = "",
+  gameCatalog = []
 }: {
   currentUser: User | null;
   mode?: "events" | "manager";
   emptyBoardTitle?: string;
   emptyBoardBody?: string;
+  gameCatalog?: string[];
 }) {
   const resolvedEmptyTitle = emptyBoardTitle.trim() || defaultEmptyBoardTitle;
   const resolvedEmptyBody = emptyBoardBody.trim() || defaultEmptyBoardBody;
@@ -121,12 +144,18 @@ export function EventBoard({
     serverHost: "",
     connectionInfo: ""
   });
+  const [gameTitleMode, setGameTitleMode] = useState<"catalog" | "custom">(() =>
+    gameCatalog.length > 0 ? "catalog" : "custom"
+  );
   const [editedStartsAt, setEditedStartsAt] = useState<Record<string, string>>({});
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
   const [liveState, setLiveState] = useState<"offline" | "connecting" | "live" | "polling">(
     "offline"
   );
+  const compactTouchShell = useCompactTouchShell();
+  const [selectedEventId, setSelectedEventId] = useState<string | null>(null);
+  const [createFlowOpen, setCreateFlowOpen] = useState(false);
 
   const canCreate = currentUser?.role === "manager" || currentUser?.role === "admin";
   const showCreateForm = canCreate && mode === "manager";
@@ -147,6 +176,30 @@ export function EventBoard({
   useEffect(() => {
     loadEvents().catch(() => undefined);
   }, [currentUser?.id]);
+
+  useEffect(() => {
+    if (gameCatalog.length === 0) {
+      setGameTitleMode("custom");
+    }
+  }, [gameCatalog.length]);
+
+  const resolvedCatalog = Array.from(
+    new Set(gameCatalog.map((title) => title.trim()).filter(Boolean))
+  );
+  const gameTitleFromCatalog = resolvedCatalog.length > 0 ? gameTitleMode === "catalog" : false;
+
+  useEffect(() => {
+    if (!compactTouchShell) {
+      setSelectedEventId(null);
+      setCreateFlowOpen(false);
+    }
+  }, [compactTouchShell]);
+
+  useEffect(() => {
+    if (selectedEventId && !events.some((entry) => entry.id === selectedEventId)) {
+      setSelectedEventId(null);
+    }
+  }, [events, selectedEventId]);
 
   useEffect(() => {
     if (!currentUser) {
@@ -241,6 +294,7 @@ export function EventBoard({
       });
       await loadEvents();
       setMessage("Event gespeichert.");
+      setCreateFlowOpen(false);
     } catch (caught) {
       setError(getErrorMessage(caught));
     }
@@ -361,6 +415,17 @@ export function EventBoard({
     );
   }
 
+  function switchGameTitleMode(next: "catalog" | "custom") {
+    if (next === "custom") {
+      setGameTitleMode("custom");
+      return;
+    }
+    setGameTitleMode("catalog");
+    if (!resolvedCatalog.includes(eventDraft.gameTitle)) {
+      setEventDraft((draft) => ({ ...draft, gameTitle: "" }));
+    }
+  }
+
   function isJoinDisabled(event: GameEvent) {
     const alreadyJoined = event.myParticipation === "joined";
     const fullForOthers = event.joinedCount >= event.maxPlayers && !alreadyJoined;
@@ -393,22 +458,386 @@ export function EventBoard({
           ? "Polling aktiv"
           : "Offline";
 
+  function renderFullEventCard(event: GameEvent) {
+    const selfStatus = myParticipationLabel(event.myParticipation);
+    const gapHint = minPlayersGapHint(event);
+    const startAbsolute = new Date(event.startsAt).toLocaleString("de-DE");
+    const pct = capacityPercent(event);
+    return (
+      <article className={`event-card event-${getEventStatusClass(event)}`}>
+        <div className="event-header">
+          <div>
+            <p className="eyebrow">{event.startMode === "now" ? "Sofort" : "Geplant"}</p>
+            <h2>{event.gameTitle}</h2>
+          </div>
+          <span className={`status-pill status-${getEventStatusClass(event)}`}>
+            {getEventStatusLabel(event)}
+          </span>
+        </div>
+        {selfStatus && event.myParticipation ? (
+          <p className={`event-self-status event-self-${event.myParticipation}`} role="status">
+            {selfStatus}
+          </p>
+        ) : null}
+        <div className="event-meta-row">
+          <span className="event-organizer">
+            Runde von <strong>{event.createdByUsername}</strong>
+          </span>
+          <time className="event-relative-start" dateTime={event.startsAt} title={startAbsolute}>
+            {formatStartRelative(event.startsAt)}
+          </time>
+        </div>
+        <div className="event-capacity-block">
+          <div
+            className="event-capacity-track"
+            role="progressbar"
+            aria-valuemin={0}
+            aria-valuemax={event.maxPlayers}
+            aria-valuenow={event.joinedCount}
+            aria-label={`Belegung: ${event.joinedCount} von ${event.maxPlayers} Plätzen`}
+          >
+            <div className="event-capacity-fill" style={{ width: `${pct}%` }} />
+          </div>
+          <div className="event-capacity-caption">
+            <span className="event-capacity-count">
+              {event.joinedCount} / {event.maxPlayers} Spieler
+            </span>
+            {gapHint ? <span className="event-capacity-hint">{gapHint}</span> : null}
+          </div>
+        </div>
+        <dl className="event-stats event-stats--pair">
+          <div>
+            <dt>Minimum</dt>
+            <dd>{event.minPlayers}</dd>
+          </div>
+          <div>
+            <dt>Start (lokal)</dt>
+            <dd>
+              <time dateTime={event.startsAt}>{startAbsolute}</time>
+            </dd>
+          </div>
+        </dl>
+        {event.serverHost || event.connectionInfo ? (
+          <div className="event-connection-details">
+            {event.serverHost ? (
+              <div className="event-conn-line">
+                <span className="event-conn-label">Server</span>
+                <span className="event-conn-value">{event.serverHost}</span>
+              </div>
+            ) : null}
+            {event.connectionInfo ? (
+              <div className="event-conn-line">
+                <span className="event-conn-label">Join / Hinweis</span>
+                <span className="event-conn-value">{event.connectionInfo}</span>
+              </div>
+            ) : null}
+          </div>
+        ) : (
+          <p className="muted event-join-hint">
+            Server- und Join-Hinweise fehlen noch. Frag kurz im LAN nach, bevor ihr startet.
+          </p>
+        )}
+        {event.status !== "archived" && event.status !== "cancelled" ? (
+          <div className="action-row">
+            <button
+              type="button"
+              className={`participation-btn${event.myParticipation === "joined" ? " participation-btn--joined" : ""}`}
+              onClick={() => setParticipation(event.id, "joined")}
+              disabled={isJoinDisabled(event)}
+            >
+              Dabei
+            </button>
+            <button
+              type="button"
+              className={`participation-btn${event.myParticipation === "declined" ? " participation-btn--declined" : ""}`}
+              onClick={() => setParticipation(event.id, "declined")}
+              disabled={event.myParticipation === "declined"}
+            >
+              Nicht dabei
+            </button>
+          </div>
+        ) : null}
+        {canManage(event) && event.status !== "archived" && event.status !== "cancelled" ? (
+          <div className="manage-row">
+            <input
+              type="datetime-local"
+              value={editedStartsAt[event.id] ?? toDatetimeLocal(event.startsAt)}
+              onChange={(change) =>
+                setEditedStartsAt({
+                  ...editedStartsAt,
+                  [event.id]: change.target.value
+                })
+              }
+            />
+            <button type="button" className="secondary" onClick={() => updateStart(event.id)}>
+              Start speichern
+            </button>
+            <button type="button" className="secondary" onClick={() => changeEventStatus(event.id, "archive")}>
+              Archivieren
+            </button>
+            <button type="button" className="secondary" onClick={() => changeEventStatus(event.id, "cancel")}>
+              Stornieren
+            </button>
+          </div>
+        ) : null}
+        {canSoftDelete(event) ? (
+          <div className="action-row">
+            <button type="button" className="secondary danger" onClick={() => softDeleteEvent(event.id)}>
+              Löschen
+            </button>
+          </div>
+        ) : null}
+      </article>
+    );
+  }
+
+  const newEventForm = (
+    <form onSubmit={createEvent} className="event-form" aria-label="Neues Event anlegen">
+      <div className="form-title">
+        <p className="eyebrow">Neue Runde</p>
+        <h2>Spielrunde vorbereiten.</h2>
+        <p className="muted">
+          Lege Spiel, Startfenster und optionale Join-Hinweise einmal sauber an, damit alle im Board
+          dieselben Informationen sehen.
+        </p>
+      </div>
+      <div className="game-title-field">
+        <label>
+          Spiel
+          {resolvedCatalog.length > 0 ? (
+            <div className="game-title-mode-toggle">
+              <button
+                type="button"
+                className={`secondary${gameTitleFromCatalog ? " mode-active" : ""}`}
+                onClick={() => switchGameTitleMode("catalog")}
+              >
+                Aus Liste
+              </button>
+              <button
+                type="button"
+                className={`secondary${!gameTitleFromCatalog ? " mode-active" : ""}`}
+                onClick={() => switchGameTitleMode("custom")}
+              >
+                Eigener Titel
+              </button>
+            </div>
+          ) : null}
+          {gameTitleFromCatalog ? (
+            <select
+              value={eventDraft.gameTitle}
+              onChange={(ev) => setEventDraft({ ...eventDraft, gameTitle: ev.target.value })}
+              required
+              aria-label="Spiel aus Katalog wählen"
+            >
+              <option value="">Spiel wählen…</option>
+              {resolvedCatalog.map((title) => (
+                <option key={title} value={title}>
+                  {title}
+                </option>
+              ))}
+            </select>
+          ) : (
+            <input
+              value={eventDraft.gameTitle}
+              onChange={(ev) => setEventDraft({ ...eventDraft, gameTitle: ev.target.value })}
+              required
+              aria-label="Spieltitel"
+            />
+          )}
+        </label>
+      </div>
+      <div className="form-grid">
+        <label>
+          Start
+          <select
+            value={eventDraft.startMode}
+            onChange={(ev) =>
+              setEventDraft({
+                ...eventDraft,
+                startMode: ev.target.value as "now" | "scheduled"
+              })
+            }
+          >
+            <option value="scheduled">Geplant</option>
+            <option value="now">Sofort</option>
+          </select>
+        </label>
+        <label>
+          Startzeit
+          <input
+            type="datetime-local"
+            disabled={eventDraft.startMode === "now"}
+            value={eventDraft.startsAt}
+            onChange={(ev) => setEventDraft({ ...eventDraft, startsAt: ev.target.value })}
+          />
+        </label>
+      </div>
+      <div className="form-grid">
+        <label>
+          Min
+          <input
+            type="number"
+            min={1}
+            value={eventDraft.minPlayers}
+            onChange={(ev) => setEventDraft({ ...eventDraft, minPlayers: Number(ev.target.value) })}
+            required
+          />
+        </label>
+        <label>
+          Max
+          <input
+            type="number"
+            min={1}
+            value={eventDraft.maxPlayers}
+            onChange={(ev) => setEventDraft({ ...eventDraft, maxPlayers: Number(ev.target.value) })}
+            required
+          />
+        </label>
+      </div>
+      <label>
+        Server
+        <input
+          value={eventDraft.serverHost}
+          onChange={(ev) => setEventDraft({ ...eventDraft, serverHost: ev.target.value })}
+        />
+      </label>
+      <label>
+        Verbindung
+        <input
+          value={eventDraft.connectionInfo}
+          onChange={(ev) => setEventDraft({ ...eventDraft, connectionInfo: ev.target.value })}
+        />
+      </label>
+      <button type="submit">Event anlegen</button>
+    </form>
+  );
+
+  const boardToolbar = (
+    <div className="board-toolbar">
+      <div>
+        <span className={`live-state live-${liveState}`}>{liveStateLabel}</span>
+        <span className="toolbar-hint">
+          {events.length === 1 ? "1 Runde im Board" : `${events.length} Runden im Board`}
+        </span>
+      </div>
+      <button type="button" className="secondary" onClick={() => loadEvents()}>
+        Aktualisieren
+      </button>
+    </div>
+  );
+
+  if (compactTouchShell) {
+    const selectedEvent = selectedEventId ? events.find((entry) => entry.id === selectedEventId) : undefined;
+    return (
+      <section
+        className={`event-board ${mode === "manager" ? "manager-board" : "events-board"} event-board--compact`}
+        aria-label="Events"
+      >
+        {boardToolbar}
+        {mode === "manager" && !canCreate ? (
+          <div className="access-panel compact" aria-label="Manager Hinweis">
+            <p className="eyebrow">Manager</p>
+            <h2>Keine Managerrechte.</h2>
+            <p className="muted">
+              Neue Runden können nur Manager und Admins anlegen. Als Spieler kannst du hier weiter
+              bestehende Runden verfolgen.
+            </p>
+          </div>
+        ) : null}
+        {message ? <p className="notice">{message}</p> : null}
+        {error ? <p className="error">{error}</p> : null}
+        {showCreateForm && !createFlowOpen ? (
+          <div className="event-compact-primary-action">
+            <button
+              type="button"
+              onClick={() => {
+                setCreateFlowOpen(true);
+                setSelectedEventId(null);
+              }}
+            >
+              Neues Event
+            </button>
+          </div>
+        ) : null}
+        {showCreateForm && createFlowOpen ? (
+          <div className="event-overlay-panel" role="region" aria-label="Neues Event anlegen">
+            <div className="event-overlay-toolbar">
+              <button type="button" className="secondary" onClick={() => setCreateFlowOpen(false)}>
+                Zurück zur Übersicht
+              </button>
+            </div>
+            {newEventForm}
+          </div>
+        ) : null}
+        {!createFlowOpen ? (
+          <>
+            <div className="event-list event-list--compact">
+              {events.map((event) => {
+                const pct = capacityPercent(event);
+                return (
+                  <button
+                    key={event.id}
+                    type="button"
+                    className={`event-compact-tile event-tile-${getEventStatusClass(event)}`}
+                    onClick={() => {
+                      setSelectedEventId(event.id);
+                      setCreateFlowOpen(false);
+                    }}
+                    aria-label={`${event.gameTitle}, ${getEventStatusLabel(event)}`}
+                  >
+                    <img src="/icon.svg" alt="" className="event-compact-icon" width={36} height={36} />
+                    <div className="event-compact-tile-body">
+                      <span className="event-compact-title">{event.gameTitle}</span>
+                      <div className="event-compact-track" aria-hidden="true">
+                        <div className="event-compact-fill" style={{ width: `${pct}%` }} />
+                      </div>
+                      <div className="event-compact-meta">
+                        <span className="event-compact-count">
+                          {event.joinedCount}/{event.maxPlayers}
+                        </span>
+                        <span className={`status-pill status-${getEventStatusClass(event)}`}>
+                          {getEventStatusLabel(event)}
+                        </span>
+                      </div>
+                    </div>
+                  </button>
+                );
+              })}
+              {events.length === 0 ? (
+                <div className="event-compact-empty event-card">
+                  <p className="eyebrow">Events</p>
+                  <h2>{resolvedEmptyTitle}</h2>
+                  <p className="muted">{resolvedEmptyBody}</p>
+                </div>
+              ) : null}
+            </div>
+            {selectedEvent ? (
+              <div
+                className="event-overlay-panel event-overlay-panel--detail"
+                role="dialog"
+                aria-modal="true"
+                aria-label={selectedEvent.gameTitle}
+              >
+                <div className="event-overlay-toolbar">
+                  <button type="button" className="secondary" onClick={() => setSelectedEventId(null)}>
+                    Zurück zur Übersicht
+                  </button>
+                </div>
+                {renderFullEventCard(selectedEvent)}
+              </div>
+            ) : null}
+          </>
+        ) : null}
+      </section>
+    );
+  }
+
   return (
     <section
       className={`event-board ${mode === "manager" ? "manager-board" : "events-board"}`}
       aria-label="Events"
     >
-      <div className="board-toolbar">
-        <div>
-          <span className={`live-state live-${liveState}`}>{liveStateLabel}</span>
-          <span className="toolbar-hint">
-            {events.length === 1 ? "1 Runde im Board" : `${events.length} Runden im Board`}
-          </span>
-        </div>
-        <button type="button" className="secondary" onClick={() => loadEvents()}>
-          Aktualisieren
-        </button>
-      </div>
+      {boardToolbar}
       {mode === "manager" && !canCreate ? (
         <div className="access-panel compact" aria-label="Manager Hinweis">
           <p className="eyebrow">Manager</p>
@@ -419,250 +848,14 @@ export function EventBoard({
           </p>
         </div>
       ) : null}
-      {showCreateForm ? (
-        <form onSubmit={createEvent} className="event-form">
-          <div className="form-title">
-            <p className="eyebrow">Neue Runde</p>
-            <h2>Spielrunde vorbereiten.</h2>
-            <p className="muted">
-              Lege Spiel, Startfenster und optionale Join-Hinweise einmal sauber an, damit alle im
-              Board dieselben Informationen sehen.
-            </p>
-          </div>
-          <label>
-            Spiel
-            <input
-              value={eventDraft.gameTitle}
-              onChange={(event) =>
-                setEventDraft({ ...eventDraft, gameTitle: event.target.value })
-              }
-              required
-            />
-          </label>
-          <div className="form-grid">
-            <label>
-              Start
-              <select
-                value={eventDraft.startMode}
-                onChange={(event) =>
-                  setEventDraft({
-                    ...eventDraft,
-                    startMode: event.target.value as "now" | "scheduled"
-                  })
-                }
-              >
-                <option value="scheduled">Geplant</option>
-                <option value="now">Sofort</option>
-              </select>
-            </label>
-            <label>
-              Startzeit
-              <input
-                type="datetime-local"
-                disabled={eventDraft.startMode === "now"}
-                value={eventDraft.startsAt}
-                onChange={(event) =>
-                  setEventDraft({ ...eventDraft, startsAt: event.target.value })
-                }
-              />
-            </label>
-          </div>
-          <div className="form-grid">
-            <label>
-              Min
-              <input
-                type="number"
-                min={1}
-                value={eventDraft.minPlayers}
-                onChange={(event) =>
-                  setEventDraft({ ...eventDraft, minPlayers: Number(event.target.value) })
-                }
-                required
-              />
-            </label>
-            <label>
-              Max
-              <input
-                type="number"
-                min={1}
-                value={eventDraft.maxPlayers}
-                onChange={(event) =>
-                  setEventDraft({ ...eventDraft, maxPlayers: Number(event.target.value) })
-                }
-                required
-              />
-            </label>
-          </div>
-          <label>
-            Server
-            <input
-              value={eventDraft.serverHost}
-              onChange={(event) => setEventDraft({ ...eventDraft, serverHost: event.target.value })}
-            />
-          </label>
-          <label>
-            Verbindung
-            <input
-              value={eventDraft.connectionInfo}
-              onChange={(event) =>
-                setEventDraft({ ...eventDraft, connectionInfo: event.target.value })
-              }
-            />
-          </label>
-          <button type="submit">Event anlegen</button>
-        </form>
-      ) : null}
 
       {message ? <p className="notice">{message}</p> : null}
       {error ? <p className="error">{error}</p> : null}
 
       <div className="event-list">
-        {events.map((event) => {
-          const selfStatus = myParticipationLabel(event.myParticipation);
-          const gapHint = minPlayersGapHint(event);
-          const startAbsolute = new Date(event.startsAt).toLocaleString("de-DE");
-          const pct = capacityPercent(event);
-          return (
-          <article className={`event-card event-${getEventStatusClass(event)}`} key={event.id}>
-            <div className="event-header">
-              <div>
-                <p className="eyebrow">{event.startMode === "now" ? "Sofort" : "Geplant"}</p>
-                <h2>{event.gameTitle}</h2>
-              </div>
-              <span className={`status-pill status-${getEventStatusClass(event)}`}>
-                {getEventStatusLabel(event)}
-              </span>
-            </div>
-            {selfStatus && event.myParticipation ? (
-              <p
-                className={`event-self-status event-self-${event.myParticipation}`}
-                role="status"
-              >
-                {selfStatus}
-              </p>
-            ) : null}
-            <div className="event-meta-row">
-              <span className="event-organizer">
-                Runde von <strong>{event.createdByUsername}</strong>
-              </span>
-              <time
-                className="event-relative-start"
-                dateTime={event.startsAt}
-                title={startAbsolute}
-              >
-                {formatStartRelative(event.startsAt)}
-              </time>
-            </div>
-            <div className="event-capacity-block">
-              <div
-                className="event-capacity-track"
-                role="progressbar"
-                aria-valuemin={0}
-                aria-valuemax={event.maxPlayers}
-                aria-valuenow={event.joinedCount}
-                aria-label={`Belegung: ${event.joinedCount} von ${event.maxPlayers} Plätzen`}
-              >
-                <div className="event-capacity-fill" style={{ width: `${pct}%` }} />
-              </div>
-              <div className="event-capacity-caption">
-                <span className="event-capacity-count">
-                  {event.joinedCount} / {event.maxPlayers} Spieler
-                </span>
-                {gapHint ? <span className="event-capacity-hint">{gapHint}</span> : null}
-              </div>
-            </div>
-            <dl className="event-stats event-stats--pair">
-              <div>
-                <dt>Minimum</dt>
-                <dd>{event.minPlayers}</dd>
-              </div>
-              <div>
-                <dt>Start (lokal)</dt>
-                <dd>
-                  <time dateTime={event.startsAt}>{startAbsolute}</time>
-                </dd>
-              </div>
-            </dl>
-            {event.serverHost || event.connectionInfo ? (
-              <div className="event-connection-details">
-                {event.serverHost ? (
-                  <div className="event-conn-line">
-                    <span className="event-conn-label">Server</span>
-                    <span className="event-conn-value">{event.serverHost}</span>
-                  </div>
-                ) : null}
-                {event.connectionInfo ? (
-                  <div className="event-conn-line">
-                    <span className="event-conn-label">Join / Hinweis</span>
-                    <span className="event-conn-value">{event.connectionInfo}</span>
-                  </div>
-                ) : null}
-              </div>
-            ) : (
-              <p className="muted event-join-hint">
-                Server- und Join-Hinweise fehlen noch. Frag kurz im LAN nach, bevor ihr startet.
-              </p>
-            )}
-            {event.status !== "archived" && event.status !== "cancelled" ? (
-              <div className="action-row">
-                <button
-                  type="button"
-                  onClick={() => setParticipation(event.id, "joined")}
-                  disabled={isJoinDisabled(event)}
-                >
-                  Dabei
-                </button>
-                <button
-                  type="button"
-                  className="secondary"
-                  onClick={() => setParticipation(event.id, "declined")}
-                  disabled={event.myParticipation === "declined"}
-                >
-                  Nicht dabei
-                </button>
-              </div>
-            ) : null}
-            {canManage(event) && event.status !== "archived" && event.status !== "cancelled" ? (
-              <div className="manage-row">
-                <input
-                  type="datetime-local"
-                  value={editedStartsAt[event.id] ?? toDatetimeLocal(event.startsAt)}
-                  onChange={(change) =>
-                    setEditedStartsAt({
-                      ...editedStartsAt,
-                      [event.id]: change.target.value
-                    })
-                  }
-                />
-                <button type="button" className="secondary" onClick={() => updateStart(event.id)}>
-                  Start speichern
-                </button>
-                <button
-                  type="button"
-                  className="secondary"
-                  onClick={() => changeEventStatus(event.id, "archive")}
-                >
-                  Archivieren
-                </button>
-                <button
-                  type="button"
-                  className="secondary"
-                  onClick={() => changeEventStatus(event.id, "cancel")}
-                >
-                  Stornieren
-                </button>
-              </div>
-            ) : null}
-            {canSoftDelete(event) ? (
-              <div className="action-row">
-                <button type="button" className="secondary danger" onClick={() => softDeleteEvent(event.id)}>
-                  Löschen
-                </button>
-              </div>
-            ) : null}
-          </article>
-          );
-        })}
+        {events.map((event) => (
+          <Fragment key={event.id}>{renderFullEventCard(event)}</Fragment>
+        ))}
         {events.length === 0 ? (
           <article className="event-card">
             <p className="eyebrow">Events</p>
@@ -671,7 +864,8 @@ export function EventBoard({
           </article>
         ) : null}
       </div>
+
+      {showCreateForm ? newEventForm : null}
     </section>
   );
 }
-

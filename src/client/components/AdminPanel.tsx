@@ -1,5 +1,6 @@
 import React, { FormEvent, useEffect, useState } from "react";
 import type {
+  AdminSection,
   AppSettings,
   AuditLogEntry,
   BulkImportCommitResponse,
@@ -40,7 +41,8 @@ const defaultSettings: AppSettings = {
   themeLoginColor: "#be123c",
   themeManagerColor: "#b7791f",
   themeAdminColor: "#2563eb",
-  themeSurfaceColor: "#f6f8f4"
+  themeSurfaceColor: "#f6f8f4",
+  gameCatalog: []
 };
 
 function summarizeBulkImportIssues(result: BulkImportResult) {
@@ -53,9 +55,11 @@ function summarizeBulkImportIssues(result: BulkImportResult) {
 
 export function AdminPanel({
   currentUser,
+  adminSection,
   onSettingsChanged
 }: {
   currentUser: User | null;
+  adminSection: AdminSection;
   onSettingsChanged: (settings: AppSettings) => void;
 }) {
   const [users, setUsers] = useState<User[]>([]);
@@ -552,24 +556,25 @@ export function AdminPanel({
   );
 
   return (
-    <section id="admin" className="admin-panel" aria-label="Adminbereich">
-      <p className="eyebrow">Admin</p>
-      <h2>User, Manager und Einstellungen.</h2>
-      <p className="muted admin-intro">
-        Verwalte hier Zugänge, Theme-Farben, Invite-Codes, Betriebszustand und den letzten
-        Änderungsverlauf der LAN-Runde, ohne die Routing- oder Login-Flows zu verändern.
-      </p>
+    <section
+      id="admin"
+      className={`admin-panel ${adminSection === "users" ? "admin-panel--users" : "admin-panel--single"}`}
+      aria-label="Adminbereich"
+    >
+      {message ? <p className="notice admin-panel-notice">{message}</p> : null}
+      {error ? <p className="error admin-panel-notice">{error}</p> : null}
 
-      <nav className="admin-subnav" aria-label="Admin Bereiche">
-        <a href="#admin-users">Benutzer</a>
-        <a href="#admin-betrieb">Betrieb</a>
-        <a href="#admin-sicherheit">Sicherheit</a>
-        <a href="#admin-invites">Invites</a>
-        <a href="#admin-audit">Audit</a>
-      </nav>
-
-      <div className="admin-section">
-      <form id="admin-users" onSubmit={createUser} className="admin-form">
+      {adminSection === "users" ? (
+        <>
+          <header className="admin-section-head">
+            <p className="eyebrow">Benutzer</p>
+            <h2>Zugänge, Einzelanlage und Import</h2>
+            <p className="muted">
+              Lege User an, importiere Listen und pflege Rollen. Änderungen wirken nach dem Speichern
+              sofort im System.
+            </p>
+          </header>
+          <form id="admin-users" onSubmit={createUser} className="admin-form admin-user-create-form">
         <label>
           Username
           <input
@@ -734,10 +739,16 @@ export function AdminPanel({
           </div>
         ))}
       </div>
-      </div>
+        </>
+      ) : null}
 
-      <div className="admin-section">
-      <form id="admin-betrieb" onSubmit={saveSettings} className="admin-form">
+      {adminSection === "betrieb" ? (
+        <>
+          <header className="admin-section-head">
+            <p className="eyebrow">Betrieb</p>
+            <h2>Einstellungen, Shell-Texte und Storage</h2>
+          </header>
+          <form id="admin-betrieb" onSubmit={saveSettings} className="admin-form">
         <label>
           App-Name
           <input
@@ -838,6 +849,27 @@ export function AdminPanel({
             placeholder="Sobald ein Manager eine Runde vorbereitet …"
           />
         </label>
+        <label>
+          Spielkatalog für neue Runden (ein Titel pro Zeile)
+          <textarea
+            value={settings.gameCatalog.join("\n")}
+            onChange={(event) =>
+              setSettings({
+                ...settings,
+                gameCatalog: event.target.value
+                  .split("\n")
+                  .map((line) => line.trim())
+                  .filter(Boolean)
+              })
+            }
+            rows={6}
+            placeholder={"Counter-Strike 2\nLeague of Legends"}
+          />
+        </label>
+        <p className="muted">
+          Diese Liste erscheint Managern als Auswahl beim Anlegen einer Runde. Leer lassen, wenn nur
+          freie Titel genutzt werden sollen.
+        </p>
         <p className="muted">
           Diese fünf Farben werden serverseitig gespeichert und steuern die Shell-Akzente für Events,
           Login, Manager, Admin und die gemeinsame Oberfläche auf allen Geräten.
@@ -894,8 +926,6 @@ export function AdminPanel({
             />
           </label>
         </div>
-        {message ? <p className="notice">{message}</p> : null}
-        {error ? <p className="error">{error}</p> : null}
         <button type="submit">Einstellungen speichern</button>
       </form>
 
@@ -1010,10 +1040,11 @@ export function AdminPanel({
           </div>
         ) : null}
       </section>
-      </div>
+        </>
+      ) : null}
 
-      <div className="admin-section">
-      <section
+      {adminSection === "sicherheit" ? (
+        <section
         id="admin-sicherheit"
         className="rate-limit-panel"
         aria-label="Rate-Limit Betrieb"
@@ -1129,10 +1160,10 @@ export function AdminPanel({
           ) : null}
         </div>
       </section>
-      </div>
+      ) : null}
 
-      <div className="admin-section">
-      <section id="admin-invites" className="invite-panel" aria-label="Invite-Codes">
+      {adminSection === "invites" ? (
+        <section id="admin-invites" className="invite-panel" aria-label="Invite-Codes">
         <p className="eyebrow">Invites</p>
         <h2>LAN-Party Invite-Codes.</h2>
         <p className="muted">
@@ -1291,10 +1322,10 @@ export function AdminPanel({
           ) : null}
         </div>
       </section>
-      </div>
+      ) : null}
 
-      <div className="admin-section">
-      <section id="admin-audit" className="audit-panel" aria-label="Audit-Log">
+      {adminSection === "audit" ? (
+        <section id="admin-audit" className="audit-panel" aria-label="Audit-Log">
         <div className="section-title-row">
           <div>
             <p className="eyebrow">Audit</p>
@@ -1326,7 +1357,7 @@ export function AdminPanel({
           ) : null}
         </div>
       </section>
-      </div>
+      ) : null}
     </section>
   );
 }
