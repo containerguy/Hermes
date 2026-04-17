@@ -14,7 +14,11 @@
     "start": "node dist-server/index.js",
     "start:bootstrap-admin": "node dist-server/db/bootstrap-admin.js",
     "test": "vitest run src",
-    "test:e2e": "npm run build && playwright test"
+    "test:e2e": "npm run build && playwright test",
+    "verify": "npm test && npm run build && npm audit --omit=dev",
+    "verify:ci": "npm ci && npm test && npm run build && npm audit --omit=dev",
+    "docker:build": "docker build --platform linux/amd64 -t hermes:local .",
+    "verify:push": "npm run verify:ci && npm run docker:build"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.1030.0",
