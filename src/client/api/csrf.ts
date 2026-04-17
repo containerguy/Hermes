@@ -16,7 +16,12 @@ export function shouldAttachCsrf(url: string, options?: RequestInit) {
     return false;
   }
 
-  const csrfExempt = ["/api/auth/request-code", "/api/auth/verify-code", "/api/auth/register"];
+  const csrfExempt = [
+    "/api/auth/request-code",
+    "/api/auth/verify-code",
+    "/api/auth/register",
+    "/api/auth/pair-redeem"
+  ];
   return !csrfExempt.some((path) => url.startsWith(path));
 }
 
