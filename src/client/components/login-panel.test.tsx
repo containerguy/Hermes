@@ -147,9 +147,10 @@ describe("LoginPanel pairing redemption", () => {
     expect(text).toContain("Profil und E-Mail aktuell halten.");
     expect(text).toContain("Push vor dem Match testen.");
     expect(text).toContain("Hermes sendet Standard-Browser-Benachrichtigungen.");
-    expect(text).toContain("Eigene Klingeltöne oder garantiertes Audio kann Hermes nicht erzwingen.");
-    expect(text).toContain("Push braucht HTTPS");
-    expect(text).toContain("Auf unterstützten Smartphones ist Zustellung und Haptik meist zuverlässiger");
+    expect(text).toContain("Klingeltöne und garantiertes Audio kann Hermes nicht erzwingen.");
+    expect(text).toMatch(/HTTPS|sicheren Kontext|Lokal|HTTP/);
+    expect(rendered.container.querySelector(".runtime-callout")).toBeTruthy();
+    expect(text).toContain("Hermes wie eine App nutzen");
     expect(text).toContain("Weiteres Gerät verbinden.");
     expect(text).toContain("Angemeldete Geräte im Blick behalten.");
     expect(text).toContain("Keine Geräte geladen.");

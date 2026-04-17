@@ -4,7 +4,17 @@ import { requestJson } from "../api/request";
 import { clearCsrfToken, primeCsrfToken } from "../api/csrf";
 import { forgetDeviceKey, getDeviceContext } from "../api/device-key";
 import { getErrorMessage } from "../errors/errors";
+import {
+  getSecureContextInfo,
+  isLikelyIosSafari,
+  isPwaDisplayMode
+} from "../lib/runtime-context";
 import { QrCanvas } from "./QrCanvas";
+
+type BeforeInstallPromptChrome = Event & {
+  prompt: () => Promise<void>;
+  userChoice: Promise<{ outcome: string }>;
+};
 
 function urlBase64ToUint8Array(base64String: string) {
   const padding = "=".repeat((4 - (base64String.length % 4)) % 4);
@@ -69,6 +79,7 @@ export function LoginPanel({
   const [redeemStatus, setRedeemStatus] = useState<
     "idle" | "redeeming" | "done" | "error"
   >("idle");
+  const [deferredInstall, setDeferredInstall] = useState<BeforeInstallPromptChrome | null>(null);
 
   async function loadSessions() {
     if (!currentUser) {
@@ -100,6 +111,29 @@ export function LoginPanel({
     setDisplayNameDraft(currentUser.displayName || currentUser.username);
     setEmailDraft(currentUser.email);
   }, [currentUser?.id, currentUser?.displayName, currentUser?.email, currentUser?.username]);
+
+  useEffect(() => {
+    function onBeforeInstallPrompt(event: Event) {
+      event.preventDefault();
+      setDeferredInstall(event as BeforeInstallPromptChrome);
+    }
+    window.addEventListener("beforeinstallprompt", onBeforeInstallPrompt);
+    return () => window.removeEventListener("beforeinstallprompt", onBeforeInstallPrompt);
+  }, []);
+
+  async function runInstallPrompt() {
+    if (!deferredInstall) {
+      return;
+    }
+    try {
+      await deferredInstall.prompt();
+      await deferredInstall.userChoice;
+    } catch {
+      /* Abbruch oder nicht unterstützt */
+    } finally {
+      setDeferredInstall(null);
+    }
+  }
 
   useEffect(() => {
     const hash = window.location.hash || "";
@@ -456,6 +490,7 @@ export function LoginPanel({
 
   if (currentUser) {
     const pushSupport = getPushSupport();
+    const secureInfo = getSecureContextInfo();
     return (
       <section className="login-panel" id="login" aria-label="Aktuelle Anmeldung">
         <header className="login-panel-intro">
@@ -536,23 +571,70 @@ export function LoginPanel({
               <h2>Push vor dem Match testen.</h2>
             </div>
           </div>
+          <div
+            className={`runtime-callout runtime-callout--${secureInfo.isSecureContext ? "ok" : "warn"}`}
+            role="status"
+          >
+            <p className="runtime-callout__title">{secureInfo.headline}</p>
+            <p className="muted runtime-callout__body">{secureInfo.body}</p>
+          </div>
+          <div className="install-hint-card" aria-label="Installation als App">
+            <p className="install-hint-card__eyebrow">Installation</p>
+            <p className="install-hint-card__title">Hermes wie eine App nutzen</p>
+            {isPwaDisplayMode() ? (
+              <p className="muted install-hint-card__body">
+                Diese Ansicht läuft als installierte Web-App. Push und Schnellzugriff sind meist
+                komfortabler als im normalen Browser-Tab.
+              </p>
+            ) : deferredInstall ? (
+              <>
+                <p className="muted install-hint-card__body">
+                  Dein Browser erlaubt eine Installation — empfohlen für stabilere Benachrichtigungen
+                  und schnellen Zugriff vom Startbildschirm.
+                </p>
+                <button
+                  type="button"
+                  className="secondary install-app-button"
+                  onClick={() => void runInstallPrompt()}
+                  disabled={busy}
+                >
+                  App installieren
+                </button>
+              </>
+            ) : isLikelyIosSafari() ? (
+              <ol className="install-steps">
+                <li>
+                  Safari: <strong>Teilen</strong> (Quadrat mit Pfeil) öffnen.
+                </li>
+                <li>
+                  <strong>Zum Home-Bildschirm</strong> wählen — Hermes startet dann wie eine App.
+                </li>
+              </ol>
+            ) : (
+              <ol className="install-steps">
+                               <li>
+                  Chrome / Edge: <strong>Drei-Punkte-Menü</strong> oder Install-Symbol in der
+                  Adresszeile.
+                </li>
+                <li>
+                  <strong>App installieren</strong> wählen. Fehlt der Eintrag, unterstützt der Browser
+                  die Installation nicht oder Hermes ist bereits installiert.
+                </li>
+              </ol>
+            )}
+          </div>
           <p className="muted">
-            Hermes sendet <strong>Standard-Browser-Benachrichtigungen</strong>. Eigene Klingeltöne
-            oder garantiertes Audio kann Hermes nicht erzwingen.
+            Hermes sendet <strong>Standard-Browser-Benachrichtigungen</strong>. Klingeltöne und
+            garantiertes Audio kann Hermes nicht erzwingen.
           </p>
           <p className="muted">
-            Push braucht <strong>HTTPS</strong> (oder <strong>localhost</strong>), Browser-APIs und
-            eine aktivierte OS-Permission. Auf unterstützten Smartphones ist Zustellung und Haptik
-            meist zuverlässiger, wenn Hermes als <strong className="pwa-install">PWA installiert</strong> ist.
-          </p>
-          <p className="muted">
-            Wenn einer der Checks unten fehlt, bleiben Einladungen und Statuswechsel lokal sichtbar,
-            aber dieses Gerät bekommt keine Push-Hinweise.
+            Wenn einer der Checks unten fehlt, bleiben Einladungen und Statuswechsel in Hermes
+            sichtbar, aber dieses Gerät bekommt keine Push-Hinweise.
           </p>
           <dl className="account-list">
             <div>
-              <dt>Secure Context</dt>
-              <dd>{pushSupport.isSecure ? "ok" : "HTTPS/localhost erforderlich"}</dd>
+              <dt>Sicherer Kontext</dt>
+              <dd>{secureInfo.isSecureContext ? "erfüllt" : "nicht erfüllt"}</dd>
             </div>
             <div>
               <dt>Browser APIs</dt>

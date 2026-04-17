@@ -20,7 +20,7 @@ async function login(page: Page, username: string) {
   await page.getByLabel("Einmalcode").fill("123456");
   await page.getByLabel("Gerätename").fill("Browser");
   await page.getByRole("button", { name: "Einloggen" }).click();
-  await expect(page.getByText(username, { exact: true })).toBeVisible();
+  await expect(page.getByRole("region", { name: "Aktuelle Anmeldung" })).toContainText(username);
 }
 
 test.beforeAll(async () => {
@@ -81,18 +81,38 @@ test("admin creates users, manager creates an event, user joins", async ({ page 
   await login(page, "manager");
   await page.goto(`${baseUrl}/#manager`);
 
-  await page.getByLabel("Spiel").fill("Browser Game");
-  await page.getByLabel("Start").selectOption("scheduled");
-  await page.getByLabel("Startzeit").fill("2026-04-15T20:00");
-  await page.getByLabel("Min").fill("1");
-  await page.getByLabel("Max").fill("2");
-  await page.getByRole("button", { name: "Event anlegen" }).click();
+  const eventForm = page.locator("form.event-form");
+  await eventForm.getByLabel("Spiel").fill("Browser Game");
+  await eventForm.locator("select").first().selectOption("scheduled");
+  await eventForm.getByLabel("Startzeit").fill("2027-06-01T18:00");
+  await eventForm.getByLabel("Min").fill("1");
+  await eventForm.getByLabel("Max").fill("2");
+  await eventForm.getByRole("button", { name: "Event anlegen" }).click();
   await expect(page.getByRole("heading", { name: "Browser Game" })).toBeVisible();
 
   await page.goto(`${baseUrl}/#login`);
   await page.getByRole("button", { name: "Logout" }).click();
   await login(page, "spieler");
   await page.goto(`${baseUrl}/#events`);
-  await page.getByRole("button", { name: "Dabei" }).click();
+  await page.getByRole("button", { name: "Dabei", exact: true }).click();
   await expect(page.getByText("1 / 2")).toBeVisible();
+});
+
+test("responsive shell and profile guidance regions stay visible", async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.goto(baseUrl);
+  await expect(page.locator(".topbar")).toBeVisible();
+  await expect(page.locator(".brand")).toBeVisible();
+  await expect(page.locator(".page-shell")).toBeVisible();
+
+  await login(page, "hauptadmin");
+  await page.goto(`${baseUrl}/#login`);
+  await expect(page.getByRole("region", { name: "Aktuelle Anmeldung" })).toBeVisible();
+  await expect(page.locator(".runtime-callout")).toBeVisible();
+  await expect(page.locator(".install-hint-card")).toBeVisible();
+
+  await page.setViewportSize({ width: 1280, height: 800 });
+  await page.goto(`${baseUrl}/#events`);
+  await expect(page.locator(".page-hero")).toBeVisible();
+  await expect(page.getByRole("region", { name: "Events" })).toBeVisible();
 });
