@@ -8,7 +8,7 @@ provides: [phase-1-validation-gate]
 affects:
   - src/server/http/app-flow.test.ts
   - .env.example
-  - readme.md
+  - README.md
   - building.md
   - .planning/phases/01-auth-profile-and-invite-hardening/01-VALIDATION.md
 tech_stack:
@@ -18,7 +18,7 @@ key_files:
   modified:
     - src/server/http/app-flow.test.ts
     - .env.example
-    - readme.md
+    - README.md
     - building.md
     - .planning/phases/01-auth-profile-and-invite-hardening/01-VALIDATION.md
 decisions:

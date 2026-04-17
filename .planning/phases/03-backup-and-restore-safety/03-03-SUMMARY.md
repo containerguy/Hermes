@@ -13,7 +13,7 @@ Completed Phase 3 end-to-end operator safety wiring: **best-effort audit coverag
   - show backup status + non-secret S3 location details via existing admin settings fetch
   - show restore recovery info (`recovery.id`, `recovery.key`) on success
   - render compact restore diagnostics panel (safe bounded fields only) on failure
-- Updated `readme.md` and `building.md` with an operator runbook:
+- Updated `README.md` and `building.md` with an operator runbook:
   - single-writer warning (SQLite + S3 snapshots)
   - how to verify backups in Admin UI
   - validation-first restore model + retention (keep 10 recoveries)

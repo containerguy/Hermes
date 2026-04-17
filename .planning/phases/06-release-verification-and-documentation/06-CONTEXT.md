@@ -21,7 +21,7 @@ Phase 6 is the release readiness pass:
 <canonical_refs>
 - `.planning/REQUIREMENTS.md` — REL-01..REL-06
 - `.github/workflows/docker-image.yml` — CI expectations (`npm test`, `npm run build`, `npm audit --omit=dev`)
-- `readme.md`, `building.md`, `.env.example`, `Dockerfile`, `docker-compose.yml`
+- `README.md`, `building.md`, `.env.example`, `Dockerfile`, `docker-compose.yml`
 - `src/server/http/*.test.ts`, `src/server/storage/*.test.ts`
 
 </canonical_refs>

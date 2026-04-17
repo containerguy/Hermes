@@ -77,7 +77,7 @@ The current codebase map is in `.planning/codebase/`. Important reference docs:
 - `.planning/codebase/STACK.md` — TypeScript, React, Express, SQLite, Drizzle, Vite, Docker, CI.
 - `.planning/codebase/CONCERNS.md` — auth abuse controls, restore risks, concurrency, frontend monolith, deployment gaps.
 - `ideas.md` — original product planning history and work package checks.
-- `readme.md` and `building.md` — current operator and build documentation.
+- `README.md` and `building.md` — current operator and build documentation.
 
 Known current constraints and risks:
 

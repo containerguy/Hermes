@@ -23,7 +23,7 @@ key-files:
   modified:
     - src/server/realtime/event-bus.ts
     - src/main.tsx
-    - readme.md
+    - README.md
     - building.md
 
 key-decisions:
@@ -66,7 +66,7 @@ Each task was committed atomically:
 ## Files Created/Modified
 - `src/server/realtime/event-bus.ts` - Retry hint + heartbeat timer per client.
 - `src/main.tsx` - Reconnect loop with capped backoff and heartbeat handler.
-- `readme.md`, `building.md` - Operator guidance for SSE/proxy timeouts.
+- `README.md`, `building.md` - Operator guidance for SSE/proxy timeouts.
 
 ## Decisions Made
 None - followed plan as specified.

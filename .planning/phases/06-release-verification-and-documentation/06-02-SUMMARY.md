@@ -5,7 +5,7 @@ Aligned operator docs and `.env.example` with the production contract and CI exp
 ## What changed
 
 - **Docs**
-  - `readme.md`: uses the CI-matching command `npm audit --omit=dev` and adds an explicit **release checklist** (TLS ownership, secure cookies, SMTP, VAPID, S3 creds, single-writer, backup verification, rollback via recovery key).
+  - `README.md`: uses the CI-matching command `npm audit --omit=dev` and adds an explicit **release checklist** (TLS ownership, secure cookies, SMTP, VAPID, S3 creds, single-writer, backup verification, rollback via recovery key).
   - `building.md`: uses `npm audit --omit=dev` to match CI.
 
 - **Sample env**

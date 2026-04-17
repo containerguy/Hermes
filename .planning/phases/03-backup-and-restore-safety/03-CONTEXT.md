@@ -63,7 +63,7 @@ Phase 3 makes S3 snapshot **backup + restore operationally safe** for admins:
 
 ### Operator docs (BKP-06)
 
-- **D-15:** Update both `readme.md` and `building.md` with a short runbook that covers:
+- **D-15:** Update both `README.md` and `building.md` with a short runbook that covers:
   - single-writer snapshot model warning
   - how to verify backups in the Admin UI
   - restore safety model (validation-first, pre-restore recovery)
@@ -97,7 +97,7 @@ Phase 3 makes S3 snapshot **backup + restore operationally safe** for admins:
 - `src/main.tsx` — Admin UI surface that will show backup status and restore diagnostics.
 
 ### Operator docs
-- `readme.md`
+- `README.md`
 - `building.md`
 
 </canonical_refs>

@@ -23,7 +23,7 @@ Hermes is a compact single-instance app with most behavior concentrated in route
 
 ## S3 Snapshot Storage And Restore
 
-- `src/server/storage/s3-storage.ts` treats S3 as whole-file SQLite snapshot storage. `readme.md` and `building.md` correctly document that this is not multi-instance safe, but there is no runtime guard preventing multiple Hermes instances from writing the same `HERMES_S3_DB_KEY`.
+- `src/server/storage/s3-storage.ts` treats S3 as whole-file SQLite snapshot storage. `README.md` and `building.md` correctly document that this is not multi-instance safe, but there is no runtime guard preventing multiple Hermes instances from writing the same `HERMES_S3_DB_KEY`.
 - `src/server/storage/s3-storage.ts` uploads snapshots after writes with a one-second debounce. Crashes, process kills, network failures, or S3 upload errors can leave the bucket behind the local SQLite state. Errors are logged but not surfaced to admins unless they happen during explicit backup/restore.
 - `src/server/storage/s3-storage.ts` calls `wal_checkpoint(TRUNCATE)` and uploads only the main SQLite file. This is a reasonable approach, but it makes snapshot correctness dependent on successful checkpointing and single-process control of the database file.
 - `src/server/storage/s3-storage.ts` `restoreDatabaseSnapshotIntoLive` disables foreign keys, deletes/restores tables, then runs `PRAGMA foreign_key_check;` without reading result rows or throwing on violations. A corrupt or incompatible snapshot could restore partially inconsistent data and still report success.
@@ -74,7 +74,7 @@ Hermes is a compact single-instance app with most behavior concentrated in route
 - `docker-compose.yml` bind-mounts `./s3.creds` and forces S3 settings. Local starts without this file will fail when compose is used, and there is no documented non-S3 compose profile.
 - `src/server/app.ts` does not include security headers such as HSTS, CSP, or frame protections. A reverse proxy can add these, but the app itself does not.
 - `src/server/index.ts` shutdown waits for `server.close`, then flushes S3. If active long-lived SSE connections remain open, shutdown can be delayed; there is no forced timeout.
-- `readme.md` documents that Hermes does not provide TLS/reverse proxy/certificate management, while push notifications require a secure context for LAN devices. Production deployment needs an explicit reverse-proxy/TLS plan.
+- `README.md` documents that Hermes does not provide TLS/reverse proxy/certificate management, while push notifications require a secure context for LAN devices. Production deployment needs an explicit reverse-proxy/TLS plan.
 
 ## Tests And CI Limitations
 
@@ -85,6 +85,6 @@ Hermes is a compact single-instance app with most behavior concentrated in route
 
 ## Documentation Gaps
 
-- `readme.md` and `building.md` document S3 snapshot semantics and single-instance limitations well, but they do not provide a recovery runbook for failed restore, corrupted snapshot, or rolling back to a previous local/S3 backup.
-- `readme.md` mentions admins should verify data after restore, but the product does not guide the operator through those checks.
+- `README.md` and `building.md` document S3 snapshot semantics and single-instance limitations well, but they do not provide a recovery runbook for failed restore, corrupted snapshot, or rolling back to a previous local/S3 backup.
+- `README.md` mentions admins should verify data after restore, but the product does not guide the operator through those checks.
 - `.env.example` includes production-looking S3 defaults and `HERMES_COOKIE_SECURE=false`; deployment docs should explicitly call out production overrides for cookie security, TLS, SMTP mode, and secret handling.

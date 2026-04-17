@@ -74,13 +74,13 @@ The current product is a brownfield TypeScript/React/Express app with SQLite as 
 - Example config: `.env.example` documents database path, server port, cookie security, S3, admin bootstrap, SMTP, VAPID, and local dev login code variables.
 - Admin bootstrap: `src/server/db/bootstrap-admin.ts` requires admin phone, username, and email env variables, then creates or updates the primary admin.
 - Cookie security: `src/server/auth/sessions.ts` sets `httpOnly`, `sameSite: "lax"`, and `secure` based on `HERMES_COOKIE_SECURE`.
-- Production notes: `readme.md` and `building.md` document local start, Docker start, S3 behavior, mail, push, backup/restore, and CI image publishing.
+- Production notes: `README.md` and `building.md` document local start, Docker start, S3 behavior, mail, push, backup/restore, and CI image publishing.
 ## Deployment Shape
 - Intended runtime: a single Node/Express instance with local SQLite as the active database.
 - Static serving: `src/server/app.ts` serves `dist/` if present and falls back to `index.html` for non-API paths.
 - Health endpoint: `/api/health` is implemented in `src/server/app.ts` and used by the Docker `HEALTHCHECK`.
 - Container registry: `.github/workflows/docker-image.yml` publishes `ghcr.io/containerguy/hermes` on pushes to `main`, version tags, and manual dispatch; pull requests build without pushing.
-- Operational caveat: `readme.md` and `building.md` state S3 is snapshot storage, not a locking backend for multiple simultaneous writers.
+- Operational caveat: `README.md` and `building.md` state S3 is snapshot storage, not a locking backend for multiple simultaneous writers.
 <!-- GSD:stack-end -->
 
 <!-- GSD:conventions-start source:CONVENTIONS.md -->

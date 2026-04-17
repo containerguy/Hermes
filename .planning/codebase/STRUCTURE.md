@@ -11,7 +11,7 @@
 - `Dockerfile` builds the app and produces a production Node runtime image.
 - `docker-compose.yml` runs the local container, mounts `/data`, exposes port 3000, and wires S3-related environment names.
 - `.env.example` documents expected environment variables without runtime secrets.
-- `README.md`, `readme.md`, `building.md`, and `ideas.md` are project documentation/notes.
+- `README.md`, `building.md`, and `ideas.md` are project documentation/notes.
 
 ## Frontend Files
 

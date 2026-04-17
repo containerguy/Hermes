@@ -134,8 +134,8 @@
 | Option | Description | Selected |
 |--------|-------------|----------|
 | building.md | Update `building.md` |  |
-| readme.md | Update `readme.md` |  |
-| both | Update both `readme.md` and `building.md` | ✓ |
+| README.md | Update `README.md` |  |
+| both | Update both `README.md` and `building.md` | ✓ |
 
 ---
 

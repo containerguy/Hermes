@@ -16,7 +16,7 @@ overrides_applied: 0
 | 2 | Restore validates schema/tables/columns/FK before mutation. | ✓ VERIFIED | Restore validation implemented in `src/server/storage/s3-storage.ts` (required tables + migration match + column compatibility + `foreign_key_check` + integrity check). |
 | 3 | Restore creates a pre-restore recovery snapshot and returns its identifier before destructive mutation. | ✓ VERIFIED | Recovery snapshot key `recoveries/<timestamp>-<id>.sqlite` is created before transactional copy; response includes `recovery { id, key }`. |
 | 4 | Restore copies by explicit compatible columns only; incompatible snapshots are rejected. | ✓ VERIFIED | Transactional copy uses explicit column lists (`INSERT ... SELECT col1,...`) and hard-blocks on mismatches; no `SELECT *` restore path. |
-| 5 | Audit and operator docs cover failure recovery and single-writer snapshot model. | ✓ VERIFIED | Audit events `storage.*` are best-effort via `tryWriteAuditLog`; runbook updated in `readme.md` and `building.md` including recovery steps and single-writer warning. |
+| 5 | Audit and operator docs cover failure recovery and single-writer snapshot model. | ✓ VERIFIED | Audit events `storage.*` are best-effort via `tryWriteAuditLog`; runbook updated in `README.md` and `building.md` including recovery steps and single-writer warning. |
 
 ## Verification Commands (recorded)
 

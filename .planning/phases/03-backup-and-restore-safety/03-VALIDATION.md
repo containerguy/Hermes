@@ -43,7 +43,7 @@ Audit entries emitted during backup/restore must:
   - last success time, last failure time/code/summary
   - non-secret location details
 - Trigger a restore failure (e.g. invalid snapshot) and confirm UI shows actionable diagnostics + keeps stable error mapping.
-- Confirm docs (`readme.md`, `building.md`) contain:
+- Confirm docs (`README.md`, `building.md`) contain:
   - single-writer warning
   - backup verification guidance
   - restore safety model
