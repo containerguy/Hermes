@@ -47,6 +47,31 @@ function getEventStatusClass(event: GameEvent) {
 
 const startRelativeFormatter = new Intl.RelativeTimeFormat("de", { numeric: "auto" });
 
+function isSameLocalCalendarDay(a: Date, b: Date): boolean {
+  return (
+    a.getFullYear() === b.getFullYear() &&
+    a.getMonth() === b.getMonth() &&
+    a.getDate() === b.getDate()
+  );
+}
+
+/** Kachel-Übersicht: heute nur Uhrzeit, sonst Datum und Uhrzeit (lokal, de-DE). */
+function formatStartForCompactOverview(iso: string): string {
+  const start = new Date(iso);
+  const now = new Date();
+  const timeOnly = new Intl.DateTimeFormat("de-DE", { hour: "2-digit", minute: "2-digit" });
+  if (isSameLocalCalendarDay(start, now)) {
+    return timeOnly.format(start);
+  }
+  return new Intl.DateTimeFormat("de-DE", {
+    day: "2-digit",
+    month: "2-digit",
+    year: "numeric",
+    hour: "2-digit",
+    minute: "2-digit"
+  }).format(start);
+}
+
 function formatStartRelative(iso: string): string {
   const startMs = new Date(iso).getTime();
   const diffSec = Math.round((startMs - Date.now()) / 1000);
@@ -588,6 +613,10 @@ export function EventBoard({
     const pct = capacityPercent(event);
     const expanded = expandedEventId === event.id;
     const panelId = `event-expand-${event.id}`;
+    const compactStartLabel = formatStartForCompactOverview(event.startsAt);
+    const tileAriaLabel = compactTouchShell
+      ? `${event.gameTitle}, Start ${compactStartLabel}, ${getEventStatusLabel(event)}. Details ${expanded ? "einklappen" : "aufklappen"}.`
+      : `${event.gameTitle}, ${getEventStatusLabel(event)}. Details ${expanded ? "einklappen" : "aufklappen"}.`;
     return (
       <div className="event-expandable" key={event.id}>
         <button
@@ -600,11 +629,16 @@ export function EventBoard({
             setExpandedEventId(expanded ? null : event.id);
             setCreateFlowOpen(false);
           }}
-          aria-label={`${event.gameTitle}, ${getEventStatusLabel(event)}. Details ${expanded ? "einklappen" : "aufklappen"}.`}
+          aria-label={tileAriaLabel}
         >
           <img src="/icon.svg" alt="" className="event-compact-icon" width={36} height={36} />
           <div className="event-compact-tile-body">
             <span className="event-compact-title">{event.gameTitle}</span>
+            {compactTouchShell ? (
+              <time className="event-compact-start" dateTime={event.startsAt}>
+                {compactStartLabel}
+              </time>
+            ) : null}
             <div className="event-compact-track" aria-hidden="true">
               <div className="event-compact-fill" style={{ width: `${pct}%` }} />
             </div>

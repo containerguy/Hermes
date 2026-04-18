@@ -591,6 +591,14 @@ h2 {
   -webkit-box-orient: vertical;
 }
 
+.event-compact-start {
+  font-size: 0.78rem;
+  font-weight: 700;
+  color: var(--muted);
+  line-height: 1.2;
+  font-variant-numeric: tabular-nums;
+}
+
 .event-compact-track {
   height: 6px;
   border-radius: 999px;
