@@ -49,7 +49,9 @@ const defaultSettings: AppSettings = {
   themeManagerColor: "#b7791f",
   themeAdminColor: "#2563eb",
   themeSurfaceColor: "#f6f8f4",
-  gameCatalog: []
+  gameCatalog: [],
+  infosEnabled: false,
+  infosMarkdown: ""
 };
 
 function summarizeBulkImportIssues(result: BulkImportResult) {
@@ -1062,6 +1064,55 @@ export function AdminPanel({
                 />
               </label>
             </div>
+            <button type="submit">Einstellungen speichern</button>
+          </form>
+        </>
+      ) : null}
+
+      {adminSection === "infos" ? (
+        <>
+          <header className="admin-section-head">
+            <p className="eyebrow">Infos</p>
+            <h2>Infoseite und Menüpunkt</h2>
+            <p className="muted">
+              Der Inhalt erscheint unter <code>#infos</code> für alle Besucher, sobald der Menüpunkt
+              aktiv ist. Es wird{" "}
+              <a
+                href="https://commonmark.org/help/"
+                target="_blank"
+                rel="noopener noreferrer"
+              >
+                Markdown
+              </a>{" "}
+              gerendert (Überschriften mit <code>#</code>, <code>##</code>, Listen mit{" "}
+              <code>-</code>, Links mit <code>[Text](URL)</code>).
+            </p>
+          </header>
+          <form id="admin-infos" onSubmit={saveSettings} className="admin-form">
+            <label className="checkbox-label">
+              <input
+                type="checkbox"
+                checked={settings.infosEnabled}
+                onChange={(event) =>
+                  setSettings({ ...settings, infosEnabled: event.target.checked })
+                }
+              />
+              Menüpunkt „Infos“ in der Hauptnavigation anzeigen
+            </label>
+            <label>
+              Inhalt (Markdown)
+              <textarea
+                value={settings.infosMarkdown}
+                onChange={(event) =>
+                  setSettings({ ...settings, infosMarkdown: event.target.value })
+                }
+                rows={18}
+                maxLength={100_000}
+                spellCheck="true"
+                aria-label="Infos-Seite Markdown"
+                placeholder={"## Willkommen\n\n- Punkt eins\n- [Website](https://example.org)"}
+              />
+            </label>
             <button type="submit">Einstellungen speichern</button>
           </form>
         </>

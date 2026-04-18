@@ -359,6 +359,10 @@ label {
   border-top-color: var(--blue);
 }
 
+.hero-infos {
+  border-top-color: var(--teal);
+}
+
 .hero-copy {
   max-width: 760px;
 }
@@ -1297,6 +1301,7 @@ dd {
 #admin-users,
 #admin-betrieb,
 #admin-design,
+#admin-infos,
 #admin-sicherheit,
 #admin-invites,
 #admin-audit {
@@ -1307,6 +1312,67 @@ dd {
   display: grid;
   gap: 10px;
   align-content: start;
+}
+
+.infos-page {
+  max-width: 760px;
+}
+
+.infos-prose {
+  color: var(--text);
+  line-height: 1.6;
+  font-size: 0.98rem;
+}
+
+.infos-prose h1,
+.infos-prose h2,
+.infos-prose h3,
+.infos-prose h4 {
+  color: var(--ink);
+  font-weight: 900;
+  line-height: 1.25;
+  margin: 1.15rem 0 0.5rem;
+}
+
+.infos-prose h1 {
+  font-size: 1.45rem;
+}
+
+.infos-prose h2 {
+  font-size: 1.22rem;
+}
+
+.infos-prose h3 {
+  font-size: 1.06rem;
+}
+
+.infos-prose p {
+  margin: 0.65rem 0;
+}
+
+.infos-prose ul,
+.infos-prose ol {
+  margin: 0.55rem 0;
+  padding-left: 1.35rem;
+}
+
+.infos-prose li {
+  margin: 0.25rem 0;
+}
+
+.infos-prose a {
+  color: var(--teal);
+  font-weight: 800;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+.infos-prose a:hover {
+  color: var(--ink);
+}
+
+.infos-prose :first-child {
+  margin-top: 0;
 }
 
 .admin-ops {

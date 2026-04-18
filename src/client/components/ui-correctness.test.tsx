@@ -155,7 +155,9 @@ describe("ui correctness structure contracts", () => {
       themeLoginColor: "#be123c",
       themeManagerColor: "#b7791f",
       themeAdminColor: "#2563eb",
-      themeSurfaceColor: "#f6f8f4"
+      themeSurfaceColor: "#f6f8f4",
+      infosEnabled: false,
+      infosMarkdown: ""
     };
 
     requestJsonMock.mockImplementation(async (path: string) => {

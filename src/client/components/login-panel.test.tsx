@@ -64,7 +64,9 @@ const defaultSettings: AppSettings = {
    themeManagerColor: "#b7791f",
   themeAdminColor: "#2563eb",
   themeSurfaceColor: "#f6f8f4",
-  gameCatalog: []
+  gameCatalog: [],
+  infosEnabled: false,
+  infosMarkdown: ""
 };
 
 const redeemedUser: User = {

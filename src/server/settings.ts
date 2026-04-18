@@ -22,7 +22,9 @@ export const settingsSchema = z.object({
   themeLoginColor: colorSchema,
   themeManagerColor: colorSchema,
   themeAdminColor: colorSchema,
-  themeSurfaceColor: colorSchema
+  themeSurfaceColor: colorSchema,
+  infosEnabled: z.boolean(),
+  infosMarkdown: z.string().max(100_000)
 });
 
 export type HermesSettings = z.infer<typeof settingsSchema>;
@@ -41,7 +43,9 @@ export const defaultSettings: HermesSettings = {
   themeLoginColor: "#be123c",
   themeManagerColor: "#b7791f",
   themeAdminColor: "#2563eb",
-  themeSurfaceColor: "#f6f8f4"
+  themeSurfaceColor: "#f6f8f4",
+  infosEnabled: false,
+  infosMarkdown: ""
 };
 
 function nowIso() {

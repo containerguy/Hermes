@@ -30,6 +30,7 @@
     "qrcode-generator": "^1.4.4",
     "react": "^19.2.3",
     "react-dom": "^19.2.3",
+    "react-markdown": "^10.1.0",
     "web-push": "^3.6.7",
     "zod": "^4.3.6"
   },

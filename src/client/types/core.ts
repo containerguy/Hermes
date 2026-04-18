@@ -27,9 +27,20 @@ export type AppSettings = {
   themeManagerColor: string;
   themeAdminColor: string;
   themeSurfaceColor: string;
+  /** Menüpunkt „Infos“ (#infos) sichtbar */
+  infosEnabled: boolean;
+  /** Markdown-Inhalt der Infos-Seite (Überschriften, Listen, Links) */
+  infosMarkdown: string;
 };
 
-export type AdminSection = "users" | "betrieb" | "design" | "sicherheit" | "invites" | "audit";
+export type AdminSection =
+  | "users"
+  | "betrieb"
+  | "design"
+  | "infos"
+  | "sicherheit"
+  | "invites"
+  | "audit";
 
 export type BulkImportFormat = "csv" | "json";
 

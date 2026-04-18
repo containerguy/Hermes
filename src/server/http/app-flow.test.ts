@@ -1120,7 +1120,9 @@ describe("app flow", () => {
       themeLoginColor: "#aa3355",
       themeManagerColor: "#cc8800",
       themeAdminColor: "#2255ee",
-      themeSurfaceColor: "#f0ede6"
+      themeSurfaceColor: "#f0ede6",
+      infosEnabled: true,
+      infosMarkdown: "## LAN-Infos\n\n- [Organisation](https://example.org)"
     };
 
     await adminAgent

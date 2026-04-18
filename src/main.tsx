@@ -10,6 +10,7 @@ import type {
 import { requestJson } from "./client/api/request";
 import { clearCsrfToken, primeCsrfToken } from "./client/api/csrf";
 import { EventBoard } from "./client/components/EventBoard";
+import { InfosPage } from "./client/components/InfosPage";
 import { LoginPage } from "./client/components/LoginPage";
 import { AdminPanel } from "./client/components/AdminPanel";
 
@@ -22,7 +23,7 @@ type Route = {
   description: string;
 };
 
-type PageId = "events" | "login" | "admin";
+type PageId = "events" | "infos" | "login" | "admin";
 
 const routes: Route[] = [
   {
@@ -33,6 +34,14 @@ const routes: Route[] = [
     title: "Von der Idee bis zum Server-Join an einem Ort.",
     description:
       "Sieh auf einen Blick, welche Runde tragfähig ist, und triff deine Wahl. Mit Manager- oder Adminrechten legst du neue Runden hier direkt an — ohne zweite Oberfläche."
+  },
+  {
+    id: "infos",
+    path: "#infos",
+    label: "Infos",
+    eyebrow: "Orientierung",
+    title: "Informationen und Hinweise.",
+    description: ""
   },
   {
     id: "login",
@@ -68,7 +77,9 @@ const defaultSettings: AppSettings = {
   themeManagerColor: "#b7791f",
   themeAdminColor: "#2563eb",
   themeSurfaceColor: "#f6f8f4",
-  gameCatalog: []
+  gameCatalog: [],
+  infosEnabled: false,
+  infosMarkdown: ""
 };
 
 function applyTheme(settings: AppSettings) {
@@ -95,6 +106,7 @@ const adminSectionBySlug: Record<string, AdminSection> = {
   users: "users",
   betrieb: "betrieb",
   design: "design",
+  infos: "infos",
   sicherheit: "sicherheit",
   invites: "invites",
   audit: "audit"
@@ -104,6 +116,7 @@ const legacyAdminHashToSection: Record<string, AdminSection> = {
   users: "users",
   betrieb: "betrieb",
   design: "design",
+  infos: "infos",
   sicherheit: "sicherheit",
   invites: "invites",
   audit: "audit"
@@ -241,7 +254,10 @@ function App() {
     currentUser?.role === "manager" || currentUser?.role === "admin" ? "manager" : "events";
 
   const omitHeroSessionAside = Boolean(
-    currentUser && (displayRoute.id === "events" || displayRoute.id === "admin")
+    currentUser &&
+      (displayRoute.id === "events" ||
+        displayRoute.id === "admin" ||
+        displayRoute.id === "infos")
   );
 
   const heroRoute = applyShellStartHero(displayRoute, appSettings);
@@ -256,6 +272,12 @@ function App() {
           onLoggedOut={() => setCurrentUser(null)}
           onUserUpdated={setCurrentUser}
         />
+      );
+    }
+
+    if (activePage === "infos") {
+      return (
+        <InfosPage markdown={appSettings.infosMarkdown} enabled={appSettings.infosEnabled} />
       );
     }
 
@@ -295,7 +317,11 @@ function App() {
         <div className="topbar-end">
           <nav className="nav-links" aria-label="Bereiche">
             {routes
-              .filter((route) => route.id !== "login")
+              .filter((route) => {
+                if (route.id === "login") return false;
+                if (route.id === "infos") return appSettings.infosEnabled;
+                return true;
+              })
               .map((route) => (
                 <a
                   href={route.path}
@@ -343,6 +369,7 @@ function App() {
                 ["users", "Benutzer"],
                 ["betrieb", "Betrieb"],
                 ["design", "Design"],
+                ["infos", "Infos"],
                 ["sicherheit", "Sicherheit"],
                 ["invites", "Invites"],
                 ["audit", "Audit"]
