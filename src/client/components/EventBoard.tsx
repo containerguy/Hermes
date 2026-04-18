@@ -1,7 +1,9 @@
-import React, { FormEvent, useEffect, useState } from "react";
+import React, { FormEvent, useEffect, useMemo, useState } from "react";
 import type { GameEvent, User } from "../types/core";
 import { requestJson } from "../api/request";
 import { ApiError, getErrorMessage } from "../errors/errors";
+import { useI18n } from "../i18n/I18nContext";
+import type { MessageKey } from "../i18n/catalog/index";
 
 function toDatetimeLocal(value: string) {
   const date = new Date(value);
@@ -11,26 +13,6 @@ function toDatetimeLocal(value: string) {
 
 function fromDatetimeLocal(value: string) {
   return new Date(value).toISOString();
-}
-
-function getEventStatusLabel(event: GameEvent) {
-  if (
-    event.status !== "archived" &&
-    event.status !== "cancelled" &&
-    event.joinedCount >= event.maxPlayers
-  ) {
-    return "voll";
-  }
-
-  const labels: Record<GameEvent["status"], string> = {
-    open: "offen",
-    ready: "startbereit",
-    running: "läuft bereits",
-    cancelled: "storniert",
-    archived: "archiviert"
-  };
-
-  return labels[event.status];
 }
 
 function getEventStatusClass(event: GameEvent) {
@@ -45,8 +27,6 @@ function getEventStatusClass(event: GameEvent) {
   return event.status;
 }
 
-const startRelativeFormatter = new Intl.RelativeTimeFormat("de", { numeric: "auto" });
-
 function isSameLocalCalendarDay(a: Date, b: Date): boolean {
   return (
     a.getFullYear() === b.getFullYear() &&
@@ -55,73 +35,12 @@ function isSameLocalCalendarDay(a: Date, b: Date): boolean {
   );
 }
 
-/** Kachel-Übersicht: heute nur Uhrzeit, sonst Datum und Uhrzeit (lokal, de-DE). */
-function formatStartForCompactOverview(iso: string): string {
-  const start = new Date(iso);
-  const now = new Date();
-  const timeOnly = new Intl.DateTimeFormat("de-DE", { hour: "2-digit", minute: "2-digit" });
-  if (isSameLocalCalendarDay(start, now)) {
-    return timeOnly.format(start);
-  }
-  return new Intl.DateTimeFormat("de-DE", {
-    day: "2-digit",
-    month: "2-digit",
-    year: "numeric",
-    hour: "2-digit",
-    minute: "2-digit"
-  }).format(start);
-}
-
-function formatStartRelative(iso: string): string {
-  const startMs = new Date(iso).getTime();
-  const diffSec = Math.round((startMs - Date.now()) / 1000);
-  const abs = Math.abs(diffSec);
-  if (abs < 60) {
-    return startRelativeFormatter.format(diffSec, "second");
-  }
-  if (abs < 3600) {
-    return startRelativeFormatter.format(Math.round(diffSec / 60), "minute");
-  }
-  if (abs < 172_800) {
-    return startRelativeFormatter.format(Math.round(diffSec / 3600), "hour");
-  }
-  return startRelativeFormatter.format(Math.round(diffSec / 86_400), "day");
-}
-
 function capacityPercent(event: GameEvent): number {
   if (event.maxPlayers <= 0) {
     return 0;
   }
   return Math.min(100, Math.round((event.joinedCount / event.maxPlayers) * 100));
 }
-
-function minPlayersGapHint(event: GameEvent): string | null {
-  if (event.status === "archived" || event.status === "cancelled") {
-    return null;
-  }
-  const gap = event.minPlayers - event.joinedCount;
-  if (gap <= 0) {
-    return "Mindestspielerzahl erreicht";
-  }
-  if (gap === 1) {
-    return "Noch 1 Spieler bis zur Mindestzahl";
-  }
-  return `Noch ${gap} Spieler bis zur Mindestzahl`;
-}
-
-function myParticipationLabel(status: GameEvent["myParticipation"]): string | null {
-  if (status === "joined") {
-    return "Du bist dabei";
-  }
-  if (status === "declined") {
-    return "Du hast abgesagt";
-  }
-  return null;
-}
-
-const defaultEmptyBoardTitle = "Noch keine Runden im Board.";
-const defaultEmptyBoardBody =
-  "Sobald ein Manager eine Runde vorbereitet, tauchen Spiel, Startfenster und Join-Hinweise hier auf.";
 
 /** Kompakte Kachel-Ansicht für schmale Viewports und installierte PWA (display-mode: standalone). */
 function useCompactTouchShell() {
@@ -157,8 +76,91 @@ export function EventBoard({
   emptyBoardBody?: string;
   gameCatalog?: string[];
 }) {
-  const resolvedEmptyTitle = emptyBoardTitle.trim() || defaultEmptyBoardTitle;
-  const resolvedEmptyBody = emptyBoardBody.trim() || defaultEmptyBoardBody;
+  const { t, locale } = useI18n();
+  const dateTag = locale === "en" ? "en-US" : "de-DE";
+  const relFormatter = useMemo(
+    () => new Intl.RelativeTimeFormat(locale === "en" ? "en" : "de", { numeric: "auto" }),
+    [locale]
+  );
+
+  function getEventStatusLabel(event: GameEvent) {
+    if (
+      event.status !== "archived" &&
+      event.status !== "cancelled" &&
+      event.joinedCount >= event.maxPlayers
+    ) {
+      return t("events.status.full");
+    }
+
+    const labels: Record<GameEvent["status"], MessageKey> = {
+      open: "events.status.open",
+      ready: "events.status.ready",
+      running: "events.status.running",
+      cancelled: "events.status.cancelled",
+      archived: "events.status.archived"
+    };
+
+    return t(labels[event.status]);
+  }
+
+  function formatStartForCompactOverview(iso: string): string {
+    const start = new Date(iso);
+    const now = new Date();
+    const timeOnly = new Intl.DateTimeFormat(dateTag, { hour: "2-digit", minute: "2-digit" });
+    if (isSameLocalCalendarDay(start, now)) {
+      return timeOnly.format(start);
+    }
+    return new Intl.DateTimeFormat(dateTag, {
+      day: "2-digit",
+      month: "2-digit",
+      year: "numeric",
+      hour: "2-digit",
+      minute: "2-digit"
+    }).format(start);
+  }
+
+  function formatStartRelative(iso: string): string {
+    const startMs = new Date(iso).getTime();
+    const diffSec = Math.round((startMs - Date.now()) / 1000);
+    const abs = Math.abs(diffSec);
+    if (abs < 60) {
+      return relFormatter.format(diffSec, "second");
+    }
+    if (abs < 3600) {
+      return relFormatter.format(Math.round(diffSec / 60), "minute");
+    }
+    if (abs < 172_800) {
+      return relFormatter.format(Math.round(diffSec / 3600), "hour");
+    }
+    return relFormatter.format(Math.round(diffSec / 86_400), "day");
+  }
+
+  function minPlayersGapHint(event: GameEvent): string | null {
+    if (event.status === "archived" || event.status === "cancelled") {
+      return null;
+    }
+    const gap = event.minPlayers - event.joinedCount;
+    if (gap <= 0) {
+      return t("events.minMet");
+    }
+    if (gap === 1) {
+      return t("events.minOne");
+    }
+    return t("events.minN", { n: gap });
+  }
+
+  function myParticipationLabel(status: GameEvent["myParticipation"]): string | null {
+    if (status === "joined") {
+      return t("events.part.joined");
+    }
+    if (status === "declined") {
+      return t("events.part.declined");
+    }
+    return null;
+  }
+
+  const resolvedEmptyTitle = emptyBoardTitle.trim() || t("events.empty.defaultTitle");
+  const resolvedEmptyBody = emptyBoardBody.trim() || t("events.empty.defaultBody");
   const [events, setEvents] = useState<GameEvent[]>([]);
   const [eventDraft, setEventDraft] = useState({
     gameTitle: "",
@@ -320,10 +322,10 @@ export function EventBoard({
         connectionInfo: ""
       });
       await loadEvents();
-      setMessage("Event gespeichert.");
+      setMessage(t("events.msg.saved"));
       setCreateFlowOpen(false);
     } catch (caught) {
-      setError(getErrorMessage(caught));
+      setError(getErrorMessage(caught, locale));
     }
   }
 
@@ -340,9 +342,9 @@ export function EventBoard({
         })
       });
       await loadEvents();
-      setMessage("Startzeit gespeichert.");
+      setMessage(t("events.msg.startSaved"));
     } catch (caught) {
-      setError(getErrorMessage(caught));
+      setError(getErrorMessage(caught, locale));
     }
   }
 
@@ -351,7 +353,7 @@ export function EventBoard({
     setMessage("");
 
     const confirmed = window.confirm(
-      action === "archive" ? "Event wirklich archivieren?" : "Event wirklich stornieren?"
+      action === "archive" ? t("events.confirm.archive") : t("events.confirm.cancel")
     );
 
     if (!confirmed) {
@@ -363,9 +365,9 @@ export function EventBoard({
         method: "POST"
       });
       await loadEvents();
-      setMessage(action === "archive" ? "Event archiviert." : "Event storniert.");
+      setMessage(action === "archive" ? t("events.msg.archived") : t("events.msg.cancelled"));
     } catch (caught) {
-      setError(getErrorMessage(caught));
+      setError(getErrorMessage(caught, locale));
     }
   }
 
@@ -375,7 +377,7 @@ export function EventBoard({
 
     const event = events.find((candidate) => candidate.id === eventId);
     const confirmed = window.confirm(
-      `Event wirklich löschen?${event ? ` (${event.gameTitle})` : ""} (nur Admins, nur archiviert/storniert)`
+      t("events.confirm.delete", { titleSuffix: event ? ` (${event.gameTitle})` : "" })
     );
     if (!confirmed) {
       return;
@@ -384,9 +386,9 @@ export function EventBoard({
     try {
       await requestJson<void>(`/api/admin/events/${eventId}`, { method: "DELETE" });
       await loadEvents();
-      setMessage("Event gelöscht.");
+      setMessage(t("events.msg.deleted"));
     } catch (caught) {
-      setError(getErrorMessage(caught));
+      setError(getErrorMessage(caught, locale));
     }
   }
 
@@ -400,7 +402,7 @@ export function EventBoard({
         body: JSON.stringify({ status })
       });
       await loadEvents();
-      setMessage(status === "joined" ? "Teilnahme gespeichert." : "Absage gespeichert.");
+      setMessage(status === "joined" ? t("events.msg.joined") : t("events.msg.declined"));
     } catch (caught) {
       if (caught instanceof ApiError && caught.message === "event_voll") {
         const body = caught.body as { event?: Partial<GameEvent> } | null | undefined;
@@ -412,18 +414,18 @@ export function EventBoard({
 
         const parts = [];
         if (Number.isFinite(playerNumber) && Number.isFinite(maxPlayers) && maxPlayers > 0) {
-          parts.push(`Event ist voll: Du wärst Spieler ${playerNumber} von ${maxPlayers}.`);
+          parts.push(t("events.full.detail", { n: playerNumber, m: maxPlayers }));
         } else {
-          parts.push("Event ist voll.");
+          parts.push(t("events.full.simple"));
         }
-        parts.push("Vielleicht ist es Zeit für eine neue Runde.");
+        parts.push(t("events.full.hint"));
 
         await loadEvents().catch(() => undefined);
         setError(parts.join(" "));
         return;
       }
 
-      setError(getErrorMessage(caught));
+      setError(getErrorMessage(caught, locale));
     }
   }
 
@@ -461,16 +463,13 @@ export function EventBoard({
 
   if (!currentUser) {
     return (
-      <div className="access-panel" aria-label="Login Hinweis">
+      <div className="access-panel" aria-label={t("events.guest.aria")}>
         <img src="/icon.svg" alt="" />
-        <p className="eyebrow">Login</p>
-        <h2>Einloggen und aktuelle Runden prüfen.</h2>
-        <p className="muted">
-          Nach dem Login siehst du sofort, welche Runde startet, wer schon dabei ist und welche
-          Server- oder Join-Hinweise hinterlegt wurden.
-        </p>
+        <p className="eyebrow">{t("events.guest.eyebrow")}</p>
+        <h2>{t("events.guest.title")}</h2>
+        <p className="muted">{t("events.guest.body")}</p>
         <a className="text-link" href="#login">
-          Zum Login
+          {t("events.guest.login")}
         </a>
       </div>
     );
@@ -478,17 +477,17 @@ export function EventBoard({
 
   const liveStateLabel =
     liveState === "live"
-      ? "Live verbunden"
+      ? t("events.live.live")
       : liveState === "connecting"
-        ? "Verbinde…"
+        ? t("events.live.connecting")
         : liveState === "polling"
-          ? "Polling aktiv"
-          : "Offline";
+          ? t("events.live.polling")
+          : t("events.live.offline");
 
   function renderEventExpandedContent(event: GameEvent) {
     const selfStatus = myParticipationLabel(event.myParticipation);
     const gapHint = minPlayersGapHint(event);
-    const startAbsolute = new Date(event.startsAt).toLocaleString("de-DE");
+    const startAbsolute = new Date(event.startsAt).toLocaleString(dateTag);
     const pct = capacityPercent(event);
     return (
       <>
@@ -499,7 +498,7 @@ export function EventBoard({
         ) : null}
         <div className="event-meta-row">
           <span className="event-organizer">
-            Runde von <strong>{event.createdByUsername}</strong>
+            {t("events.organizer")} <strong>{event.createdByUsername}</strong>
           </span>
           <time className="event-relative-start" dateTime={event.startsAt} title={startAbsolute}>
             {formatStartRelative(event.startsAt)}
@@ -512,24 +511,27 @@ export function EventBoard({
             aria-valuemin={0}
             aria-valuemax={event.maxPlayers}
             aria-valuenow={event.joinedCount}
-            aria-label={`Belegung: ${event.joinedCount} von ${event.maxPlayers} Plätzen`}
+            aria-label={t("events.capacity.aria", {
+              joined: event.joinedCount,
+              max: event.maxPlayers
+            })}
           >
             <div className="event-capacity-fill" style={{ width: `${pct}%` }} />
           </div>
           <div className="event-capacity-caption">
             <span className="event-capacity-count">
-              {event.joinedCount} / {event.maxPlayers} Spieler
+              {t("events.capacity.players", { joined: event.joinedCount, max: event.maxPlayers })}
             </span>
             {gapHint ? <span className="event-capacity-hint">{gapHint}</span> : null}
           </div>
         </div>
         <dl className="event-stats event-stats--pair">
           <div>
-            <dt>Minimum</dt>
+            <dt>{t("events.meta.min")}</dt>
             <dd>{event.minPlayers}</dd>
           </div>
           <div>
-            <dt>Start (lokal)</dt>
+            <dt>{t("events.meta.startLocal")}</dt>
             <dd>
               <time dateTime={event.startsAt}>{startAbsolute}</time>
             </dd>
@@ -539,21 +541,19 @@ export function EventBoard({
           <div className="event-connection-details">
             {event.serverHost ? (
               <div className="event-conn-line">
-                <span className="event-conn-label">Server</span>
+                <span className="event-conn-label">{t("events.conn.server")}</span>
                 <span className="event-conn-value">{event.serverHost}</span>
               </div>
             ) : null}
             {event.connectionInfo ? (
               <div className="event-conn-line">
-                <span className="event-conn-label">Join / Hinweis</span>
+                <span className="event-conn-label">{t("events.conn.join")}</span>
                 <span className="event-conn-value">{event.connectionInfo}</span>
               </div>
             ) : null}
           </div>
         ) : (
-          <p className="muted event-join-hint">
-            Server- und Join-Hinweise fehlen noch. Frag kurz im LAN nach, bevor ihr startet.
-          </p>
+          <p className="muted event-join-hint">{t("events.conn.missing")}</p>
         )}
         {event.status !== "archived" && event.status !== "cancelled" ? (
           <div className="action-row">
@@ -563,7 +563,7 @@ export function EventBoard({
               onClick={() => setParticipation(event.id, "joined")}
               disabled={isJoinDisabled(event)}
             >
-              Dabei
+              {t("events.action.join")}
             </button>
             <button
               type="button"
@@ -571,7 +571,7 @@ export function EventBoard({
               onClick={() => setParticipation(event.id, "declined")}
               disabled={event.myParticipation === "declined"}
             >
-              Nicht dabei
+              {t("events.action.decline")}
             </button>
           </div>
         ) : null}
@@ -588,20 +588,20 @@ export function EventBoard({
               }
             />
             <button type="button" className="secondary" onClick={() => updateStart(event.id)}>
-              Start speichern
+              {t("events.action.saveStart")}
             </button>
             <button type="button" className="secondary" onClick={() => changeEventStatus(event.id, "archive")}>
-              Archivieren
+              {t("events.action.archive")}
             </button>
             <button type="button" className="secondary" onClick={() => changeEventStatus(event.id, "cancel")}>
-              Stornieren
+              {t("events.action.cancel")}
             </button>
           </div>
         ) : null}
         {canSoftDelete(event) ? (
           <div className="action-row">
             <button type="button" className="secondary danger" onClick={() => softDeleteEvent(event.id)}>
-              Löschen
+              {t("events.action.delete")}
             </button>
           </div>
         ) : null}
@@ -614,9 +614,19 @@ export function EventBoard({
     const expanded = expandedEventId === event.id;
     const panelId = `event-expand-${event.id}`;
     const compactStartLabel = formatStartForCompactOverview(event.startsAt);
+    const which = expanded ? t("events.tile.collapse") : t("events.tile.expand");
     const tileAriaLabel = compactTouchShell
-      ? `${event.gameTitle}, Start ${compactStartLabel}, ${getEventStatusLabel(event)}. Details ${expanded ? "einklappen" : "aufklappen"}.`
-      : `${event.gameTitle}, ${getEventStatusLabel(event)}. Details ${expanded ? "einklappen" : "aufklappen"}.`;
+      ? t("events.tile.aria", {
+          title: event.gameTitle,
+          start: compactStartLabel,
+          status: getEventStatusLabel(event),
+          which
+        })
+      : t("events.tile.ariaNoStart", {
+          title: event.gameTitle,
+          status: getEventStatusLabel(event),
+          which
+        });
     return (
       <div className="event-expandable" key={event.id}>
         <button
@@ -661,12 +671,14 @@ export function EventBoard({
             id={panelId}
             role="region"
             aria-labelledby={`event-tile-${event.id}`}
-            aria-label={`Details: ${event.gameTitle}`}
+            aria-label={t("events.panel.details", { title: event.gameTitle })}
           >
             <article className={`event-card event-${getEventStatusClass(event)} event-card--expanded-follow`}>
               <div className="event-header event-header--expanded-follow">
                 <div>
-                  <p className="eyebrow">{event.startMode === "now" ? "Sofort" : "Geplant"}</p>
+                  <p className="eyebrow">
+                    {event.startMode === "now" ? t("events.mode.now") : t("events.mode.scheduled")}
+                  </p>
                   <h2>{event.gameTitle}</h2>
                 </div>
                 <span className={`status-pill status-${getEventStatusClass(event)}`}>
@@ -682,23 +694,20 @@ export function EventBoard({
   }
 
   const newEventForm = (
-    <form onSubmit={createEvent} className="event-form" aria-label="Neues Event anlegen">
+    <form onSubmit={createEvent} className="event-form" aria-label={t("events.form.aria")}>
       <div className="form-title">
-        <p className="eyebrow">Neue Runde</p>
-        <h2>Spielrunde vorbereiten.</h2>
-        <p className="muted">
-          Lege Spiel, Startfenster und optionale Join-Hinweise einmal sauber an, damit alle im Board
-          dieselben Informationen sehen.
-        </p>
+        <p className="eyebrow">{t("events.form.eyebrow")}</p>
+        <h2>{t("events.form.title")}</h2>
+        <p className="muted">{t("events.form.intro")}</p>
       </div>
       <div className="game-title-field">
         <label>
-          Spiel
+          {t("events.form.game")}
           {catalogAvailable ? (
             <div
               className="game-title-mode-toggle"
               role="group"
-              aria-label="Spieltitel: Katalog oder Freitext"
+              aria-label={t("events.form.catalogToggle")}
             >
               <button
                 type="button"
@@ -706,7 +715,7 @@ export function EventBoard({
                 aria-pressed={gameTitleFromCatalog}
                 onClick={() => switchGameTitleMode("catalog")}
               >
-                Aus Liste
+                {t("events.form.fromList")}
               </button>
               <button
                 type="button"
@@ -714,7 +723,7 @@ export function EventBoard({
                 aria-pressed={!gameTitleFromCatalog}
                 onClick={() => switchGameTitleMode("custom")}
               >
-                Eigener Titel
+                {t("events.form.customTitle")}
               </button>
             </div>
           ) : null}
@@ -723,9 +732,9 @@ export function EventBoard({
               value={eventDraft.gameTitle}
               onChange={(ev) => setEventDraft({ ...eventDraft, gameTitle: ev.target.value })}
               required
-              aria-label="Spiel aus Katalog wählen"
+              aria-label={t("events.form.catalogToggle")}
             >
-              <option value="">Spiel wählen…</option>
+              <option value="">{t("events.form.pickGame")}</option>
               {resolvedCatalog.map((title) => (
                 <option key={title} value={title}>
                   {title}
@@ -737,14 +746,14 @@ export function EventBoard({
               value={eventDraft.gameTitle}
               onChange={(ev) => setEventDraft({ ...eventDraft, gameTitle: ev.target.value })}
               required
-              aria-label="Spieltitel"
+              aria-label={t("events.form.gameTitleAria")}
             />
           )}
         </label>
       </div>
       <div className="form-grid">
         <label>
-          Start
+          {t("events.form.start")}
           <select
             value={eventDraft.startMode}
             onChange={(ev) =>
@@ -754,12 +763,12 @@ export function EventBoard({
               })
             }
           >
-            <option value="scheduled">Geplant</option>
-            <option value="now">Sofort</option>
+            <option value="scheduled">{t("events.mode.scheduled")}</option>
+            <option value="now">{t("events.mode.now")}</option>
           </select>
         </label>
         <label>
-          Startzeit
+          {t("events.form.startTime")}
           <input
             type="datetime-local"
             disabled={eventDraft.startMode === "now"}
@@ -770,7 +779,7 @@ export function EventBoard({
       </div>
       <div className="form-grid">
         <label>
-          Min
+          {t("events.form.min")}
           <input
             type="number"
             min={1}
@@ -780,7 +789,7 @@ export function EventBoard({
           />
         </label>
         <label>
-          Max
+          {t("events.form.max")}
           <input
             type="number"
             min={1}
@@ -791,20 +800,20 @@ export function EventBoard({
         </label>
       </div>
       <label>
-        Server
+        {t("events.form.server")}
         <input
           value={eventDraft.serverHost}
           onChange={(ev) => setEventDraft({ ...eventDraft, serverHost: ev.target.value })}
         />
       </label>
       <label>
-        Verbindung
+        {t("events.form.connection")}
         <input
           value={eventDraft.connectionInfo}
           onChange={(ev) => setEventDraft({ ...eventDraft, connectionInfo: ev.target.value })}
         />
       </label>
-      <button type="submit">Event anlegen</button>
+      <button type="submit">{t("events.form.submit")}</button>
     </form>
   );
 
@@ -813,11 +822,13 @@ export function EventBoard({
       <div>
         <span className={`live-state live-${liveState}`}>{liveStateLabel}</span>
         <span className="toolbar-hint">
-          {events.length === 1 ? "1 Runde im Board" : `${events.length} Runden im Board`}
+          {events.length === 1
+            ? t("events.count.one")
+            : t("events.count.many", { n: events.length })}
         </span>
       </div>
       <button type="button" className="secondary" onClick={() => loadEvents()}>
-        Aktualisieren
+        {t("events.refresh")}
       </button>
     </div>
   );
@@ -826,16 +837,13 @@ export function EventBoard({
   const boardClassName = `event-board ${mode === "manager" ? "manager-board" : "events-board"} event-board--expandable${compactTouchShell ? " event-board--compact" : ""}`;
 
   return (
-    <section className={boardClassName} aria-label="Events">
+    <section className={boardClassName} aria-label={t("events.board.aria")}>
       {boardToolbar}
       {mode === "manager" && !canCreate ? (
-        <div className="access-panel compact" aria-label="Manager Hinweis">
-          <p className="eyebrow">Manager</p>
-          <h2>Keine Managerrechte.</h2>
-          <p className="muted">
-            Neue Runden können nur Manager und Admins anlegen. Als Spieler kannst du hier weiter
-            bestehende Runden verfolgen.
-          </p>
+        <div className="access-panel compact" aria-label={t("events.manager.denied.title")}>
+          <p className="eyebrow">{t("events.manager.denied.eyebrow")}</p>
+          <h2>{t("events.manager.denied.title")}</h2>
+          <p className="muted">{t("events.manager.denied.body")}</p>
         </div>
       ) : null}
       {message ? <p className="notice">{message}</p> : null}
@@ -849,15 +857,15 @@ export function EventBoard({
               setExpandedEventId(null);
             }}
           >
-            Neues Event
+            {t("events.newCompact")}
           </button>
         </div>
       ) : null}
       {showCreateForm && compactTouchShell && createFlowOpen ? (
-        <div className="event-overlay-panel" role="region" aria-label="Neues Event anlegen">
+        <div className="event-overlay-panel" role="region" aria-label={t("events.overlay.aria")}>
           <div className="event-overlay-toolbar">
             <button type="button" className="secondary" onClick={() => setCreateFlowOpen(false)}>
-              Zurück zur Übersicht
+              {t("events.overlay.back")}
             </button>
           </div>
           {newEventForm}
@@ -872,13 +880,13 @@ export function EventBoard({
             {events.length === 0 ? (
               compactTouchShell ? (
                 <div className="event-compact-empty event-card">
-                  <p className="eyebrow">Events</p>
+                  <p className="eyebrow">{t("events.empty.eyebrow")}</p>
                   <h2>{resolvedEmptyTitle}</h2>
                   <p className="muted">{resolvedEmptyBody}</p>
                 </div>
               ) : (
                 <article className="event-card">
-                  <p className="eyebrow">Events</p>
+                  <p className="eyebrow">{t("events.empty.eyebrow")}</p>
                   <h2>{resolvedEmptyTitle}</h2>
                   <p className="muted">{resolvedEmptyBody}</p>
                 </article>

@@ -1124,7 +1124,8 @@ describe("app flow", () => {
       themeSurfaceColor: "#f0ede6",
       infosEnabled: true,
       infosMarkdown: "## LAN-Infos\n\n- [Organisation](https://example.org)",
-      s3SnapshotEnabled: true
+      s3SnapshotEnabled: true,
+      defaultLocale: "de"
     };
 
     await adminAgent

@@ -1,6 +1,7 @@
 import { z } from "zod";
 import type { DatabaseContext } from "./db/client";
 import { appSettings } from "./db/schema";
+import { appLocaleSchema } from "../shared/locale";
 
 const colorSchema = z.string().regex(/^#[0-9a-fA-F]{6}$/);
 
@@ -29,7 +30,12 @@ export const settingsSchema = z.object({
    * true (Default): S3-Snapshots aktiv, wenn HERMES_STORAGE_BACKEND=s3.
    * false: keine S3-Backups/Restores in der laufenden Instanz (Env kann trotzdem s3 sein).
    */
-  s3SnapshotEnabled: z.boolean()
+  s3SnapshotEnabled: z.boolean(),
+  /**
+   * Fallback-Sprache, wenn die Browsersprache weder eindeutig deutsch noch englisch ist.
+   * Beeinflusst auch serverseitige Defaults (z. B. Registrierung ohne Client-Locale).
+   */
+  defaultLocale: appLocaleSchema
 });
 
 export type HermesSettings = z.infer<typeof settingsSchema>;
@@ -51,7 +57,8 @@ export const defaultSettings: HermesSettings = {
   themeSurfaceColor: "#f6f8f4",
   infosEnabled: false,
   infosMarkdown: "",
-  s3SnapshotEnabled: true
+  s3SnapshotEnabled: true,
+  defaultLocale: "de"
 };
 
 function nowIso() {

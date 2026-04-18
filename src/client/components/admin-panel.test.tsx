@@ -4,6 +4,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { createRoot, type Root } from "react-dom/client";
 import { act } from "react-dom/test-utils";
 import { AdminPanel } from "./AdminPanel";
+import { I18nProvider } from "../i18n/I18nContext";
 
 import type { AppSettings, BulkImportResult, User } from "../types/core";
 import { requestJson } from "../api/request";
@@ -26,7 +27,7 @@ async function renderIntoDocument(element: React.ReactElement) {
   const root: Root = createRoot(container);
 
   await act(async () => {
-    root.render(element);
+    root.render(<I18nProvider locale="de">{element}</I18nProvider>);
     await flushMicrotasks();
   });
 
@@ -60,7 +61,8 @@ const defaultSettings: AppSettings = {
   gameCatalog: [],
   infosEnabled: false,
   infosMarkdown: "",
-  s3SnapshotEnabled: true
+  s3SnapshotEnabled: true,
+  defaultLocale: "de"
 };
 
 const adminUser: User = {
@@ -172,7 +174,9 @@ describe("AdminPanel bulk import UX", () => {
     );
 
     expect(rendered.container.textContent || "").toContain("User aus CSV oder JSON importieren");
-    expect(rendered.container.querySelector('section[aria-label="Bulk User Import"]')).toBeTruthy();
+    expect(
+      rendered.container.querySelector('section[aria-label="User aus CSV oder JSON importieren."]')
+    ).toBeTruthy();
     expect(rendered.container.querySelector('select[aria-label="Importformat"]')).toBeTruthy();
     expect(rendered.container.querySelector('textarea[aria-label="Importdaten"]')).toBeTruthy();
     expect(rendered.container.textContent || "").toContain("Vorschau zeigt blockierende Konflikte");
@@ -201,7 +205,7 @@ describe("AdminPanel bulk import UX", () => {
     );
 
     const textarea = rendered.container.querySelector('textarea[aria-label="Importdaten"]') as HTMLTextAreaElement;
-    const form = rendered.container.querySelector('form[aria-label="Bulk Import Formular"]');
+    const form = rendered.container.querySelector('form[aria-label="Bulk-Import-Formular"]');
 
     await act(async () => {
       textarea.value = "username,email,role\nanna,anna@example.test,user";
@@ -210,7 +214,7 @@ describe("AdminPanel bulk import UX", () => {
     });
 
     await act(async () => {
-      form?.dispatchEvent(new Event("submit", { bubbles: true, cancelable: true }));
+      form?.requestSubmit();
       await flushMicrotasks();
     });
 
@@ -261,7 +265,7 @@ describe("AdminPanel bulk import UX", () => {
     );
 
     const textarea = rendered.container.querySelector('textarea[aria-label="Importdaten"]') as HTMLTextAreaElement;
-    const form = rendered.container.querySelector('form[aria-label="Bulk Import Formular"]');
+    const form = rendered.container.querySelector('form[aria-label="Bulk-Import-Formular"]');
 
     await act(async () => {
       textarea.value = "username,email,role\nanna,anna@example.test,user";
@@ -270,7 +274,7 @@ describe("AdminPanel bulk import UX", () => {
     });
 
     await act(async () => {
-      form?.dispatchEvent(new Event("submit", { bubbles: true, cancelable: true }));
+      form?.requestSubmit();
       await flushMicrotasks();
     });
 
@@ -391,7 +395,7 @@ describe("AdminPanel bulk import UX", () => {
     );
 
     const textarea = rendered.container.querySelector('textarea[aria-label="Importdaten"]') as HTMLTextAreaElement;
-    const form = rendered.container.querySelector('form[aria-label="Bulk Import Formular"]');
+    const form = rendered.container.querySelector('form[aria-label="Bulk-Import-Formular"]');
 
     await act(async () => {
       textarea.value = "username,email,role\nanna,anna@example.test,user";
@@ -400,7 +404,7 @@ describe("AdminPanel bulk import UX", () => {
     });
 
     await act(async () => {
-      form?.dispatchEvent(new Event("submit", { bubbles: true, cancelable: true }));
+      form?.requestSubmit();
       await flushMicrotasks();
     });
 

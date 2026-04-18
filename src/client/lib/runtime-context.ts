@@ -1,3 +1,6 @@
+import type { AppLocale } from "../../shared/locale";
+import { MESSAGES } from "../i18n/catalog/index";
+
 /** Testbar via `win`-Parameter (kein globales `window` nötig). */
 export type SecureContextInfo = {
   isSecureContext: boolean;
@@ -11,32 +14,30 @@ export type SecureContextInfo = {
 
 type RuntimeWindow = Pick<Window, "location" | "isSecureContext">;
 
-export function getSecureContextInfo(win: RuntimeWindow = window): SecureContextInfo {
+export function getSecureContextInfo(win: RuntimeWindow = window, locale: AppLocale = "de"): SecureContextInfo {
   const protocol = win.location.protocol;
   const hostname = win.location.hostname;
   const isHttps = protocol === "https:";
   const isLocalhost = hostname === "localhost" || hostname === "127.0.0.1";
   const isSecureContext = win.isSecureContext;
 
+  const copy = MESSAGES[locale];
+
   let headline: string;
   let body: string;
 
   if (isSecureContext && isHttps) {
-    headline = "Sichere Verbindung (HTTPS)";
-    body =
-      "Diese Hermes-Instanz läuft über HTTPS. Web Push ist hier grundsätzlich möglich, sofern Browser und Gerät die APIs freigeben.";
+    headline = copy["secure.https.title"];
+    body = copy["secure.https.body"];
   } else if (isSecureContext && isLocalhost) {
-    headline = "Lokaler sicherer Kontext";
-    body =
-      "localhost gilt als sicherer Kontext — ideal zum Testen von Push ohne öffentliches Zertifikat.";
+    headline = copy["secure.localhost.title"];
+    body = copy["secure.localhost.body"];
   } else if (isHttps && !isSecureContext) {
-    headline = "HTTPS in eingeschränktem Kontext";
-    body =
-      "Die Adresse nutzt HTTPS, der Browser wertet den Kontext aber nicht als vollständig sicher (z. B. eingebettete Ansicht). Push kann fehlschlagen.";
+    headline = copy["secure.httpsPartial.title"];
+    body = copy["secure.httpsPartial.body"];
   } else {
-    headline = "Kein sicherer Kontext (HTTP oder unsicheres Umfeld)";
-    body =
-      "Web Push braucht einen sicheren Kontext: HTTPS im Betrieb oder localhost für Entwicklung. Ohne TLS zeigt der Browser die nötigen APIs nicht an.";
+    headline = copy["secure.insecure.title"];
+    body = copy["secure.insecure.body"];
   }
 
   return { isSecureContext, protocol, hostname, isHttps, isLocalhost, headline, body };

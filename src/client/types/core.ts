@@ -1,3 +1,5 @@
+import type { AppLocale } from "../../shared/locale";
+
 export type User = {
   id: string;
   phoneNumber: string;
@@ -6,6 +8,8 @@ export type User = {
   email: string;
   role: "user" | "manager" | "admin";
   notificationsEnabled: boolean;
+  /** Explizite UI-Sprache; fehlt → Browser + Admin-Fallback */
+  locale?: AppLocale | null;
   deletedAt?: string | null;
 };
 
@@ -36,6 +40,8 @@ export type AppSettings = {
    * false: S3-Backups/Restore in der App abgeschaltet (Default an).
    */
   s3SnapshotEnabled: boolean;
+  /** Fallback, wenn die Browsersprache weder klar DE noch EN ist (Default de). */
+  defaultLocale: AppLocale;
 };
 
 export type AdminSection =

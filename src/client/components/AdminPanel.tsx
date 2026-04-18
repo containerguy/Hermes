@@ -17,6 +17,7 @@ import type {
 } from "../types/core";
 import { requestJson } from "../api/request";
 import { ApiError, getErrorMessage } from "../errors/errors";
+import { useI18n } from "../i18n/I18nContext";
 
 function toDatetimeLocal(value: string) {
   const date = new Date(value);
@@ -52,16 +53,9 @@ const defaultSettings: AppSettings = {
   gameCatalog: [],
   infosEnabled: false,
   infosMarkdown: "",
-  s3SnapshotEnabled: true
+  s3SnapshotEnabled: true,
+  defaultLocale: "de"
 };
-
-function summarizeBulkImportIssues(result: BulkImportResult) {
-  if (result.issues.length === 0) {
-    return "Keine blockierenden Konflikte erkannt.";
-  }
-
-  return `${result.blockingIssueCount} blockierende Probleme erkannt.`;
-}
 
 export function AdminPanel({
   currentUser,
@@ -108,6 +102,15 @@ export function AdminPanel({
   const [rateLimitBusy, setRateLimitBusy] = useState(false);
   const settingsImportRef = useRef<HTMLInputElement>(null);
   const usersExportImportRef = useRef<HTMLInputElement>(null);
+  const { t, locale } = useI18n();
+  const dateTag = locale === "en" ? "en-US" : "de-DE";
+
+  function bulkImportSummary(result: BulkImportResult) {
+    if (result.issues.length === 0) {
+      return t("admin.bulk.noBlocking");
+    }
+    return t("admin.bulk.summaryBlocking", { count: result.blockingIssueCount });
+  }
 
   const isAdmin = currentUser?.role === "admin";
 
@@ -137,9 +140,9 @@ export function AdminPanel({
       anchor.download = filename;
       anchor.click();
       URL.revokeObjectURL(url);
-      setMessage("Download gestartet.");
+      setMessage(t("login.msg.downloadStarted"));
     } catch (caught) {
-      setError(getErrorMessage(caught));
+      setError(getErrorMessage(caught, locale));
     }
   }
 
@@ -159,7 +162,7 @@ export function AdminPanel({
         }
       }
       if (!settingsPayload || typeof settingsPayload !== "object" || Array.isArray(settingsPayload)) {
-        setError("Ungültige Einstellungen-Datei.");
+        setError(t("login.error.invalidSettingsFile"));
         return;
       }
       const result = await requestJson<{ settings: AppSettings }>("/api/admin/settings/import", {
@@ -169,9 +172,9 @@ export function AdminPanel({
       setSettings(result.settings);
       setGameCatalogDraft(result.settings.gameCatalog.join("\n"));
       onSettingsChanged(result.settings);
-      setMessage("Einstellungen importiert.");
+      setMessage(t("login.msg.settingsImported"));
     } catch (caught) {
-      setError(getErrorMessage(caught));
+      setError(getErrorMessage(caught, locale));
     } finally {
       if (settingsImportRef.current) {
         settingsImportRef.current.value = "";
@@ -192,7 +195,7 @@ export function AdminPanel({
         Array.isArray(raw) ||
         !Array.isArray((raw as { users?: unknown }).users)
       ) {
-        setError("Ungültiges User-Export-Format (users-Array fehlt).");
+        setError(t("login.error.invalidUserExport"));
         return;
       }
       const result = await requestJson<BulkImportCommitResponse>("/api/admin/users/import/from-export", {
@@ -201,9 +204,9 @@ export function AdminPanel({
       });
       await loadAdminData();
       setBulkImportPreview(null);
-      setMessage(`User-Import abgeschlossen: ${result.importedCount} angelegt.`);
+      setMessage(t("login.msg.userImportDone", { count: result.importedCount }));
     } catch (caught) {
-      setError(getErrorMessage(caught));
+      setError(getErrorMessage(caught, locale));
     } finally {
       setBulkImportBusy(false);
       if (usersExportImportRef.current) {
@@ -283,7 +286,7 @@ export function AdminPanel({
       await loadAdminData();
       setMessage("Rate-Limit gelöscht.");
     } catch (caught) {
-      setError(getErrorMessage(caught));
+      setError(getErrorMessage(caught, locale));
     } finally {
       setRateLimitBusy(false);
     }
@@ -307,7 +310,7 @@ export function AdminPanel({
       await loadAdminData();
       setMessage("Allowlist-Eintrag gespeichert.");
     } catch (caught) {
-      setError(getErrorMessage(caught));
+      setError(getErrorMessage(caught, locale));
     } finally {
       setRateLimitBusy(false);
     }
@@ -330,7 +333,7 @@ export function AdminPanel({
       await loadAdminData();
       setMessage("Allowlist-Eintrag gelöscht.");
     } catch (caught) {
-      setError(getErrorMessage(caught));
+      setError(getErrorMessage(caught, locale));
     } finally {
       setRateLimitBusy(false);
     }
@@ -350,7 +353,7 @@ export function AdminPanel({
       await loadAdminData();
       setMessage("User gespeichert.");
     } catch (caught) {
-      setError(getErrorMessage(caught));
+      setError(getErrorMessage(caught, locale));
     }
   }
 
@@ -373,7 +376,7 @@ export function AdminPanel({
       );
     } catch (caught) {
       setBulkImportPreview(null);
-      setError(getErrorMessage(caught));
+      setError(getErrorMessage(caught, locale));
     } finally {
       setBulkImportBusy(false);
     }
@@ -400,7 +403,7 @@ export function AdminPanel({
           setBulkImportPreview(importResult);
         }
       }
-      setError(getErrorMessage(caught));
+      setError(getErrorMessage(caught, locale));
     } finally {
       setBulkImportBusy(false);
     }
@@ -418,7 +421,7 @@ export function AdminPanel({
       await loadAdminData();
       setMessage("Rolle gespeichert.");
     } catch (caught) {
-      setError(getErrorMessage(caught));
+      setError(getErrorMessage(caught, locale));
     }
   }
 
@@ -437,7 +440,7 @@ export function AdminPanel({
       await loadAdminData();
       setMessage("User gelöscht.");
     } catch (caught) {
-      setError(getErrorMessage(caught));
+      setError(getErrorMessage(caught, locale));
     }
   }
 
@@ -467,7 +470,7 @@ export function AdminPanel({
       await loadAdminData();
       setMessage("Invite-Code erstellt.");
     } catch (caught) {
-      setError(getErrorMessage(caught));
+      setError(getErrorMessage(caught, locale));
     }
   }
 
@@ -491,7 +494,7 @@ export function AdminPanel({
       await loadAdminData();
       setMessage("Invite-Code deaktiviert.");
     } catch (caught) {
-      setError(getErrorMessage(caught));
+      setError(getErrorMessage(caught, locale));
     }
   }
 
@@ -515,7 +518,7 @@ export function AdminPanel({
       await loadAdminData();
       setMessage("Invite-Code reaktiviert.");
     } catch (caught) {
-      setError(getErrorMessage(caught));
+      setError(getErrorMessage(caught, locale));
     }
   }
 
@@ -548,7 +551,7 @@ export function AdminPanel({
       await loadAdminData();
       setMessage("Invite gespeichert.");
     } catch (caught) {
-      setError(getErrorMessage(caught));
+      setError(getErrorMessage(caught, locale));
     }
   }
 
@@ -569,7 +572,7 @@ export function AdminPanel({
       await loadAdminData();
       setMessage("Invite gelöscht.");
     } catch (caught) {
-      setError(getErrorMessage(caught));
+      setError(getErrorMessage(caught, locale));
     }
   }
 
@@ -592,7 +595,7 @@ export function AdminPanel({
       onSettingsChanged(result.settings);
       setMessage("Einstellungen gespeichert.");
     } catch (caught) {
-      setError(getErrorMessage(caught));
+      setError(getErrorMessage(caught, locale));
     }
   }
 
@@ -606,7 +609,7 @@ export function AdminPanel({
       await loadAdminData();
       setMessage("Backup wurde nach S3 geschrieben.");
     } catch (caught) {
-      setError(getErrorMessage(caught));
+      setError(getErrorMessage(caught, locale));
     } finally {
       setOpsBusy(false);
     }
@@ -641,7 +644,7 @@ export function AdminPanel({
           : "Restore abgeschlossen. Bitte prüfe User, Events und deine aktuelle Session."
       );
     } catch (caught) {
-      setError(getErrorMessage(caught));
+      setError(getErrorMessage(caught, locale));
       if (caught instanceof ApiError) {
         const body = caught.body as
           | { diagnostics?: RestoreDiagnostics; recovery?: RestoreRecovery | null }
@@ -660,11 +663,11 @@ export function AdminPanel({
     return (
       <article id="admin" className="access-panel admin-access">
         <img src="/icon.svg" alt="" />
-        <p className="eyebrow">Admin</p>
-        <h2>User, Manager und Einstellungen.</h2>
-        <p>Der Adminbereich ist nach Admin-Login verfügbar.</p>
+        <p className="eyebrow">{t("main.nav.admin")}</p>
+        <h2>{t("admin.gate.title")}</h2>
+        <p>{t("admin.gate.body")}</p>
         <a className="text-link" href="#login">
-          Admin-Login öffnen
+          {t("admin.gate.link")}
         </a>
       </article>
     );
@@ -679,7 +682,7 @@ export function AdminPanel({
     <section
       id="admin"
       className={`admin-panel ${adminSection === "users" ? "admin-panel--users" : "admin-panel--single"}`}
-      aria-label="Adminbereich"
+      aria-label={t("admin.panel.aria")}
     >
       {message ? <p className="notice admin-panel-notice">{message}</p> : null}
       {error ? <p className="error admin-panel-notice">{error}</p> : null}
@@ -687,20 +690,14 @@ export function AdminPanel({
       {adminSection === "users" ? (
         <>
           <header className="admin-section-head">
-            <p className="eyebrow">Benutzer</p>
-            <h2>Zugänge, Einzelanlage und Import</h2>
-            <p className="muted">
-              Lege User an, importiere Listen und pflege Rollen. Änderungen wirken nach dem Speichern
-              sofort im System.
-            </p>
+            <p className="eyebrow">{t("main.admin.nav.users")}</p>
+            <h2>{t("admin.users.title")}</h2>
+            <p className="muted">{t("admin.users.intro")}</p>
           </header>
-          <section className="invite-panel" aria-label="User Export und Import">
-            <p className="eyebrow">Export / Import</p>
-            <h2>Alle aktiven User als JSON.</h2>
-            <p className="muted">
-              Enthält dieselben Felder wie der JSON-Bulk-Import plus Benachrichtigungs-Präferenz. Bestehende
-              User (gleicher Username oder E-Mail) blockieren den Import wie bei der Vorschau.
-            </p>
+          <section className="invite-panel" aria-label={t("admin.exportUsers.title")}>
+            <p className="eyebrow">{t("admin.exportUsers.eyebrow")}</p>
+            <h2>{t("admin.exportUsers.title")}</h2>
+            <p className="muted">{t("admin.exportUsers.help")}</p>
             <div className="action-row">
               <button
                 type="button"
@@ -708,7 +705,7 @@ export function AdminPanel({
                   void downloadJsonAttachment("/api/admin/users/export", "hermes-users.json")
                 }
               >
-                User exportieren
+                {t("admin.exportUsers.export")}
               </button>
               <button
                 type="button"
@@ -716,7 +713,7 @@ export function AdminPanel({
                 onClick={() => usersExportImportRef.current?.click()}
                 disabled={bulkImportBusy}
               >
-                User importieren (Export-Datei)
+                {t("admin.exportUsers.import")}
               </button>
               <input
                 ref={usersExportImportRef}
@@ -734,7 +731,7 @@ export function AdminPanel({
           </section>
           <form id="admin-users" onSubmit={createUser} className="admin-form admin-user-create-form">
         <label>
-          Username
+          {t("login.field.username")}
           <input
             value={newUser.username}
             onChange={(event) => setNewUser({ ...newUser, username: event.target.value })}
@@ -742,7 +739,7 @@ export function AdminPanel({
           />
         </label>
         <label>
-          E-Mail
+          {t("login.field.email")}
           <input
             type="email"
             value={newUser.email}
@@ -751,31 +748,28 @@ export function AdminPanel({
           />
         </label>
         <label>
-          Rolle
+          {t("main.hero.role")}
           <select
             value={newUser.role}
             onChange={(event) => setNewUser({ ...newUser, role: event.target.value as User["role"] })}
           >
-            <option value="user">User</option>
-            <option value="manager">Manager</option>
-            <option value="admin">Admin</option>
+            <option value="user">{t("admin.role.user")}</option>
+            <option value="manager">{t("admin.role.manager")}</option>
+            <option value="admin">{t("admin.role.admin")}</option>
           </select>
         </label>
-        <button type="submit">User anlegen</button>
+        <button type="submit">{t("admin.user.create")}</button>
       </form>
 
-      <section className="invite-panel" aria-label="Bulk User Import">
-        <p className="eyebrow">Bulk Import</p>
-        <h2>User aus CSV oder JSON importieren.</h2>
-        <p className="muted">
-          Hermes prüft jede Zeile serverseitig gegen denselben Admin-Contract wie Einzel-User.
-          Vorschau zeigt blockierende Konflikte, Commit bleibt gesperrt bis der letzte Preview-Lauf sauber ist.
-        </p>
-        <form onSubmit={previewBulkImport} className="admin-form" aria-label="Bulk Import Formular">
+      <section className="invite-panel" aria-label={t("admin.bulk.title")}>
+        <p className="eyebrow">{t("admin.bulk.eyebrow")}</p>
+        <h2>{t("admin.bulk.title")}</h2>
+        <p className="muted">{t("admin.bulk.intro")}</p>
+        <form onSubmit={previewBulkImport} className="admin-form" aria-label={t("admin.bulk.formAria")}>
           <label>
-            Format
+            {t("admin.bulk.format")}
             <select
-              aria-label="Importformat"
+              aria-label={t("admin.bulk.formatAria")}
               value={bulkImportDraft.format}
               onChange={(event) => {
                 setBulkImportDraft({
@@ -790,9 +784,9 @@ export function AdminPanel({
             </select>
           </label>
           <label>
-            Importdaten
+            {t("admin.bulk.data")}
             <textarea
-              aria-label="Importdaten"
+              aria-label={t("admin.bulk.dataAria")}
               value={bulkImportDraft.source}
               onChange={(event) => {
                 setBulkImportDraft({ ...bulkImportDraft, source: event.target.value });
@@ -809,7 +803,7 @@ export function AdminPanel({
           </label>
           <div className="action-row">
             <button type="submit" disabled={bulkImportBusy || bulkImportDraft.source.trim().length === 0}>
-              Vorschau laden
+              {t("admin.bulk.preview")}
             </button>
             <button
               type="button"
@@ -817,43 +811,47 @@ export function AdminPanel({
               onClick={() => void commitBulkImport()}
               disabled={bulkImportBusy || !bulkImportCanCommit}
             >
-              Import committen
+              {t("admin.bulk.commit")}
             </button>
           </div>
         </form>
 
         {bulkImportPreview ? (
-          <div className="device-list" aria-label="Bulk Import Vorschau">
+          <div className="device-list" aria-label={t("admin.bulk.previewAria")}>
             <article className="device-row">
               <div>
-                <strong>Preview Zusammenfassung</strong>
-                <span>Format: {bulkImportPreview.format.toUpperCase()}</span>
-                <span>Zeilen gesamt: {bulkImportPreview.totalRows}</span>
-                <span>Gültige Kandidaten: {bulkImportPreview.acceptedRows}</span>
-                <span>{summarizeBulkImportIssues(bulkImportPreview)}</span>
+                <strong>{t("admin.bulk.summary")}</strong>
+                <span>{t("admin.bulk.summaryFormat", { fmt: bulkImportPreview.format.toUpperCase() })}</span>
+                <span>
+                  {t("admin.bulk.rowsTotal")} {bulkImportPreview.totalRows}
+                </span>
+                <span>
+                  {t("admin.bulk.candidates")} {bulkImportPreview.acceptedRows}
+                </span>
+                <span>{bulkImportSummary(bulkImportPreview)}</span>
               </div>
             </article>
 
-            <article className="device-row" aria-label="Blockierende Probleme">
+            <article className="device-row" aria-label={t("admin.bulk.blockingAria")}>
               <div>
-                <strong>Blockierende Probleme</strong>
+                <strong>{t("admin.bulk.blocking")}</strong>
                 {bulkImportPreview.issues.length > 0 ? (
                   <ul>
                     {bulkImportPreview.issues.map((issue, index) => (
                       <li key={`${issue.row}-${issue.field}-${index}`}>
-                        Zeile {issue.row}: {issue.message}
+                        {t("admin.bulk.issueRow", { row: issue.row, message: issue.message })}
                       </li>
                     ))}
                   </ul>
                 ) : (
-                  <span>Keine blockierenden Konflikte erkannt.</span>
+                  <span>{t("admin.bulk.noBlocking")}</span>
                 )}
               </div>
             </article>
 
-            <article className="device-row" aria-label="Import Kandidaten">
+            <article className="device-row" aria-label={t("admin.bulk.candidatesAria")}>
               <div>
-                <strong>Importierbare User</strong>
+                <strong>{t("admin.bulk.importable")}</strong>
                 {bulkImportPreview.validCandidates.length > 0 ? (
                   <ul>
                     {bulkImportPreview.validCandidates.map((candidate) => (
@@ -863,7 +861,7 @@ export function AdminPanel({
                     ))}
                   </ul>
                 ) : (
-                  <span>Noch keine importierbaren User in dieser Vorschau.</span>
+                  <span>{t("admin.bulk.noneYet")}</span>
                 )}
               </div>
             </article>
@@ -871,7 +869,7 @@ export function AdminPanel({
         ) : null}
       </section>
 
-      <div className="admin-list" aria-label="Userliste">
+      <div className="admin-list" aria-label={t("admin.user.listAria")}>
         {users.map((user) => (
           <div className="admin-list-row" key={user.id}>
             <div>
@@ -882,9 +880,9 @@ export function AdminPanel({
               value={user.role}
               onChange={(event) => updateRole(user.id, event.target.value as User["role"])}
             >
-              <option value="user">User</option>
-              <option value="manager">Manager</option>
-              <option value="admin">Admin</option>
+              <option value="user">{t("admin.role.user")}</option>
+              <option value="manager">{t("admin.role.manager")}</option>
+              <option value="admin">{t("admin.role.admin")}</option>
             </select>
             <button
               type="button"
@@ -892,7 +890,7 @@ export function AdminPanel({
               onClick={() => deleteUser(user)}
               disabled={user.id === currentUser?.id}
             >
-              Löschen
+              {t("admin.user.delete")}
             </button>
           </div>
         ))}
@@ -903,12 +901,12 @@ export function AdminPanel({
       {adminSection === "betrieb" ? (
         <>
           <header className="admin-section-head">
-            <p className="eyebrow">Betrieb</p>
-            <h2>Einstellungen, Shell-Texte und Storage</h2>
+            <p className="eyebrow">{t("main.admin.nav.ops")}</p>
+            <h2>{t("admin.betrieb.title")}</h2>
           </header>
           <form id="admin-betrieb" onSubmit={saveSettings} className="admin-form">
         <label>
-          App-Name
+          {t("admin.label.appName")}
           <input
             value={settings.appName}
             onChange={(event) => setSettings({ ...settings, appName: event.target.value })}
@@ -916,7 +914,7 @@ export function AdminPanel({
           />
         </label>
         <label>
-          Auto-Archiv nach Stunden
+          {t("admin.label.archiveHours")}
           <input
             type="number"
             min={1}
@@ -942,7 +940,7 @@ export function AdminPanel({
               })
             }
           />
-          Notifications standardmäßig aktiv
+          {t("admin.label.notifyDefault")}
         </label>
                <label className="checkbox-label">
           <input
@@ -955,7 +953,7 @@ export function AdminPanel({
               })
             }
           />
-          Öffentliche Registrierung per Invite-Code erlauben
+          {t("admin.label.publicReg")}
         </label>
         <label className="checkbox-label">
           <input
@@ -968,33 +966,39 @@ export function AdminPanel({
               })
             }
           />
-          S3-Snapshots und Restore in der laufenden Instanz erlauben (Standard: an, nur wirksam wenn die
-          Umgebung S3 nutzt)
+          {t("admin.label.s3snap")}
         </label>
-        <p className="muted">
-          Wenn deaktiviert, schreibt Hermes keine periodischen oder manuellen Snapshots nach S3 und blockiert
-          Restore in der App – auch wenn <code>HERMES_STORAGE_BACKEND=s3</code> gesetzt ist. Der erste
-          Datenbank-Download auf ein leeres Volume beim Start richtet sich weiterhin nur nach der
-          Umgebungsvariable, nicht nach dieser Option.
-        </p>
-        <p className="muted">
-          Shell-Texte für Startseite und leeres Event-Board. Überschrift und Leerzustand: leer lassen
-          für die eingebauten Standardtexte. Start-Beschreibung: leer lassen, wenn unter der
-          Überschrift kein Absatz erscheinen soll (kompakter Hero, sinnvoll für die installierte App).
-        </p>
+        <p className="muted">{t("admin.help.s3snap")}</p>
         <label>
-          Start · Hero-Überschrift (optional)
+          {t("admin.label.defaultLocale")}
+          <select
+            value={settings.defaultLocale}
+            onChange={(event) =>
+              setSettings({
+                ...settings,
+                defaultLocale: event.target.value as AppSettings["defaultLocale"]
+              })
+            }
+          >
+            <option value="de">{t("admin.locale.de")}</option>
+            <option value="en">{t("admin.locale.en")}</option>
+          </select>
+        </label>
+        <p className="muted">{t("admin.help.defaultLocale")}</p>
+        <p className="muted">{t("admin.shell.help")}</p>
+        <label>
+          {t("admin.shell.heroTitle")}
           <input
             value={settings.shellStartTitle}
             onChange={(event) =>
               setSettings({ ...settings, shellStartTitle: event.target.value })
             }
             maxLength={240}
-            placeholder="Von der Idee bis zum Server-Join an einem Ort."
+            placeholder={t("main.route.events.title")}
           />
         </label>
         <label>
-          Start · Hero-Beschreibung (optional)
+          {t("admin.shell.heroDesc")}
           <textarea
             value={settings.shellStartDescription}
             onChange={(event) =>
@@ -1002,22 +1006,22 @@ export function AdminPanel({
             }
             maxLength={2000}
             rows={4}
-            placeholder="Sieh auf einen Blick, welche Runde tragfähig ist …"
+            placeholder={t("main.route.events.description")}
           />
         </label>
         <label>
-          Events-Board · Leerzustand Überschrift (optional)
+          {t("admin.shell.emptyTitle")}
           <input
             value={settings.shellEventsEmptyTitle}
             onChange={(event) =>
               setSettings({ ...settings, shellEventsEmptyTitle: event.target.value })
             }
             maxLength={240}
-            placeholder="Noch keine Runden im Board."
+            placeholder={t("events.empty.defaultTitle")}
           />
         </label>
         <label>
-          Events-Board · Leerzustand Text (optional)
+          {t("admin.shell.emptyBody")}
           <textarea
             value={settings.shellEventsEmptyBody}
             onChange={(event) =>
@@ -1025,11 +1029,11 @@ export function AdminPanel({
             }
             maxLength={2000}
             rows={3}
-            placeholder="Sobald ein Manager eine Runde vorbereitet …"
+            placeholder={t("events.empty.defaultBody")}
           />
         </label>
         <label>
-          Spielkatalog für neue Runden (ein Titel pro Zeile)
+          {t("admin.catalog.label")}
           <textarea
             value={gameCatalogDraft}
             onChange={(event) => setGameCatalogDraft(event.target.value)}
@@ -1037,18 +1041,11 @@ export function AdminPanel({
             placeholder={"Counter-Strike 2\nLeague of Legends"}
           />
         </label>
-        <p className="muted">
-          Diese Liste erscheint Managern als Auswahl beim Anlegen einer Runde. Leer lassen, wenn nur
-          freie Titel genutzt werden sollen. Beim Speichern werden leere Zeilen verworfen und
-          überflüssige Leerzeichen am Zeilenanfang und -ende entfernt.
-        </p>
-        <section className="admin-ops" aria-label="Einstellungen Export">
-          <p className="eyebrow">Portabilität</p>
-          <h3>Einstellungen als JSON</h3>
-          <p className="muted">
-            Export enthält alle gespeicherten App-Einstellungen. Import merged mit dem aktuellen Stand und
-            validiert wie beim Speichern im Formular.
-          </p>
+        <p className="muted">{t("admin.catalog.help")}</p>
+        <section className="admin-ops" aria-label={t("admin.portability.title")}>
+          <p className="eyebrow">{t("admin.portability.eyebrow")}</p>
+          <h3>{t("admin.portability.title")}</h3>
+          <p className="muted">{t("admin.portability.help")}</p>
           <div className="action-row">
             <button
               type="button"
@@ -1056,14 +1053,14 @@ export function AdminPanel({
                 void downloadJsonAttachment("/api/admin/settings/export", "hermes-settings.json")
               }
             >
-              Einstellungen exportieren
+              {t("admin.settings.export")}
             </button>
             <button
               type="button"
               className="secondary"
               onClick={() => settingsImportRef.current?.click()}
             >
-              Einstellungen importieren
+              {t("admin.settings.import")}
             </button>
             <input
               ref={settingsImportRef}
@@ -1079,115 +1076,119 @@ export function AdminPanel({
             />
           </div>
         </section>
-        <button type="submit">Einstellungen speichern</button>
+        <button type="submit">{t("admin.settings.save")}</button>
       </form>
 
-      <section className="admin-ops" aria-label="Backup und Restore">
-        <p className="eyebrow">Storage</p>
-        <h2>Backup und Restore.</h2>
-        <p className="muted">
-          Backup schreibt den aktuellen SQLite-Snapshot nach S3. Restore ersetzt die aktiven Daten
-          durch den Snapshot aus S3.
-        </p>
-        <p className="muted">
-          Nutze Restore nur bewusst zwischen Spielrunden und prüfe danach direkt Users, Events und
-          die aktuelle Session.
-        </p>
+      <section className="admin-ops" aria-label={t("admin.storage.title")}>
+        <p className="eyebrow">{t("admin.storage.eyebrow")}</p>
+        <h2>{t("admin.storage.title")}</h2>
+        <p className="muted">{t("admin.storage.intro1")}</p>
+        <p className="muted">{t("admin.storage.intro2")}</p>
         {storage?.backend === "disabled" ? (
           storage?.envS3Configured ? (
-            <p className="muted">
-              S3 ist in der Umgebung aktiv, aber Snapshots sind in den App-Einstellungen abgeschaltet.
-              Aktiviere die Option „S3-Snapshots …“ oben und speichere, um Backup und Restore zu nutzen.
-            </p>
+            <p className="muted">{t("admin.storage.disabled.app")}</p>
           ) : (
-            <p className="muted">S3 Snapshot Storage ist in der Umgebung nicht aktiviert (HERMES_STORAGE_BACKEND ≠ s3).</p>
+            <p className="muted">{t("admin.storage.disabled.env")}</p>
           )
         ) : (
-          <div className="device-list" aria-label="Backup Status">
+          <div className="device-list" aria-label={t("admin.storage.backupStatus")}>
             <article className="device-row">
               <div>
-                <strong>Backup Status</strong>
+                <strong>{t("admin.storage.backupStatus")}</strong>
                 <span>
-                  Letzter Erfolg:{" "}
+                  {t("admin.storage.lastOk")}{" "}
                   {storage?.backupStatus?.lastSuccessAt
-                    ? new Date(storage.backupStatus.lastSuccessAt).toLocaleString("de-DE")
+                    ? new Date(storage.backupStatus.lastSuccessAt).toLocaleString(dateTag)
                     : "—"}
                 </span>
                 <span>
-                  Letzter Fehler:{" "}
+                  {t("admin.storage.lastErr")}{" "}
                   {storage?.backupStatus?.lastFailureAt
-                    ? new Date(storage.backupStatus.lastFailureAt).toLocaleString("de-DE")
+                    ? new Date(storage.backupStatus.lastFailureAt).toLocaleString(dateTag)
                     : "—"}
                 </span>
                 <span>
-                  Fehlercode:{" "}
+                  {t("admin.storage.errCode")}{" "}
                   {storage?.backupStatus?.failureCode ? storage.backupStatus.failureCode : "—"}
                 </span>
                 <span>
-                  Hinweis:{" "}
+                  {t("admin.storage.hint")}{" "}
                   {storage?.backupStatus?.failureSummary ? storage.backupStatus.failureSummary : "—"}
                 </span>
                 <span>
-                  Ziel:{" "}
+                  {t("admin.storage.target")}{" "}
                   {storage?.location
                     ? `s3://${storage.location.bucket}/${storage.location.key} (${storage.location.region})`
                     : "—"}
                 </span>
-                <span>Endpoint: {storage?.location?.endpoint ?? "—"}</span>
+                <span>
+                  {t("admin.storage.endpoint")} {storage?.location?.endpoint ?? "—"}
+                </span>
               </div>
             </article>
           </div>
         )}
         <div className="action-row">
           <button type="button" onClick={runBackup} disabled={opsBusy}>
-            Backup starten
+            {t("admin.storage.backupRun")}
           </button>
           <button type="button" className="secondary" onClick={runRestore} disabled={opsBusy}>
-            Restore starten
+            {t("admin.storage.restoreRun")}
           </button>
         </div>
         {restoreRecovery ? (
           <p className="muted">
-            Recovery: <strong>{restoreRecovery.id}</strong> · <code>{restoreRecovery.key}</code>
+            {t("admin.storage.recovery")} <strong>{restoreRecovery.id}</strong> ·{" "}
+            <code>{restoreRecovery.key}</code>
           </p>
         ) : null}
         {restoreDiagnostics ? (
-          <div className="device-list" aria-label="Restore Diagnostik">
+          <div className="device-list" aria-label={t("admin.storage.diagTitle")}>
             <article className="device-row">
               <div>
-                <strong>Restore Diagnostik</strong>
-                <span>Typ: {restoreDiagnostics.kind}</span>
-                <span>Hinweis: {restoreDiagnostics.summary}</span>
+                <strong>{t("admin.storage.diagTitle")}</strong>
+                <span>
+                  {t("admin.storage.diagType")} {restoreDiagnostics.kind}
+                </span>
+                <span>
+                  {t("admin.storage.diagHint")} {restoreDiagnostics.summary}
+                </span>
                 {restoreDiagnostics.migrations ? (
                   <span>
-                    Migrationen: live {restoreDiagnostics.migrations.liveLatest ?? "—"} · snapshot{" "}
-                    {restoreDiagnostics.migrations.snapshotLatest ?? "—"}
+                    {t("admin.storage.diagMigrations", {
+                      live: restoreDiagnostics.migrations.liveLatest ?? "—",
+                      snap: restoreDiagnostics.migrations.snapshotLatest ?? "—"
+                    })}
                   </span>
                 ) : null}
                 {restoreDiagnostics.missingTables?.length ? (
                   <span>
-                    Fehlende Tabellen: {restoreDiagnostics.missingTables.slice(0, 10).join(", ")}
+                    {t("admin.storage.diagMissing", {
+                      tables: restoreDiagnostics.missingTables.slice(0, 10).join(", ")
+                    })}
                   </span>
                 ) : null}
                 {restoreDiagnostics.columnMismatches?.length ? (
                   <span>
-                    Spalten:{" "}
-                    {restoreDiagnostics.columnMismatches
-                      .slice(0, 5)
-                      .map(
-                        (m) =>
-                          `${m.table} (missing: ${m.missingInSnapshot.slice(0, 6).join(", ")})`
-                      )
-                      .join(" · ")}
+                    {t("admin.storage.diagColumns", {
+                      detail: restoreDiagnostics.columnMismatches
+                        .slice(0, 5)
+                        .map(
+                          (m) =>
+                            `${m.table} (missing: ${m.missingInSnapshot.slice(0, 6).join(", ")})`
+                        )
+                        .join(" · ")
+                    })}
                   </span>
                 ) : null}
                 {restoreDiagnostics.foreignKeyFailures?.length ? (
                   <span>
-                    FK Fehler:{" "}
-                    {restoreDiagnostics.foreignKeyFailures
-                      .slice(0, 5)
-                      .map((fk) => `${fk.table}#${fk.rowid} -> ${fk.parent}`)
-                      .join(" · ")}
+                    {t("admin.storage.diagFk", {
+                      detail: restoreDiagnostics.foreignKeyFailures
+                        .slice(0, 5)
+                        .map((fk) => `${fk.table}#${fk.rowid} -> ${fk.parent}`)
+                        .join(" · ")
+                    })}
                   </span>
                 ) : null}
                 {restoreDiagnostics.snapshot ? (
@@ -1206,21 +1207,15 @@ export function AdminPanel({
       {adminSection === "design" ? (
         <>
           <header className="admin-section-head">
-            <p className="eyebrow">Design</p>
-            <h2>Shell-Farben und Theme</h2>
+            <p className="eyebrow">{t("main.admin.nav.design")}</p>
+            <h2>{t("admin.design.title")}</h2>
           </header>
           <form id="admin-design" onSubmit={saveSettings} className="admin-form">
-            <p className="muted">
-              Diese fünf Farben werden serverseitig gespeichert und steuern die Shell-Akzente für
-              Events, Login, Manager, Admin und die gemeinsame Oberfläche auf allen Geräten.
-            </p>
-            <p className="muted">
-              Änderungen wirken sofort in der Shell und bleiben der zentrale Theme-Vertrag für Desktop
-              und Smartphone.
-            </p>
-            <div className="color-grid" aria-label="Designfarben">
+            <p className="muted">{t("admin.design.help")}</p>
+            <p className="muted">{t("admin.design.help2")}</p>
+            <div className="color-grid" aria-label={t("admin.design.colorsAria")}>
               <label>
-                Primärfarbe
+                {t("admin.design.primary")}
                 <input
                   type="color"
                   value={settings.themePrimaryColor}
@@ -1230,7 +1225,7 @@ export function AdminPanel({
                 />
               </label>
               <label>
-                Loginfarbe
+                {t("admin.design.login")}
                 <input
                   type="color"
                   value={settings.themeLoginColor}
@@ -1240,7 +1235,7 @@ export function AdminPanel({
                 />
               </label>
               <label>
-                Managerfarbe
+                {t("admin.design.manager")}
                 <input
                   type="color"
                   value={settings.themeManagerColor}
@@ -1250,7 +1245,7 @@ export function AdminPanel({
                 />
               </label>
               <label>
-                Adminfarbe
+                {t("admin.design.admin")}
                 <input
                   type="color"
                   value={settings.themeAdminColor}
@@ -1260,7 +1255,7 @@ export function AdminPanel({
                 />
               </label>
               <label>
-                Hintergrund
+                {t("admin.design.surface")}
                 <input
                   type="color"
                   value={settings.themeSurfaceColor}
@@ -1270,7 +1265,7 @@ export function AdminPanel({
                 />
               </label>
             </div>
-            <button type="submit">Einstellungen speichern</button>
+            <button type="submit">{t("admin.settings.save")}</button>
           </form>
         </>
       ) : null}
@@ -1278,21 +1273,9 @@ export function AdminPanel({
       {adminSection === "infos" ? (
         <>
           <header className="admin-section-head">
-            <p className="eyebrow">Infos</p>
-            <h2>Infoseite und Menüpunkt</h2>
-            <p className="muted">
-              Der Inhalt erscheint unter <code>#infos</code> für alle Besucher, sobald der Menüpunkt
-              aktiv ist. Es wird{" "}
-              <a
-                href="https://commonmark.org/help/"
-                target="_blank"
-                rel="noopener noreferrer"
-              >
-                Markdown
-              </a>{" "}
-              gerendert (Überschriften mit <code>#</code>, <code>##</code>, Listen mit{" "}
-              <code>-</code>, Links mit <code>[Text](URL)</code>).
-            </p>
+            <p className="eyebrow">{t("main.admin.nav.infos")}</p>
+            <h2>{t("admin.infos.title")}</h2>
+            <p className="muted">{t("admin.infos.help")}</p>
           </header>
           <form id="admin-infos" onSubmit={saveSettings} className="admin-form">
             <label className="checkbox-label">
@@ -1303,10 +1286,10 @@ export function AdminPanel({
                   setSettings({ ...settings, infosEnabled: event.target.checked })
                 }
               />
-              Menüpunkt „Infos“ in der Hauptnavigation anzeigen
+              {t("admin.infos.menuCheck")}
             </label>
             <label>
-              Inhalt (Markdown)
+              {t("admin.infos.markdownLabel")}
               <textarea
                 value={settings.infosMarkdown}
                 onChange={(event) =>
@@ -1315,11 +1298,11 @@ export function AdminPanel({
                 rows={18}
                 maxLength={100_000}
                 spellCheck="true"
-                aria-label="Infos-Seite Markdown"
-                placeholder={"## Willkommen\n\n- Punkt eins\n- [Website](https://example.org)"}
+                aria-label={t("admin.infos.markdownAria")}
+                placeholder={t("admin.infos.markdownPlaceholder")}
               />
             </label>
-            <button type="submit">Einstellungen speichern</button>
+            <button type="submit">{t("admin.settings.save")}</button>
           </form>
         </>
       ) : null}
@@ -1328,12 +1311,12 @@ export function AdminPanel({
         <section
         id="admin-sicherheit"
         className="rate-limit-panel"
-        aria-label="Rate-Limit Betrieb"
+        aria-label={t("admin.rate.sectionAria")}
       >
         <div className="section-title-row">
           <div>
-            <p className="eyebrow">Rate-Limits</p>
-            <h2>Sperren prüfen und aufheben.</h2>
+            <p className="eyebrow">{t("admin.rate.eyebrow")}</p>
+            <h2>{t("admin.rate.title")}</h2>
           </div>
           <button
             type="button"
@@ -1341,26 +1324,25 @@ export function AdminPanel({
             onClick={() => loadAdminData()}
             disabled={rateLimitBusy}
           >
-            Aktualisieren
+            {t("loginProfile.devicesRefresh")}
           </button>
         </div>
-        <p className="muted">
-          Wenn sich jemand im LAN versehentlich aussperrt, kannst du aktive IP/Username-Sperren hier
-          sehen, löschen und lokale IPs/PREFIXe in eine Allowlist aufnehmen.
-        </p>
+        <p className="muted">{t("admin.rate.intro")}</p>
 
-        <div className="device-list" aria-label="Aktive Rate-Limit Sperren">
+        <div className="device-list" aria-label={t("admin.rate.listAria")}>
           {activeRateLimits.map((entry) => (
             <article className="device-row" key={entry.id}>
               <div>
                 <strong>{entry.scope}</strong>
-                <span>Key: {entry.key.slice(0, 10)}…</span>
-                <span>Versuche: {entry.attemptCount}</span>
+                <span>
+                  {t("admin.rate.key")} {entry.key.slice(0, 10)}…
+                </span>
+                <span>
+                  {t("admin.rate.attempts")} {entry.attemptCount}
+                </span>
                 <time dateTime={entry.blockedUntil ?? undefined}>
-                  Gesperrt bis:{" "}
-                  {entry.blockedUntil
-                    ? new Date(entry.blockedUntil).toLocaleString("de-DE")
-                    : "—"}
+                  {t("admin.rate.blockedUntil")}{" "}
+                  {entry.blockedUntil ? new Date(entry.blockedUntil).toLocaleString(dateTag) : "—"}
                 </time>
               </div>
               <div className="device-actions">
@@ -1370,15 +1352,15 @@ export function AdminPanel({
                   onClick={() => clearRateLimitEntry(entry)}
                   disabled={rateLimitBusy}
                 >
-                  Sperre löschen
+                  {t("admin.rate.clearLock")}
                 </button>
               </div>
             </article>
           ))}
           {activeRateLimits.length === 0 ? (
             <article className="device-row">
-              <strong>Keine aktiven Sperren.</strong>
-              <span>Wenn Rate-Limits aktiv sind, erscheinen sie hier.</span>
+              <strong>{t("admin.rate.noneActive")}</strong>
+              <span>{t("admin.rate.noneHint")}</span>
             </article>
           ) : null}
         </div>
@@ -1386,10 +1368,10 @@ export function AdminPanel({
         <form
           onSubmit={addAllowlistEntry}
           className="admin-form inline-form"
-          aria-label="Allowlist Eintrag hinzufügen"
+          aria-label={t("admin.rate.allowlistFormAria")}
         >
           <label>
-            IP oder CIDR (z.B. 192.168.0.42 oder 192.168.0.0/24)
+            {t("admin.rate.allowlistIp")}
             <input
               value={allowlistDraft.ipOrCidr}
               onChange={(event) =>
@@ -1399,7 +1381,7 @@ export function AdminPanel({
             />
           </label>
           <label>
-            Label (z.B. "Router", "Gaming-PC", "Admin-Laptop")
+            {t("admin.rate.allowlistNote")}
             <input
               value={allowlistDraft.note}
               onChange={(event) => setAllowlistDraft({ ...allowlistDraft, note: event.target.value })}
@@ -1407,18 +1389,19 @@ export function AdminPanel({
             />
           </label>
           <button type="submit" disabled={rateLimitBusy}>
-            Allowlist speichern
+            {t("admin.rate.allowlistSave")}
           </button>
         </form>
 
-        <div className="device-list" aria-label="Rate-Limit Allowlist">
+        <div className="device-list" aria-label={t("admin.rate.allowlistAria")}>
           {rateLimitAllowlist.map((entry) => (
             <article className="device-row" key={entry.id}>
               <div>
                 <strong>{entry.ipOrCidr}</strong>
-                <span>{entry.note ?? "Ohne Label"}</span>
+                <span>{entry.note ?? t("admin.rate.allowlistNoLabel")}</span>
                 <time dateTime={entry.updatedAt}>
-                  Aktualisiert: {new Date(entry.updatedAt).toLocaleString("de-DE")}
+                  {t("admin.rate.allowlistUpdated")}{" "}
+                  {new Date(entry.updatedAt).toLocaleString(dateTag)}
                 </time>
               </div>
               <div className="device-actions">
@@ -1428,15 +1411,15 @@ export function AdminPanel({
                   onClick={() => deleteAllowlistEntry(entry)}
                   disabled={rateLimitBusy}
                 >
-                  Entfernen
+                  {t("admin.rate.allowlistRemove")}
                 </button>
               </div>
             </article>
           ))}
           {rateLimitAllowlist.length === 0 ? (
             <article className="device-row">
-              <strong>Noch keine Allowlist-Einträge.</strong>
-              <span>Für stabile LAN-Setups können lokale IPs hier ausgenommen werden.</span>
+              <strong>{t("admin.allowlist.empty")}</strong>
+              <span>{t("admin.allowlist.emptyHint")}</span>
             </article>
           ) : null}
         </div>
@@ -1444,44 +1427,41 @@ export function AdminPanel({
       ) : null}
 
       {adminSection === "invites" ? (
-        <section id="admin-invites" className="invite-panel" aria-label="Invite-Codes">
-        <p className="eyebrow">Invites</p>
-        <h2>LAN-Party Invite-Codes.</h2>
-        <p className="muted">
-          Wenn Felder leer bleiben, nutzt Hermes standardmäßig <strong>300</strong> Nutzungen und{" "}
-          <strong>30 Tage</strong> Laufzeit.
-        </p>
+        <section id="admin-invites" className="invite-panel" aria-label={t("admin.invites.sectionAria")}>
+        <p className="eyebrow">{t("main.admin.nav.invites")}</p>
+        <h2>{t("admin.invites.title")}</h2>
+        <p className="muted">{t("admin.invites.help")}</p>
         <form onSubmit={createInviteCode} className="admin-form inline-form">
           <label>
-            Name
+            {t("admin.invites.fieldName")}
             <input
               value={newInvite.label}
               onChange={(event) => setNewInvite({ ...newInvite, label: event.target.value })}
-              placeholder="LAN Party April"
+              placeholder={t("admin.invites.placeholderName")}
               required
             />
           </label>
           <label>
-            Max. Nutzungen
+            {t("admin.invites.fieldMaxUses")}
             <input
               type="number"
               min={1}
               max={500}
               value={newInvite.maxUses}
               onChange={(event) => setNewInvite({ ...newInvite, maxUses: event.target.value })}
-              placeholder="300"
+              placeholder={t("admin.invites.placeholderMax")}
             />
           </label>
           <label>
-            Gültig bis
+            {t("admin.invites.fieldExpires")}
             <input
               type="datetime-local"
               value={newInvite.expiresAt}
               onChange={(event) => setNewInvite({ ...newInvite, expiresAt: event.target.value })}
-              placeholder="30 Tage"
+              placeholder={t("admin.invites.placeholderExpires")}
             />
           </label>
-          <button type="submit">Invite erstellen</button>
+          <button type="submit">{t("admin.invites.create")}</button>
         </form>
         <div className="invite-list">
           {inviteCodes.map((invite) => (
@@ -1490,15 +1470,20 @@ export function AdminPanel({
                 <strong>{invite.label}</strong>
                 <code>{invite.code}</code>
                 <span>
-                  {invite.usedCount} / {invite.maxUses ?? "∞"} genutzt
+                  {t("admin.invites.used", {
+                    used: invite.usedCount,
+                    max: invite.maxUses ?? "∞"
+                  })}
                   {invite.expiresAt
-                    ? ` · gültig bis ${new Date(invite.expiresAt).toLocaleString("de-DE")}`
+                    ? t("admin.invites.validUntil", {
+                        at: new Date(invite.expiresAt).toLocaleString(dateTag)
+                      })
                     : ""}
-                  {invite.revokedAt ? " · deaktiviert" : ""}
+                  {invite.revokedAt ? t("admin.invites.revoked") : ""}
                 </span>
                 <div className="form-grid">
                   <label>
-                    Label
+                    {t("admin.invites.rowLabel")}
                     <input
                       value={inviteDrafts[invite.id]?.label ?? invite.label}
                       onChange={(event) =>
@@ -1518,7 +1503,7 @@ export function AdminPanel({
                     />
                   </label>
                   <label>
-                    Max. Nutzungen (leer = ∞)
+                    {t("admin.invites.rowMaxEmpty")}
                     <input
                       type="number"
                       min={1}
@@ -1542,7 +1527,7 @@ export function AdminPanel({
                     />
                   </label>
                   <label>
-                    Gültig bis (leer = nie)
+                    {t("admin.invites.rowExpiresEmpty")}
                     <input
                       type="datetime-local"
                       value={
@@ -1567,7 +1552,7 @@ export function AdminPanel({
               </div>
               <div className="device-actions">
                 <button type="button" className="secondary" onClick={() => updateInviteCode(invite)}>
-                  Speichern
+                  {t("admin.invites.save")}
                 </button>
                 <button
                   type="button"
@@ -1575,7 +1560,7 @@ export function AdminPanel({
                   onClick={() => deactivateInviteCode(invite)}
                   disabled={Boolean(invite.revokedAt)}
                 >
-                  Deaktivieren
+                  {t("admin.invites.deactivate")}
                 </button>
                 <button
                   type="button"
@@ -1583,22 +1568,22 @@ export function AdminPanel({
                   onClick={() => reactivateInviteCode(invite)}
                   disabled={!invite.revokedAt}
                 >
-                  Reaktivieren
+                  {t("admin.invites.reactivate")}
                 </button>
                 <button
                   type="button"
                   className="secondary danger"
                   onClick={() => deleteUnusedInviteCode(invite)}
                 >
-                  Löschen
+                  {t("admin.user.delete")}
                 </button>
               </div>
             </article>
           ))}
           {inviteCodes.length === 0 ? (
             <article className="invite-row">
-              <strong>Noch keine Invite-Codes.</strong>
-              <span>Neue Registrierungen brauchen einen aktiven Code.</span>
+              <strong>{t("admin.invites.empty")}</strong>
+              <span>{t("admin.invites.emptyHint")}</span>
             </article>
           ) : null}
         </div>
@@ -1606,34 +1591,35 @@ export function AdminPanel({
       ) : null}
 
       {adminSection === "audit" ? (
-        <section id="admin-audit" className="audit-panel" aria-label="Audit-Log">
+        <section id="admin-audit" className="audit-panel" aria-label={t("admin.audit.sectionAria")}>
         <div className="section-title-row">
           <div>
-            <p className="eyebrow">Audit</p>
-            <h2>Letzte Aktionen.</h2>
-            <p className="muted">
-              Das Audit-Log hilft dir beim Nachvollziehen von Änderungen, wenn Invite-, User- oder
-              Restore-Aktionen später geprüft werden müssen.
-            </p>
+            <p className="eyebrow">{t("main.admin.nav.audit")}</p>
+            <h2>{t("admin.audit.title")}</h2>
+            <p className="muted">{t("admin.audit.intro")}</p>
           </div>
           <button type="button" className="secondary" onClick={() => loadAdminData()}>
-            Aktualisieren
+            {t("loginProfile.devicesRefresh")}
           </button>
         </div>
         <div className="audit-list">
           {auditLogs.map((entry) => (
             <article className="audit-row" key={entry.id}>
               <time dateTime={entry.createdAt}>
-                {new Date(entry.createdAt).toLocaleString("de-DE")}
+                {new Date(entry.createdAt).toLocaleString(dateTag)}
               </time>
               <strong>{entry.summary}</strong>
-              <span>{[entry.action, entry.actorUsername ?? "System"].filter(Boolean).join(" | ")}</span>
+              <span>
+                {[entry.action, entry.actorUsername ?? t("admin.audit.actorSystem")]
+                  .filter(Boolean)
+                  .join(" | ")}
+              </span>
             </article>
           ))}
           {auditLogs.length === 0 ? (
             <article className="audit-row">
-              <strong>Noch keine Audit-Einträge.</strong>
-              <span>Neue Aktionen erscheinen hier nach dem Speichern.</span>
+              <strong>{t("admin.audit.empty")}</strong>
+              <span>{t("admin.audit.emptyHint")}</span>
             </article>
           ) : null}
         </div>

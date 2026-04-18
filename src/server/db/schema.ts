@@ -13,6 +13,8 @@ export const users = sqliteTable(
     notificationsEnabled: integer("notifications_enabled", { mode: "boolean" })
       .notNull()
       .default(true),
+    /** "de" | "en" | NULL — NULL: Browser + Admin-Fallback */
+    locale: text("locale"),
     createdByUserId: text("created_by_user_id"),
     deletedAt: text("deleted_at"),
     createdAt: text("created_at").notNull(),

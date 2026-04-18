@@ -30,6 +30,7 @@ import {
 import { ensureActiveEmailAvailable } from "../domain/users";
 import { sendEmailChangeCode, sendLoginCode } from "../mail/mailer";
 import { readSettings } from "../settings";
+import { browserLanguageToLocale } from "../../shared/locale";
 
 const requestCodeSchema = z.object({
   username: z.string().trim().min(1).max(80)
@@ -49,12 +50,18 @@ const verifyCodeSchema = requestCodeSchema.extend({
 const registerSchema = z.object({
   inviteCode: z.string().trim().min(1).max(80),
   username: z.string().trim().min(1).max(80),
-  email: z.string().trim().email().max(160)
+  email: z.string().trim().email().max(160),
+  locale: z.enum(["de", "en"]).optional()
 });
 
-const profileSchema = z.object({
-  displayName: z.string().trim().min(1).max(80)
-});
+const profileSchema = z
+  .object({
+    displayName: z.string().trim().min(1).max(80).optional(),
+    locale: z.union([z.enum(["de", "en"]), z.null()]).optional()
+  })
+  .refine((data) => data.displayName !== undefined || data.locale !== undefined, {
+    message: "leerer_profil_patch"
+  });
 
 const emailChangeSchema = z
   .object({
@@ -315,6 +322,9 @@ export function createAuthRouter(context: DatabaseContext) {
     }
 
     const userId = randomUUID();
+    const registrationLocale =
+      parsed.data.locale ??
+      browserLanguageToLocale(request.get("accept-language"), settings.defaultLocale);
 
     const registerInvitedUser = () => {
       return context.sqlite
@@ -352,6 +362,7 @@ export function createAuthRouter(context: DatabaseContext) {
               email: parsed.data.email,
               role: "user",
               notificationsEnabled: settings.defaultNotificationsEnabled,
+              locale: registrationLocale,
               createdByUserId: freshInvite.createdByUserId,
               deletedAt: null,
               createdAt: transactionTimestamp,
@@ -662,11 +673,17 @@ export function createAuthRouter(context: DatabaseContext) {
     }
 
     const timestamp = nowIso();
-    context.db
-      .update(users)
-      .set({ displayName: parsed.data.displayName, updatedAt: timestamp })
-      .where(eq(users.id, current.user.id))
-      .run();
+    const patch: { displayName?: string; locale?: string | null; updatedAt: string } = {
+      updatedAt: timestamp
+    };
+    if (parsed.data.displayName !== undefined) {
+      patch.displayName = parsed.data.displayName;
+    }
+    if (parsed.data.locale !== undefined) {
+      patch.locale = parsed.data.locale;
+    }
+
+    context.db.update(users).set(patch).where(eq(users.id, current.user.id)).run();
 
     const updated = context.db.select().from(users).where(eq(users.id, current.user.id)).get();
     tryWriteAuditLog(context, {
@@ -675,7 +692,10 @@ export function createAuthRouter(context: DatabaseContext) {
       entityType: "user",
       entityId: current.user.id,
       summary: `${current.user.username} hat sein Profil aktualisiert.`,
-      metadata: { displayName: parsed.data.displayName }
+      metadata: {
+        displayName: parsed.data.displayName,
+        locale: parsed.data.locale
+      }
     });
 
     response.json({ user: updated ? publicUser(updated) : publicUser(current.user) });

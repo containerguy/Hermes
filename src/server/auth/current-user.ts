@@ -17,6 +17,7 @@ export function publicUser(user: typeof users.$inferSelect) {
     email: user.email,
     role: user.role,
     notificationsEnabled: user.notificationsEnabled,
+    locale: user.locale,
     deletedAt: user.deletedAt
   };
 }

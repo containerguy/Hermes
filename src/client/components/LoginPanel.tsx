@@ -4,11 +4,13 @@ import { requestJson } from "../api/request";
 import { clearCsrfToken, primeCsrfToken } from "../api/csrf";
 import { forgetDeviceKey, getDeviceContext } from "../api/device-key";
 import { getErrorMessage } from "../errors/errors";
+import { useI18n } from "../i18n/I18nContext";
 import {
   getSecureContextInfo,
   isLikelyIosSafari,
   isPwaDisplayMode
 } from "../lib/runtime-context";
+import { browserLanguageToLocale } from "../../shared/locale";
 import { QrCanvas } from "./QrCanvas";
 
 type BeforeInstallPromptChrome = Event & {
@@ -60,6 +62,7 @@ export function LoginPanel({
   onLoggedOut: () => void;
   onUserUpdated: (user: User) => void;
 }) {
+  const { t, locale } = useI18n();
   const [username, setUsername] = useState("");
   const [registration, setRegistration] = useState({ inviteCode: "", username: "", email: "" });
   const [code, setCode] = useState("");
@@ -69,6 +72,7 @@ export function LoginPanel({
   const [sessions, setSessions] = useState<UserSession[]>([]);
   const [sessionNames, setSessionNames] = useState<Record<string, string>>({});
   const [displayNameDraft, setDisplayNameDraft] = useState("");
+  const [localeDraft, setLocaleDraft] = useState<"" | "de" | "en">("");
   const [emailDraft, setEmailDraft] = useState("");
   const [emailVerifyCode, setEmailVerifyCode] = useState("");
   const [message, setMessage] = useState("");
@@ -91,7 +95,7 @@ export function LoginPanel({
     setSessions(result.sessions);
     setSessionNames(
       Object.fromEntries(
-        result.sessions.map((session) => [session.id, session.deviceName || "Unbenanntes Gerät"])
+        result.sessions.map((session) => [session.id, session.deviceName || t("loginProfile.unnamedDevice")])
       )
     );
   }
@@ -100,17 +104,19 @@ export function LoginPanel({
     loadSessions().catch(() => undefined);
   }, [currentUser?.id]);
 
-  useEffect(() => {
+   useEffect(() => {
     if (!currentUser) {
       setDisplayNameDraft("");
       setEmailDraft("");
       setEmailVerifyCode("");
+      setLocaleDraft("");
       return;
     }
 
     setDisplayNameDraft(currentUser.displayName || currentUser.username);
     setEmailDraft(currentUser.email);
-  }, [currentUser?.id, currentUser?.displayName, currentUser?.email, currentUser?.username]);
+    setLocaleDraft(currentUser.locale === "de" || currentUser.locale === "en" ? currentUser.locale : "");
+  }, [currentUser?.id, currentUser?.displayName, currentUser?.email, currentUser?.username, currentUser?.locale]);
 
   useEffect(() => {
     function onBeforeInstallPrompt(event: Event) {
@@ -162,11 +168,11 @@ export function LoginPanel({
         onLoggedIn(result.user);
         primeCsrfToken();
         setRedeemStatus("done");
-        setMessage("Gerät erfolgreich verbunden.");
+        setMessage(t("login.msg.pairDone"));
       })
       .catch((caught) => {
         setRedeemStatus("error");
-        setError(getErrorMessage(caught));
+        setError(getErrorMessage(caught, locale));
       })
       .finally(() => {
         params.delete("pair");
@@ -195,7 +201,7 @@ export function LoginPanel({
       setPairingToken(result.token);
       setPairingExpiresAt(result.expiresAt);
     } catch (caught) {
-      setError(getErrorMessage(caught));
+      setError(getErrorMessage(caught, locale));
     } finally {
       setBusy(false);
     }
@@ -224,9 +230,9 @@ export function LoginPanel({
       clearCsrfToken();
       onLoggedOut();
       setStep("request");
-      setMessage("Dieses Gerät wurde vergessen.");
+      setMessage(t("login.msg.deviceForgotten"));
     } catch (caught) {
-      setError(getErrorMessage(caught));
+      setError(getErrorMessage(caught, locale));
     } finally {
       setBusy(false);
     }
@@ -244,9 +250,9 @@ export function LoginPanel({
         body: JSON.stringify({ username })
       });
       setStep("verify");
-      setMessage("Code wurde per E-Mail versendet.");
+      setMessage(t("login.msg.loginCodeSent"));
     } catch (caught) {
-      setError(getErrorMessage(caught));
+      setError(getErrorMessage(caught, locale));
     } finally {
       setBusy(false);
     }
@@ -273,9 +279,9 @@ export function LoginPanel({
       onLoggedIn(result.user);
       primeCsrfToken();
       setCode("");
-      setMessage("Angemeldet.");
+      setMessage(t("login.msg.loggedIn"));
     } catch (caught) {
-      setError(getErrorMessage(caught));
+      setError(getErrorMessage(caught, locale));
     } finally {
       setBusy(false);
     }
@@ -290,14 +296,17 @@ export function LoginPanel({
     try {
       await requestJson<{ user: User; codeSent: boolean }>("/api/auth/register", {
         method: "POST",
-        body: JSON.stringify(registration)
+        body: JSON.stringify({
+          ...registration,
+          locale: browserLanguageToLocale(navigator.language, settings.defaultLocale)
+        })
       });
       setUsername(registration.username);
       setMode("login");
       setStep("verify");
-      setMessage("Registrierung gespeichert. Code wurde per E-Mail versendet.");
+      setMessage(t("login.msg.registered"));
     } catch (caught) {
-      setError(getErrorMessage(caught));
+      setError(getErrorMessage(caught, locale));
     } finally {
       setBusy(false);
     }
@@ -310,7 +319,7 @@ export function LoginPanel({
     clearCsrfToken();
     onLoggedOut();
     setStep("request");
-    setMessage("Abgemeldet.");
+    setMessage(t("login.msg.loggedOut"));
     setBusy(false);
   }
 
@@ -327,14 +336,14 @@ export function LoginPanel({
       if (result.revokedCurrent) {
         clearCsrfToken();
         onLoggedOut();
-        setMessage("Dieses Gerät wurde abgemeldet.");
+        setMessage(t("login.msg.deviceRevokedSelf"));
         return;
       }
 
       await loadSessions();
-      setMessage("Gerät abgemeldet.");
+      setMessage(t("login.msg.deviceRevoked"));
     } catch (caught) {
-      setError(getErrorMessage(caught));
+      setError(getErrorMessage(caught, locale));
     } finally {
       setBusy(false);
     }
@@ -349,12 +358,15 @@ export function LoginPanel({
     try {
       const result = await requestJson<{ user: User }>("/api/auth/profile", {
         method: "PATCH",
-        body: JSON.stringify({ displayName: displayNameDraft })
+        body: JSON.stringify({
+          displayName: displayNameDraft,
+          locale: localeDraft === "" ? null : localeDraft
+        })
       });
       onUserUpdated(result.user);
-      setMessage("Profil gespeichert.");
+      setMessage(t("login.msg.profileSaved"));
     } catch (caught) {
-      setError(getErrorMessage(caught));
+      setError(getErrorMessage(caught, locale));
     } finally {
       setBusy(false);
     }
@@ -371,9 +383,9 @@ export function LoginPanel({
         method: "POST",
         body: JSON.stringify({ newEmail: emailDraft })
       });
-      setMessage("Bestätigungscode wurde an die neue E-Mail-Adresse versendet.");
+      setMessage(t("login.msg.emailCodeSent"));
     } catch (caught) {
-      setError(getErrorMessage(caught));
+      setError(getErrorMessage(caught, locale));
     } finally {
       setBusy(false);
     }
@@ -394,9 +406,9 @@ export function LoginPanel({
       onLoggedOut();
       setStep("request");
       setEmailVerifyCode("");
-      setMessage("E-Mail bestätigt. Bitte erneut einloggen.");
+      setMessage(t("login.msg.emailConfirmedRelogin"));
     } catch (caught) {
-      setError(getErrorMessage(caught));
+      setError(getErrorMessage(caught, locale));
     } finally {
       setBusy(false);
     }
@@ -413,9 +425,9 @@ export function LoginPanel({
         body: JSON.stringify({ deviceName: sessionNames[sessionId] ?? "" })
       });
       await loadSessions();
-      setMessage("Gerätename gespeichert.");
+      setMessage(t("login.msg.deviceNameSaved"));
     } catch (caught) {
-      setError(getErrorMessage(caught));
+      setError(getErrorMessage(caught, locale));
     } finally {
       setBusy(false);
     }
@@ -461,9 +473,9 @@ export function LoginPanel({
         body: JSON.stringify({ enabled: true })
       });
       onUserUpdated(result.user);
-      setMessage("Notifications aktiv.");
+      setMessage(t("login.msg.notificationsActive"));
     } catch (caught) {
-      setError(getErrorMessage(caught));
+      setError(getErrorMessage(caught, locale));
     } finally {
       setBusy(false);
     }
@@ -480,9 +492,9 @@ export function LoginPanel({
         body: JSON.stringify({ enabled: false })
       });
       onUserUpdated(result.user);
-      setMessage("Notifications deaktiviert.");
+      setMessage(t("login.msg.notificationsOff"));
     } catch (caught) {
-      setError(getErrorMessage(caught));
+      setError(getErrorMessage(caught, locale));
     } finally {
       setBusy(false);
     }
@@ -490,47 +502,54 @@ export function LoginPanel({
 
   if (currentUser) {
     const pushSupport = getPushSupport();
-    const secureInfo = getSecureContextInfo();
+    const secureInfo = getSecureContextInfo(window, locale);
+    const dateLocale = locale === "en" ? "en-US" : "de-DE";
     return (
-      <section className="login-panel" id="login" aria-label="Aktuelle Anmeldung">
+      <section className="login-panel" id="login" aria-label={t("loginProfile.sectionAria")}>
         <header className="login-panel-intro">
-          <p className="eyebrow">Einstellungen</p>
-          <h2>Profil und Benachrichtigungen</h2>
-          <p className="muted">
-            Zuerst bearbeitbare Daten und Push — danach Geräteliste und Pairing. Login, Rolle und
-            E-Mail findest du unten in der Konto-Übersicht.
-          </p>
+          <p className="eyebrow">{t("loginProfile.introEyebrow")}</p>
+          <h2>{t("loginProfile.introTitle")}</h2>
+          <p className="muted">{t("loginProfile.introBody")}</p>
         </header>
 
-        <section className="device-panel" aria-label="Profil bearbeiten">
+        <section className="device-panel" aria-label={t("loginProfile.profileSectionAria")}>
           <div className="section-title-row">
             <div>
-              <p className="eyebrow">Profil</p>
-              <h3>Profil und E-Mail aktuell halten.</h3>
-              <p className="muted">
-                Passe Anzeigename und Mailadresse hier an, damit Einmalcodes und Teilnehmerlisten
-                auf allen Geräten konsistent bleiben.
-              </p>
+              <p className="eyebrow">{t("loginProfile.profileEyebrow")}</p>
+              <h3>{t("loginProfile.profileTitle")}</h3>
+              <p className="muted">{t("loginProfile.profileHelp")}</p>
             </div>
           </div>
 
           <form onSubmit={updateProfile} className="admin-form">
             <label>
-              Anzeigename (frei wählbar)
+              {t("loginProfile.displayName")}
               <input
                 value={displayNameDraft}
                 onChange={(event) => setDisplayNameDraft(event.target.value)}
                 required
               />
             </label>
+            <label>
+              {t("loginProfile.localeLabel")}
+              <select
+                value={localeDraft}
+                onChange={(event) => setLocaleDraft(event.target.value as "" | "de" | "en")}
+              >
+                <option value="">{t("loginProfile.localeAuto")}</option>
+                <option value="de">{t("loginProfile.locale.de")}</option>
+                <option value="en">{t("loginProfile.locale.en")}</option>
+              </select>
+            </label>
+            <p className="muted">{t("loginProfile.localeHelp")}</p>
             <button type="submit" disabled={busy}>
-              Anzeigename speichern
+              {t("loginProfile.saveProfile")}
             </button>
           </form>
 
           <form onSubmit={requestEmailChange} className="admin-form">
             <label>
-              Neue E-Mail-Adresse
+              {t("loginProfile.newEmail")}
               <input
                 type="email"
                 value={emailDraft}
@@ -539,13 +558,13 @@ export function LoginPanel({
               />
             </label>
             <button type="submit" disabled={busy}>
-              Bestätigungscode senden
+              {t("loginProfile.sendEmailCode")}
             </button>
           </form>
 
           <form onSubmit={verifyEmailChange} className="admin-form">
             <label>
-              Bestätigungscode
+              {t("loginProfile.emailCode")}
               <input
                 autoComplete="one-time-code"
                 inputMode="numeric"
@@ -557,18 +576,18 @@ export function LoginPanel({
               />
             </label>
             <button type="submit" disabled={busy}>
-              E-Mail bestätigen
+              {t("loginProfile.confirmEmail")}
             </button>
           </form>
         </section>
 
         {message ? <p className="notice">{message}</p> : null}
         {error ? <p className="error">{error}</p> : null}
-        <section className="device-panel" aria-label="Notifications Hinweise">
+        <section className="device-panel" aria-label={t("loginProfile.notificationsEyebrow")}>
           <div className="section-title-row">
             <div>
-              <p className="eyebrow">Notifications</p>
-              <h2>Push vor dem Match testen.</h2>
+              <p className="eyebrow">{t("loginProfile.notificationsEyebrow")}</p>
+              <h2>{t("loginProfile.notificationsTitle")}</h2>
             </div>
           </div>
           <div
@@ -578,75 +597,57 @@ export function LoginPanel({
             <p className="runtime-callout__title">{secureInfo.headline}</p>
             <p className="muted runtime-callout__body">{secureInfo.body}</p>
           </div>
-          <div className="install-hint-card" aria-label="Installation als App">
-            <p className="install-hint-card__eyebrow">Installation</p>
-            <p className="install-hint-card__title">Hermes wie eine App nutzen</p>
+          <div className="install-hint-card" aria-label={t("loginProfile.installEyebrow")}>
+            <p className="install-hint-card__eyebrow">{t("loginProfile.installEyebrow")}</p>
+            <p className="install-hint-card__title">{t("loginProfile.installTitle")}</p>
             {isPwaDisplayMode() ? (
-              <p className="muted install-hint-card__body">
-                Diese Ansicht läuft als installierte Web-App. Push und Schnellzugriff sind meist
-                komfortabler als im normalen Browser-Tab.
-              </p>
+              <p className="muted install-hint-card__body">{t("loginProfile.installPwaBody")}</p>
             ) : deferredInstall ? (
               <>
-                <p className="muted install-hint-card__body">
-                  Dein Browser erlaubt eine Installation — empfohlen für stabilere Benachrichtigungen
-                  und schnellen Zugriff vom Startbildschirm.
-                </p>
+                <p className="muted install-hint-card__body">{t("loginProfile.installDeferredBody")}</p>
                 <button
                   type="button"
                   className="secondary install-app-button"
                   onClick={() => void runInstallPrompt()}
                   disabled={busy}
                 >
-                  App installieren
+                  {t("loginProfile.installButton")}
                 </button>
               </>
             ) : isLikelyIosSafari() ? (
               <ol className="install-steps">
-                <li>
-                  Safari: <strong>Teilen</strong> (Quadrat mit Pfeil) öffnen.
-                </li>
-                <li>
-                  <strong>Zum Home-Bildschirm</strong> wählen — Hermes startet dann wie eine App.
-                </li>
+                <li>{t("loginProfile.iosStep1")}</li>
+                <li>{t("loginProfile.iosStep2")}</li>
               </ol>
             ) : (
               <ol className="install-steps">
-                               <li>
-                  Chrome / Edge: <strong>Drei-Punkte-Menü</strong> oder Install-Symbol in der
-                  Adresszeile.
-                </li>
-                <li>
-                  <strong>App installieren</strong> wählen. Fehlt der Eintrag, unterstützt der Browser
-                  die Installation nicht oder Hermes ist bereits installiert.
-                </li>
+                <li>{t("loginProfile.chromeStep1")}</li>
+                <li>{t("loginProfile.chromeStep2")}</li>
               </ol>
             )}
           </div>
-          <p className="muted">
-            Hermes sendet <strong>Standard-Browser-Benachrichtigungen</strong>. Klingeltöne und
-            garantiertes Audio kann Hermes nicht erzwingen.
-          </p>
-          <p className="muted">
-            Wenn einer der Checks unten fehlt, bleiben Einladungen und Statuswechsel in Hermes
-            sichtbar, aber dieses Gerät bekommt keine Push-Hinweise.
-          </p>
+          <p className="muted">{t("loginProfile.pushExplain1")}</p>
+          <p className="muted">{t("loginProfile.pushExplain2")}</p>
           <dl className="account-list">
             <div>
-              <dt>Sicherer Kontext</dt>
-              <dd>{secureInfo.isSecureContext ? "erfüllt" : "nicht erfüllt"}</dd>
+              <dt>{t("loginProfile.dt.secureContext")}</dt>
+              <dd>
+                {secureInfo.isSecureContext ? t("loginProfile.secure.ok") : t("loginProfile.secure.missing")}
+              </dd>
             </div>
             <div>
-              <dt>Browser APIs</dt>
-              <dd>{pushSupport.hasApis ? "ok" : "Push/Notification/ServiceWorker fehlt"}</dd>
+              <dt>{t("loginProfile.dt.browserApis")}</dt>
+              <dd>
+                {pushSupport.hasApis ? "ok" : t("loginProfile.push.missingApis")}
+              </dd>
             </div>
             <div>
-              <dt>Permission</dt>
+              <dt>{t("loginProfile.dt.permission")}</dt>
               <dd>
                 {pushSupport.permission === "unsupported"
-                  ? "nicht verfügbar"
+                  ? t("loginProfile.perm.unavailable")
                   : pushSupport.permission === "default"
-                    ? "noch nicht gefragt"
+                    ? t("loginProfile.perm.default")
                     : pushSupport.permission}
               </dd>
             </div>
@@ -654,33 +655,32 @@ export function LoginPanel({
         </section>
         <div className="action-row">
           <button type="button" onClick={enableNotifications} disabled={busy}>
-            Notifications aktivieren
+            {t("loginProfile.notifyOn")}
           </button>
           <button type="button" className="secondary" onClick={disableNotifications} disabled={busy}>
-            Deaktivieren
+            {t("loginProfile.notifyOff")}
           </button>
         </div>
-        <section className="device-panel" aria-label="Angemeldete Geräte">
+        <section className="device-panel" aria-label={t("loginProfile.devicesEyebrow")}>
           <div className="section-title-row">
             <div>
-              <p className="eyebrow">Geräte</p>
-              <h2>Angemeldete Geräte im Blick behalten.</h2>
-              <p className="muted">
-                Benenne Sessions sinnvoll um, entferne alte Geräte und prüfe bei Bedarf, wo dein
-                Konto zuletzt aktiv war.
-              </p>
+              <p className="eyebrow">{t("loginProfile.devicesEyebrow")}</p>
+              <h2>{t("loginProfile.devicesTitle")}</h2>
+              <p className="muted">{t("loginProfile.devicesHelp")}</p>
             </div>
             <button type="button" className="secondary" onClick={() => loadSessions()} disabled={busy}>
-              Aktualisieren
+              {t("loginProfile.devicesRefresh")}
             </button>
           </div>
           <div className="device-list">
             {sessions.map((session) => (
               <article className="device-row" key={session.id}>
                 <div>
-                  <strong>{session.current ? "Aktuelles Gerät" : "Gerät"}</strong>
+                  <strong>
+                    {session.current ? t("loginProfile.device.current") : t("loginProfile.device.generic")}
+                  </strong>
                   <label>
-                    Name
+                    {t("loginProfile.device.nameField")}
                     <input
                       value={sessionNames[session.id] ?? session.deviceName ?? ""}
                       onChange={(event) =>
@@ -690,9 +690,10 @@ export function LoginPanel({
                       required
                     />
                   </label>
-                  <span>{session.userAgent || "Kein User-Agent gespeichert"}</span>
+                  <span>{session.userAgent || t("loginProfile.device.noUa")}</span>
                   <time dateTime={session.lastSeenAt}>
-                    Zuletzt aktiv: {new Date(session.lastSeenAt).toLocaleString("de-DE")}
+                    {t("loginProfile.device.lastActive")}{" "}
+                    {new Date(session.lastSeenAt).toLocaleString(dateLocale)}
                   </time>
                 </div>
                 <div className="device-actions">
@@ -702,7 +703,7 @@ export function LoginPanel({
                     onClick={() => renameSession(session.id)}
                     disabled={busy}
                   >
-                    Name speichern
+                    {t("loginProfile.device.saveName")}
                   </button>
                   <button
                     type="button"
@@ -710,7 +711,7 @@ export function LoginPanel({
                     onClick={() => revokeSession(session.id)}
                     disabled={busy}
                   >
-                    Abmelden
+                    {t("loginProfile.device.signOut")}
                   </button>
                   {session.current ? (
                     <button
@@ -719,7 +720,7 @@ export function LoginPanel({
                       onClick={forgetDevice}
                       disabled={busy}
                     >
-                      Dieses Gerät vergessen
+                      {t("loginProfile.device.forget")}
                     </button>
                   ) : null}
                 </div>
@@ -727,21 +728,18 @@ export function LoginPanel({
             ))}
             {sessions.length === 0 ? (
               <article className="device-row">
-                <strong>Keine Geräte geladen.</strong>
-                <span>Aktualisieren lädt deine aktiven Sessions.</span>
+                <strong>{t("loginProfile.devicesEmptyTitle")}</strong>
+                <span>{t("loginProfile.devicesEmptyHint")}</span>
               </article>
             ) : null}
           </div>
         </section>
-        <section className="device-panel" aria-label="Gerät hinzufügen">
+        <section className="device-panel" aria-label={t("loginProfile.pair.sectionAria")}>
           <div className="section-title-row">
             <div>
-              <p className="eyebrow">Pairing</p>
-              <h2>Weiteres Gerät verbinden.</h2>
-              <p className="muted">
-                Erzeuge einen kurzlebigen Pairing-Link, um Hermes auf Smartphone, Tablet oder
-                Zweit-PC ohne erneutes Tippen des Einmalcodes zu öffnen.
-              </p>
+              <p className="eyebrow">{t("loginProfile.pairEyebrow")}</p>
+              <h2>{t("loginProfile.pair.titleConnect")}</h2>
+              <p className="muted">{t("loginProfile.pair.helpConnect")}</p>
             </div>
             {pairingToken ? (
               <button
@@ -750,7 +748,7 @@ export function LoginPanel({
                 onClick={clearPairingToken}
                 disabled={busy}
               >
-                Schließen
+                {t("loginProfile.pair.close")}
               </button>
             ) : null}
           </div>
@@ -759,11 +757,7 @@ export function LoginPanel({
               const pairUrl = `${window.location.origin}${window.location.pathname}#login?pair=${pairingToken}`;
               return (
                 <div className="pair-token-panel">
-                  <QrCanvas
-                    payload={pairUrl}
-                    pixelSize={256}
-                    label="Pairing QR-Code"
-                  />
+                  <QrCanvas payload={pairUrl} pixelSize={256} label={t("loginProfile.pair.qrLabel")} />
                   <a
                     href={pairUrl}
                     target="_blank"
@@ -774,16 +768,13 @@ export function LoginPanel({
                   </a>
                   {pairingExpiresAt ? (
                     <time dateTime={pairingExpiresAt} className="pair-expires">
-                      Gültig bis {new Date(pairingExpiresAt).toLocaleString("de-DE")}
+                      {t("loginProfile.pair.validUntil")}{" "}
+                      {new Date(pairingExpiresAt).toLocaleString(dateLocale)}
                     </time>
                   ) : null}
                   <div className="action-row">
-                    <button
-                      type="button"
-                      onClick={mintPairingToken}
-                      disabled={busy}
-                    >
-                      Neuen Code erzeugen
+                    <button type="button" onClick={mintPairingToken} disabled={busy}>
+                      {t("loginProfile.pairNewCode")}
                     </button>
                   </div>
                 </div>
@@ -792,60 +783,62 @@ export function LoginPanel({
           ) : (
             <div className="action-row">
               <button type="button" onClick={mintPairingToken} disabled={busy}>
-                Pairing-Code erzeugen
+                {t("loginProfile.pairGenerate")}
               </button>
             </div>
           )}
-          {redeemStatus === "done" ? (
-            <p className="notice">Gerät erfolgreich verbunden.</p>
-          ) : null}
+          {redeemStatus === "done" ? <p className="notice">{t("login.msg.pairDone")}</p> : null}
         </section>
-        <section className="device-panel account-summary-panel" aria-label="Konto-Übersicht">
-          <p className="eyebrow">Konto</p>
-          <h3>Angemeldet als {currentUser.displayName || currentUser.username}</h3>
+        <section className="device-panel account-summary-panel" aria-label={t("loginProfile.accountEyebrow")}>
+          <p className="eyebrow">{t("loginProfile.accountEyebrow")}</p>
+          <h3>
+            {t("loginProfile.accountTitle", {
+              name: currentUser.displayName || currentUser.username
+            })}
+          </h3>
           <dl className="account-list">
             <div>
-              <dt>Login</dt>
+              <dt>{t("loginProfile.account.login")}</dt>
               <dd>{currentUser.username}</dd>
             </div>
             <div>
-              <dt>Rolle</dt>
+              <dt>{t("loginProfile.account.role")}</dt>
               <dd>{currentUser.role}</dd>
             </div>
             <div>
-              <dt>E-Mail</dt>
+              <dt>{t("loginProfile.account.email")}</dt>
               <dd>{currentUser.email}</dd>
             </div>
           </dl>
         </section>
         <button type="button" className="secondary" onClick={logout} disabled={busy}>
-          Logout
+          {t("loginProfile.logout")}
         </button>
       </section>
     );
   }
 
   return (
-    <section className="login-panel" id="login" aria-label="Login">
-      <p className="eyebrow">{mode === "register" ? "Registrierung" : "Login"}</p>
+    <section className="login-panel" id="login" aria-label={t("main.nav.login")}>
+      <p className="eyebrow">{mode === "register" ? t("login.mode.register") : t("login.mode.login")}</p>
       <h2>
         {mode === "register"
-          ? "Mit Invite-Code registrieren."
+          ? t("login.title.register")
           : step === "request"
-            ? "Einmalcode anfordern."
-            : "Code eingeben."}
+            ? t("login.title.request")
+            : t("login.title.verify")}
       </h2>
       <p className="muted">
         {mode === "register"
-          ? "Lege dein Konto mit Invite-Code, Username und E-Mail an. Danach bekommst du direkt einen Einmalcode für den ersten Login."
+          ? t("login.help.register")
           : step === "request"
-            ? "Gib deinen Username ein. Hermes schickt den Einmalcode an die hinterlegte E-Mail-Adresse."
-            : "Trage den Code aus der Mail ein und gib diesem Gerät optional einen Namen für die Geräteübersicht."}
+            ? t("login.help.request")
+            : t("login.help.verify")}
       </p>
       {mode === "register" ? (
         <form onSubmit={registerUser}>
           <label>
-            Invite-Code
+            {t("login.field.invite")}
             <input
               value={registration.inviteCode}
               onChange={(event) =>
@@ -855,7 +848,7 @@ export function LoginPanel({
             />
           </label>
           <label>
-            Username
+            {t("login.field.username")}
             <input
               autoComplete="username"
               value={registration.username}
@@ -866,7 +859,7 @@ export function LoginPanel({
             />
           </label>
           <label>
-            E-Mail
+            {t("login.field.email")}
             <input
               type="email"
               value={registration.email}
@@ -878,17 +871,17 @@ export function LoginPanel({
           {error ? <p className="error">{error}</p> : null}
           <div className="action-row">
             <button type="button" className="secondary" onClick={() => setMode("login")}>
-              Zum Login
+              {t("login.backToLogin")}
             </button>
             <button type="submit" disabled={busy}>
-              Registrieren
+              {t("login.register.submit")}
             </button>
           </div>
         </form>
       ) : (
         <form onSubmit={step === "request" ? requestCode : verifyCode}>
           <label>
-            Username
+            {t("login.field.username")}
             <input
               autoComplete="username"
               value={username}
@@ -899,7 +892,7 @@ export function LoginPanel({
           {step === "verify" ? (
             <>
               <label>
-                Einmalcode
+                {t("login.field.code")}
                 <input
                   autoComplete="one-time-code"
                   inputMode="numeric"
@@ -911,9 +904,9 @@ export function LoginPanel({
                 />
               </label>
               <label>
-                Gerätename
+                {t("login.field.deviceName")}
                 <input
-                  placeholder="PC, Smartphone, Laptop"
+                  placeholder={t("login.deviceName.placeholder")}
                   value={deviceName}
                   onChange={(event) => setDeviceName(event.target.value)}
                 />
@@ -925,16 +918,16 @@ export function LoginPanel({
           <div className="action-row">
             {step === "verify" ? (
               <button type="button" className="secondary" onClick={() => setStep("request")}>
-                Zurück
+                {t("login.back")}
               </button>
             ) : null}
             <button type="submit" disabled={busy}>
-              {step === "request" ? "Code senden" : "Einloggen"}
+              {step === "request" ? t("login.sendCode") : t("login.signIn")}
             </button>
           </div>
           {settings.publicRegistrationEnabled ? (
             <button type="button" className="secondary" onClick={() => setMode("register")}>
-              Mit Invite-Code registrieren
+              {t("login.register.cta")}
             </button>
           ) : null}
         </form>

@@ -5,6 +5,7 @@ import { createRoot, type Root } from "react-dom/client";
 import { act } from "react-dom/test-utils";
 import { EventBoard } from "./EventBoard";
 import { AdminPanel } from "./AdminPanel";
+import { I18nProvider } from "../i18n/I18nContext";
 
 import type { AppSettings, User } from "../types/core";
 
@@ -37,7 +38,7 @@ async function renderIntoDocument(element: React.ReactElement) {
   const root: Root = createRoot(container);
 
   await act(async () => {
-    root.render(element);
+    root.render(<I18nProvider locale="de">{element}</I18nProvider>);
     await flushMicrotasks();
   });
 
@@ -158,7 +159,8 @@ describe("ui correctness structure contracts", () => {
       themeSurfaceColor: "#f6f8f4",
       infosEnabled: false,
       infosMarkdown: "",
-      s3SnapshotEnabled: true
+      s3SnapshotEnabled: true,
+      defaultLocale: "de"
     };
 
     requestJsonMock.mockImplementation(async (path: string) => {
