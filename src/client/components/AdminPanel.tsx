@@ -37,7 +37,7 @@ function parseGameCatalogDraft(source: string): string[] {
 }
 
 const defaultSettings: AppSettings = {
-  appName: "Hermes",
+  appName: "",
   defaultNotificationsEnabled: true,
   eventAutoArchiveHours: 8,
   publicRegistrationEnabled: false,
@@ -910,9 +910,11 @@ export function AdminPanel({
           <input
             value={settings.appName}
             onChange={(event) => setSettings({ ...settings, appName: event.target.value })}
-            required
+            maxLength={80}
+            placeholder={t("brand.displayName")}
           />
         </label>
+        <p className="muted">{t("admin.help.appName")}</p>
         <label>
           {t("admin.label.archiveHours")}
           <input

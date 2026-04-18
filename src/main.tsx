@@ -61,7 +61,7 @@ function buildAppRoutes(t: TFunction): Route[] {
 }
 
 const defaultSettings: AppSettings = {
-  appName: "Hermes",
+  appName: "",
   defaultNotificationsEnabled: true,
   eventAutoArchiveHours: 8,
   publicRegistrationEnabled: false,
@@ -277,6 +277,15 @@ function AppShell({
 
   const heroRoute = applyShellStartHero(displayRoute, appSettings);
 
+  const displayAppName = useMemo(
+    () => appSettings.appName.trim() || t("brand.displayName"),
+    [appSettings.appName, t]
+  );
+
+  useEffect(() => {
+    document.title = displayAppName;
+  }, [displayAppName]);
+
   const adminNav = useMemo(
     () =>
       [
@@ -339,7 +348,7 @@ function AppShell({
       <header className="topbar" aria-label={t("main.topbar.aria")}>
         <a className="brand" href="#events" aria-label={t("main.brand.aria")}>
           <img className="brand-mark" src="/icon.svg" alt="" />
-          <span>{appSettings.appName}</span>
+          <span>{displayAppName}</span>
         </a>
         <div className="topbar-end">
           <nav className="nav-links" aria-label={t("main.nav.regions")}>

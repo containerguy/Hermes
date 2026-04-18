@@ -1,6 +1,8 @@
 import { deMessages } from "./de";
 
 export const enMessages: { [K in keyof typeof deMessages]: string } = {
+  "brand.displayName": "MatchDesk",
+
   "main.nav.start": "Home",
   "main.nav.infos": "Info",
   "main.nav.login": "Login",
@@ -339,7 +341,9 @@ export const enMessages: { [K in keyof typeof deMessages]: string } = {
   "admin.panel.aria": "Admin area",
   "admin.user.delete": "Delete",
   "admin.betrieb.title": "Settings, shell copy, and storage",
-  "admin.label.appName": "App name",
+  "admin.label.appName": "Name shown in the UI",
+  "admin.help.appName":
+    "Optional. Leave empty for the built-in name “Mitspielzentrale” (German UI) or “MatchDesk” (English UI). A custom value replaces it in the shell and document title.",
   "admin.label.archiveHours": "Auto-archive after hours",
   "admin.label.notifyDefault": "Notifications on by default",
   "admin.label.publicReg": "Allow public registration with invite code",

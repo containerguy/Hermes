@@ -1,4 +1,6 @@
 export const deMessages = {
+  "brand.displayName": "Mitspielzentrale",
+
   "main.nav.start": "Start",
   "main.nav.infos": "Infos",
   "main.nav.login": "Login",
@@ -337,7 +339,9 @@ export const deMessages = {
   "admin.panel.aria": "Adminbereich",
   "admin.user.delete": "Löschen",
   "admin.betrieb.title": "Einstellungen, Shell-Texte und Storage",
-  "admin.label.appName": "App-Name",
+  "admin.label.appName": "Name in der Oberfläche",
+  "admin.help.appName":
+    "Optional. Leer lassen für den eingebauten Namen „Mitspielzentrale“ (deutsche Oberfläche) bzw. „MatchDesk“ (englische Oberfläche). Eigener Text ersetzt das in Menü und Titelzeile.",
   "admin.label.archiveHours": "Auto-Archiv nach Stunden",
   "admin.label.notifyDefault": "Notifications standardmäßig aktiv",
   "admin.label.publicReg": "Öffentliche Registrierung per Invite-Code erlauben",

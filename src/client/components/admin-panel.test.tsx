@@ -45,7 +45,7 @@ async function renderIntoDocument(element: React.ReactElement) {
 }
 
 const defaultSettings: AppSettings = {
-  appName: "Hermes",
+  appName: "",
   defaultNotificationsEnabled: true,
   eventAutoArchiveHours: 8,
   publicRegistrationEnabled: false,
@@ -205,7 +205,9 @@ describe("AdminPanel bulk import UX", () => {
     );
 
     const textarea = rendered.container.querySelector('textarea[aria-label="Importdaten"]') as HTMLTextAreaElement;
-    const form = rendered.container.querySelector('form[aria-label="Bulk-Import-Formular"]');
+    const form = rendered.container.querySelector(
+      'form[aria-label="Bulk-Import-Formular"]'
+    ) as HTMLFormElement | null;
 
     await act(async () => {
       textarea.value = "username,email,role\nanna,anna@example.test,user";
@@ -265,7 +267,9 @@ describe("AdminPanel bulk import UX", () => {
     );
 
     const textarea = rendered.container.querySelector('textarea[aria-label="Importdaten"]') as HTMLTextAreaElement;
-    const form = rendered.container.querySelector('form[aria-label="Bulk-Import-Formular"]');
+    const form = rendered.container.querySelector(
+      'form[aria-label="Bulk-Import-Formular"]'
+    ) as HTMLFormElement | null;
 
     await act(async () => {
       textarea.value = "username,email,role\nanna,anna@example.test,user";
@@ -395,7 +399,9 @@ describe("AdminPanel bulk import UX", () => {
     );
 
     const textarea = rendered.container.querySelector('textarea[aria-label="Importdaten"]') as HTMLTextAreaElement;
-    const form = rendered.container.querySelector('form[aria-label="Bulk-Import-Formular"]');
+    const form = rendered.container.querySelector(
+      'form[aria-label="Bulk-Import-Formular"]'
+    ) as HTMLFormElement | null;
 
     await act(async () => {
       textarea.value = "username,email,role\nanna,anna@example.test,user";

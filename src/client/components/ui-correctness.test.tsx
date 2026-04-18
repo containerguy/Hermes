@@ -143,7 +143,7 @@ describe("ui correctness structure contracts", () => {
     const requestJsonMock = requestJson as unknown as ReturnType<typeof vi.fn>;
 
     const defaultSettings: AppSettings = {
-      appName: "Hermes",
+      appName: "",
       defaultNotificationsEnabled: true,
       eventAutoArchiveHours: 8,
       publicRegistrationEnabled: false,

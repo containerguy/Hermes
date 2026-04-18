@@ -52,7 +52,7 @@ async function renderIntoDocument(element: React.ReactElement) {
 }
 
 const defaultSettings: AppSettings = {
-  appName: "Hermes",
+  appName: "",
   defaultNotificationsEnabled: true,
   eventAutoArchiveHours: 8,
   publicRegistrationEnabled: false,

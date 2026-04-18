@@ -6,7 +6,8 @@ import { appLocaleSchema } from "../shared/locale";
 const colorSchema = z.string().regex(/^#[0-9a-fA-F]{6}$/);
 
 export const settingsSchema = z.object({
-  appName: z.string().trim().min(1).max(80),
+  /** Leer = eingebauter Anzeigename je nach UI-Sprache (Mitspielzentrale / MatchDesk). */
+  appName: z.string().trim().max(80),
   defaultNotificationsEnabled: z.boolean(),
   eventAutoArchiveHours: z.number().int().min(1).max(72),
   publicRegistrationEnabled: z.boolean(),
@@ -41,7 +42,7 @@ export const settingsSchema = z.object({
 export type HermesSettings = z.infer<typeof settingsSchema>;
 
 export const defaultSettings: HermesSettings = {
-  appName: "Hermes",
+  appName: "",
   defaultNotificationsEnabled: true,
   eventAutoArchiveHours: 8,
   publicRegistrationEnabled: false,
