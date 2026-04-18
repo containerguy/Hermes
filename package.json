@@ -6,9 +6,10 @@
   "scripts": {
     "dev": "vite --host 0.0.0.0",
     "build": "tsc --noEmit && vite build && npm run build:server",
-    "build:server": "esbuild src/server/index.ts src/server/db/bootstrap-admin.ts --bundle --platform=node --format=esm --packages=external --outdir=dist-server && mkdir -p dist-server/migrations dist-server/db/migrations && cp src/server/db/migrations/*.sql dist-server/migrations/ && cp src/server/db/migrations/*.sql dist-server/db/migrations/",
+    "build:server": "esbuild src/server/index.ts src/server/db/bootstrap-admin.ts src/server/db/migrate.ts --bundle --platform=node --format=esm --packages=external --outdir=dist-server && mkdir -p dist-server/migrations dist-server/db/migrations && cp src/server/db/migrations/*.sql dist-server/migrations/ && cp src/server/db/migrations/*.sql dist-server/db/migrations/",
     "db:bootstrap-admin": "tsx src/server/db/bootstrap-admin.ts",
-    "db:migrate": "tsx src/server/db/migrate.ts",
+    "db:migrate": "node dist-server/db/migrate.js",
+    "db:migrate:dev": "tsx src/server/db/migrate.ts",
     "preview": "vite preview --host 0.0.0.0",
     "server": "tsx src/server/index.ts",
     "start": "node dist-server/index.js",
