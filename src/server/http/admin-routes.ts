@@ -72,10 +72,20 @@ const bulkImportRequestSchema = z.object({
   source: z.string().min(1).max(500_000)
 });
 
-const bulkImportRowSchema = createUserSchema.strict();
+const bulkImportRowSchema = createUserSchema.extend({ notificationsEnabled: z.boolean().optional() }).strict();
+
+const settingsImportSchema = z.object({
+  settings: settingsSchema.partial()
+});
+
+const userExportBundleSchema = z.object({
+  version: z.number().int().optional(),
+  exportedAt: z.string().optional(),
+  users: z.array(bulkImportRowSchema)
+});
 
 type BulkImportFormat = z.infer<typeof bulkImportFormatSchema>;
-type BulkImportCandidate = z.infer<typeof createUserSchema>;
+type BulkImportCandidate = z.infer<typeof bulkImportRowSchema>;
 type BulkImportIssueCode =
   | "ungueltige_import_daten"
   | "ungueltige_import_zeile"
@@ -109,7 +119,13 @@ const csvHeaderAliases: Record<keyof BulkImportCandidate, string[]> = {
   username: ["username", "user", "benutzername"],
   displayName: ["displayname", "display_name", "name", "anzeigename"],
   email: ["email", "e-mail", "mail"],
-  role: ["role", "rolle"]
+  role: ["role", "rolle"],
+  notificationsEnabled: [
+    "notificationsenabled",
+    "notifications_enabled",
+    "benachrichtigungen",
+    "push"
+  ]
 };
 
 function nowIso() {
@@ -329,6 +345,20 @@ function analyzeBulkImport(context: DatabaseContext, input: { format: BulkImport
   const emailRows = new Map<string, number>();
 
   for (const parsedRow of parsedRows) {
+    const rawNe = parsedRow.raw.notificationsEnabled;
+    let notificationsEnabled: boolean | undefined;
+    if (rawNe === true || rawNe === false) {
+      notificationsEnabled = rawNe;
+    } else if (typeof rawNe === "string") {
+      const t = rawNe.trim().toLowerCase();
+      if (t === "true" || t === "1" || t === "ja" || t === "yes") {
+        notificationsEnabled = true;
+      }
+      if (t === "false" || t === "0" || t === "nein" || t === "no") {
+        notificationsEnabled = false;
+      }
+    }
+
     const normalizedInput: RawImportRow = {
       phoneNumber:
         typeof parsedRow.raw.phoneNumber === "string" && parsedRow.raw.phoneNumber.trim().length > 0
@@ -340,7 +370,8 @@ function analyzeBulkImport(context: DatabaseContext, input: { format: BulkImport
           ? parsedRow.raw.displayName.trim()
           : undefined,
       email: parsedRow.raw.email,
-      role: parsedRow.raw.role === undefined || parsedRow.raw.role === "" ? undefined : parsedRow.raw.role
+      role: parsedRow.raw.role === undefined || parsedRow.raw.role === "" ? undefined : parsedRow.raw.role,
+      notificationsEnabled
     };
 
     const result = bulkImportRowSchema.safeParse(normalizedInput);
@@ -469,6 +500,44 @@ function buildBulkImportAuditMetadata(analysis: BulkImportAnalysis) {
   };
 }
 
+function commitBulkImportAnalysis(
+  context: DatabaseContext,
+  admin: { id: string; username: string },
+  analysis: BulkImportAnalysis
+) {
+  const settings = readSettings(context);
+  const timestamp = nowIso();
+  const insertedUsers: Array<typeof users.$inferSelect> = [];
+
+  context.sqlite.transaction(() => {
+    for (const candidate of analysis.validCandidates) {
+      const id = randomUUID();
+      context.db
+        .insert(users)
+        .values({
+          id,
+          phoneNumber: candidate.phoneNumber ?? fallbackPhoneNumber(id),
+          username: candidate.username,
+          displayName: candidate.displayName ?? candidate.username,
+          email: candidate.email,
+          role: candidate.role,
+          notificationsEnabled: candidate.notificationsEnabled ?? settings.defaultNotificationsEnabled,
+          createdByUserId: admin.id,
+          createdAt: timestamp,
+          updatedAt: timestamp
+        })
+        .run();
+
+      const created = context.db.select().from(users).where(eq(users.id, id)).get();
+      if (created) {
+        insertedUsers.push(created);
+      }
+    }
+  })();
+
+  return insertedUsers;
+}
+
 export function createAdminRouter(context: DatabaseContext) {
   const router = Router();
 
@@ -505,6 +574,46 @@ export function createAdminRouter(context: DatabaseContext) {
       .orderBy(asc(users.username))
       .all();
     response.json({ users: allUsers.map(publicUser) });
+  });
+
+  router.get("/users/export", (request, response) => {
+    const admin = requireUser(context, request)!;
+
+    const allUsers = context.db
+      .select()
+      .from(users)
+      .where(isNull(users.deletedAt))
+      .orderBy(asc(users.username))
+      .all();
+
+    const exportUsers = allUsers.map((row) => ({
+      phoneNumber: row.phoneNumber,
+      username: row.username,
+      displayName: row.displayName ?? undefined,
+      email: row.email,
+      role: row.role,
+      notificationsEnabled: row.notificationsEnabled
+    }));
+
+    const payload = {
+      version: 1 as const,
+      exportedAt: new Date().toISOString(),
+      users: exportUsers
+    };
+
+    tryWriteAuditLog(context, {
+      actor: admin,
+      action: "user_export_download",
+      entityType: "user_batch",
+      entityId: null,
+      summary: `${admin.username} hat ${exportUsers.length} User exportiert.`,
+      metadata: { userCount: exportUsers.length }
+    });
+
+    const stamp = payload.exportedAt.replace(/[:.]/g, "-");
+    response.setHeader("Content-Disposition", `attachment; filename="hermes-users-${stamp}.json"`);
+    response.type("application/json");
+    response.send(JSON.stringify(payload, null, 2));
   });
 
   router.get("/audit-log", (request, response) => {
@@ -623,36 +732,10 @@ export function createAdminRouter(context: DatabaseContext) {
       return;
     }
 
-    const settings = readSettings(context);
-    const timestamp = nowIso();
-    const insertedUsers: Array<typeof users.$inferSelect> = [];
+    let insertedUsers: Array<typeof users.$inferSelect> = [];
 
     try {
-      context.sqlite.transaction(() => {
-        for (const candidate of analysis.validCandidates) {
-          const id = randomUUID();
-          context.db
-            .insert(users)
-            .values({
-              id,
-              phoneNumber: candidate.phoneNumber ?? fallbackPhoneNumber(id),
-              username: candidate.username,
-              displayName: candidate.displayName ?? candidate.username,
-              email: candidate.email,
-              role: candidate.role,
-              notificationsEnabled: settings.defaultNotificationsEnabled,
-              createdByUserId: admin.id,
-              createdAt: timestamp,
-              updatedAt: timestamp
-            })
-            .run();
-
-          const created = context.db.select().from(users).where(eq(users.id, id)).get();
-          if (created) {
-            insertedUsers.push(created);
-          }
-        }
-      })();
+      insertedUsers = commitBulkImportAnalysis(context, admin, analysis);
     } catch (error) {
       console.error("[Hermes] Failed to commit bulk user import", error);
       response.status(409).json({ error: "import_konnte_nicht_gespeichert_werden" });
@@ -665,6 +748,64 @@ export function createAdminRouter(context: DatabaseContext) {
       entityType: "user_batch",
       entityId: null,
       summary: `${admin.username} hat ${insertedUsers.length} User per Bulk-Import angelegt.`,
+      metadata: buildBulkImportAuditMetadata(analysis)
+    });
+
+    response.status(201).json({
+      importedCount: insertedUsers.length,
+      users: insertedUsers.map(publicUser),
+      import: {
+        format: analysis.format,
+        totalRows: analysis.totalRows,
+        acceptedRows: analysis.acceptedRows,
+        blockingIssueCount: 0,
+        hasBlockingIssues: false,
+        validCandidates: analysis.validCandidates,
+        issues: []
+      }
+    });
+  });
+
+  router.post("/users/import/from-export", (request, response) => {
+    const admin = requireAdmin(context, request);
+    const parsed = userExportBundleSchema.safeParse(request.body);
+
+    if (!admin) {
+      response.status(403).json({ error: "admin_erforderlich" });
+      return;
+    }
+
+    if (!parsed.success) {
+      response.status(400).json({ error: "ungueltiger_export_bundle" });
+      return;
+    }
+
+    const analysis = analyzeBulkImport(context, {
+      format: "json",
+      source: JSON.stringify(parsed.data.users)
+    });
+
+    if (analysis.blockingIssueCount > 0) {
+      response.status(409).json({ error: "import_blockiert", ...buildBulkImportResponse(analysis) });
+      return;
+    }
+
+    let insertedUsers: Array<typeof users.$inferSelect> = [];
+
+    try {
+      insertedUsers = commitBulkImportAnalysis(context, admin, analysis);
+    } catch (error) {
+      console.error("[Hermes] Failed to commit user export import", error);
+      response.status(409).json({ error: "import_konnte_nicht_gespeichert_werden" });
+      return;
+    }
+
+    tryWriteAuditLog(context, {
+      actor: admin,
+      action: "user_export_import",
+      entityType: "user_batch",
+      entityId: null,
+      summary: `${admin.username} hat ${insertedUsers.length} User aus einem Export-Archiv importiert.`,
       metadata: buildBulkImportAuditMetadata(analysis)
     });
 
@@ -936,8 +1077,9 @@ export function createAdminRouter(context: DatabaseContext) {
   });
 
   router.get("/settings", (_request, response) => {
-    const backend = getStorageBackend();
-    const location = getS3LocationDetails();
+    const backend = getStorageBackend(context.sqlite);
+    const location = getS3LocationDetails(context.sqlite);
+    const envS3Configured = process.env.HERMES_STORAGE_BACKEND === "s3";
     let backupStatus = null;
     try {
       backupStatus = readBackupStatus(context.sqlite);
@@ -950,6 +1092,7 @@ export function createAdminRouter(context: DatabaseContext) {
       settings: readSettings(context),
       storage: {
         backend,
+        envS3Configured,
         location,
         backupStatus: backupStatus
           ? {
@@ -1267,10 +1410,61 @@ export function createAdminRouter(context: DatabaseContext) {
     response.json({ settings: readSettings(context) });
   });
 
+  router.get("/settings/export", (request, response) => {
+    const admin = requireUser(context, request)!;
+    const settings = readSettings(context);
+    const payload = {
+      version: 1 as const,
+      exportedAt: new Date().toISOString(),
+      settings
+    };
+
+    tryWriteAuditLog(context, {
+      actor: admin,
+      action: "settings_export_download",
+      entityType: "settings",
+      entityId: "app",
+      summary: `${admin.username} hat Einstellungen exportiert.`,
+      metadata: { keys: Object.keys(settings) }
+    });
+
+    const stamp = payload.exportedAt.replace(/[:.]/g, "-");
+    response.setHeader("Content-Disposition", `attachment; filename="hermes-settings-${stamp}.json"`);
+    response.type("application/json");
+    response.send(JSON.stringify(payload, null, 2));
+  });
+
+  router.post("/settings/import", (request, response) => {
+    const admin = requireAdmin(context, request);
+    const parsed = settingsImportSchema.safeParse(request.body);
+
+    if (!admin) {
+      response.status(403).json({ error: "admin_erforderlich" });
+      return;
+    }
+
+    if (!parsed.success) {
+      response.status(400).json({ error: "ungueltige_settings_import" });
+      return;
+    }
+
+    const merged = settingsSchema.parse({ ...readSettings(context), ...parsed.data.settings });
+    writeSettings(context, merged, admin.id);
+    tryWriteAuditLog(context, {
+      actor: admin,
+      action: "settings.import",
+      entityType: "settings",
+      entityId: "app",
+      summary: `${admin.username} hat Einstellungen aus einem Export übernommen.`,
+      metadata: { keys: Object.keys(parsed.data.settings) }
+    });
+    response.json({ settings: merged });
+  });
+
   router.post("/backup", async (request, response) => {
     const admin = requireAdmin(context, request);
-    const backend = getStorageBackend();
-    const location = getS3LocationDetails();
+    const backend = getStorageBackend(context.sqlite);
+    const location = getS3LocationDetails(context.sqlite);
     const creds = getS3CredentialSourcePresence();
 
     tryWriteAuditLog(context, {
@@ -1329,8 +1523,8 @@ export function createAdminRouter(context: DatabaseContext) {
 
   router.post("/restore", async (request, response) => {
     const admin = requireAdmin(context, request);
-    const backend = getStorageBackend();
-    const location = getS3LocationDetails();
+    const backend = getStorageBackend(context.sqlite);
+    const location = getS3LocationDetails(context.sqlite);
     const creds = getS3CredentialSourcePresence();
 
     tryWriteAuditLog(context, {

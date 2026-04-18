@@ -1,4 +1,4 @@
-import React, { FormEvent, useEffect, useState } from "react";
+import React, { FormEvent, useEffect, useRef, useState } from "react";
 import type {
   AdminSection,
   AppSettings,
@@ -51,7 +51,8 @@ const defaultSettings: AppSettings = {
   themeSurfaceColor: "#f6f8f4",
   gameCatalog: [],
   infosEnabled: false,
-  infosMarkdown: ""
+  infosMarkdown: "",
+  s3SnapshotEnabled: true
 };
 
 function summarizeBulkImportIssues(result: BulkImportResult) {
@@ -105,8 +106,111 @@ export function AdminPanel({
   const [error, setError] = useState("");
   const [opsBusy, setOpsBusy] = useState(false);
   const [rateLimitBusy, setRateLimitBusy] = useState(false);
+  const settingsImportRef = useRef<HTMLInputElement>(null);
+  const usersExportImportRef = useRef<HTMLInputElement>(null);
 
   const isAdmin = currentUser?.role === "admin";
+
+  async function downloadJsonAttachment(path: string, fallbackName: string) {
+    setError("");
+    setMessage("");
+    try {
+      const response = await fetch(path, { credentials: "include" });
+      if (!response.ok) {
+        const body = (await response.json().catch(() => ({}))) as { error?: string };
+        throw new ApiError({
+          code: body.error ?? "request_failed",
+          status: response.status,
+          body
+        });
+      }
+      const blob = await response.blob();
+      const cd = response.headers.get("Content-Disposition");
+      let filename = fallbackName;
+      const match = cd?.match(/filename="([^"]+)"/);
+      if (match?.[1]) {
+        filename = match[1];
+      }
+      const url = URL.createObjectURL(blob);
+      const anchor = document.createElement("a");
+      anchor.href = url;
+      anchor.download = filename;
+      anchor.click();
+      URL.revokeObjectURL(url);
+      setMessage("Download gestartet.");
+    } catch (caught) {
+      setError(getErrorMessage(caught));
+    }
+  }
+
+  async function runSettingsImport(file: File) {
+    setError("");
+    setMessage("");
+    try {
+      const text = await file.text();
+      const raw: unknown = JSON.parse(text);
+      let settingsPayload: unknown;
+      if (raw && typeof raw === "object" && !Array.isArray(raw)) {
+        const record = raw as Record<string, unknown>;
+        if (record.settings && typeof record.settings === "object" && !Array.isArray(record.settings)) {
+          settingsPayload = record.settings;
+        } else if (typeof record.appName === "string") {
+          settingsPayload = record;
+        }
+      }
+      if (!settingsPayload || typeof settingsPayload !== "object" || Array.isArray(settingsPayload)) {
+        setError("Ungültige Einstellungen-Datei.");
+        return;
+      }
+      const result = await requestJson<{ settings: AppSettings }>("/api/admin/settings/import", {
+        method: "POST",
+        body: JSON.stringify({ settings: settingsPayload })
+      });
+      setSettings(result.settings);
+      setGameCatalogDraft(result.settings.gameCatalog.join("\n"));
+      onSettingsChanged(result.settings);
+      setMessage("Einstellungen importiert.");
+    } catch (caught) {
+      setError(getErrorMessage(caught));
+    } finally {
+      if (settingsImportRef.current) {
+        settingsImportRef.current.value = "";
+      }
+    }
+  }
+
+  async function runUsersExportImport(file: File) {
+    setError("");
+    setMessage("");
+    setBulkImportBusy(true);
+    try {
+      const text = await file.text();
+      const raw: unknown = JSON.parse(text);
+      if (
+        !raw ||
+        typeof raw !== "object" ||
+        Array.isArray(raw) ||
+        !Array.isArray((raw as { users?: unknown }).users)
+      ) {
+        setError("Ungültiges User-Export-Format (users-Array fehlt).");
+        return;
+      }
+      const result = await requestJson<BulkImportCommitResponse>("/api/admin/users/import/from-export", {
+        method: "POST",
+        body: text
+      });
+      await loadAdminData();
+      setBulkImportPreview(null);
+      setMessage(`User-Import abgeschlossen: ${result.importedCount} angelegt.`);
+    } catch (caught) {
+      setError(getErrorMessage(caught));
+    } finally {
+      setBulkImportBusy(false);
+      if (usersExportImportRef.current) {
+        usersExportImportRef.current.value = "";
+      }
+    }
+  }
 
   async function loadAdminData() {
     if (!isAdmin) {
@@ -590,6 +694,44 @@ export function AdminPanel({
               sofort im System.
             </p>
           </header>
+          <section className="invite-panel" aria-label="User Export und Import">
+            <p className="eyebrow">Export / Import</p>
+            <h2>Alle aktiven User als JSON.</h2>
+            <p className="muted">
+              Enthält dieselben Felder wie der JSON-Bulk-Import plus Benachrichtigungs-Präferenz. Bestehende
+              User (gleicher Username oder E-Mail) blockieren den Import wie bei der Vorschau.
+            </p>
+            <div className="action-row">
+              <button
+                type="button"
+                onClick={() =>
+                  void downloadJsonAttachment("/api/admin/users/export", "hermes-users.json")
+                }
+              >
+                User exportieren
+              </button>
+              <button
+                type="button"
+                className="secondary"
+                onClick={() => usersExportImportRef.current?.click()}
+                disabled={bulkImportBusy}
+              >
+                User importieren (Export-Datei)
+              </button>
+              <input
+                ref={usersExportImportRef}
+                type="file"
+                accept="application/json,.json"
+                style={{ display: "none" }}
+                onChange={(event) => {
+                  const file = event.target.files?.[0];
+                  if (file) {
+                    void runUsersExportImport(file);
+                  }
+                }}
+              />
+            </div>
+          </section>
           <form id="admin-users" onSubmit={createUser} className="admin-form admin-user-create-form">
         <label>
           Username
@@ -802,7 +944,7 @@ export function AdminPanel({
           />
           Notifications standardmäßig aktiv
         </label>
-        <label className="checkbox-label">
+               <label className="checkbox-label">
           <input
             type="checkbox"
             checked={settings.publicRegistrationEnabled}
@@ -815,6 +957,26 @@ export function AdminPanel({
           />
           Öffentliche Registrierung per Invite-Code erlauben
         </label>
+        <label className="checkbox-label">
+          <input
+            type="checkbox"
+            checked={settings.s3SnapshotEnabled}
+            onChange={(event) =>
+              setSettings({
+                ...settings,
+                s3SnapshotEnabled: event.target.checked
+              })
+            }
+          />
+          S3-Snapshots und Restore in der laufenden Instanz erlauben (Standard: an, nur wirksam wenn die
+          Umgebung S3 nutzt)
+        </label>
+        <p className="muted">
+          Wenn deaktiviert, schreibt Hermes keine periodischen oder manuellen Snapshots nach S3 und blockiert
+          Restore in der App – auch wenn <code>HERMES_STORAGE_BACKEND=s3</code> gesetzt ist. Der erste
+          Datenbank-Download auf ein leeres Volume beim Start richtet sich weiterhin nur nach der
+          Umgebungsvariable, nicht nach dieser Option.
+        </p>
         <p className="muted">
           Shell-Texte für Startseite und leeres Event-Board. Überschrift und Leerzustand: leer lassen
           für die eingebauten Standardtexte. Start-Beschreibung: leer lassen, wenn unter der
@@ -880,6 +1042,43 @@ export function AdminPanel({
           freie Titel genutzt werden sollen. Beim Speichern werden leere Zeilen verworfen und
           überflüssige Leerzeichen am Zeilenanfang und -ende entfernt.
         </p>
+        <section className="admin-ops" aria-label="Einstellungen Export">
+          <p className="eyebrow">Portabilität</p>
+          <h3>Einstellungen als JSON</h3>
+          <p className="muted">
+            Export enthält alle gespeicherten App-Einstellungen. Import merged mit dem aktuellen Stand und
+            validiert wie beim Speichern im Formular.
+          </p>
+          <div className="action-row">
+            <button
+              type="button"
+              onClick={() =>
+                void downloadJsonAttachment("/api/admin/settings/export", "hermes-settings.json")
+              }
+            >
+              Einstellungen exportieren
+            </button>
+            <button
+              type="button"
+              className="secondary"
+              onClick={() => settingsImportRef.current?.click()}
+            >
+              Einstellungen importieren
+            </button>
+            <input
+              ref={settingsImportRef}
+              type="file"
+              accept="application/json,.json"
+              style={{ display: "none" }}
+              onChange={(event) => {
+                const file = event.target.files?.[0];
+                if (file) {
+                  void runSettingsImport(file);
+                }
+              }}
+            />
+          </div>
+        </section>
         <button type="submit">Einstellungen speichern</button>
       </form>
 
@@ -895,7 +1094,14 @@ export function AdminPanel({
           die aktuelle Session.
         </p>
         {storage?.backend === "disabled" ? (
-          <p className="muted">S3 Snapshot Storage ist deaktiviert (HERMES_STORAGE_BACKEND ≠ s3).</p>
+          storage?.envS3Configured ? (
+            <p className="muted">
+              S3 ist in der Umgebung aktiv, aber Snapshots sind in den App-Einstellungen abgeschaltet.
+              Aktiviere die Option „S3-Snapshots …“ oben und speichere, um Backup und Restore zu nutzen.
+            </p>
+          ) : (
+            <p className="muted">S3 Snapshot Storage ist in der Umgebung nicht aktiviert (HERMES_STORAGE_BACKEND ≠ s3).</p>
+          )
         ) : (
           <div className="device-list" aria-label="Backup Status">
             <article className="device-row">

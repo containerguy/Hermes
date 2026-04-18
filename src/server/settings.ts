@@ -24,7 +24,12 @@ export const settingsSchema = z.object({
   themeAdminColor: colorSchema,
   themeSurfaceColor: colorSchema,
   infosEnabled: z.boolean(),
-  infosMarkdown: z.string().max(100_000)
+  infosMarkdown: z.string().max(100_000),
+  /**
+   * true (Default): S3-Snapshots aktiv, wenn HERMES_STORAGE_BACKEND=s3.
+   * false: keine S3-Backups/Restores in der laufenden Instanz (Env kann trotzdem s3 sein).
+   */
+  s3SnapshotEnabled: z.boolean()
 });
 
 export type HermesSettings = z.infer<typeof settingsSchema>;
@@ -45,7 +50,8 @@ export const defaultSettings: HermesSettings = {
   themeAdminColor: "#2563eb",
   themeSurfaceColor: "#f6f8f4",
   infosEnabled: false,
-  infosMarkdown: ""
+  infosMarkdown: "",
+  s3SnapshotEnabled: true
 };
 
 function nowIso() {

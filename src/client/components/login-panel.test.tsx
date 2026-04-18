@@ -66,7 +66,8 @@ const defaultSettings: AppSettings = {
   themeSurfaceColor: "#f6f8f4",
   gameCatalog: [],
   infosEnabled: false,
-  infosMarkdown: ""
+  infosMarkdown: "",
+  s3SnapshotEnabled: true
 };
 
 const redeemedUser: User = {

@@ -76,12 +76,34 @@ const restorableTables = [
   "schema_migrations"
 ];
 
-function isS3StorageEnabled() {
+function envS3StorageEnabled() {
   return process.env.HERMES_STORAGE_BACKEND === "s3";
 }
 
-export function getStorageBackend(): StorageBackend {
-  return isS3StorageEnabled() ? "s3" : "disabled";
+/**
+ * App-Einstellung (Default: an). Nur lesbar, wenn SQLite bereits geöffnet ist.
+ */
+export function readS3SnapshotAppEnabled(sqlite: Database.Database): boolean {
+  const row = sqlite
+    .prepare("SELECT value FROM app_settings WHERE key = ?")
+    .get("s3SnapshotEnabled") as { value: string } | undefined;
+  if (!row) {
+    return true;
+  }
+  try {
+    return JSON.parse(row.value) !== false;
+  } catch {
+    return true;
+  }
+}
+
+/** Env s3 + App-Schalter: für alle Laufzeit-Operationen mit SQLite. */
+export function isS3SnapshotOperational(sqlite: Database.Database): boolean {
+  return envS3StorageEnabled() && readS3SnapshotAppEnabled(sqlite);
+}
+
+export function getStorageBackend(sqlite: Database.Database): StorageBackend {
+  return isS3SnapshotOperational(sqlite) ? "s3" : "disabled";
 }
 
 function normalizeCredentialKey(key: string) {
@@ -201,8 +223,8 @@ function readS3LocationConfig(): S3LocationDetails {
   };
 }
 
-export function getS3LocationDetails(): S3LocationDetails | null {
-  if (!isS3StorageEnabled()) {
+export function getS3LocationDetails(sqlite: Database.Database): S3LocationDetails | null {
+  if (!isS3SnapshotOperational(sqlite)) {
     return null;
   }
   return readS3LocationConfig();
@@ -673,7 +695,7 @@ async function createRecoverySnapshot(
   sqlite: Database.Database,
   databasePath = getDatabasePath()
 ): Promise<{ id: string; key: string; location: Omit<S3LocationDetails, "key"> & { bucket: string } }> {
-  if (!isS3StorageEnabled()) {
+  if (!isS3SnapshotOperational(sqlite)) {
     throw new Error("S3 storage is not enabled.");
   }
 
@@ -711,8 +733,12 @@ async function createRecoverySnapshot(
   };
 }
 
+/**
+ * Erst-Start / leere DB: nur Umgebungsvariable, noch kein app_settings-Eintrag.
+ * App-Schalter „S3 aus“ wirkt nach dem Start für Backups; initialer Download bleibt deploy-gesteuert.
+ */
 export async function restoreDatabaseFromStorageIfNeeded(databasePath = getDatabasePath()) {
-  if (!isS3StorageEnabled()) {
+  if (!envS3StorageEnabled()) {
     return;
   }
 
@@ -745,10 +771,10 @@ export async function restoreDatabaseFromStorageIfNeeded(databasePath = getDatab
 }
 
 export async function restoreDatabaseSnapshotIntoLive(sqlite: Database.Database) {
-  if (!isS3StorageEnabled()) {
+  if (!isS3SnapshotOperational(sqlite)) {
     throw new RestoreValidationError("Storage disabled", {
       kind: "validation_failed",
-      summary: "S3 Snapshot Storage ist deaktiviert."
+      summary: "S3 Snapshot Storage ist deaktiviert (Umgebung oder App-Einstellung)."
     });
   }
 
@@ -865,7 +891,7 @@ export async function restoreDatabaseSnapshotIntoLive(sqlite: Database.Database)
 }
 
 export async function persistDatabaseSnapshot(sqlite: Database.Database, databasePath = getDatabasePath()) {
-  if (!isS3StorageEnabled()) {
+  if (!isS3SnapshotOperational(sqlite)) {
     return;
   }
 
@@ -914,7 +940,7 @@ export async function flushDatabaseSnapshot(sqlite: Database.Database) {
 }
 
 export function scheduleDatabaseSnapshot(sqlite: Database.Database) {
-  if (!isS3StorageEnabled()) {
+  if (!isS3SnapshotOperational(sqlite)) {
     return;
   }
 

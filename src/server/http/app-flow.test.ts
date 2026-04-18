@@ -711,6 +711,7 @@ describe("app flow", () => {
     expect(response.body.settings).toBeTruthy();
     expect(response.body.storage).toBeTruthy();
     expect(response.body.storage.backend).toBe("disabled");
+    expect(response.body.storage.envS3Configured).toBe(false);
     expect(response.body.storage.backupStatus === null || typeof response.body.storage.backupStatus === "object").toBe(
       true
     );
@@ -1122,7 +1123,8 @@ describe("app flow", () => {
       themeAdminColor: "#2255ee",
       themeSurfaceColor: "#f0ede6",
       infosEnabled: true,
-      infosMarkdown: "## LAN-Infos\n\n- [Organisation](https://example.org)"
+      infosMarkdown: "## LAN-Infos\n\n- [Organisation](https://example.org)",
+      s3SnapshotEnabled: true
     };
 
     await adminAgent

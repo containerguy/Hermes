@@ -157,7 +157,8 @@ describe("ui correctness structure contracts", () => {
       themeAdminColor: "#2563eb",
       themeSurfaceColor: "#f6f8f4",
       infosEnabled: false,
-      infosMarkdown: ""
+      infosMarkdown: "",
+      s3SnapshotEnabled: true
     };
 
     requestJsonMock.mockImplementation(async (path: string) => {
@@ -165,7 +166,7 @@ describe("ui correctness structure contracts", () => {
         return { users: [] };
       }
       if (path === "/api/admin/settings") {
-        return { settings: defaultSettings, storage: { backend: "disabled" } };
+        return { settings: defaultSettings, storage: { backend: "disabled", envS3Configured: false } };
       }
       if (path.startsWith("/api/admin/audit-log")) {
         return {

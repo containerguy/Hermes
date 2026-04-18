@@ -59,7 +59,8 @@ const defaultSettings: AppSettings = {
   themeSurfaceColor: "#f6f8f4",
   gameCatalog: [],
   infosEnabled: false,
-  infosMarkdown: ""
+  infosMarkdown: "",
+  s3SnapshotEnabled: true
 };
 
 const adminUser: User = {
@@ -126,7 +127,7 @@ function baseAdminDataResponse(path: string) {
     return { users: baseUsers };
   }
   if (path === "/api/admin/settings") {
-    return { settings: defaultSettings, storage: { backend: "disabled" } };
+    return { settings: defaultSettings, storage: { backend: "disabled", envS3Configured: false } };
   }
   if (path.startsWith("/api/admin/audit-log")) {
     return { auditLogs: baseAuditLogs };
@@ -321,7 +322,7 @@ describe("AdminPanel bulk import UX", () => {
         };
       }
       if (path === "/api/admin/settings") {
-        return { settings: defaultSettings, storage: { backend: "disabled" } };
+        return { settings: defaultSettings, storage: { backend: "disabled", envS3Configured: false } };
       }
       if (path.startsWith("/api/admin/audit-log")) {
         auditLoadCount += 1;
