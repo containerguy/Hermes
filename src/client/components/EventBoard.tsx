@@ -3,6 +3,7 @@ import type { GameEvent, User } from "../types/core";
 import { requestJson } from "../api/request";
 import { ApiError, getErrorMessage } from "../errors/errors";
 import { useI18n } from "../i18n/I18nContext";
+import { useBrandIconSrc } from "../lib/BrandingContext";
 import type { MessageKey } from "../i18n/catalog/index";
 
 function toDatetimeLocal(value: string) {
@@ -77,6 +78,7 @@ export function EventBoard({
   gameCatalog?: string[];
 }) {
   const { t, locale } = useI18n();
+  const markSrc = useBrandIconSrc();
   const dateTag = locale === "en" ? "en-US" : "de-DE";
   const relFormatter = useMemo(
     () => new Intl.RelativeTimeFormat(locale === "en" ? "en" : "de", { numeric: "auto" }),
@@ -464,7 +466,7 @@ export function EventBoard({
   if (!currentUser) {
     return (
       <div className="access-panel" aria-label={t("events.guest.aria")}>
-        <img src="/icon.svg" alt="" />
+        <img src={markSrc} alt="" />
         <p className="eyebrow">{t("events.guest.eyebrow")}</p>
         <h2>{t("events.guest.title")}</h2>
         <p className="muted">{t("events.guest.body")}</p>
@@ -641,7 +643,7 @@ export function EventBoard({
           }}
           aria-label={tileAriaLabel}
         >
-          <img src="/icon.svg" alt="" className="event-compact-icon" width={36} height={36} />
+          <img src={markSrc} alt="" className="event-compact-icon" width={36} height={36} />
           <div className="event-compact-tile-body">
             <span className="event-compact-title">{event.gameTitle}</span>
             {compactTouchShell ? (

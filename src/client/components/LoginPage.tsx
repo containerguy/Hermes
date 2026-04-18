@@ -1,5 +1,6 @@
 import React from "react";
 import type { AppSettings, User } from "../types/core";
+import { brandIconSrc } from "../lib/brand-icon";
 import { LoginPanel } from "./LoginPanel";
 
 export function LoginPage({
@@ -15,6 +16,7 @@ export function LoginPage({
   onLoggedOut: () => void;
   onUserUpdated: (user: User) => void;
 }) {
+  const asideIcon = brandIconSrc(settings);
   return (
     <section
       className={`auth-layout${currentUser ? " auth-layout--profile" : ""}`}
@@ -29,7 +31,7 @@ export function LoginPage({
       />
       {currentUser ? null : (
         <aside className="auth-visual" aria-label="Login Hinweise">
-          <img src="/icon.svg" alt="" />
+          <img src={asideIcon} alt="" />
           <p className="eyebrow">Mailcode</p>
           <h2>Ein Login, mehrere Geräte.</h2>
           <p>

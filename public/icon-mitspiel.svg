@@ -1,0 +1,5 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128" role="img" aria-label="Mitspielzentrale">
+  <rect width="128" height="128" rx="20" fill="#17202a"/>
+  <path fill="#ffffff" d="M29 30L46 30 46 55 64 82 82 55 82 30 99 30 99 98 82 98 82 58 64 88 46 58 46 98 29 98z"/>
+  <path fill="#27ae80" d="M102 29l12 11-12 11-12-11z"/>
+</svg>

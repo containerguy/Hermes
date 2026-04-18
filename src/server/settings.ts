@@ -1,6 +1,7 @@
 import { z } from "zod";
 import type { DatabaseContext } from "./db/client";
 import { appSettings } from "./db/schema";
+import { brandMarkSchema } from "../shared/brand-mark";
 import { appLocaleSchema } from "../shared/locale";
 
 const colorSchema = z.string().regex(/^#[0-9a-fA-F]{6}$/);
@@ -8,6 +9,8 @@ const colorSchema = z.string().regex(/^#[0-9a-fA-F]{6}$/);
 export const settingsSchema = z.object({
   /** Leer = eingebauter Anzeigename je nach UI-Sprache (Mitspielzentrale / MatchDesk). */
   appName: z.string().trim().max(80),
+  /** App-Logo in der UI: H (Hermes) oder M (Mitspiel / MatchDesk). */
+  brandMark: brandMarkSchema,
   defaultNotificationsEnabled: z.boolean(),
   eventAutoArchiveHours: z.number().int().min(1).max(72),
   publicRegistrationEnabled: z.boolean(),
@@ -43,6 +46,7 @@ export type HermesSettings = z.infer<typeof settingsSchema>;
 
 export const defaultSettings: HermesSettings = {
   appName: "",
+  brandMark: "mitspiel",
   defaultNotificationsEnabled: true,
   eventAutoArchiveHours: 8,
   publicRegistrationEnabled: false,

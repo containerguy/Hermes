@@ -1109,6 +1109,7 @@ describe("app flow", () => {
 
     const updatedSettings = {
       appName: "Hermes HQ",
+      brandMark: "mitspiel" as const,
       defaultNotificationsEnabled: false,
       eventAutoArchiveHours: 12,
       publicRegistrationEnabled: true,

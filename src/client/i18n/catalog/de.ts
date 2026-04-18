@@ -342,6 +342,11 @@ export const deMessages = {
   "admin.label.appName": "Name in der Oberfläche",
   "admin.help.appName":
     "Optional. Leer lassen für den eingebauten Namen „Mitspielzentrale“ (deutsche Oberfläche) bzw. „MatchDesk“ (englische Oberfläche). Eigener Text ersetzt das in Menü und Titelzeile.",
+  "admin.label.brandMark": "Logo in der Oberfläche",
+  "admin.brandMark.mitspiel": "M · Mitspielzentrale / MatchDesk (Standard)",
+  "admin.brandMark.hermes": "H · Hermes (klassisch)",
+  "admin.help.brandMark":
+    "Steuert das Kachel-Icon in Menü, Login und Event-Board. PWA-Installations-Icon bleibt „Hermes“.",
   "admin.label.archiveHours": "Auto-Archiv nach Stunden",
   "admin.label.notifyDefault": "Notifications standardmäßig aktiv",
   "admin.label.publicReg": "Öffentliche Registrierung per Invite-Code erlauben",

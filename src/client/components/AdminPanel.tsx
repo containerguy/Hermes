@@ -18,6 +18,7 @@ import type {
 import { requestJson } from "../api/request";
 import { ApiError, getErrorMessage } from "../errors/errors";
 import { useI18n } from "../i18n/I18nContext";
+import { useBrandIconSrc } from "../lib/BrandingContext";
 
 function toDatetimeLocal(value: string) {
   const date = new Date(value);
@@ -38,6 +39,7 @@ function parseGameCatalogDraft(source: string): string[] {
 
 const defaultSettings: AppSettings = {
   appName: "",
+  brandMark: "mitspiel",
   defaultNotificationsEnabled: true,
   eventAutoArchiveHours: 8,
   publicRegistrationEnabled: false,
@@ -103,6 +105,7 @@ export function AdminPanel({
   const settingsImportRef = useRef<HTMLInputElement>(null);
   const usersExportImportRef = useRef<HTMLInputElement>(null);
   const { t, locale } = useI18n();
+  const gateMarkSrc = useBrandIconSrc();
   const dateTag = locale === "en" ? "en-US" : "de-DE";
 
   function bulkImportSummary(result: BulkImportResult) {
@@ -662,7 +665,7 @@ export function AdminPanel({
   if (!isAdmin) {
     return (
       <article id="admin" className="access-panel admin-access">
-        <img src="/icon.svg" alt="" />
+        <img src={gateMarkSrc} alt="" />
         <p className="eyebrow">{t("main.nav.admin")}</p>
         <h2>{t("admin.gate.title")}</h2>
         <p>{t("admin.gate.body")}</p>
@@ -915,6 +918,22 @@ export function AdminPanel({
           />
         </label>
         <p className="muted">{t("admin.help.appName")}</p>
+        <label>
+          {t("admin.label.brandMark")}
+          <select
+            value={settings.brandMark}
+            onChange={(event) =>
+              setSettings({
+                ...settings,
+                brandMark: event.target.value as AppSettings["brandMark"]
+              })
+            }
+          >
+            <option value="mitspiel">{t("admin.brandMark.mitspiel")}</option>
+            <option value="hermes">{t("admin.brandMark.hermes")}</option>
+          </select>
+        </label>
+        <p className="muted">{t("admin.help.brandMark")}</p>
         <label>
           {t("admin.label.archiveHours")}
           <input

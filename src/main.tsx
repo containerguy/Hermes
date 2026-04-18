@@ -10,6 +10,8 @@ import { InfosPage } from "./client/components/InfosPage";
 import { LoginPage } from "./client/components/LoginPage";
 import { AdminPanel } from "./client/components/AdminPanel";
 import { I18nProvider, useI18n, type TFunction } from "./client/i18n/I18nContext";
+import { BrandingProvider, useBrandIconSrc } from "./client/lib/BrandingContext";
+import { brandIconSrc } from "./client/lib/brand-icon";
 import { resolveEffectiveLocale } from "./client/lib/locale-display";
 
 type Route = {
@@ -62,6 +64,7 @@ function buildAppRoutes(t: TFunction): Route[] {
 
 const defaultSettings: AppSettings = {
   appName: "",
+  brandMark: "mitspiel",
   defaultNotificationsEnabled: true,
   eventAutoArchiveHours: 8,
   publicRegistrationEnabled: false,
@@ -176,6 +179,7 @@ function PageHeader({
   omitSessionAside: boolean;
 }) {
   const { t } = useI18n();
+  const markSrc = useBrandIconSrc();
   const hasHeroDescription = Boolean(route.description.trim());
   return (
     <section
@@ -189,7 +193,7 @@ function PageHeader({
       </div>
       {omitSessionAside ? null : (
         <aside className="hero-status" aria-label={t("main.hero.statusAria")}>
-          <img src="/icon.svg" alt="" />
+          <img src={markSrc} alt="" />
           <div>
             <span>{t("main.hero.session")}</span>
             <strong>{currentUser ? currentUser.username : t("main.hero.guest")}</strong>
@@ -216,6 +220,7 @@ function AppShell({
   setAppSettings: React.Dispatch<React.SetStateAction<AppSettings>>;
 }) {
   const { t } = useI18n();
+  const shellIconSrc = useMemo(() => brandIconSrc(appSettings), [appSettings.brandMark]);
   const routes = useMemo(() => buildAppRoutes(t), [t]);
 
   const initialRoute = parseHashRoute();
@@ -344,10 +349,11 @@ function AppShell({
   }
 
   return (
+    <BrandingProvider iconSrc={shellIconSrc}>
     <main className={`app-shell page-${activePage}`}>
       <header className="topbar" aria-label={t("main.topbar.aria")}>
         <a className="brand" href="#events" aria-label={t("main.brand.aria")}>
-          <img className="brand-mark" src="/icon.svg" alt="" />
+          <img className="brand-mark" src={shellIconSrc} alt="" />
           <span>{displayAppName}</span>
         </a>
         <div className="topbar-end">
@@ -428,6 +434,7 @@ function AppShell({
         {renderActivePage()}
       </div>
     </main>
+    </BrandingProvider>
   );
 }
 

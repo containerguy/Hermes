@@ -344,6 +344,11 @@ export const enMessages: { [K in keyof typeof deMessages]: string } = {
   "admin.label.appName": "Name shown in the UI",
   "admin.help.appName":
     "Optional. Leave empty for the built-in name “Mitspielzentrale” (German UI) or “MatchDesk” (English UI). A custom value replaces it in the shell and document title.",
+  "admin.label.brandMark": "Logo in the UI",
+  "admin.brandMark.mitspiel": "M · Mitspielzentrale / MatchDesk (default)",
+  "admin.brandMark.hermes": "H · Hermes (classic)",
+  "admin.help.brandMark":
+    "Controls the tile icon in the menu, login aside, and event board. The PWA install icon stays “Hermes”.",
   "admin.label.archiveHours": "Auto-archive after hours",
   "admin.label.notifyDefault": "Notifications on by default",
   "admin.label.publicReg": "Allow public registration with invite code",

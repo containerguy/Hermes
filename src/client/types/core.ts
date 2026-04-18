@@ -1,4 +1,7 @@
+import type { BrandMark } from "../../shared/brand-mark";
 import type { AppLocale } from "../../shared/locale";
+
+export type { BrandMark };
 
 export type User = {
   id: string;
@@ -15,6 +18,8 @@ export type User = {
 
 export type AppSettings = {
   appName: string;
+  /** Welches Marken-Icon in Shell, Boards und Login gezeigt wird. */
+  brandMark: BrandMark;
   defaultNotificationsEnabled: boolean;
   eventAutoArchiveHours: number;
   publicRegistrationEnabled: boolean;
