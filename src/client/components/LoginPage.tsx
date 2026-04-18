@@ -16,7 +16,10 @@ export function LoginPage({
   onUserUpdated: (user: User) => void;
 }) {
   return (
-    <section className="auth-layout" aria-label="Login Arbeitsbereich">
+    <section
+      className={`auth-layout${currentUser ? " auth-layout--profile" : ""}`}
+      aria-label={currentUser ? "Profil Arbeitsbereich" : "Login Arbeitsbereich"}
+    >
       <LoginPanel
         currentUser={currentUser}
         settings={settings}
@@ -24,25 +27,27 @@ export function LoginPage({
         onLoggedOut={onLoggedOut}
         onUserUpdated={onUserUpdated}
       />
-      <aside className="auth-visual" aria-label="Login Hinweise">
-        <img src="/icon.svg" alt="" />
-        <p className="eyebrow">Mailcode</p>
-        <h2>Ein Login, mehrere Geräte.</h2>
-        <p>
-          Username eingeben, Code aus der E-Mail nutzen und Smartphone sowie PC parallel angemeldet
-          lassen.
-        </p>
-        <dl className="signal-list">
-          <div>
-            <dt>Default</dt>
-            <dd>Push aktiv</dd>
-          </div>
-          <div>
-            <dt>Code</dt>
-            <dd>6 Stellen</dd>
-          </div>
-        </dl>
-      </aside>
+      {currentUser ? null : (
+        <aside className="auth-visual" aria-label="Login Hinweise">
+          <img src="/icon.svg" alt="" />
+          <p className="eyebrow">Mailcode</p>
+          <h2>Ein Login, mehrere Geräte.</h2>
+          <p>
+            Username eingeben, Code aus der E-Mail nutzen und Smartphone sowie PC parallel angemeldet
+            lassen.
+          </p>
+          <dl className="signal-list">
+            <div>
+              <dt>Default</dt>
+              <dd>Push aktiv</dd>
+            </div>
+            <div>
+              <dt>Code</dt>
+              <dd>6 Stellen</dd>
+            </div>
+          </dl>
+        </aside>
+      )}
     </section>
   );
 }

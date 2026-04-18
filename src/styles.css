@@ -1050,6 +1050,11 @@ dd {
   align-items: stretch;
 }
 
+/* Profil ohne Login-Hinweis-Spalte: eine Spalte, Panel darf etwas breiter sein */
+.auth-layout--profile {
+  grid-template-columns: minmax(min(100%, 320px), 720px);
+}
+
 .login-panel {
   border-top: 8px solid var(--rose);
 }
