@@ -7,6 +7,8 @@ Build- und Release-Hinweise liegen in [`building.md`](building.md).
 
 ## Oberfläche
 
+![Screenshot Overview](screen_mitspielzentrale.png)
+
 Die WebApp ist in getrennte Arbeitsbereiche aufgeteilt:
 
 - `#events`: Eventübersicht für Abstimmung, Status, Startzeit und Serverdaten.
