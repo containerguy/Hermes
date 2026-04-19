@@ -3,7 +3,7 @@ import { and, eq, isNull, ne, or } from "drizzle-orm";
 import type { DatabaseContext } from "../db/client";
 import { users } from "../db/schema";
 
-export const userRoleSchema = z.enum(["user", "manager", "admin"]);
+export const userRoleSchema = z.enum(["user", "organizer", "manager", "admin"]);
 
 export type UserRole = z.infer<typeof userRoleSchema>;
 
@@ -83,7 +83,7 @@ export function canManageEvent(
 }
 
 export function canCreateEvent(actor: { role: UserRole }) {
-  return actor.role === "admin" || actor.role === "manager";
+  return actor.role === "admin" || actor.role === "manager" || actor.role === "organizer";
 }
 
 export function canAssignRoles(actor: { role: UserRole }) {

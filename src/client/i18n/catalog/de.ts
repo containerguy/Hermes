@@ -283,7 +283,7 @@ export const deMessages = {
   "events.manager.denied.eyebrow": "Manager",
   "events.manager.denied.title": "Keine Managerrechte.",
   "events.manager.denied.body":
-    "Neue Runden können nur Manager und Admins anlegen. Als Spieler kannst du hier weiter bestehende Runden verfolgen.",
+    "Neue Runden können Manager, Organisatoren und Admins anlegen. Als Spieler kannst du hier weiter bestehende Runden verfolgen.",
   "events.newCompact": "Neues Event",
   "events.overlay.aria": "Neues Event anlegen",
   "events.overlay.back": "Zurück zur Übersicht",
@@ -316,6 +316,7 @@ export const deMessages = {
   "admin.exportUsers.import": "User importieren (Export-Datei)",
   "admin.user.create": "User anlegen",
   "admin.role.user": "User",
+  "admin.role.organizer": "Organisator",
   "admin.role.manager": "Manager",
   "admin.role.admin": "Admin",
   "admin.bulk.eyebrow": "Bulk Import",

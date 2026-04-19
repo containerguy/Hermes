@@ -285,7 +285,7 @@ export const enMessages: { [K in keyof typeof deMessages]: string } = {
   "events.manager.denied.eyebrow": "Manager",
   "events.manager.denied.title": "No manager permissions.",
   "events.manager.denied.body":
-    "Only managers and admins create new rounds. As a player you can follow existing rounds here.",
+    "Only managers, organizers, and admins create new rounds. As a player you can follow existing rounds here.",
   "events.newCompact": "New event",
   "events.overlay.aria": "Create new event",
   "events.overlay.back": "Back to overview",
@@ -318,6 +318,7 @@ export const enMessages: { [K in keyof typeof deMessages]: string } = {
   "admin.exportUsers.import": "Import users (export file)",
   "admin.user.create": "Create user",
   "admin.role.user": "User",
+  "admin.role.organizer": "Organizer",
   "admin.role.manager": "Manager",
   "admin.role.admin": "Admin",
   "admin.bulk.eyebrow": "Bulk import",

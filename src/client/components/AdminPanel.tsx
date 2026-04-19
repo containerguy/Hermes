@@ -766,6 +766,7 @@ export function AdminPanel({
             onChange={(event) => setNewUser({ ...newUser, role: event.target.value as User["role"] })}
           >
             <option value="user">{t("admin.role.user")}</option>
+            <option value="organizer">{t("admin.role.organizer")}</option>
             <option value="manager">{t("admin.role.manager")}</option>
             <option value="admin">{t("admin.role.admin")}</option>
           </select>
@@ -893,6 +894,7 @@ export function AdminPanel({
               onChange={(event) => updateRole(user.id, event.target.value as User["role"])}
             >
               <option value="user">{t("admin.role.user")}</option>
+              <option value="organizer">{t("admin.role.organizer")}</option>
               <option value="manager">{t("admin.role.manager")}</option>
               <option value="admin">{t("admin.role.admin")}</option>
             </select>

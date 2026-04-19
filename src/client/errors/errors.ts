@@ -2,6 +2,8 @@ import type { AppLocale } from "../../shared/locale";
 
 export const errorMessages: Record<string, string> = {
   admin_erforderlich: "Adminrechte erforderlich.",
+  manager_erforderlich:
+    "Zum Anlegen von Runden sind Manager-, Organisator- oder Adminrechte nötig.",
   backup_fehlgeschlagen: "Backup konnte nicht erstellt werden. Prüfe S3-Konfiguration und Logs.",
   csrf_token_ungueltig: "Sicherheitsprüfung fehlgeschlagen. Bitte Seite neu laden und erneut versuchen.",
   device_key_required: "Dieses Gerät hat noch keinen Geräteschlüssel. Bitte Seite neu laden.",
@@ -59,6 +61,7 @@ export const errorMessages: Record<string, string> = {
 
 export const errorMessagesEn: Record<string, string> = {
   admin_erforderlich: "Admin rights required.",
+  manager_erforderlich: "Creating rounds requires manager, organizer, or admin permissions.",
   backup_fehlgeschlagen: "Backup could not be created. Check S3 configuration and logs.",
   csrf_token_ungueltig: "Security check failed. Reload the page and try again.",
   device_key_required: "This device has no device key yet. Please reload the page.",

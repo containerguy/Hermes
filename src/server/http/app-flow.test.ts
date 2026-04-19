@@ -1658,4 +1658,76 @@ describe("app flow", () => {
 
     await request(started!.app).get("/api/kiosk/events?id=kiosk-test-secret-ok").expect(403);
   });
+
+  it("lets organizers create events and cancel their own, but not other users events", async () => {
+    const suffix = randomUUID().slice(0, 8);
+    const orgName = `orguser-${suffix}`;
+    const mgrName = `mgrpeer-${suffix}`;
+    const adminAgent = request.agent(started!.app);
+    await login(adminAgent, "hauptadmin");
+    const csrf = await fetchCsrf(adminAgent);
+
+    await adminAgent
+      .post("/api/admin/users")
+      .send({
+        username: orgName,
+        email: `${orgName}@example.test`,
+        role: "organizer"
+      })
+      .set(CSRF_HEADER, csrf)
+      .expect(201);
+
+    await adminAgent
+      .post("/api/admin/users")
+      .send({
+        username: mgrName,
+        email: `${mgrName}@example.test`,
+        role: "manager"
+      })
+      .set(CSRF_HEADER, csrf)
+      .expect(201);
+
+    const orgAgent = request.agent(started!.app);
+    await login(orgAgent, orgName);
+    const orgCsrf = await fetchCsrf(orgAgent);
+
+    const ownEvent = await orgAgent
+      .post("/api/events")
+      .set(CSRF_HEADER, orgCsrf)
+      .send({
+        gameTitle: "Organizer Round",
+        startMode: "now",
+        minPlayers: 2,
+        maxPlayers: 8
+      })
+      .expect(201);
+
+    const mgrAgent = request.agent(started!.app);
+    await login(mgrAgent, mgrName);
+    const mgrCsrf = await fetchCsrf(mgrAgent);
+
+    const peerEvent = await mgrAgent
+      .post("/api/events")
+      .set(CSRF_HEADER, mgrCsrf)
+      .send({
+        gameTitle: "Manager Peer Round",
+        startMode: "now",
+        minPlayers: 2,
+        maxPlayers: 8
+      })
+      .expect(201);
+
+    await orgAgent
+      .post(`/api/events/${(peerEvent.body as { event: { id: string } }).event.id}/cancel`)
+      .set(CSRF_HEADER, orgCsrf)
+      .expect(403)
+      .expect((response) => {
+        expect(response.body.error).toBe("verboten");
+      });
+
+    await orgAgent
+      .post(`/api/events/${(ownEvent.body as { event: { id: string } }).event.id}/cancel`)
+      .set(CSRF_HEADER, orgCsrf)
+      .expect(200);
+  });
 });

@@ -185,7 +185,10 @@ export function EventBoard({
   const [expandedEventId, setExpandedEventId] = useState<string | null>(null);
   const [createFlowOpen, setCreateFlowOpen] = useState(false);
 
-  const canCreate = currentUser?.role === "manager" || currentUser?.role === "admin";
+  const canCreate =
+    currentUser?.role === "manager" ||
+    currentUser?.role === "organizer" ||
+    currentUser?.role === "admin";
   const showCreateForm = canCreate && mode === "manager";
 
   async function loadEvents() {

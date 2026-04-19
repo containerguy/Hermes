@@ -141,7 +141,10 @@ export async function sendPushToOperators(context: DatabaseContext, payload: Pus
     .select()
     .from(users)
     .where(
-      and(eq(users.notificationsEnabled, true), inArray(users.role, ["admin", "manager"]))
+      and(
+        eq(users.notificationsEnabled, true),
+        inArray(users.role, ["admin", "manager", "organizer"])
+      )
     )
     .all();
 

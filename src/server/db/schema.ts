@@ -9,7 +9,7 @@ export const users = sqliteTable(
     username: text("username").notNull(),
     displayName: text("display_name"),
     email: text("email").notNull(),
-    role: text("role", { enum: ["user", "manager", "admin"] }).notNull().default("user"),
+    role: text("role", { enum: ["user", "organizer", "manager", "admin"] }).notNull().default("user"),
     notificationsEnabled: integer("notifications_enabled", { mode: "boolean" })
       .notNull()
       .default(true),

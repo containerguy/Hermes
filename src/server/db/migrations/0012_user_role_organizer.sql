@@ -1,0 +1,1 @@
+-- Rolle "organizer": siehe 0013_users_role_organizer_check.sql (CHECK-Erweiterung).

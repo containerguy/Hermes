@@ -315,7 +315,11 @@ function AppShell({
       : activeRoute;
 
   const eventBoardMode =
-    currentUser?.role === "manager" || currentUser?.role === "admin" ? "manager" : "events";
+    currentUser?.role === "manager" ||
+    currentUser?.role === "organizer" ||
+    currentUser?.role === "admin"
+      ? "manager"
+      : "events";
 
   const omitHeroSessionAside = Boolean(
     currentUser &&

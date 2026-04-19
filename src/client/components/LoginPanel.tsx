@@ -5,6 +5,7 @@ import { clearCsrfToken, primeCsrfToken } from "../api/csrf";
 import { forgetDeviceKey, getDeviceContext } from "../api/device-key";
 import { getErrorMessage } from "../errors/errors";
 import { useI18n } from "../i18n/I18nContext";
+import type { MessageKey } from "../i18n/catalog/index";
 import {
   getSecureContextInfo,
   isLikelyIosSafari,
@@ -803,7 +804,7 @@ export function LoginPanel({
             </div>
             <div>
               <dt>{t("loginProfile.account.role")}</dt>
-              <dd>{currentUser.role}</dd>
+              <dd>{t(`admin.role.${currentUser.role}` as MessageKey)}</dd>
             </div>
             <div>
               <dt>{t("loginProfile.account.email")}</dt>

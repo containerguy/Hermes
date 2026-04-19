@@ -9,7 +9,7 @@ export type User = {
   username: string;
   displayName: string;
   email: string;
-  role: "user" | "manager" | "admin";
+  role: "user" | "organizer" | "manager" | "admin";
   notificationsEnabled: boolean;
   /** Explizite UI-Sprache; fehlt → Browser + Admin-Fallback */
   locale?: AppLocale | null;
