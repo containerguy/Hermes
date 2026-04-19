@@ -1771,10 +1771,15 @@ dd {
 }
 
 .kiosk-stream-shell {
+  box-sizing: border-box;
   min-height: 100vh;
+  min-height: 100dvh;
+  width: 100%;
+  max-width: none;
+  margin: 0;
   padding: clamp(16px, 3vw, 48px);
-  max-width: 960px;
-  margin: 0 auto;
+  display: flex;
+  flex-direction: column;
 }
 
 .kiosk-stream-header {
@@ -1782,6 +1787,7 @@ dd {
   align-items: center;
   gap: 16px;
   margin-bottom: clamp(20px, 4vw, 40px);
+  flex-shrink: 0;
 }
 
 .kiosk-stream-header h1 {
@@ -1809,13 +1815,49 @@ dd {
   font-size: 1.1rem;
 }
 
-.kiosk-stream-list {
+.kiosk-board-viewport {
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
+  position: relative;
+}
+
+.kiosk-board-viewport--scroll {
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
+.kiosk-board-content {
+  will-change: transform;
+}
+
+.kiosk-game-board {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 320px), 1fr));
+  gap: clamp(16px, 2.2vw, 28px);
+  align-items: start;
+}
+
+.kiosk-game-column {
+  min-width: 0;
+}
+
+.kiosk-game-heading {
+  margin: 0 0 12px;
+  font-size: clamp(1.15rem, 2.8vw, 1.5rem);
+  line-height: 1.2;
+  padding-bottom: 8px;
+  border-bottom: 2px solid var(--line);
+  color: var(--text);
+}
+
+.kiosk-game-events {
   list-style: none;
   margin: 0;
   padding: 0;
   display: flex;
   flex-direction: column;
-  gap: 20px;
+  gap: 16px;
 }
 
 .kiosk-event-card {
@@ -1841,6 +1883,14 @@ dd {
   flex: 1 1 12rem;
 }
 
+.kiosk-event-time-heading {
+  margin: 0;
+  font-size: clamp(1.05rem, 2.4vw, 1.25rem);
+  font-weight: 650;
+  color: var(--text);
+  flex: 1 1 10rem;
+}
+
 .kiosk-event-meta {
   display: flex;
   flex-wrap: wrap;
@@ -1849,6 +1899,11 @@ dd {
   margin-bottom: 12px;
   font-size: 1rem;
   color: var(--text);
+}
+
+.kiosk-event-meta--single {
+  justify-content: flex-start;
+  margin-bottom: 10px;
 }
 
 .kiosk-event-time {

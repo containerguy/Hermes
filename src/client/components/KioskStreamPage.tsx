@@ -1,9 +1,12 @@
-import React, { useCallback, useEffect, useMemo, useState } from "react";
+import React, { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import type { AppSettings, GameEvent } from "../types/core";
 import { ApiError, getErrorMessage } from "../errors/errors";
 import { useI18n } from "../i18n/I18nContext";
 import { useBrandIconSrc } from "../lib/BrandingContext";
 import type { MessageKey } from "../i18n/catalog/index";
+
+const KIOSK_PRIMARY_VIEW_MS = 8000;
+const KIOSK_OVERFLOW_VIEW_MS = 5000;
 
 async function fetchKioskEvents(id: string): Promise<GameEvent[]> {
   const response = await fetch(`/api/kiosk/events?${new URLSearchParams({ id })}`, {
@@ -39,6 +42,29 @@ function capacityPercent(event: GameEvent): number {
   return Math.min(100, Math.round((event.joinedCount / event.maxPlayers) * 100));
 }
 
+function compareStartsAt(a: GameEvent, b: GameEvent): number {
+  return new Date(a.startsAt).getTime() - new Date(b.startsAt).getTime();
+}
+
+function groupEventsByGameTitle(events: GameEvent[]): Array<{ gameTitle: string; events: GameEvent[] }> {
+  const sorted = [...events].sort(compareStartsAt);
+  const map = new Map<string, GameEvent[]>();
+  for (const event of sorted) {
+    const list = map.get(event.gameTitle);
+    if (list) {
+      list.push(event);
+    } else {
+      map.set(event.gameTitle, [event]);
+    }
+  }
+  return [...map.entries()]
+    .map(([gameTitle, evs]) => ({
+      gameTitle,
+      events: [...evs].sort(compareStartsAt)
+    }))
+    .sort((a, b) => compareStartsAt(a.events[0]!, b.events[0]!));
+}
+
 export function KioskStreamPage({
   appSettings,
   streamId
@@ -52,6 +78,13 @@ export function KioskStreamPage({
   const [events, setEvents] = useState<GameEvent[]>([]);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(true);
+  const [overflowPx, setOverflowPx] = useState(0);
+  const [scrollPhase, setScrollPhase] = useState<"start" | "overflow">("start");
+  const [instantTransform, setInstantTransform] = useState(false);
+  const [prefersReducedMotion, setPrefersReducedMotion] = useState(false);
+
+  const boardViewportRef = useRef<HTMLDivElement>(null);
+  const boardContentRef = useRef<HTMLDivElement>(null);
 
   const relFormatter = useMemo(
     () => new Intl.RelativeTimeFormat(locale === "en" ? "en" : "de", { numeric: "auto" }),
@@ -59,6 +92,95 @@ export function KioskStreamPage({
   );
 
   const displayAppName = appSettings.appName.trim() || t("brand.displayName");
+
+  const gameGroups = useMemo(() => groupEventsByGameTitle(events), [events]);
+
+  useEffect(() => {
+    const mq = window.matchMedia("(prefers-reduced-motion: reduce)");
+    setPrefersReducedMotion(mq.matches);
+    const onChange = () => setPrefersReducedMotion(mq.matches);
+    mq.addEventListener("change", onChange);
+    return () => mq.removeEventListener("change", onChange);
+  }, []);
+
+  const measureOverflow = useCallback(() => {
+    const viewport = boardViewportRef.current;
+    const content = boardContentRef.current;
+    if (!viewport || !content) {
+      return;
+    }
+    setOverflowPx(Math.max(0, Math.ceil(content.scrollHeight - viewport.clientHeight)));
+  }, []);
+
+  useLayoutEffect(() => {
+    if (loading || error || events.length === 0) {
+      return;
+    }
+    measureOverflow();
+  }, [error, events.length, gameGroups, loading, measureOverflow]);
+
+  useEffect(() => {
+    if (loading || error || events.length === 0) {
+      return;
+    }
+    const viewport = boardViewportRef.current;
+    const content = boardContentRef.current;
+    if (!viewport || !content) {
+      return;
+    }
+    const ro = new ResizeObserver(() => measureOverflow());
+    ro.observe(viewport);
+    ro.observe(content);
+    return () => ro.disconnect();
+  }, [error, events.length, loading, measureOverflow]);
+
+  useEffect(() => {
+    if (prefersReducedMotion || loading || error || events.length === 0 || overflowPx <= 1) {
+      setScrollPhase("start");
+      setInstantTransform(false);
+      return;
+    }
+
+    let primaryTimer: number | undefined;
+    let overflowTimer: number | undefined;
+    let cancelled = false;
+
+    const armPrimary = () => {
+      primaryTimer = window.setTimeout(() => {
+        if (cancelled) {
+          return;
+        }
+        setInstantTransform(false);
+        setScrollPhase("overflow");
+        overflowTimer = window.setTimeout(() => {
+          if (cancelled) {
+            return;
+          }
+          setInstantTransform(true);
+          setScrollPhase("start");
+          requestAnimationFrame(() => {
+            requestAnimationFrame(() => {
+              setInstantTransform(false);
+              armPrimary();
+            });
+          });
+        }, KIOSK_OVERFLOW_VIEW_MS);
+      }, KIOSK_PRIMARY_VIEW_MS);
+    };
+
+    setScrollPhase("start");
+    armPrimary();
+
+    return () => {
+      cancelled = true;
+      if (primaryTimer !== undefined) {
+        window.clearTimeout(primaryTimer);
+      }
+      if (overflowTimer !== undefined) {
+        window.clearTimeout(overflowTimer);
+      }
+    };
+  }, [error, events.length, loading, overflowPx, prefersReducedMotion]);
 
   function getEventStatusLabel(event: GameEvent) {
     if (
@@ -126,6 +248,66 @@ export function KioskStreamPage({
     return () => window.clearInterval(timer);
   }, [load, streamId]);
 
+  function renderEventCard(event: GameEvent) {
+    const pct = capacityPercent(event);
+    const startAbsolute = new Date(event.startsAt).toLocaleString(dateTag);
+    return (
+      <article className={`kiosk-event-card event-${getEventStatusClass(event)}`}>
+        <div className="kiosk-event-top">
+          <time className="kiosk-event-time-heading" dateTime={event.startsAt} title={startAbsolute}>
+            {formatStartRelative(event.startsAt)} · {startAbsolute}
+          </time>
+          <span className={`status-pill status-${getEventStatusClass(event)}`}>
+            {getEventStatusLabel(event)}
+          </span>
+        </div>
+        <div className="kiosk-event-meta kiosk-event-meta--single">
+          <span className="kiosk-event-organizer">
+            {t("events.organizer")} <strong>{event.createdByUsername}</strong>
+          </span>
+        </div>
+        <div className="event-capacity-block kiosk-event-capacity">
+          <div
+            className="event-capacity-track"
+            role="progressbar"
+            aria-valuemin={0}
+            aria-valuemax={event.maxPlayers}
+            aria-valuenow={event.joinedCount}
+            aria-label={t("events.capacity.aria", {
+              joined: event.joinedCount,
+              max: event.maxPlayers
+            })}
+          >
+            <div className="event-capacity-fill" style={{ width: `${pct}%` }} />
+          </div>
+          <div className="event-capacity-caption">
+            <span className="event-capacity-count">
+              {t("events.capacity.players", { joined: event.joinedCount, max: event.maxPlayers })}
+            </span>
+          </div>
+        </div>
+        {event.serverHost || event.connectionInfo ? (
+          <div className="event-connection-details kiosk-event-conn">
+            {event.serverHost ? (
+              <div className="event-conn-line">
+                <span className="event-conn-label">{t("events.conn.server")}</span>
+                <span className="event-conn-value">{event.serverHost}</span>
+              </div>
+            ) : null}
+            {event.connectionInfo ? (
+              <div className="event-conn-line">
+                <span className="event-conn-label">{t("events.conn.join")}</span>
+                <span className="event-conn-value">{event.connectionInfo}</span>
+              </div>
+            ) : null}
+          </div>
+        ) : (
+          <p className="muted kiosk-event-missing">{t("events.conn.missing")}</p>
+        )}
+      </article>
+    );
+  }
+
   if (!streamId) {
     return (
       <div className="kiosk-stream-shell">
@@ -142,6 +324,11 @@ export function KioskStreamPage({
       </div>
     );
   }
+
+  const showBoard = !loading && !error && events.length > 0;
+  const allowManualScroll = prefersReducedMotion && overflowPx > 1;
+  const transformActive =
+    !prefersReducedMotion && overflowPx > 1 && scrollPhase === "overflow" ? -overflowPx : 0;
 
   return (
     <div className="kiosk-stream-shell">
@@ -169,70 +356,34 @@ export function KioskStreamPage({
         <p className="kiosk-stream-empty">{t("kiosk.empty")}</p>
       ) : null}
 
-      <ul className="kiosk-stream-list" aria-label={t("kiosk.listAria")}>
-        {events.map((event) => {
-          const pct = capacityPercent(event);
-          const startAbsolute = new Date(event.startsAt).toLocaleString(dateTag);
-          return (
-            <li key={event.id}>
-              <article className={`kiosk-event-card event-${getEventStatusClass(event)}`}>
-                <div className="kiosk-event-top">
-                  <h2 className="kiosk-event-title">{event.gameTitle}</h2>
-                  <span className={`status-pill status-${getEventStatusClass(event)}`}>
-                    {getEventStatusLabel(event)}
-                  </span>
-                </div>
-                <div className="kiosk-event-meta">
-                  <span className="kiosk-event-organizer">
-                    {t("events.organizer")} <strong>{event.createdByUsername}</strong>
-                  </span>
-                  <time className="kiosk-event-time" dateTime={event.startsAt} title={startAbsolute}>
-                    {formatStartRelative(event.startsAt)} · {startAbsolute}
-                  </time>
-                </div>
-                <div className="event-capacity-block kiosk-event-capacity">
-                  <div
-                    className="event-capacity-track"
-                    role="progressbar"
-                    aria-valuemin={0}
-                    aria-valuemax={event.maxPlayers}
-                    aria-valuenow={event.joinedCount}
-                    aria-label={t("events.capacity.aria", {
-                      joined: event.joinedCount,
-                      max: event.maxPlayers
-                    })}
-                  >
-                    <div className="event-capacity-fill" style={{ width: `${pct}%` }} />
-                  </div>
-                  <div className="event-capacity-caption">
-                    <span className="event-capacity-count">
-                      {t("events.capacity.players", { joined: event.joinedCount, max: event.maxPlayers })}
-                    </span>
-                  </div>
-                </div>
-                {event.serverHost || event.connectionInfo ? (
-                  <div className="event-connection-details kiosk-event-conn">
-                    {event.serverHost ? (
-                      <div className="event-conn-line">
-                        <span className="event-conn-label">{t("events.conn.server")}</span>
-                        <span className="event-conn-value">{event.serverHost}</span>
-                      </div>
-                    ) : null}
-                    {event.connectionInfo ? (
-                      <div className="event-conn-line">
-                        <span className="event-conn-label">{t("events.conn.join")}</span>
-                        <span className="event-conn-value">{event.connectionInfo}</span>
-                      </div>
-                    ) : null}
-                  </div>
-                ) : (
-                  <p className="muted kiosk-event-missing">{t("events.conn.missing")}</p>
-                )}
-              </article>
-            </li>
-          );
-        })}
-      </ul>
+      {showBoard ? (
+        <div
+          ref={boardViewportRef}
+          className={`kiosk-board-viewport${allowManualScroll ? " kiosk-board-viewport--scroll" : ""}`}
+        >
+          <div
+            ref={boardContentRef}
+            className="kiosk-board-content"
+            style={{
+              transform: allowManualScroll ? undefined : `translateY(${transformActive}px)`,
+              transition: allowManualScroll || instantTransform ? "none" : "transform 0.75s ease-in-out"
+            }}
+          >
+            <section className="kiosk-game-board" aria-label={t("kiosk.listAria")}>
+              {gameGroups.map((group) => (
+                <section key={group.gameTitle} className="kiosk-game-column">
+                  <h2 className="kiosk-game-heading">{group.gameTitle}</h2>
+                  <ul className="kiosk-game-events">
+                    {group.events.map((event) => (
+                      <li key={event.id}>{renderEventCard(event)}</li>
+                    ))}
+                  </ul>
+                </section>
+              ))}
+            </section>
+          </div>
+        </div>
+      ) : null}
     </div>
   );
 }
