@@ -65,7 +65,12 @@ const defaultSettings: AppSettings = {
   defaultLocale: "de",
   kioskStreamEnabled: false,
   kioskStreamPath: "stream",
-  kioskStreamSecret: ""
+  kioskStreamSecret: "",
+  ampIntegrationEnabled: false,
+  ampBaseUrl: "",
+  ampUsername: "",
+  ampPassword: "",
+  ampTlsSkipVerify: false
 };
 
 export function AdminPanel({
@@ -1089,6 +1094,66 @@ export function AdminPanel({
             {t("admin.kiosk.copyUrl")}
           </button>
         </div>
+        <p className="eyebrow admin-kiosk-eyebrow">{t("admin.amp.title")}</p>
+        <p className="muted">{t("admin.amp.help")}</p>
+        <label className="checkbox-label">
+          <input
+            type="checkbox"
+            checked={settings.ampIntegrationEnabled}
+            onChange={(event) =>
+              setSettings({
+                ...settings,
+                ampIntegrationEnabled: event.target.checked
+              })
+            }
+          />
+          {t("admin.amp.enabled")}
+        </label>
+        <label>
+          {t("admin.amp.baseUrl")}
+          <input
+            value={settings.ampBaseUrl}
+            onChange={(event) => setSettings({ ...settings, ampBaseUrl: event.target.value })}
+            maxLength={512}
+            spellCheck={false}
+            autoComplete="off"
+            placeholder="http://192.168.200.98:8080"
+          />
+        </label>
+        <label>
+          {t("admin.amp.username")}
+          <input
+            value={settings.ampUsername}
+            onChange={(event) => setSettings({ ...settings, ampUsername: event.target.value })}
+            maxLength={120}
+            spellCheck={false}
+            autoComplete="off"
+          />
+        </label>
+        <label>
+          {t("admin.amp.password")}
+          <input
+            type="password"
+            value={settings.ampPassword}
+            onChange={(event) => setSettings({ ...settings, ampPassword: event.target.value })}
+            maxLength={500}
+            spellCheck={false}
+            autoComplete="new-password"
+          />
+        </label>
+        <label className="checkbox-label">
+          <input
+            type="checkbox"
+            checked={settings.ampTlsSkipVerify}
+            onChange={(event) =>
+              setSettings({
+                ...settings,
+                ampTlsSkipVerify: event.target.checked
+              })
+            }
+          />
+          {t("admin.amp.tlsSkip")}
+        </label>
         <p className="muted">{t("admin.shell.help")}</p>
         <label>
           {t("admin.shell.heroTitle")}

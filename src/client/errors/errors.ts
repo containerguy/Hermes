@@ -56,7 +56,14 @@ export const errorMessages: Record<string, string> = {
   mailversand_fehlgeschlagen: "Mailversand fehlgeschlagen.",
   code_abgelehnt: "Code abgelehnt.",
   event_voll: "Event ist voll.",
-  kiosk_ungueltig: "Kiosk-Anzeige ist deaktiviert oder der Schlüssel in der URL ist ungültig."
+  kiosk_ungueltig: "Kiosk-Anzeige ist deaktiviert oder der Schlüssel in der URL ist ungültig.",
+  amp_deaktiviert: "Die AMP-Anbindung ist deaktiviert.",
+  amp_nicht_konfiguriert: "AMP ist nicht vollständig konfiguriert (URL oder Zugangsdaten fehlen).",
+  amp_auth_fehlgeschlagen: "Anmeldung bei AMP fehlgeschlagen. Benutzername, Passwort und URL prüfen.",
+  amp_anfrage_fehlgeschlagen: "Die AMP-API hat nicht geantwortet oder einen Fehler gemeldet. Netzwerk und AMP-Logs prüfen.",
+  amp_url_erforderlich: "AMP-Basis-URL ist erforderlich, wenn die Anbindung aktiv ist.",
+  amp_url_ungueltig: "AMP-Basis-URL ist ungültig.",
+  amp_zugang_erforderlich: "AMP-Benutzername und Passwort sind erforderlich, wenn die Anbindung aktiv ist."
 };
 
 export const errorMessagesEn: Record<string, string> = {
@@ -113,7 +120,14 @@ export const errorMessagesEn: Record<string, string> = {
   mailversand_fehlgeschlagen: "Mail delivery failed.",
   code_abgelehnt: "Code rejected.",
   event_voll: "Event is full.",
-  kiosk_ungueltig: "The kiosk display is disabled or the URL key is invalid."
+  kiosk_ungueltig: "The kiosk display is disabled or the URL key is invalid.",
+  amp_deaktiviert: "AMP integration is disabled.",
+  amp_nicht_konfiguriert: "AMP is not fully configured (URL or credentials missing).",
+  amp_auth_fehlgeschlagen: "AMP sign-in failed. Check username, password, and URL.",
+  amp_anfrage_fehlgeschlagen: "The AMP API did not respond or returned an error. Check network and AMP logs.",
+  amp_url_erforderlich: "AMP base URL is required when integration is enabled.",
+  amp_url_ungueltig: "AMP base URL is invalid.",
+  amp_zugang_erforderlich: "AMP username and password are required when integration is enabled."
 };
 
 export class ApiError extends Error {

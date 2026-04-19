@@ -53,6 +53,22 @@ export type AppSettings = {
   kioskStreamPath: string;
   /** Geheimer Zugriffsschlüssel; nur in Admin-API sichtbar, nicht in /api/settings/public */
   kioskStreamSecret: string;
+  /** CubeCoders AMP: Instanzen beim Event-Anlegen auswählbar (serverseitig konfiguriert). */
+  ampIntegrationEnabled: boolean;
+  /** Basis-URL ohne /API, z. B. http://192.168.200.98:8080 */
+  ampBaseUrl: string;
+  ampUsername: string;
+  ampPassword: string;
+  ampTlsSkipVerify: boolean;
+};
+
+/** Eintrag aus GET /api/integrations/amp/instances (CubeCoders AMP). */
+export type AmpIntegrationInstance = {
+  id: string;
+  friendlyName: string;
+  module: string;
+  serverHost: string;
+  connectionInfo: string;
 };
 
 /** Öffentliche App-Einstellungen (ohne Admin-/Betriebsfelder) für Bootstrap ohne Admin-Session. */
@@ -76,6 +92,7 @@ export type PublicAppSettings = Pick<
   | "defaultLocale"
   | "kioskStreamEnabled"
   | "kioskStreamPath"
+  | "ampIntegrationEnabled"
 >;
 
 export type AdminSection =
