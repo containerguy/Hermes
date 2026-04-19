@@ -3,6 +3,13 @@ import { deMessages } from "./de";
 export const enMessages: { [K in keyof typeof deMessages]: string } = {
   "brand.displayName": "MatchDesk",
 
+  "kiosk.pageTitle": "Current rounds",
+  "kiosk.bootLoading": "Loading…",
+  "kiosk.loading": "Refreshing…",
+  "kiosk.empty": "No active game rounds right now.",
+  "kiosk.missingId": "The id query parameter is missing. Use the full URL from the admin area.",
+  "kiosk.listAria": "Active game rounds",
+
   "main.nav.start": "Home",
   "main.nav.infos": "Info",
   "main.nav.login": "Login",
@@ -359,6 +366,17 @@ export const enMessages: { [K in keyof typeof deMessages]: string } = {
   "admin.label.defaultLocale": "Default language (fallback)",
   "admin.help.defaultLocale":
     "Used when the browser language is neither clearly German nor English, and as a server fallback for registration without a client locale.",
+  "admin.kiosk.title": "Kiosk / stream display",
+  "admin.kiosk.help":
+    "Shows active game rounds without login at a fixed URL path with a secret id query parameter. Example: https://your-host/stream?id=… — adjust the path and secret, save, then use the URL on the display device.",
+  "admin.kiosk.enabled": "Enable kiosk view",
+  "admin.kiosk.path": "URL path (one segment, e.g. stream)",
+  "admin.kiosk.secret": "Secret key (id query parameter)",
+  "admin.kiosk.secretPlaceholder": "at least 12 characters (letters, digits, _ and -)",
+  "admin.kiosk.generate": "Generate random key",
+  "admin.kiosk.copyUrl": "Copy full URL",
+  "admin.kiosk.copied": "URL copied to clipboard.",
+  "admin.kiosk.copyFailed": "Clipboard unavailable — copy the URL manually.",
   "admin.locale.de": "German",
   "admin.locale.en": "English",
   "admin.shell.help":

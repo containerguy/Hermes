@@ -27,7 +27,7 @@ import {
   toSafeBackupFailureSummary,
   toSafeRestoreDiagnostics
 } from "../storage/s3-storage";
-import { readSettings, settingsSchema, writeSettings } from "../settings";
+import { readSettings, settingsPartialSchema, settingsSchema, writeSettings } from "../settings";
 
 const createUserSchema = z.object({
   phoneNumber: z.string().trim().min(3).max(40).optional(),
@@ -75,7 +75,7 @@ const bulkImportRequestSchema = z.object({
 const bulkImportRowSchema = createUserSchema.extend({ notificationsEnabled: z.boolean().optional() }).strict();
 
 const settingsImportSchema = z.object({
-  settings: settingsSchema.partial()
+  settings: settingsPartialSchema
 });
 
 const userExportBundleSchema = z.object({
@@ -1386,7 +1386,7 @@ export function createAdminRouter(context: DatabaseContext) {
 
   router.put("/settings", (request, response) => {
     const admin = requireAdmin(context, request);
-    const parsed = settingsSchema.partial().safeParse(request.body);
+    const parsed = settingsPartialSchema.safeParse(request.body);
 
     if (!admin) {
       response.status(403).json({ error: "admin_erforderlich" });

@@ -37,6 +37,12 @@ function parseGameCatalogDraft(source: string): string[] {
     .filter(Boolean);
 }
 
+function generateKioskStreamSecret(): string {
+  const bytes = new Uint8Array(16);
+  crypto.getRandomValues(bytes);
+  return Array.from(bytes, (b) => b.toString(16).padStart(2, "")).join("");
+}
+
 const defaultSettings: AppSettings = {
   appName: "",
   brandMark: "mitspiel",
@@ -56,7 +62,10 @@ const defaultSettings: AppSettings = {
   infosEnabled: false,
   infosMarkdown: "",
   s3SnapshotEnabled: true,
-  defaultLocale: "de"
+  defaultLocale: "de",
+  kioskStreamEnabled: false,
+  kioskStreamPath: "stream",
+  kioskStreamSecret: ""
 };
 
 export function AdminPanel({
@@ -1006,6 +1015,78 @@ export function AdminPanel({
           </select>
         </label>
         <p className="muted">{t("admin.help.defaultLocale")}</p>
+        <p className="eyebrow admin-kiosk-eyebrow">{t("admin.kiosk.title")}</p>
+        <p className="muted">{t("admin.kiosk.help")}</p>
+        <label className="checkbox-label">
+          <input
+            type="checkbox"
+            checked={settings.kioskStreamEnabled}
+            onChange={(event) =>
+              setSettings({
+                ...settings,
+                kioskStreamEnabled: event.target.checked
+              })
+            }
+          />
+          {t("admin.kiosk.enabled")}
+        </label>
+        <label>
+          {t("admin.kiosk.path")}
+          <input
+            value={settings.kioskStreamPath}
+            onChange={(event) =>
+              setSettings({ ...settings, kioskStreamPath: event.target.value.trim() })
+            }
+            maxLength={63}
+            pattern="[a-zA-Z0-9][a-zA-Z0-9_-]*"
+            spellCheck={false}
+            autoComplete="off"
+            placeholder="stream"
+          />
+        </label>
+        <label>
+          {t("admin.kiosk.secret")}
+          <input
+            type="password"
+            value={settings.kioskStreamSecret}
+            onChange={(event) =>
+              setSettings({ ...settings, kioskStreamSecret: event.target.value })
+            }
+            maxLength={128}
+            spellCheck={false}
+            autoComplete="new-password"
+            placeholder={t("admin.kiosk.secretPlaceholder")}
+          />
+        </label>
+        <div className="action-row">
+          <button
+            type="button"
+            className="secondary"
+            onClick={() =>
+              setSettings({ ...settings, kioskStreamSecret: generateKioskStreamSecret() })
+            }
+          >
+            {t("admin.kiosk.generate")}
+          </button>
+          <button
+            type="button"
+            className="secondary"
+            onClick={async () => {
+              const path = settings.kioskStreamPath.trim().replace(/^\/+|\/+$/g, "") || "stream";
+              const origin = window.location.origin;
+              const url = `${origin}/${path}?id=${encodeURIComponent(settings.kioskStreamSecret)}`;
+              try {
+                await navigator.clipboard.writeText(url);
+                setMessage(t("admin.kiosk.copied"));
+                setError("");
+              } catch {
+                setError(t("admin.kiosk.copyFailed"));
+              }
+            }}
+          >
+            {t("admin.kiosk.copyUrl")}
+          </button>
+        </div>
         <p className="muted">{t("admin.shell.help")}</p>
         <label>
           {t("admin.shell.heroTitle")}

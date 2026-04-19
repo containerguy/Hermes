@@ -70,7 +70,10 @@ const defaultSettings: AppSettings = {
   infosEnabled: false,
   infosMarkdown: "",
   s3SnapshotEnabled: true,
-  defaultLocale: "de"
+  defaultLocale: "de",
+  kioskStreamEnabled: false,
+  kioskStreamPath: "stream",
+  kioskStreamSecret: ""
 };
 
 const redeemedUser: User = {

@@ -1,6 +1,13 @@
 export const deMessages = {
   "brand.displayName": "Mitspielzentrale",
 
+  "kiosk.pageTitle": "Aktuelle Runden",
+  "kiosk.bootLoading": "Lade…",
+  "kiosk.loading": "Aktualisiere…",
+  "kiosk.empty": "Derzeit keine aktiven Spielrunden.",
+  "kiosk.missingId": "Der Parameter id fehlt in der URL. Bitte die vollständige Adresse aus dem Adminbereich verwenden.",
+  "kiosk.listAria": "Liste der aktiven Spielrunden",
+
   "main.nav.start": "Start",
   "main.nav.infos": "Infos",
   "main.nav.login": "Login",
@@ -356,6 +363,17 @@ export const deMessages = {
   "admin.label.defaultLocale": "Standardsprache (Fallback)",
   "admin.help.defaultLocale":
     "Wird genutzt, wenn die Browsersprache weder eindeutig Deutsch noch Englisch ist, und als Server-Fallback bei Registrierung ohne Client-Angabe.",
+  "admin.kiosk.title": "Kiosk / Stream-Anzeige",
+  "admin.kiosk.help":
+    "Zeigt aktive Spielrunden ohne Login auf einem festen URL-Pfad mit geheimem id-Parameter. Beispiel: https://dein-host/stream?id=… — Passe Pfad und Geheimnis an und speichere, bevor du die URL auf dem Anzeigegerät einträgst.",
+  "admin.kiosk.enabled": "Kiosk-Ansicht aktivieren",
+  "admin.kiosk.path": "URL-Pfad (ein Segment, z. B. stream)",
+  "admin.kiosk.secret": "Geheimer Schlüssel (Query-Parameter id)",
+  "admin.kiosk.secretPlaceholder": "mindestens 12 Zeichen (Buchstaben, Ziffern, _ und -)",
+  "admin.kiosk.generate": "Zufälligen Schlüssel erzeugen",
+  "admin.kiosk.copyUrl": "Vollständige URL kopieren",
+  "admin.kiosk.copied": "URL in die Zwischenablage kopiert.",
+  "admin.kiosk.copyFailed": "Zwischenablage nicht verfügbar — URL manuell kopieren.",
   "admin.locale.de": "Deutsch",
   "admin.locale.en": "English",
   "admin.shell.help":

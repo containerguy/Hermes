@@ -53,7 +53,8 @@ export const errorMessages: Record<string, string> = {
   nicht_angemeldet: "Nicht angemeldet.",
   mailversand_fehlgeschlagen: "Mailversand fehlgeschlagen.",
   code_abgelehnt: "Code abgelehnt.",
-  event_voll: "Event ist voll."
+  event_voll: "Event ist voll.",
+  kiosk_ungueltig: "Kiosk-Anzeige ist deaktiviert oder der Schlüssel in der URL ist ungültig."
 };
 
 export const errorMessagesEn: Record<string, string> = {
@@ -108,7 +109,8 @@ export const errorMessagesEn: Record<string, string> = {
   nicht_angemeldet: "Not signed in.",
   mailversand_fehlgeschlagen: "Mail delivery failed.",
   code_abgelehnt: "Code rejected.",
-  event_voll: "Event is full."
+  event_voll: "Event is full.",
+  kiosk_ungueltig: "The kiosk display is disabled or the URL key is invalid."
 };
 
 export class ApiError extends Error {

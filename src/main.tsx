@@ -9,6 +9,7 @@ import { EventBoard } from "./client/components/EventBoard";
 import { InfosPage } from "./client/components/InfosPage";
 import { LoginPage } from "./client/components/LoginPage";
 import { AdminPanel } from "./client/components/AdminPanel";
+import { KioskStreamPage } from "./client/components/KioskStreamPage";
 import { I18nProvider, useI18n, type TFunction } from "./client/i18n/I18nContext";
 import { BrandingProvider, useBrandIconSrc } from "./client/lib/BrandingContext";
 import { brandIconSrc } from "./client/lib/brand-icon";
@@ -81,7 +82,10 @@ const defaultSettings: AppSettings = {
   infosEnabled: false,
   infosMarkdown: "",
   s3SnapshotEnabled: true,
-  defaultLocale: "de"
+  defaultLocale: "de",
+  kioskStreamEnabled: false,
+  kioskStreamPath: "stream",
+  kioskStreamSecret: ""
 };
 
 function applyTheme(settings: AppSettings) {
@@ -159,6 +163,11 @@ function parseHashRoute(): { page: PageId; adminSection: AdminSection } {
   return { page: "events", adminSection: "users" };
 }
 
+function normalizeDocumentPath(path: string) {
+  const trimmed = path.replace(/\/+$/, "");
+  return trimmed === "" ? "/" : trimmed;
+}
+
 function applyShellStartHero(route: Route, settings: AppSettings): Route {
   if (route.id !== "events") {
     return route;
@@ -226,6 +235,13 @@ function AppShell({
   const initialRoute = parseHashRoute();
   const [activePage, setActivePage] = useState<PageId>(() => initialRoute.page);
   const [adminSection, setAdminSection] = useState<AdminSection>(() => initialRoute.adminSection);
+  const [publicSettingsReady, setPublicSettingsReady] = useState(false);
+  const documentPath = useMemo(() => normalizeDocumentPath(window.location.pathname), []);
+  const kioskPathConfigured = `/${appSettings.kioskStreamPath.replace(/^\/+|\/+$/g, "")}`;
+  const isKioskDocumentEntry =
+    publicSettingsReady &&
+    appSettings.kioskStreamEnabled &&
+    documentPath === kioskPathConfigured;
 
   useEffect(() => {
     requestJson<{ user: User }>("/api/auth/me")
@@ -245,8 +261,21 @@ function AppShell({
         setAppSettings((prev) => ({ ...prev, ...result.settings }));
         applyTheme({ ...defaultSettings, ...result.settings });
       })
-      .catch(() => applyTheme(defaultSettings));
+      .catch(() => applyTheme(defaultSettings))
+      .finally(() => {
+        setPublicSettingsReady(true);
+      });
   }, [setAppSettings]);
+
+  useEffect(() => {
+    if (!publicSettingsReady || documentPath === "/") {
+      return;
+    }
+    if (isKioskDocumentEntry) {
+      return;
+    }
+    window.location.replace("/#events");
+  }, [documentPath, isKioskDocumentEntry, publicSettingsReady]);
 
   useEffect(() => {
     if (currentUser?.role !== "admin") {
@@ -301,8 +330,8 @@ function AppShell({
   );
 
   useEffect(() => {
-    document.title = displayAppName;
-  }, [displayAppName]);
+    document.title = isKioskDocumentEntry ? `${displayAppName} · ${t("kiosk.pageTitle")}` : displayAppName;
+  }, [displayAppName, isKioskDocumentEntry, t]);
 
   const adminNav = useMemo(
     () =>
@@ -358,6 +387,23 @@ function AppShell({
         emptyBoardBody={appSettings.shellEventsEmptyBody}
         gameCatalog={appSettings.gameCatalog}
       />
+    );
+  }
+
+  if (!publicSettingsReady && documentPath !== "/") {
+    return (
+      <div className="kiosk-boot" role="status" aria-live="polite">
+        <p>{t("kiosk.bootLoading")}</p>
+      </div>
+    );
+  }
+
+  if (isKioskDocumentEntry) {
+    const streamId = new URLSearchParams(window.location.search).get("id");
+    return (
+      <BrandingProvider iconSrc={shellIconSrc}>
+        <KioskStreamPage appSettings={appSettings} streamId={streamId} />
+      </BrandingProvider>
     );
   }
 

@@ -1127,7 +1127,10 @@ describe("app flow", () => {
       infosEnabled: true,
       infosMarkdown: "## LAN-Infos\n\n- [Organisation](https://example.org)",
       s3SnapshotEnabled: true,
-      defaultLocale: "de" as const
+      defaultLocale: "de" as const,
+      kioskStreamEnabled: false,
+      kioskStreamPath: "stream",
+      kioskStreamSecret: ""
     };
 
     await adminAgent
@@ -1587,5 +1590,72 @@ describe("app flow", () => {
       .post(`/api/events/${eventId}/participation`)
       .send({ status: "joined" })
       .expect(200);
+  });
+
+  it("exposes active game rounds on /api/kiosk/events only when kiosk is enabled and id matches", async () => {
+    const adminAgent = request.agent(started!.app);
+    await login(adminAgent, "hauptadmin");
+    const csrf = await fetchCsrf(adminAgent);
+    const settingsRes = await adminAgent.get("/api/admin/settings").expect(200);
+    const base = settingsRes.body.settings as Record<string, unknown>;
+
+    await request(started!.app).get("/api/kiosk/events").expect(403);
+    await request(started!.app).get("/api/kiosk/events?id=nope").expect(403);
+
+    await adminAgent
+      .put("/api/admin/settings")
+      .set(CSRF_HEADER, csrf)
+      .send({
+        ...base,
+        kioskStreamEnabled: true,
+        kioskStreamPath: "stream",
+        kioskStreamSecret: "kiosk-test-secret-ok"
+      })
+      .expect(200);
+
+    await request(started!.app)
+      .get("/api/kiosk/events?id=wrong")
+      .expect(403)
+      .expect((response) => {
+        expect(response.body.error).toBe("kiosk_ungueltig");
+      });
+
+    const emptyList = await request(started!.app)
+      .get("/api/kiosk/events?id=kiosk-test-secret-ok")
+      .expect(200);
+    expect(Array.isArray(emptyList.body.events)).toBe(true);
+    expect(emptyList.body.events.length).toBe(0);
+
+    await adminAgent
+      .post("/api/events")
+      .set(CSRF_HEADER, csrf)
+      .send({
+        gameTitle: "Kiosk Show",
+        startMode: "scheduled",
+        startsAt: new Date(Date.now() + 3_600_000).toISOString(),
+        minPlayers: 2,
+        maxPlayers: 8
+      })
+      .expect(201);
+
+    const withEvent = await request(started!.app)
+      .get("/api/kiosk/events?id=kiosk-test-secret-ok")
+      .expect(200);
+    expect(withEvent.body.events.length).toBe(1);
+    expect(withEvent.body.events[0].gameTitle).toBe("Kiosk Show");
+    expect(withEvent.body.events[0].myParticipation).toBeNull();
+
+    await adminAgent
+      .put("/api/admin/settings")
+      .set(CSRF_HEADER, csrf)
+      .send({
+        ...base,
+        kioskStreamEnabled: false,
+        kioskStreamPath: "stream",
+        kioskStreamSecret: "kiosk-test-secret-ok"
+      })
+      .expect(200);
+
+    await request(started!.app).get("/api/kiosk/events?id=kiosk-test-secret-ok").expect(403);
   });
 });

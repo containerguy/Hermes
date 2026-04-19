@@ -6,7 +6,16 @@ import { appLocaleSchema } from "../shared/locale";
 
 const colorSchema = z.string().regex(/^#[0-9a-fA-F]{6}$/);
 
-export const settingsSchema = z.object({
+const kioskPathSegmentSchema = z
+  .string()
+  .trim()
+  .regex(/^[a-zA-Z0-9][a-zA-Z0-9_-]{0,62}$/, "kiosk_pfad_ungueltig");
+
+const kioskSecretSchema = z
+  .string()
+  .regex(/^[a-zA-Z0-9_-]{12,128}$/, "kiosk_geheimnis_ungueltig");
+
+const settingsObjectSchema = z.object({
   /** Leer = eingebauter Anzeigename je nach UI-Sprache (Mitspielzentrale / MatchDesk). */
   appName: z.string().trim().max(80),
   /** App-Logo in der UI: H (Hermes) oder M (Mitspiel / MatchDesk). */
@@ -39,8 +48,34 @@ export const settingsSchema = z.object({
    * Fallback-Sprache, wenn die Browsersprache weder eindeutig deutsch noch englisch ist.
    * Beeinflusst auch serverseitige Defaults (z. B. Registrierung ohne Client-Locale).
    */
-  defaultLocale: appLocaleSchema
+  defaultLocale: appLocaleSchema,
+  /**
+   * Öffentliche Anzeige (Kiosk) für aktive Spielrunden ohne Login.
+   * URL: /{kioskStreamPath}?id={kioskStreamSecret}
+   */
+  kioskStreamEnabled: z.boolean(),
+  /** Ein Pfadsegment ohne Schrägstriche, z. B. stream oder display */
+  kioskStreamPath: kioskPathSegmentSchema,
+  /** Geheimer Zugriffsschlüssel (Query id), min. 12 Zeichen wenn Kiosk aktiv */
+  kioskStreamSecret: z.string().max(128)
 });
+
+export const settingsSchema = settingsObjectSchema.superRefine((data, ctx) => {
+  if (!data.kioskStreamEnabled) {
+    return;
+  }
+  const parsed = kioskSecretSchema.safeParse(data.kioskStreamSecret);
+  if (!parsed.success) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      path: ["kioskStreamSecret"],
+      message: "kiosk_geheimnis_erforderlich"
+    });
+  }
+});
+
+/** Für partielle Updates/Imports ohne `.partial()` auf ein Schema mit Refinement. */
+export const settingsPartialSchema = settingsObjectSchema.partial();
 
 export type HermesSettings = z.infer<typeof settingsSchema>;
 
@@ -63,6 +98,8 @@ export type PublicHermesSettings = Pick<
   | "infosEnabled"
   | "infosMarkdown"
   | "defaultLocale"
+  | "kioskStreamEnabled"
+  | "kioskStreamPath"
 >;
 
 export function pickPublicSettings(full: HermesSettings): PublicHermesSettings {
@@ -82,7 +119,9 @@ export function pickPublicSettings(full: HermesSettings): PublicHermesSettings {
     themeSurfaceColor: full.themeSurfaceColor,
     infosEnabled: full.infosEnabled,
     infosMarkdown: full.infosMarkdown,
-    defaultLocale: full.defaultLocale
+    defaultLocale: full.defaultLocale,
+    kioskStreamEnabled: full.kioskStreamEnabled,
+    kioskStreamPath: full.kioskStreamPath
   };
 }
 
@@ -105,7 +144,10 @@ export const defaultSettings: HermesSettings = {
   infosEnabled: false,
   infosMarkdown: "",
   s3SnapshotEnabled: true,
-  defaultLocale: "de"
+  defaultLocale: "de",
+  kioskStreamEnabled: false,
+  kioskStreamPath: "stream",
+  kioskStreamSecret: ""
 };
 
 function nowIso() {

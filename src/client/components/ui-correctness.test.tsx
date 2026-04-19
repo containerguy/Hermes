@@ -161,7 +161,10 @@ describe("ui correctness structure contracts", () => {
       infosEnabled: false,
       infosMarkdown: "",
       s3SnapshotEnabled: true,
-      defaultLocale: "de"
+      defaultLocale: "de",
+      kioskStreamEnabled: false,
+      kioskStreamPath: "stream",
+      kioskStreamSecret: ""
     };
 
     requestJsonMock.mockImplementation(async (path: string) => {

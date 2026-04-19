@@ -47,6 +47,12 @@ export type AppSettings = {
   s3SnapshotEnabled: boolean;
   /** Fallback, wenn die Browsersprache weder klar DE noch EN ist (Default de). */
   defaultLocale: AppLocale;
+  /** Öffentliche Kiosk-/Stream-Ansicht ohne Login (URL-Pfad + Query id). */
+  kioskStreamEnabled: boolean;
+  /** Ein URL-Pfadsegment, z. B. stream → /stream?id=… */
+  kioskStreamPath: string;
+  /** Geheimer Zugriffsschlüssel; nur in Admin-API sichtbar, nicht in /api/settings/public */
+  kioskStreamSecret: string;
 };
 
 /** Öffentliche App-Einstellungen (ohne Admin-/Betriebsfelder) für Bootstrap ohne Admin-Session. */
@@ -68,6 +74,8 @@ export type PublicAppSettings = Pick<
   | "infosEnabled"
   | "infosMarkdown"
   | "defaultLocale"
+  | "kioskStreamEnabled"
+  | "kioskStreamPath"
 >;
 
 export type AdminSection =
