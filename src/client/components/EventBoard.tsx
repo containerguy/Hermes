@@ -1,5 +1,5 @@
 import React, { FormEvent, useEffect, useMemo, useState } from "react";
-import type { GameEvent, User } from "../types/core";
+import type { AmpIntegrationInstance, GameEvent, User } from "../types/core";
 import { requestJson } from "../api/request";
 import { ApiError, getErrorMessage } from "../errors/errors";
 import { useI18n } from "../i18n/I18nContext";
@@ -69,13 +69,15 @@ export function EventBoard({
   mode = "events",
   emptyBoardTitle = "",
   emptyBoardBody = "",
-  gameCatalog = []
+  gameCatalog = [],
+  ampIntegrationEnabled = false
 }: {
   currentUser: User | null;
   mode?: "events" | "manager";
   emptyBoardTitle?: string;
   emptyBoardBody?: string;
   gameCatalog?: string[];
+  ampIntegrationEnabled?: boolean;
 }) {
   const { t, locale } = useI18n();
   const markSrc = useBrandIconSrc();
@@ -184,12 +186,47 @@ export function EventBoard({
   const compactTouchShell = useCompactTouchShell();
   const [expandedEventId, setExpandedEventId] = useState<string | null>(null);
   const [createFlowOpen, setCreateFlowOpen] = useState(false);
+  const [ampInstances, setAmpInstances] = useState<AmpIntegrationInstance[]>([]);
+  const [ampLoading, setAmpLoading] = useState(false);
+  const [ampLoadError, setAmpLoadError] = useState("");
+  const [ampSelection, setAmpSelection] = useState("");
 
   const canCreate =
     currentUser?.role === "manager" ||
     currentUser?.role === "organizer" ||
     currentUser?.role === "admin";
   const showCreateForm = canCreate && mode === "manager";
+  const ampFormVisible =
+    ampIntegrationEnabled && showCreateForm && (!compactTouchShell || createFlowOpen);
+
+  useEffect(() => {
+    if (!ampFormVisible || !currentUser) {
+      return undefined;
+    }
+    let cancelled = false;
+    setAmpLoading(true);
+    setAmpLoadError("");
+    void requestJson<{ instances: AmpIntegrationInstance[] }>("/api/integrations/amp/instances")
+      .then((result) => {
+        if (!cancelled) {
+          setAmpInstances(result.instances);
+        }
+      })
+      .catch((caught) => {
+        if (!cancelled) {
+          setAmpInstances([]);
+          setAmpLoadError(getErrorMessage(caught, locale));
+        }
+      })
+      .finally(() => {
+        if (!cancelled) {
+          setAmpLoading(false);
+        }
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [ampFormVisible, currentUser?.id, locale]);
 
   async function loadEvents() {
     if (!currentUser) {
@@ -326,6 +363,7 @@ export function EventBoard({
         serverHost: "",
         connectionInfo: ""
       });
+      setAmpSelection("");
       await loadEvents();
       setMessage(t("events.msg.saved"));
       setCreateFlowOpen(false);
@@ -804,6 +842,51 @@ export function EventBoard({
           />
         </label>
       </div>
+      {ampIntegrationEnabled ? (
+        <>
+          <label>
+            {t("events.amp.label")}
+            <select
+              value={ampSelection}
+              onChange={(ev) => {
+                const value = ev.target.value;
+                setAmpSelection(value);
+                if (!value) {
+                  return;
+                }
+                const inst = ampInstances.find((row) => row.id === value);
+                if (inst) {
+                  setEventDraft((draft) => ({
+                    ...draft,
+                    serverHost: inst.serverHost,
+                    connectionInfo: inst.connectionInfo
+                  }));
+                }
+              }}
+              disabled={ampLoading}
+              aria-busy={ampLoading}
+            >
+              <option value="">
+                {ampLoading ? t("events.amp.loading") : t("events.amp.placeholder")}
+              </option>
+              {ampInstances.map((inst) => (
+                <option key={inst.id} value={inst.id}>
+                  {inst.module ? `${inst.friendlyName} · ${inst.module}` : inst.friendlyName}
+                </option>
+              ))}
+            </select>
+          </label>
+          <p className="muted">{t("events.amp.hint")}</p>
+          {ampLoadError ? (
+            <p className="error" role="alert">
+              {ampLoadError}
+            </p>
+          ) : null}
+          {!ampLoading && !ampLoadError && ampInstances.length === 0 ? (
+            <p className="muted">{t("events.amp.empty")}</p>
+          ) : null}
+        </>
+      ) : null}
       <label>
         {t("events.form.server")}
         <input

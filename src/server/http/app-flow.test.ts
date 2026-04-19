@@ -1130,7 +1130,12 @@ describe("app flow", () => {
       defaultLocale: "de" as const,
       kioskStreamEnabled: false,
       kioskStreamPath: "stream",
-      kioskStreamSecret: ""
+      kioskStreamSecret: "",
+      ampIntegrationEnabled: false,
+      ampBaseUrl: "",
+      ampUsername: "",
+      ampPassword: "",
+      ampTlsSkipVerify: false
     };
 
     await adminAgent
@@ -1657,6 +1662,19 @@ describe("app flow", () => {
       .expect(200);
 
     await request(started!.app).get("/api/kiosk/events?id=kiosk-test-secret-ok").expect(403);
+  });
+
+  it("returns amp_deaktiviert for /api/integrations/amp/instances when integration is off", async () => {
+    await request(started!.app).get("/api/integrations/amp/instances").expect(401);
+
+    const adminAgent = request.agent(started!.app);
+    await login(adminAgent, "hauptadmin");
+    await adminAgent
+      .get("/api/integrations/amp/instances")
+      .expect(403)
+      .expect((response) => {
+        expect(response.body.error).toBe("amp_deaktiviert");
+      });
   });
 
   it("lets organizers create events and cancel their own, but not other users events", async () => {

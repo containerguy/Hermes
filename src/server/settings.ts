@@ -57,22 +57,73 @@ const settingsObjectSchema = z.object({
   /** Ein Pfadsegment ohne Schrägstriche, z. B. stream oder display */
   kioskStreamPath: kioskPathSegmentSchema,
   /** Geheimer Zugriffsschlüssel (Query id), min. 12 Zeichen wenn Kiosk aktiv */
-  kioskStreamSecret: z.string().max(128)
+  kioskStreamSecret: z.string().max(128),
+  /**
+   * CubeCoders AMP: Integration für dedizierte Server-Instanzen (nur serverseitig, Credentials in DB).
+   */
+  ampIntegrationEnabled: z.boolean(),
+  /** Basis-URL der AMP-Installation, z. B. http://192.168.1.10:8080/ (ohne /API) */
+  ampBaseUrl: z.string().max(512),
+  ampUsername: z.string().max(120),
+  ampPassword: z.string().max(500),
+  /** Selbstsigniertes HTTPS auf der AMP-URL: TLS-Zertifikat nicht strikt prüfen */
+  ampTlsSkipVerify: z.boolean()
 });
 
-export const settingsSchema = settingsObjectSchema.superRefine((data, ctx) => {
-  if (!data.kioskStreamEnabled) {
-    return;
-  }
-  const parsed = kioskSecretSchema.safeParse(data.kioskStreamSecret);
-  if (!parsed.success) {
-    ctx.addIssue({
-      code: z.ZodIssueCode.custom,
-      path: ["kioskStreamSecret"],
-      message: "kiosk_geheimnis_erforderlich"
-    });
-  }
-});
+export const settingsSchema = settingsObjectSchema
+  .superRefine((data, ctx) => {
+    if (!data.kioskStreamEnabled) {
+      return;
+    }
+    const parsed = kioskSecretSchema.safeParse(data.kioskStreamSecret);
+    if (!parsed.success) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["kioskStreamSecret"],
+        message: "kiosk_geheimnis_erforderlich"
+      });
+    }
+  })
+  .superRefine((data, ctx) => {
+    if (!data.ampIntegrationEnabled) {
+      return;
+    }
+    const trimmedUrl = data.ampBaseUrl.trim();
+    if (!trimmedUrl) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["ampBaseUrl"],
+        message: "amp_url_erforderlich"
+      });
+      return;
+    }
+    try {
+      const parsed = new URL(/^https?:\/\//i.test(trimmedUrl) ? trimmedUrl : `http://${trimmedUrl}`);
+      if (parsed.protocol !== "http:" && parsed.protocol !== "https:") {
+        throw new Error("bad");
+      }
+    } catch {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["ampBaseUrl"],
+        message: "amp_url_ungueltig"
+      });
+    }
+    if (!data.ampUsername.trim()) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["ampUsername"],
+        message: "amp_zugang_erforderlich"
+      });
+    }
+    if (!data.ampPassword) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["ampPassword"],
+        message: "amp_zugang_erforderlich"
+      });
+    }
+  });
 
 /** Für partielle Updates/Imports ohne `.partial()` auf ein Schema mit Refinement. */
 export const settingsPartialSchema = settingsObjectSchema.partial();
@@ -100,6 +151,7 @@ export type PublicHermesSettings = Pick<
   | "defaultLocale"
   | "kioskStreamEnabled"
   | "kioskStreamPath"
+  | "ampIntegrationEnabled"
 >;
 
 export function pickPublicSettings(full: HermesSettings): PublicHermesSettings {
@@ -121,7 +173,8 @@ export function pickPublicSettings(full: HermesSettings): PublicHermesSettings {
     infosMarkdown: full.infosMarkdown,
     defaultLocale: full.defaultLocale,
     kioskStreamEnabled: full.kioskStreamEnabled,
-    kioskStreamPath: full.kioskStreamPath
+    kioskStreamPath: full.kioskStreamPath,
+    ampIntegrationEnabled: full.ampIntegrationEnabled
   };
 }
 
@@ -147,7 +200,12 @@ export const defaultSettings: HermesSettings = {
   defaultLocale: "de",
   kioskStreamEnabled: false,
   kioskStreamPath: "stream",
-  kioskStreamSecret: ""
+  kioskStreamSecret: "",
+  ampIntegrationEnabled: false,
+  ampBaseUrl: "",
+  ampUsername: "",
+  ampPassword: "",
+  ampTlsSkipVerify: false
 };
 
 function nowIso() {

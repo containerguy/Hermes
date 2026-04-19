@@ -274,6 +274,12 @@ export const deMessages = {
   "events.form.min": "Min",
   "events.form.max": "Max",
   "events.form.server": "Server",
+  "events.amp.label": "AMP-Instanz",
+  "events.amp.placeholder": "— Auswahl —",
+  "events.amp.loading": "Lade Instanzen…",
+  "events.amp.hint":
+    "Optional: dedizierte Server aus CubeCoders AMP übernehmen (Adresse und Verbindung). Anmeldung und URL konfiguriert der Admin unter Betrieb.",
+  "events.amp.empty": "Keine AMP-Instanzen gemeldet (oder ADS liefert eine leere Liste).",
   "events.form.connection": "Verbindung",
   "events.form.submit": "Event anlegen",
   "events.board.aria": "Events",
@@ -375,6 +381,14 @@ export const deMessages = {
   "admin.kiosk.copyUrl": "Vollständige URL kopieren",
   "admin.kiosk.copied": "URL in die Zwischenablage kopiert.",
   "admin.kiosk.copyFailed": "Zwischenablage nicht verfügbar — URL manuell kopieren.",
+  "admin.amp.title": "CubeCoders AMP",
+  "admin.amp.help":
+    "Wenn aktiviert, können Manager und Organisatoren beim Anlegen einer Runde Instanzen von deinem AMP-Controller laden und Server-/Verbindungsfelder ausfüllen. Basis-URL ohne „/API“ (z. B. http://192.168.200.98:8080). Zugangsdaten werden nur serverseitig gespeichert.",
+  "admin.amp.enabled": "AMP-Anbindung aktivieren",
+  "admin.amp.baseUrl": "AMP-Basis-URL",
+  "admin.amp.username": "AMP-Benutzername",
+  "admin.amp.password": "AMP-Passwort",
+  "admin.amp.tlsSkip": "Bei HTTPS: selbstsigniertes Zertifikat akzeptieren (nur im vertrauenswürdigen LAN)",
   "admin.locale.de": "Deutsch",
   "admin.locale.en": "English",
   "admin.shell.help":

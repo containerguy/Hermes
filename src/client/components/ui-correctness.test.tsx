@@ -164,7 +164,12 @@ describe("ui correctness structure contracts", () => {
       defaultLocale: "de",
       kioskStreamEnabled: false,
       kioskStreamPath: "stream",
-      kioskStreamSecret: ""
+      kioskStreamSecret: "",
+      ampIntegrationEnabled: false,
+      ampBaseUrl: "",
+      ampUsername: "",
+      ampPassword: "",
+      ampTlsSkipVerify: false
     };
 
     requestJsonMock.mockImplementation(async (path: string) => {

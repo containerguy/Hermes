@@ -276,6 +276,12 @@ export const enMessages: { [K in keyof typeof deMessages]: string } = {
   "events.form.min": "Min",
   "events.form.max": "Max",
   "events.form.server": "Server",
+  "events.amp.label": "AMP instance",
+  "events.amp.placeholder": "— Select —",
+  "events.amp.loading": "Loading instances…",
+  "events.amp.hint":
+    "Optional: pull dedicated servers from CubeCoders AMP (address and connection). An admin configures sign-in and URL under Operations.",
+  "events.amp.empty": "No AMP instances reported (or ADS returned an empty list).",
   "events.form.connection": "Connection",
   "events.form.submit": "Create event",
   "events.board.aria": "Events",
@@ -378,6 +384,14 @@ export const enMessages: { [K in keyof typeof deMessages]: string } = {
   "admin.kiosk.copyUrl": "Copy full URL",
   "admin.kiosk.copied": "URL copied to clipboard.",
   "admin.kiosk.copyFailed": "Clipboard unavailable — copy the URL manually.",
+  "admin.amp.title": "CubeCoders AMP",
+  "admin.amp.help":
+    "When enabled, managers and organizers can load instances from your AMP controller when creating a round and fill server/connection fields. Base URL without “/API” (e.g. http://192.168.200.98:8080). Credentials are stored server-side only.",
+  "admin.amp.enabled": "Enable AMP integration",
+  "admin.amp.baseUrl": "AMP base URL",
+  "admin.amp.username": "AMP username",
+  "admin.amp.password": "AMP password",
+  "admin.amp.tlsSkip": "For HTTPS: accept self-signed certificate (trusted LAN only)",
   "admin.locale.de": "German",
   "admin.locale.en": "English",
   "admin.shell.help":

@@ -85,7 +85,12 @@ const defaultSettings: AppSettings = {
   defaultLocale: "de",
   kioskStreamEnabled: false,
   kioskStreamPath: "stream",
-  kioskStreamSecret: ""
+  kioskStreamSecret: "",
+  ampIntegrationEnabled: false,
+  ampBaseUrl: "",
+  ampUsername: "",
+  ampPassword: "",
+  ampTlsSkipVerify: false
 };
 
 function applyTheme(settings: AppSettings) {
@@ -390,6 +395,7 @@ function AppShell({
         emptyBoardTitle={appSettings.shellEventsEmptyTitle}
         emptyBoardBody={appSettings.shellEventsEmptyBody}
         gameCatalog={appSettings.gameCatalog}
+        ampIntegrationEnabled={appSettings.ampIntegrationEnabled}
       />
     );
   }
