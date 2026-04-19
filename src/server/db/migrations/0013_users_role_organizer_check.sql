@@ -1,6 +1,5 @@
 -- Erweitere users.role CHECK um 'organizer' (SQLite: Tabelle neu aufbauen).
-
-PRAGMA foreign_keys = OFF;
+-- Fremdschlüssel: migrate.ts schaltet foreign_keys vor der Transaktion aus (PRAGMA in SQL greift dort nicht).
 
 CREATE TABLE users__new (
   id TEXT PRIMARY KEY NOT NULL,
@@ -52,5 +51,3 @@ ALTER TABLE users__new RENAME TO users;
 CREATE UNIQUE INDEX IF NOT EXISTS users_phone_number_unique ON users(phone_number);
 CREATE UNIQUE INDEX IF NOT EXISTS users_username_unique ON users(username);
 CREATE UNIQUE INDEX IF NOT EXISTS users_email_unique ON users(email);
-
-PRAGMA foreign_keys = ON;

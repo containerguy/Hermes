@@ -38,10 +38,17 @@ export function runMigrations(sqlite: Database.Database = createSqliteClient()) 
 
     const sql = fs.readFileSync(path.join(migrationsDirectory, file), "utf8");
 
-    sqlite.transaction(() => {
-      sqlite.exec(sql);
-      insertMigration.run(file, new Date().toISOString());
-    })();
+    // PRAGMA foreign_keys in .sql is ignored inside BEGIN TRANSACTION; some migrations
+    // (e.g. rebuilding `users`) must run with FK checks off for the whole batch.
+    sqlite.pragma("foreign_keys = OFF");
+    try {
+      sqlite.transaction(() => {
+        sqlite.exec(sql);
+        insertMigration.run(file, new Date().toISOString());
+      })();
+    } finally {
+      sqlite.pragma("foreign_keys = ON");
+    }
   }
 }
 
