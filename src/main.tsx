@@ -2,7 +2,7 @@ import React, { useEffect, useMemo, useState } from "react";
 import { createRoot } from "react-dom/client";
 import "./styles.css";
 
-import type { AdminSection, AppSettings, User } from "./client/types/core";
+import type { AdminSection, AppSettings, PublicAppSettings, User } from "./client/types/core";
 import { requestJson } from "./client/api/request";
 import { clearCsrfToken, primeCsrfToken } from "./client/api/csrf";
 import { EventBoard } from "./client/components/EventBoard";
@@ -240,13 +240,26 @@ function AppShell({
   }, [setCurrentUser]);
 
   useEffect(() => {
+    requestJson<{ settings: PublicAppSettings }>("/api/settings/public")
+      .then((result) => {
+        setAppSettings((prev) => ({ ...prev, ...result.settings }));
+        applyTheme({ ...defaultSettings, ...result.settings });
+      })
+      .catch(() => applyTheme(defaultSettings));
+  }, [setAppSettings]);
+
+  useEffect(() => {
+    if (currentUser?.role !== "admin") {
+      return;
+    }
+
     requestJson<{ settings: AppSettings }>("/api/settings")
       .then((result) => {
         setAppSettings(result.settings);
         applyTheme(result.settings);
       })
-      .catch(() => applyTheme(defaultSettings));
-  }, [setAppSettings]);
+      .catch(() => {});
+  }, [currentUser?.id, currentUser?.role, setAppSettings]);
 
   useEffect(() => {
     function syncHash() {

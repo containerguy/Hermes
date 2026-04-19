@@ -44,6 +44,48 @@ export const settingsSchema = z.object({
 
 export type HermesSettings = z.infer<typeof settingsSchema>;
 
+/** Öffentliche Teilmenge (kein defaultNotificationsEnabled, eventAutoArchiveHours, s3SnapshotEnabled). */
+export type PublicHermesSettings = Pick<
+  HermesSettings,
+  | "appName"
+  | "brandMark"
+  | "publicRegistrationEnabled"
+  | "shellStartTitle"
+  | "shellStartDescription"
+  | "shellEventsEmptyTitle"
+  | "shellEventsEmptyBody"
+  | "gameCatalog"
+  | "themePrimaryColor"
+  | "themeLoginColor"
+  | "themeManagerColor"
+  | "themeAdminColor"
+  | "themeSurfaceColor"
+  | "infosEnabled"
+  | "infosMarkdown"
+  | "defaultLocale"
+>;
+
+export function pickPublicSettings(full: HermesSettings): PublicHermesSettings {
+  return {
+    appName: full.appName,
+    brandMark: full.brandMark,
+    publicRegistrationEnabled: full.publicRegistrationEnabled,
+    shellStartTitle: full.shellStartTitle,
+    shellStartDescription: full.shellStartDescription,
+    shellEventsEmptyTitle: full.shellEventsEmptyTitle,
+    shellEventsEmptyBody: full.shellEventsEmptyBody,
+    gameCatalog: full.gameCatalog,
+    themePrimaryColor: full.themePrimaryColor,
+    themeLoginColor: full.themeLoginColor,
+    themeManagerColor: full.themeManagerColor,
+    themeAdminColor: full.themeAdminColor,
+    themeSurfaceColor: full.themeSurfaceColor,
+    infosEnabled: full.infosEnabled,
+    infosMarkdown: full.infosMarkdown,
+    defaultLocale: full.defaultLocale
+  };
+}
+
 export const defaultSettings: HermesSettings = {
   appName: "",
   brandMark: "mitspiel",

@@ -8,6 +8,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { CSRF_HEADER } from "../auth/csrf";
 import { bootstrapAdmin } from "../db/bootstrap-admin";
 import { createHermesApp } from "../app";
+import { pickPublicSettings } from "../settings";
 
 type StartedApp = Awaited<ReturnType<typeof createHermesApp>>;
 
@@ -1126,7 +1127,7 @@ describe("app flow", () => {
       infosEnabled: true,
       infosMarkdown: "## LAN-Infos\n\n- [Organisation](https://example.org)",
       s3SnapshotEnabled: true,
-      defaultLocale: "de"
+      defaultLocale: "de" as const
     };
 
     await adminAgent
@@ -1145,11 +1146,22 @@ describe("app flow", () => {
         expect(response.body.settings).toEqual(updatedSettings);
       });
 
-    await request(started!.app)
+    await adminAgent
       .get("/api/settings")
       .expect(200)
       .expect((response) => {
         expect(response.body.settings).toEqual(updatedSettings);
+      });
+
+    await request(started!.app)
+      .get("/api/settings")
+      .expect(401);
+
+    await request(started!.app)
+      .get("/api/settings/public")
+      .expect(200)
+      .expect((response) => {
+        expect(response.body.settings).toEqual(pickPublicSettings(updatedSettings));
       });
   });
 
@@ -1504,7 +1516,7 @@ describe("app flow", () => {
     await request(started!.app).post("/api/auth/request-code").send({ username: "invitee" }).expect(202);
 
     await request(started!.app)
-      .get("/api/settings")
+      .get("/api/settings/public")
       .expect(200)
       .expect((response) => {
         expect(response.body.settings.appName).toBe("Hermes Test");

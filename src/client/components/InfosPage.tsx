@@ -1,6 +1,49 @@
 import React from "react";
 import ReactMarkdown from "react-markdown";
 
+/**
+ * Erlaubt nur http(s), Hash-Fragmente und same-origin-relative Pfade (inkl. /absolut).
+ * Blockiert u. a. javascript:, data:, und protocol-relative // URLs.
+ */
+function sanitizeMarkdownHref(href: string | undefined): string | undefined {
+  if (href == null) {
+    return undefined;
+  }
+
+  const trimmed = href.trim();
+  if (trimmed === "") {
+    return undefined;
+  }
+
+  const lower = trimmed.toLowerCase();
+  if (
+    lower.startsWith("javascript:") ||
+    lower.startsWith("data:") ||
+    lower.startsWith("vbscript:") ||
+    lower.startsWith("file:")
+  ) {
+    return undefined;
+  }
+
+  if (trimmed.startsWith("#")) {
+    return trimmed;
+  }
+
+  if (trimmed.startsWith("/") && !trimmed.startsWith("//")) {
+    return trimmed;
+  }
+
+  if (trimmed.startsWith("http://") || trimmed.startsWith("https://")) {
+    return trimmed;
+  }
+
+  if (/^[\w./\-]+$/.test(trimmed) && !trimmed.includes(":")) {
+    return trimmed;
+  }
+
+  return undefined;
+}
+
 export function InfosPage({ markdown, enabled }: { markdown: string; enabled: boolean }) {
   if (!enabled) {
     return (
@@ -31,18 +74,24 @@ export function InfosPage({ markdown, enabled }: { markdown: string; enabled: bo
       <div className="infos-prose">
         <ReactMarkdown
           components={{
-            a: ({ href, children, ...props }) => (
-              <a
-                href={href}
-                {...props}
-                rel="noopener noreferrer"
-                target={
-                  href?.startsWith("http://") || href?.startsWith("https://") ? "_blank" : undefined
-                }
-              >
-                {children}
-              </a>
-            )
+            a: ({ href, children, node: _node, ...props }) => {
+              const safe = sanitizeMarkdownHref(typeof href === "string" ? href : undefined);
+              if (safe === undefined) {
+                return <span className="text-link">{children}</span>;
+              }
+
+              const external = safe.startsWith("http://") || safe.startsWith("https://");
+              return (
+                <a
+                  href={safe}
+                  {...props}
+                  rel={external ? "noopener noreferrer" : undefined}
+                  target={external ? "_blank" : undefined}
+                >
+                  {children}
+                </a>
+              );
+            }
           }}
         >
           {markdown}

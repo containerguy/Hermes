@@ -49,6 +49,27 @@ export type AppSettings = {
   defaultLocale: AppLocale;
 };
 
+/** Öffentliche App-Einstellungen (ohne Admin-/Betriebsfelder) für Bootstrap ohne Admin-Session. */
+export type PublicAppSettings = Pick<
+  AppSettings,
+  | "appName"
+  | "brandMark"
+  | "publicRegistrationEnabled"
+  | "shellStartTitle"
+  | "shellStartDescription"
+  | "shellEventsEmptyTitle"
+  | "shellEventsEmptyBody"
+  | "gameCatalog"
+  | "themePrimaryColor"
+  | "themeLoginColor"
+  | "themeManagerColor"
+  | "themeAdminColor"
+  | "themeSurfaceColor"
+  | "infosEnabled"
+  | "infosMarkdown"
+  | "defaultLocale"
+>;
+
 export type AdminSection =
   | "users"
   | "betrieb"
