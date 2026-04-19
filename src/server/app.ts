@@ -9,6 +9,7 @@ import { createPushRouter } from "./http/push-routes";
 import { createRealtimeRouter } from "./http/realtime-routes";
 import { createKioskRouter } from "./http/kiosk-routes";
 import { createPizzaRouter } from "./http/pizza-routes";
+import { createAmpIntegrationRouter } from "./http/amp-routes";
 import { createDb } from "./db/client";
 import { runMigrations } from "./db/migrate";
 import { broadcastEventsChanged } from "./realtime/event-bus";
@@ -104,6 +105,7 @@ export async function createHermesApp() {
   app.use("/api/realtime", createRealtimeRouter(context));
   app.use("/api/kiosk", createKioskRouter(context));
   app.use("/api/pizza", createPizzaRouter(context));
+  app.use("/api/integrations/amp", createAmpIntegrationRouter(context));
 
   const statusInterval = setInterval(() => {
     if (refreshEventStatuses(context)) {

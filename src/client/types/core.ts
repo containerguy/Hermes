@@ -65,12 +65,28 @@ export type AppSettings = {
   pizzaPaypalName: string;
   /** Bargeld-Empfänger-Hinweis im Anteilsbildschirm. */
   pizzaCashRecipient: string;
+  /** CubeCoders AMP: Instanzen beim Event-Anlegen auswählbar (serverseitig konfiguriert). */
+  ampIntegrationEnabled: boolean;
+  /** Basis-URL ohne /API, z. B. http://192.168.200.98:8080 */
+  ampBaseUrl: string;
+  ampUsername: string;
+  ampPassword: string;
+  ampTlsSkipVerify: boolean;
 };
 
 /** Build-/Release-Infos aus dem Server (package.json + optional Repo-URL). */
 export type AppReleaseInfo = {
   version: string;
   repoUrl: string;
+};
+
+/** Eintrag aus GET /api/integrations/amp/instances (CubeCoders AMP). */
+export type AmpIntegrationInstance = {
+  id: string;
+  friendlyName: string;
+  module: string;
+  serverHost: string;
+  connectionInfo: string;
 };
 
 /** Öffentliche App-Einstellungen (ohne Admin-/Betriebsfelder) für Bootstrap ohne Admin-Session. */
@@ -99,6 +115,7 @@ export type PublicAppSettings = Pick<
   | "pizzaPaypalHandle"
   | "pizzaPaypalName"
   | "pizzaCashRecipient"
+  | "ampIntegrationEnabled"
 >;
 
 export type AdminSection =

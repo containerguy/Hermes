@@ -78,7 +78,12 @@ const defaultSettings: AppSettings = {
   featuresPizzaEnabled: false,
   pizzaPaypalHandle: "",
   pizzaPaypalName: "",
-  pizzaCashRecipient: ""
+  pizzaCashRecipient: "",
+  ampIntegrationEnabled: false,
+  ampBaseUrl: "",
+  ampUsername: "",
+  ampPassword: "",
+  ampTlsSkipVerify: false
 };
 
 const redeemedUser: User = {

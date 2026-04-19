@@ -168,7 +168,12 @@ describe("ui correctness structure contracts", () => {
       featuresPizzaEnabled: false,
       pizzaPaypalHandle: "",
       pizzaPaypalName: "",
-      pizzaCashRecipient: ""
+      pizzaCashRecipient: "",
+      ampIntegrationEnabled: false,
+      ampBaseUrl: "",
+      ampUsername: "",
+      ampPassword: "",
+      ampTlsSkipVerify: false
     };
 
     requestJsonMock.mockImplementation(async (path: string) => {

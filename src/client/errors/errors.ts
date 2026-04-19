@@ -59,7 +59,14 @@ export const errorMessages: Record<string, string> = {
   kiosk_ungueltig: "Kiosk-Anzeige ist deaktiviert oder der Schlüssel in der URL ist ungültig.",
   api_token_nur_lesen: "Dieses API-Token ist nur für Lesezugriff. Schreibende Aktionen sind nicht erlaubt.",
   ungueltiger_api_token: "API-Token-Anfrage ist ungültig.",
-  api_token_nicht_gefunden: "API-Token nicht gefunden."
+  api_token_nicht_gefunden: "API-Token nicht gefunden.",
+  amp_deaktiviert: "Die AMP-Anbindung ist deaktiviert.",
+  amp_nicht_konfiguriert: "AMP ist nicht vollständig konfiguriert (URL oder Zugangsdaten fehlen).",
+  amp_auth_fehlgeschlagen: "Anmeldung bei AMP fehlgeschlagen. Benutzername, Passwort und URL prüfen.",
+  amp_anfrage_fehlgeschlagen: "Die AMP-API hat nicht geantwortet oder einen Fehler gemeldet. Netzwerk und AMP-Logs prüfen.",
+  amp_url_erforderlich: "AMP-Basis-URL ist erforderlich, wenn die Anbindung aktiv ist.",
+  amp_url_ungueltig: "AMP-Basis-URL ist ungültig.",
+  amp_zugang_erforderlich: "AMP-Benutzername und Passwort sind erforderlich, wenn die Anbindung aktiv ist."
 };
 
 export const errorMessagesEn: Record<string, string> = {
@@ -119,7 +126,14 @@ export const errorMessagesEn: Record<string, string> = {
   kiosk_ungueltig: "The kiosk display is disabled or the URL key is invalid.",
   api_token_nur_lesen: "This API token is read-only. Write operations are not allowed.",
   ungueltiger_api_token: "Invalid API token request.",
-  api_token_nicht_gefunden: "API token not found."
+  api_token_nicht_gefunden: "API token not found.",
+  amp_deaktiviert: "AMP integration is disabled.",
+  amp_nicht_konfiguriert: "AMP is not fully configured (URL or credentials missing).",
+  amp_auth_fehlgeschlagen: "AMP sign-in failed. Check username, password, and URL.",
+  amp_anfrage_fehlgeschlagen: "The AMP API did not respond or returned an error. Check network and AMP logs.",
+  amp_url_erforderlich: "AMP base URL is required when integration is enabled.",
+  amp_url_ungueltig: "AMP base URL is invalid.",
+  amp_zugang_erforderlich: "AMP username and password are required when integration is enabled."
 };
 
 export class ApiError extends Error {
