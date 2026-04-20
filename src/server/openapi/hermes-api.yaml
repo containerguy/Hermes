@@ -19,7 +19,7 @@ info:
     als Fallback verwendet (explizit nur Cookie *oder* gültiger Bearer).
 
     Öffentlich ohne Login: `GET /api/health`, `GET /api/settings/public`, `GET /api/openapi.yaml`, `GET /api/docs`, Kiosk-Pfad (falls aktiviert).
-  version: 0.8.0
+  version: 0.9.0
 
 servers:
   - url: /

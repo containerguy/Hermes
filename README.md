@@ -12,7 +12,7 @@ Build- und Release-Hinweise liegen in [`building.md`](building.md).
 Die WebApp ist in getrennte Arbeitsbereiche aufgeteilt:
 
 - `#Start`: Eventübersicht für Abstimmung, Status, Startzeit und Serverdaten, sowie Eventverwaltung.
-- `#login`: Login vor der Anmeldung; nach dem Login wird daraus `Profil` mit Konto, Logout, Notification-Einstellungen und Geräteverwaltung.
+- `#login`: Login vor der Anmeldung; nach dem Login wird daraus `Profil` mit Konto, **API-Tokens** (Integrationen), Logout, Notification-Einstellungen und Geräteverwaltung.
 - `#infos`: Falls aktiviert, stehen hier weitere Informationen rund um das Hauptevent bereit
 - `#admin`: Userverwaltung, Rollenzuweisung, Invite-Codes, Audit-Log und globale Einstellungen.
 
@@ -179,6 +179,37 @@ Hermes setzt bei Push-Benachrichtigungen eine Vibrationssequenz und nutzt `requi
 
 Hermes nutzt für Live-Updates **Server-Sent Events (SSE)**. Die Verbindung sendet Heartbeats und der Client verbindet sich bei Fehlern automatisch neu. Trotzdem können Reverse-Proxies oder Load-Balancer Idle-Timeouts erzwingen — Hermes fällt dann zusätzlich auf Polling zurück.
 
+## HTTP-API, API-Tokens und Doku
+
+Die JSON-API liegt unter **`/api/*`** (siehe OpenAPI). Typische Ressourcen: Events (`/api/events`), Auth & Profil (`/api/auth/...`), Admin (`/api/admin/...`, nur Rolle **admin**), Push (`/api/push/...`), Realtime (`/api/realtime/events` als SSE).
+
+### Authentifizierung
+
+- **Browser / Web-UI:** Session-Cookie `hermes_session` nach erfolgreichem Login (wie bisher).
+- **Skripte & Integrationen:** persönliches **API-Token** mit Header  
+  `Authorization: Bearer <token>`  
+  Tokens werden unter **`/#login`** (Profil) erzeugt und widerrufen. Der Klartext wird **nur einmal** beim Anlegen angezeigt und danach nur noch als Hash gespeichert.
+
+Ist der Header `Authorization: Bearer …` gesetzt und der Token **ungültig**, nutzt Hermes **keinen** Cookie-Fallback (explizit nur gültiger Bearer oder Cookie).
+
+### API-Token-Scopes
+
+- **`full`:** dieselben Rechte wie der zugehörige Benutzer (Admin / Manager / Organisator / User), inklusive schreibender Requests.
+- **`read_only`:** nur **`GET`**, **`HEAD`** und **`OPTIONS`** auf geschützten Routen. Schreibende Methoden (z. B. `POST`, `PATCH`, `DELETE`) auf Events, Admin und Push liefern **`403`** mit Code `api_token_nur_lesen`.  
+  Read-only-Tokens dürfen **keine** neuen API-Tokens anlegen oder widerrufen.
+
+### CSRF (Browser vs. Bearer)
+
+Schreibende Requests aus dem **Browser** mit Cookie-Session benötigen den Header **`x-hermes-csrf`** (Token über `GET /api/auth/csrf`).  
+Reine **Bearer**-Clients sind von der CSRF-Pflicht **befreit**.
+
+### OpenAPI und Swagger UI
+
+- **`GET /api/openapi.yaml`** — maschinenlesbare Spezifikation (YAML).
+- **`GET /api/docs`** — **Swagger UI** zur interaktiven Erkundung der API (lädt Hilfsressourcen von `unpkg.com`; eigene Content-Security-Policy nur für diese Seite).
+
+In Produktion sollte die API nur über **HTTPS** erreichbar sein; Tokens wie Passwörter behandeln.
+
 ## Backup, Restore Und Reset
 
 S3 ist das primäre persistente Snapshot-Backend. Admins können im Adminbereich aktiv ein Backup nach S3 starten oder den aktuellen Datenstand aus dem S3-Snapshot wiederherstellen.
@@ -265,6 +296,7 @@ Falls Chromium wegen fehlender Systembibliotheken nicht startet, müssen die Pla
 
 ## Release-Checklist (Operator)
 
+- HTTP-API verstanden: bei Bedarf **`/api/docs`** für Operatoren/Integratoren bereitstellen; Tokens nur über vertrauenswürdige Kanäle verteilen
 - Reverse Proxy / TLS ist **operator-owned** (Hermes liefert kein TLS, nur HTTP)
 - `HERMES_COOKIE_SECURE=true` sobald Hermes hinter HTTPS läuft
 - SMTP konfiguriert (und `HERMES_MAIL_MODE=smtp`), `HERMES_MAIL_FROM` gesetzt
