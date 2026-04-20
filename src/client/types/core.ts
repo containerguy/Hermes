@@ -59,6 +59,12 @@ export type AppSettings = {
   kioskStreamSecret: string;
 };
 
+/** Build-/Release-Infos aus dem Server (package.json + optional Repo-URL). */
+export type AppReleaseInfo = {
+  version: string;
+  repoUrl: string;
+};
+
 /** Öffentliche App-Einstellungen (ohne Admin-/Betriebsfelder) für Bootstrap ohne Admin-Session. */
 export type PublicAppSettings = Pick<
   AppSettings,

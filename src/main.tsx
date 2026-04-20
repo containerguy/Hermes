@@ -2,7 +2,7 @@ import React, { useEffect, useMemo, useState } from "react";
 import { createRoot } from "react-dom/client";
 import "./styles.css";
 
-import type { AdminSection, AppSettings, PublicAppSettings, User } from "./client/types/core";
+import type { AdminSection, AppReleaseInfo, AppSettings, PublicAppSettings, User } from "./client/types/core";
 import { requestJson } from "./client/api/request";
 import { clearCsrfToken, primeCsrfToken } from "./client/api/csrf";
 import { EventBoard } from "./client/components/EventBoard";
@@ -237,6 +237,7 @@ function AppShell({
   const [activePage, setActivePage] = useState<PageId>(() => initialRoute.page);
   const [adminSection, setAdminSection] = useState<AdminSection>(() => initialRoute.adminSection);
   const [publicSettingsReady, setPublicSettingsReady] = useState(false);
+  const [releaseInfo, setReleaseInfo] = useState<AppReleaseInfo | null>(null);
   const documentPath = useMemo(() => normalizeDocumentPath(window.location.pathname), []);
   const kioskPathConfigured = `/${appSettings.kioskStreamPath.replace(/^\/+|\/+$/g, "")}`;
   const isKioskDocumentEntry =
@@ -257,10 +258,11 @@ function AppShell({
   }, [setCurrentUser]);
 
   useEffect(() => {
-    requestJson<{ settings: PublicAppSettings }>("/api/settings/public")
+    requestJson<{ settings: PublicAppSettings; release: AppReleaseInfo }>("/api/settings/public")
       .then((result) => {
         setAppSettings((prev) => ({ ...prev, ...result.settings }));
         applyTheme({ ...defaultSettings, ...result.settings });
+        setReleaseInfo(result.release);
       })
       .catch(() => applyTheme(defaultSettings))
       .finally(() => {
@@ -509,6 +511,24 @@ function AppShell({
         />
         {renderActivePage()}
       </div>
+      {releaseInfo ? (
+        <footer className="app-footer" aria-label={t("main.footer.aria")}>
+          <p className="app-footer__inner">
+            <a
+              className="text-link app-footer__link"
+              href={releaseInfo.repoUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+            >
+              {t("main.footer.repo")}
+            </a>
+            <span className="app-footer__sep" aria-hidden="true">
+              ·
+            </span>
+            <span className="app-footer__version">{t("main.footer.version", { version: releaseInfo.version })}</span>
+          </p>
+        </footer>
+      ) : null}
     </main>
     </BrandingProvider>
   );

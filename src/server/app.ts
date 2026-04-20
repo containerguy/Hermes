@@ -20,6 +20,7 @@ import {
   restoreDatabaseFromStorageIfNeeded,
   scheduleDatabaseSnapshot
 } from "./storage/s3-storage";
+import { getReleaseInfo } from "./version-info";
 
 export async function createHermesApp() {
   await restoreDatabaseFromStorageIfNeeded();
@@ -73,7 +74,10 @@ export async function createHermesApp() {
   });
 
   app.get("/api/settings/public", (_request, response) => {
-    response.json({ settings: pickPublicSettings(readSettings(context)) });
+    response.json({
+      settings: pickPublicSettings(readSettings(context)),
+      release: getReleaseInfo()
+    });
   });
 
   app.get("/api/settings", (request, response) => {

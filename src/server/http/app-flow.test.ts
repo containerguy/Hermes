@@ -1535,6 +1535,8 @@ describe("app flow", () => {
       .expect((response) => {
         expect(response.body.settings.appName).toBe("Hermes Test");
         expect(response.body.settings.themeAdminColor).toBe("#2563eb");
+        expect(response.body.release?.version).toMatch(/\d+\.\d+\.\d+/);
+        expect(response.body.release?.repoUrl).toMatch(/^https?:\/\//);
       });
 
     await adminAgent.post("/api/admin/backup").set(CSRF_HEADER, adminCsrf).expect(200);

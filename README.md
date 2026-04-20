@@ -210,6 +210,8 @@ Reine **Bearer**-Clients sind von der CSRF-Pflicht **befreit**.
 
 In Produktion sollte die API nur über **HTTPS** erreichbar sein; Tokens wie Passwörter behandeln.
 
+Die **Fußzeile** der Web-UI zeigt den Link zum Quellrepository und die **Version** aus der laufenden Instanz (`package.json`). Optional kann `HERMES_SOURCE_REPO_URL` in der `.env` auf ein Fork- oder Intern-Repo zeigen.
+
 ## Backup, Restore Und Reset
 
 S3 ist das primäre persistente Snapshot-Backend. Admins können im Adminbereich aktiv ein Backup nach S3 starten oder den aktuellen Datenstand aus dem S3-Snapshot wiederherstellen.
