@@ -8,6 +8,8 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 function resolveOpenApiSpecPath(): string {
   const candidates = [
     path.join(process.cwd(), "dist-server/openapi/hermes-api.yaml"),
+    // Bundled server: index.js and openapi/ live under dist-server/
+    path.join(__dirname, "openapi/hermes-api.yaml"),
     path.join(__dirname, "../openapi/hermes-api.yaml")
   ];
   for (const candidate of candidates) {
@@ -27,8 +29,10 @@ function docsCsp() {
     "img-src 'self' data: https://unpkg.com",
     "font-src 'self' https://unpkg.com",
     "style-src 'self' 'unsafe-inline' https://unpkg.com",
-    "script-src 'self' https://unpkg.com",
-    "connect-src 'self'"
+    // Inline boot script calls SwaggerUIBundle; external bundle loads from unpkg.
+    "script-src 'self' 'unsafe-inline' https://unpkg.com",
+    "connect-src 'self'",
+    "worker-src 'self' blob:"
   ].join("; ");
 }
 
