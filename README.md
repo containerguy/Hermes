@@ -1,6 +1,6 @@
-# Hermes
+# Hermes / Matchdesk / Mitspielzentrale
 
-Hermes ist eine responsive WebApp für LAN-Party-Spielrunden. User melden sich mit Username und E-Mail-Einmalcode an, Manager legen Events an, und Teilnehmer stimmen mit `dabei` oder `nicht dabei` ab.
+Codename Hermes ist eine responsive WebApp für die Organisation von Spielrunden. Gestartet für LAN-Parties, können nun auch Turniere für verschiedene Sportarten darüber verwaltet werden. User melden sich mit Username und E-Mail-Einmalcode an, Manager / Organisatoren legen Events an, und Teilnehmer stimmen mit `dabei` oder `nicht dabei` ab.
 
 Build- und Release-Hinweise liegen in [`building.md`](building.md).
 
@@ -11,20 +11,22 @@ Build- und Release-Hinweise liegen in [`building.md`](building.md).
 
 Die WebApp ist in getrennte Arbeitsbereiche aufgeteilt:
 
-- `#events`: Eventübersicht für Abstimmung, Status, Startzeit und Serverdaten.
+- `#Start`: Eventübersicht für Abstimmung, Status, Startzeit und Serverdaten, sowie Eventverwaltung.
 - `#login`: Login vor der Anmeldung; nach dem Login wird daraus `Profil` mit Konto, Logout, Notification-Einstellungen und Geräteverwaltung.
-- `#manager`: Eventanlage und Eventsteuerung für Manager und Admins.
+- `#infos`: Falls aktiviert, stehen hier weitere Informationen rund um das Hauptevent bereit
 - `#admin`: Userverwaltung, Rollenzuweisung, Invite-Codes, Audit-Log und globale Einstellungen.
-
-Das Managerformular wird bewusst nur im Managerbereich angezeigt. Die Eventübersicht bleibt damit für Teilnehmer auf Abstimmung und Status fokussiert.
 
 Im Adminbereich können Designfarben und Theme unter dem Unterpunkt **Design** gepflegt werden. Diese Werte liegen wie die übrigen App-Einstellungen in `app_settings` und werden beim Laden der WebApp angewendet.
 
 Admins sehen im Bereich `#admin` außerdem ein Audit-Log. Dort werden Login/Logout, User- und Settingsänderungen, Eventaktionen, Teilnahmen sowie Backup/Restore-Aktionen chronologisch angezeigt.
 
-Admins können öffentliche Registrierung aktivieren und Invite-Codes für LAN-Partys erstellen. Neue User registrieren sich dann mit Invite-Code, Username und E-Mail-Adresse; danach wird der Login-Code per E-Mail verschickt.
+Admins können die öffentliche Registrierung aktivieren und Invite-Codes für LAN-Partys erstellen. Neue User registrieren sich dann mit Invite-Code, Username und E-Mail-Adresse; danach wird der Login-Code per E-Mail verschickt.
 
 Invite-Codes sind dabei **credential-like**: Sie werden von Hermes generiert, sind für Admins sichtbar und sollten wie Zugangsdaten behandelt werden. Audit-Logs enthalten bewusst nur eine maskierte Variante (kein vollständiger Invite-Code in den Metadaten).
+
+## Kiosk Modus
+Falls aktiviert, kann über eine entsprechend generierte URL eine Übersicht der anstehenden Spiele angezeigt werden. Die Funktion ist primär für die Darstellung auf Fernsehern und Co. vorgesehen.
+![Screenshot Overview](screen/screen_mitspielzentrale_kiosk_sport.png)
 
 ## Wo Werden Einstellungen Gespeichert?
 
