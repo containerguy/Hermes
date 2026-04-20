@@ -3,6 +3,7 @@ import type { DatabaseContext } from "./db/client";
 import { appSettings } from "./db/schema";
 import { brandMarkSchema } from "../shared/brand-mark";
 import { appLocaleSchema } from "../shared/locale";
+import { projectTemplateSchema } from "../shared/project-template";
 
 const colorSchema = z.string().regex(/^#[0-9a-fA-F]{6}$/);
 
@@ -20,6 +21,11 @@ const settingsObjectSchema = z.object({
   appName: z.string().trim().max(80),
   /** App-Logo in der UI: H (Hermes) oder M (Mitspiel / MatchDesk). */
   brandMark: brandMarkSchema,
+  /**
+   * Inhaltliches Projekt-Template: steuert eingebaute UI-Standardtexte (Client-i18n-Overlays).
+   * `lan_party` = bisherige LAN-Party-Kopie; `table_tennis` = Sport/Turnier.
+   */
+  projectTemplate: projectTemplateSchema,
   defaultNotificationsEnabled: z.boolean(),
   eventAutoArchiveHours: z.number().int().min(1).max(72),
   publicRegistrationEnabled: z.boolean(),
@@ -84,6 +90,7 @@ export type PublicHermesSettings = Pick<
   HermesSettings,
   | "appName"
   | "brandMark"
+  | "projectTemplate"
   | "publicRegistrationEnabled"
   | "shellStartTitle"
   | "shellStartDescription"
@@ -106,6 +113,7 @@ export function pickPublicSettings(full: HermesSettings): PublicHermesSettings {
   return {
     appName: full.appName,
     brandMark: full.brandMark,
+    projectTemplate: full.projectTemplate,
     publicRegistrationEnabled: full.publicRegistrationEnabled,
     shellStartTitle: full.shellStartTitle,
     shellStartDescription: full.shellStartDescription,
@@ -128,6 +136,7 @@ export function pickPublicSettings(full: HermesSettings): PublicHermesSettings {
 export const defaultSettings: HermesSettings = {
   appName: "",
   brandMark: "mitspiel",
+  projectTemplate: "lan_party",
   defaultNotificationsEnabled: true,
   eventAutoArchiveHours: 8,
   publicRegistrationEnabled: false,

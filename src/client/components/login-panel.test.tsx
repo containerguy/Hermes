@@ -54,6 +54,7 @@ async function renderIntoDocument(element: React.ReactElement) {
 const defaultSettings: AppSettings = {
   appName: "",
   brandMark: "mitspiel",
+  projectTemplate: "lan_party",
   defaultNotificationsEnabled: true,
   eventAutoArchiveHours: 8,
   publicRegistrationEnabled: false,

@@ -66,6 +66,7 @@ function buildAppRoutes(t: TFunction): Route[] {
 const defaultSettings: AppSettings = {
   appName: "",
   brandMark: "mitspiel",
+  projectTemplate: "lan_party",
   defaultNotificationsEnabled: true,
   eventAutoArchiveHours: 8,
   publicRegistrationEnabled: false,
@@ -524,7 +525,7 @@ function App() {
   );
 
   return (
-    <I18nProvider locale={effectiveLocale}>
+    <I18nProvider locale={effectiveLocale} projectTemplate={appSettings.projectTemplate}>
       <AppShell
         currentUser={currentUser}
         setCurrentUser={setCurrentUser}

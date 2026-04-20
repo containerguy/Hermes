@@ -364,6 +364,11 @@ export const deMessages = {
   "admin.label.s3snap": "S3-Snapshots und Restore in der laufenden Instanz erlauben (Standard: an, nur wirksam wenn die Umgebung S3 nutzt)",
   "admin.help.s3snap":
     "Wenn deaktiviert, schreibt Hermes keine periodischen oder manuellen Snapshots nach S3 und blockiert Restore in der App – auch wenn HERMES_STORAGE_BACKEND=s3 gesetzt ist. Der erste Datenbank-Download auf ein leeres Volume beim Start richtet sich weiterhin nur nach der Umgebungsvariable, nicht nach dieser Option.",
+  "admin.projectTemplate.label": "Projekt-Template",
+  "admin.projectTemplate.help":
+    "Bestimmt die eingebauten Standardtexte (Navigation, Board, Formulare, Kiosk). Ausgefüllte Shell-Texte weiter unten überschreiben die Überschriften am Start und im leeren Board. „Tischtennis“ nutzt turniernahe Formulierungen; Datenmodell und Abläufe bleiben gleich.",
+  "admin.projectTemplate.lan_party": "LAN-Party (Standard)",
+  "admin.projectTemplate.table_tennis": "Tischtennis / Turnier",
   "admin.label.defaultLocale": "Standardsprache (Fallback)",
   "admin.help.defaultLocale":
     "Wird genutzt, wenn die Browsersprache weder eindeutig Deutsch noch Englisch ist, und als Server-Fallback bei Registrierung ohne Client-Angabe.",

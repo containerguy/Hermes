@@ -1,7 +1,9 @@
 import type { BrandMark } from "../../shared/brand-mark";
 import type { AppLocale } from "../../shared/locale";
+import type { ProjectTemplateId } from "../../shared/project-template";
 
 export type { BrandMark };
+export type { ProjectTemplateId };
 
 export type User = {
   id: string;
@@ -20,6 +22,8 @@ export type AppSettings = {
   appName: string;
   /** Welches Marken-Icon in Shell, Boards und Login gezeigt wird. */
   brandMark: BrandMark;
+  /** UI-Text-Basis: LAN-Party (Standard) oder Tischtennis/Sport-Turnier. */
+  projectTemplate: ProjectTemplateId;
   defaultNotificationsEnabled: boolean;
   eventAutoArchiveHours: number;
   publicRegistrationEnabled: boolean;
@@ -60,6 +64,7 @@ export type PublicAppSettings = Pick<
   AppSettings,
   | "appName"
   | "brandMark"
+  | "projectTemplate"
   | "publicRegistrationEnabled"
   | "shellStartTitle"
   | "shellStartDescription"

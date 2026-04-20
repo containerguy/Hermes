@@ -46,6 +46,7 @@ function generateKioskStreamSecret(): string {
 const defaultSettings: AppSettings = {
   appName: "",
   brandMark: "mitspiel",
+  projectTemplate: "lan_party",
   defaultNotificationsEnabled: true,
   eventAutoArchiveHours: 8,
   publicRegistrationEnabled: false,
@@ -1001,6 +1002,22 @@ export function AdminPanel({
           {t("admin.label.s3snap")}
         </label>
         <p className="muted">{t("admin.help.s3snap")}</p>
+        <label>
+          {t("admin.projectTemplate.label")}
+          <select
+            value={settings.projectTemplate}
+            onChange={(event) =>
+              setSettings({
+                ...settings,
+                projectTemplate: event.target.value as AppSettings["projectTemplate"]
+              })
+            }
+          >
+            <option value="lan_party">{t("admin.projectTemplate.lan_party")}</option>
+            <option value="table_tennis">{t("admin.projectTemplate.table_tennis")}</option>
+          </select>
+        </label>
+        <p className="muted">{t("admin.projectTemplate.help")}</p>
         <label>
           {t("admin.label.defaultLocale")}
           <select

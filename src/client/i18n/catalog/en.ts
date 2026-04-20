@@ -367,6 +367,11 @@ export const enMessages: { [K in keyof typeof deMessages]: string } = {
     "Allow S3 snapshots and restore in this instance (default on; only if environment uses S3)",
   "admin.help.s3snap":
     "If disabled, Hermes writes no periodic or manual snapshots to S3 and blocks in-app restore—even when HERMES_STORAGE_BACKEND=s3. The first database download to an empty volume at startup still follows the environment variable only, not this option.",
+  "admin.projectTemplate.label": "Project template",
+  "admin.projectTemplate.help":
+    "Controls built-in default copy (navigation, board, forms, kiosk). Filled-in shell texts below override the home headline and empty-board texts. “Table tennis” uses tournament-oriented wording; data model and flows stay the same.",
+  "admin.projectTemplate.lan_party": "LAN party (default)",
+  "admin.projectTemplate.table_tennis": "Table tennis / tournament",
   "admin.label.defaultLocale": "Default language (fallback)",
   "admin.help.defaultLocale":
     "Used when the browser language is neither clearly German nor English, and as a server fallback for registration without a client locale.",

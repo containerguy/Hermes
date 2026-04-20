@@ -1111,6 +1111,7 @@ describe("app flow", () => {
     const updatedSettings = {
       appName: "Hermes HQ",
       brandMark: "mitspiel" as const,
+      projectTemplate: "lan_party" as const,
       defaultNotificationsEnabled: false,
       eventAutoArchiveHours: 12,
       publicRegistrationEnabled: true,

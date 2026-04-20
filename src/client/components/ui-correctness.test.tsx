@@ -145,6 +145,7 @@ describe("ui correctness structure contracts", () => {
     const defaultSettings: AppSettings = {
       appName: "",
       brandMark: "mitspiel",
+      projectTemplate: "lan_party",
       defaultNotificationsEnabled: true,
       eventAutoArchiveHours: 8,
       publicRegistrationEnabled: false,
