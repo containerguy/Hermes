@@ -365,6 +365,18 @@ function AppShell({
     }
 
     if (activePage === "infos") {
+      if (!currentUser) {
+        return (
+          <section className="access-panel" aria-label={t("main.route.infos.title")}>
+            <p className="eyebrow">{t("main.route.infos.eyebrow")}</p>
+            <h2>{t("main.infos.guest.title")}</h2>
+            <p className="muted">{t("main.infos.guest.body")}</p>
+            <a className="text-link" href="#login">
+              {t("main.infos.guest.login")}
+            </a>
+          </section>
+        );
+      }
       return <InfosPage markdown={appSettings.infosMarkdown} enabled={appSettings.infosEnabled} />;
     }
 
@@ -427,7 +439,7 @@ function AppShell({
                   return false;
                 }
                 if (route.id === "infos") {
-                  return appSettings.infosEnabled;
+                  return Boolean(currentUser) && appSettings.infosEnabled;
                 }
                 return true;
               })

@@ -39,6 +39,9 @@ export const enMessages: { [K in keyof typeof deMessages]: string } = {
     "See which round is ready to start and make your choice. Managers and admins create new rounds right here—no second UI.",
   "main.route.infos.eyebrow": "Orientation",
   "main.route.infos.title": "Information and notes.",
+  "main.infos.guest.title": "Sign-in required",
+  "main.infos.guest.body": "The Infos page is only visible when you are signed in.",
+  "main.infos.guest.login": "Go to sign-in",
   "main.route.login.eyebrow": "Email code instead of a password",
   "main.route.login.title": "Sign in fast and stay ready on every device.",
   "main.route.login.description":
