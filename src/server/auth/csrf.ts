@@ -2,6 +2,7 @@ import { createHmac, timingSafeEqual } from "node:crypto";
 import type { Request, Response } from "express";
 import type { DatabaseContext } from "../db/client";
 import { getCurrentSession } from "./current-user";
+import { resolveHermesAuth } from "./hermes-auth";
 
 export const CSRF_HEADER = "x-hermes-csrf";
 
@@ -28,6 +29,11 @@ export function verifyCsrfToken(sessionId: string, token: string | undefined) {
 }
 
 export function requireCsrf(context: DatabaseContext, request: Request, response: Response) {
+  resolveHermesAuth(context, request);
+  if (request.hermesAuth?.kind === "api_token") {
+    return true;
+  }
+
   const current = getCurrentSession(context, request);
 
   if (!current) {

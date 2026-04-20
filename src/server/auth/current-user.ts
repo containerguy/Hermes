@@ -1,12 +1,7 @@
-import { and, eq, isNull } from "drizzle-orm";
 import type { Request } from "express";
-import { hashSessionToken, SESSION_COOKIE } from "./sessions";
 import type { DatabaseContext } from "../db/client";
-import { sessions, users } from "../db/schema";
-
-function nowIso() {
-  return new Date().toISOString();
-}
+import { users } from "../db/schema";
+import { resolveHermesAuth } from "./hermes-auth";
 
 export function publicUser(user: typeof users.$inferSelect) {
   return {
@@ -23,41 +18,17 @@ export function publicUser(user: typeof users.$inferSelect) {
 }
 
 export function getCurrentSession(context: DatabaseContext, request: Request) {
-  const token = request.cookies?.[SESSION_COOKIE] as string | undefined;
-
-  if (!token) {
-    return undefined;
+  resolveHermesAuth(context, request);
+  const auth = request.hermesAuth;
+  if (auth?.kind === "session") {
+    return { session: auth.session, user: auth.user };
   }
-
-  const tokenHash = hashSessionToken(token);
-  const result = context.db
-    .select({ session: sessions, user: users })
-    .from(sessions)
-    .innerJoin(users, eq(sessions.userId, users.id))
-    .where(and(eq(sessions.tokenHash, tokenHash), isNull(sessions.revokedAt)))
-    .get();
-
-  if (!result || result.user.deletedAt) {
-    return undefined;
-  }
-
-  context.db
-    .update(sessions)
-    .set({ lastSeenAt: nowIso() })
-    .where(eq(sessions.id, result.session.id))
-    .run();
-
-  return result;
+  return undefined;
 }
 
 export function requireUser(context: DatabaseContext, request: Request) {
-  const current = getCurrentSession(context, request);
-
-  if (!current) {
-    return undefined;
-  }
-
-  return current.user;
+  resolveHermesAuth(context, request);
+  return request.hermesAuth?.user;
 }
 
 export function requireAdmin(context: DatabaseContext, request: Request) {

@@ -56,7 +56,10 @@ export const errorMessages: Record<string, string> = {
   mailversand_fehlgeschlagen: "Mailversand fehlgeschlagen.",
   code_abgelehnt: "Code abgelehnt.",
   event_voll: "Event ist voll.",
-  kiosk_ungueltig: "Kiosk-Anzeige ist deaktiviert oder der Schlüssel in der URL ist ungültig."
+  kiosk_ungueltig: "Kiosk-Anzeige ist deaktiviert oder der Schlüssel in der URL ist ungültig.",
+  api_token_nur_lesen: "Dieses API-Token ist nur für Lesezugriff. Schreibende Aktionen sind nicht erlaubt.",
+  ungueltiger_api_token: "API-Token-Anfrage ist ungültig.",
+  api_token_nicht_gefunden: "API-Token nicht gefunden."
 };
 
 export const errorMessagesEn: Record<string, string> = {
@@ -113,7 +116,10 @@ export const errorMessagesEn: Record<string, string> = {
   mailversand_fehlgeschlagen: "Mail delivery failed.",
   code_abgelehnt: "Code rejected.",
   event_voll: "Event is full.",
-  kiosk_ungueltig: "The kiosk display is disabled or the URL key is invalid."
+  kiosk_ungueltig: "The kiosk display is disabled or the URL key is invalid.",
+  api_token_nur_lesen: "This API token is read-only. Write operations are not allowed.",
+  ungueltiger_api_token: "Invalid API token request.",
+  api_token_nicht_gefunden: "API token not found."
 };
 
 export class ApiError extends Error {

@@ -1,5 +1,5 @@
 import React, { FormEvent, useEffect, useState } from "react";
-import type { AppSettings, User, UserSession } from "../types/core";
+import type { ApiToken, AppSettings, User, UserSession } from "../types/core";
 import { requestJson } from "../api/request";
 import { clearCsrfToken, primeCsrfToken } from "../api/csrf";
 import { forgetDeviceKey, getDeviceContext } from "../api/device-key";
@@ -85,6 +85,23 @@ export function LoginPanel({
     "idle" | "redeeming" | "done" | "error"
   >("idle");
   const [deferredInstall, setDeferredInstall] = useState<BeforeInstallPromptChrome | null>(null);
+  const [apiTokens, setApiTokens] = useState<ApiToken[]>([]);
+  const [apiTokenLabel, setApiTokenLabel] = useState("");
+  const [apiTokenScope, setApiTokenScope] = useState<"full" | "read_only">("full");
+  const [newApiTokenPlaintext, setNewApiTokenPlaintext] = useState<string | null>(null);
+
+  async function loadApiTokens() {
+    if (!currentUser) {
+      setApiTokens([]);
+      return;
+    }
+    try {
+      const result = await requestJson<{ apiTokens: ApiToken[] }>("/api/auth/api-tokens");
+      setApiTokens(result.apiTokens ?? []);
+    } catch {
+      setApiTokens([]);
+    }
+  }
 
   async function loadSessions() {
     if (!currentUser) {
@@ -103,14 +120,16 @@ export function LoginPanel({
 
   useEffect(() => {
     loadSessions().catch(() => undefined);
+    loadApiTokens().catch(() => undefined);
   }, [currentUser?.id]);
 
-   useEffect(() => {
+  useEffect(() => {
     if (!currentUser) {
       setDisplayNameDraft("");
       setEmailDraft("");
       setEmailVerifyCode("");
       setLocaleDraft("");
+      setNewApiTokenPlaintext(null);
       return;
     }
 
@@ -434,6 +453,48 @@ export function LoginPanel({
     }
   }
 
+  async function createApiToken(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    setBusy(true);
+    setError("");
+    setMessage("");
+    setNewApiTokenPlaintext(null);
+
+    try {
+      const result = await requestJson<{ token: string; apiToken: ApiToken }>("/api/auth/api-tokens", {
+        method: "POST",
+        body: JSON.stringify({
+          label: apiTokenLabel.trim() || undefined,
+          scope: apiTokenScope
+        })
+      });
+      setNewApiTokenPlaintext(result.token);
+      setApiTokenLabel("");
+      await loadApiTokens();
+      setMessage(t("login.msg.apiTokenCreated"));
+    } catch (caught) {
+      setError(getErrorMessage(caught, locale));
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function revokeApiToken(tokenId: string) {
+    setBusy(true);
+    setError("");
+    setMessage("");
+
+    try {
+      await requestJson<void>(`/api/auth/api-tokens/${tokenId}`, { method: "DELETE" });
+      await loadApiTokens();
+      setMessage(t("login.msg.apiTokenRevoked"));
+    } catch (caught) {
+      setError(getErrorMessage(caught, locale));
+    } finally {
+      setBusy(false);
+    }
+  }
+
   async function enableNotifications() {
     setBusy(true);
     setError("");
@@ -580,6 +641,83 @@ export function LoginPanel({
               {t("loginProfile.confirmEmail")}
             </button>
           </form>
+        </section>
+
+        <section className="device-panel" aria-label={t("loginProfile.apiTokensEyebrow")}>
+          <div className="section-title-row">
+            <div>
+              <p className="eyebrow">{t("loginProfile.apiTokensEyebrow")}</p>
+              <h3>{t("loginProfile.apiTokensTitle")}</h3>
+              <p className="muted">{t("loginProfile.apiTokensHelp")}</p>
+            </div>
+          </div>
+
+          <form onSubmit={createApiToken} className="admin-form">
+            <label>
+              {t("loginProfile.apiTokenLabel")}
+              <input
+                value={apiTokenLabel}
+                onChange={(event) => setApiTokenLabel(event.target.value)}
+                autoComplete="off"
+              />
+            </label>
+            <label>
+              {t("loginProfile.apiTokenScope")}
+              <select
+                value={apiTokenScope}
+                onChange={(event) =>
+                  setApiTokenScope(event.target.value as "full" | "read_only")
+                }
+              >
+                <option value="full">{t("loginProfile.apiTokenScopeFull")}</option>
+                <option value="read_only">{t("loginProfile.apiTokenScopeReadOnly")}</option>
+              </select>
+            </label>
+            <button type="submit" disabled={busy}>
+              {t("loginProfile.apiTokenCreate")}
+            </button>
+          </form>
+
+          {newApiTokenPlaintext ? (
+            <div className="access-panel compact" role="status">
+              <p className="eyebrow">{t("loginProfile.apiTokenReveal")}</p>
+              <pre className="api-token-reveal">{newApiTokenPlaintext}</pre>
+              <p className="muted">{t("loginProfile.apiTokenCopyHint")}</p>
+            </div>
+          ) : null}
+
+          {(apiTokens ?? []).length === 0 ? (
+            <p className="muted">{t("loginProfile.apiTokenListEmpty")}</p>
+          ) : (
+            <ul className="account-list api-token-list">
+              {(apiTokens ?? []).map((token) => (
+                <li key={token.id}>
+                  <div>
+                    <strong>{token.label || token.id.slice(0, 8)}</strong>
+                    <span className="muted">
+                      {" "}
+                      · {token.scope === "full" ? t("loginProfile.apiTokenScopeFull") : t("loginProfile.apiTokenScopeReadOnly")}
+                    </span>
+                    <div className="muted small-meta">
+                      {t("loginProfile.apiTokenCreated")}:{" "}
+                      {new Date(token.createdAt).toLocaleString(dateLocale)}
+                      {token.lastUsedAt
+                        ? ` · ${t("loginProfile.apiTokenLastUsed")}: ${new Date(token.lastUsedAt).toLocaleString(dateLocale)}`
+                        : null}
+                    </div>
+                  </div>
+                  <button
+                    type="button"
+                    className="secondary danger"
+                    disabled={busy}
+                    onClick={() => void revokeApiToken(token.id)}
+                  >
+                    {t("loginProfile.apiTokenRevoke")}
+                  </button>
+                </li>
+              ))}
+            </ul>
+          )}
         </section>
 
         {message ? <p className="notice">{message}</p> : null}

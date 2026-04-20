@@ -1,0 +1,548 @@
+openapi: 3.1.0
+info:
+  title: Hermes API
+  description: |
+    HTTP API für die Hermes LAN-Party-Koordination.
+
+    **Authentifizierung**
+    - **Browser:** Session-Cookie `hermes_session` nach Login (wie die Web-UI).
+    - **API-Client:** `Authorization: Bearer <token>` mit einem im Profil erzeugten API-Token.
+
+    **CSRF:** Schreibende Anfragen aus dem Browser senden den Header `x-hermes-csrf` (siehe `GET /api/auth/csrf`).
+    Bei reiner Bearer-Authentifizierung entfällt die CSRF-Pflicht.
+
+    **API-Token-Scopes**
+    - `full`: dieselben Rechte wie der zugehörige Benutzer (Admin/Manager/…); Schreibzugriff wie mit Session.
+    - `read_only`: nur `GET`/`HEAD`/`OPTIONS`; schreibende Methoden liefern `403` mit `api_token_nur_lesen`.
+
+    **Hinweis:** Ist der Header `Authorization: Bearer …` gesetzt, wird bei ungültigem Token **kein** Session-Cookie
+    als Fallback verwendet (explizit nur Cookie *oder* gültiger Bearer).
+
+    Öffentlich ohne Login: `GET /api/health`, `GET /api/settings/public`, `GET /api/openapi.yaml`, `GET /api/docs`, Kiosk-Pfad (falls aktiviert).
+  version: 0.7.0
+
+servers:
+  - url: /
+    description: Relativ zur Hermes-Instanz
+
+tags:
+  - name: auth
+    description: Login, Profil, Sitzungen, API-Tokens
+  - name: events
+    description: Spielrunden (Events)
+  - name: admin
+    description: Admin — Benutzer, Invites, Einstellungen, Backup (nur Rolle admin)
+  - name: push
+    description: Web-Push
+  - name: realtime
+    description: Server-Sent Events
+  - name: meta
+    description: Health & Dokumentation
+
+security:
+  - cookieAuth: []
+  - bearerAuth: []
+
+paths:
+  /api/health:
+    get:
+      tags: [meta]
+      summary: Liveness
+      security: []
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ok:
+                    type: boolean
+
+  /api/settings/public:
+    get:
+      tags: [meta]
+      summary: Öffentliche Einstellungen
+      security: []
+      responses:
+        "200":
+          description: Theme, Projekt-Template, etc.
+          content:
+            application/json:
+              schema:
+                type: object
+
+  /api/openapi.yaml:
+    get:
+      tags: [meta]
+      summary: OpenAPI-Spezifikation (YAML)
+      security: []
+      responses:
+        "200":
+          description: YAML
+          content:
+            application/yaml:
+              schema:
+                type: string
+
+  /api/docs:
+    get:
+      tags: [meta]
+      summary: Swagger UI (interaktive Doku)
+      security: []
+      responses:
+        "200":
+          description: HTML
+
+  /api/auth/csrf:
+    get:
+      tags: [auth]
+      summary: CSRF-Token für Browser-Clients
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  token:
+                    type: string
+                  header:
+                    type: string
+                    example: x-hermes-csrf
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+
+  /api/auth/api-tokens:
+    get:
+      tags: [auth]
+      summary: Eigene API-Tokens auflisten
+      description: Nur Klartext beim Anlegen einmal sichtbar; hier ohne Secret.
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  apiTokens:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/ApiTokenPublic"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+    post:
+      tags: [auth]
+      summary: Neues API-Token erzeugen
+      description: |
+        Antwort enthält `token` **nur in dieser Antwort**. Danach nur noch Hash gespeichert.
+        Read-only-Tokens dürfen keine neuen Tokens anlegen.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [scope]
+              properties:
+                label:
+                  type: string
+                  maxLength: 120
+                scope:
+                  type: string
+                  enum: [full, read_only]
+      responses:
+        "201":
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  token:
+                    type: string
+                    description: Nur jetzt zurückgegeben
+                  apiToken:
+                    $ref: "#/components/schemas/ApiTokenPublic"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+
+  /api/auth/api-tokens/{id}:
+    delete:
+      tags: [auth]
+      summary: API-Token widerrufen
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "204":
+          description: Widerrufen
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+
+  /api/events:
+    get:
+      tags: [events]
+      summary: Alle Events (nicht soft-deleted)
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  events:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/GameEvent"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+    post:
+      tags: [events]
+      summary: Event anlegen
+      description: Benötigt Manager-, Organisator- oder Admin-Rolle.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/EventCreate"
+      responses:
+        "201":
+          description: Angelegt
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+
+  /api/events/{id}:
+    patch:
+      tags: [events]
+      summary: Event aktualisieren
+      parameters:
+        - $ref: "#/components/parameters/EventId"
+      responses:
+        "200":
+          description: OK
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "409":
+          description: Event abgeschlossen
+
+  /api/events/{id}/participation:
+    post:
+      tags: [events]
+      summary: Teilnahme setzen (dabei / nicht dabei)
+      parameters:
+        - $ref: "#/components/parameters/EventId"
+      responses:
+        "200":
+          description: OK
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "409":
+          description: u.a. Event voll
+
+  /api/events/{id}/cancel:
+    post:
+      tags: [events]
+      summary: Event stornieren
+      parameters:
+        - $ref: "#/components/parameters/EventId"
+      responses:
+        "204":
+          description: OK
+
+  /api/events/{id}/archive:
+    post:
+      tags: [events]
+      summary: Event archivieren
+      parameters:
+        - $ref: "#/components/parameters/EventId"
+      responses:
+        "204":
+          description: OK
+
+  /api/admin/users:
+    get:
+      tags: [admin]
+      summary: Benutzerliste
+      responses:
+        "200":
+          description: OK
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+    post:
+      tags: [admin]
+      summary: Benutzer anlegen
+      responses:
+        "201":
+          description: OK
+        "403":
+          $ref: "#/components/responses/Forbidden"
+
+  /api/admin/users/{id}:
+    patch:
+      tags: [admin]
+      summary: Benutzer aktualisieren
+      parameters:
+        - $ref: "#/components/parameters/UserId"
+      responses:
+        "200":
+          description: OK
+    delete:
+      tags: [admin]
+      summary: Benutzer löschen (soft)
+      parameters:
+        - $ref: "#/components/parameters/UserId"
+      responses:
+        "204":
+          description: OK
+
+  /api/admin/invite-codes:
+    get:
+      tags: [admin]
+      summary: Invite-Codes
+      responses:
+        "200":
+          description: OK
+    post:
+      tags: [admin]
+      summary: Invite-Code anlegen
+      responses:
+        "201":
+          description: OK
+
+  /api/admin/invite-codes/{id}/deactivate:
+    post:
+      tags: [admin]
+      summary: Invite deaktivieren
+      parameters:
+        - $ref: "#/components/parameters/InviteId"
+
+  /api/admin/invite-codes/{id}/reactivate:
+    post:
+      tags: [admin]
+      summary: Invite reaktivieren
+      parameters:
+        - $ref: "#/components/parameters/InviteId"
+
+  /api/admin/settings:
+    get:
+      tags: [admin]
+      summary: Vollständige App-Einstellungen
+      responses:
+        "200":
+          description: OK
+    put:
+      tags: [admin]
+      summary: Einstellungen speichern (Teil-Update)
+      responses:
+        "200":
+          description: OK
+
+  /api/admin/events/{id}:
+    delete:
+      tags: [admin]
+      summary: Event soft-deleten (Admin)
+      parameters:
+        - $ref: "#/components/parameters/EventId"
+      responses:
+        "204":
+          description: OK
+
+  /api/push/public-key:
+    get:
+      tags: [push]
+      summary: VAPID Public Key
+      security: []
+      responses:
+        "200":
+          description: OK
+
+  /api/push/subscriptions:
+    post:
+      tags: [push]
+      summary: Push-Subscription registrieren
+      description: Benötigt Session oder Bearer; bei API-Token ist `sessionId` der Subscription optional null.
+      responses:
+        "201":
+          description: OK
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+
+  /api/push/preferences:
+    patch:
+      tags: [push]
+      summary: Benachrichtigungen ein/aus
+      responses:
+        "200":
+          description: OK
+
+  /api/realtime/events:
+    get:
+      tags: [realtime]
+      summary: SSE Event-Stream
+      description: text/event-stream
+      responses:
+        "200":
+          description: Stream
+
+components:
+  securitySchemes:
+    cookieAuth:
+      type: apiKey
+      in: cookie
+      name: hermes_session
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: API-Token
+
+  parameters:
+    EventId:
+      name: id
+      in: path
+      required: true
+      schema:
+        type: string
+    UserId:
+      name: id
+      in: path
+      required: true
+      schema:
+        type: string
+    InviteId:
+      name: id
+      in: path
+      required: true
+      schema:
+        type: string
+
+  responses:
+    Unauthorized:
+      description: Nicht angemeldet
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/Error"
+          example:
+            error: nicht_angemeldet
+    Forbidden:
+      description: Fehlende Rechte oder read-only-Token auf Schreiboperation
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/Error"
+          examples:
+            admin:
+              value:
+                error: admin_erforderlich
+            readOnly:
+              value:
+                error: api_token_nur_lesen
+    BadRequest:
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/Error"
+    NotFound:
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/Error"
+
+  schemas:
+    Error:
+      type: object
+      properties:
+        error:
+          type: string
+          description: Maschinenlesbarer Code
+
+    ApiTokenPublic:
+      type: object
+      properties:
+        id:
+          type: string
+        label:
+          type: string
+          nullable: true
+        scope:
+          type: string
+          enum: [full, read_only]
+        createdAt:
+          type: string
+        lastUsedAt:
+          type: string
+          nullable: true
+        revokedAt:
+          type: string
+          nullable: true
+
+    GameEvent:
+      type: object
+      properties:
+        id:
+          type: string
+        gameTitle:
+          type: string
+        startMode:
+          type: string
+          enum: [now, scheduled]
+        startsAt:
+          type: string
+        minPlayers:
+          type: integer
+        maxPlayers:
+          type: integer
+        details:
+          type: string
+          nullable: true
+        status:
+          type: string
+        joinedCount:
+          type: integer
+        myParticipation:
+          type: string
+          nullable: true
+          enum: [joined, declined]
+
+    EventCreate:
+      type: object
+      required: [gameTitle, startMode, minPlayers, maxPlayers]
+      properties:
+        gameTitle:
+          type: string
+        startMode:
+          type: string
+          enum: [now, scheduled]
+        startsAt:
+          type: string
+          description: ISO-8601, Pflicht wenn startMode scheduled
+        minPlayers:
+          type: integer
+        maxPlayers:
+          type: integer
+        details:
+          type: string
+          maxLength: 4000

@@ -4,6 +4,7 @@ import { randomBytes, randomUUID } from "node:crypto";
 import { z } from "zod";
 import { requireCsrf } from "../auth/csrf";
 import { publicUser, requireAdmin, requireUser } from "../auth/current-user";
+import { enforceApiTokenWriteAccess } from "../auth/hermes-auth";
 import { listAuditLogs, maskInviteCode, tryWriteAuditLog } from "../audit-log";
 import {
   addRateLimitAllowlist,
@@ -559,6 +560,9 @@ export function createAdminRouter(context: DatabaseContext) {
 
   router.use((request, response, next) => {
     if (["POST", "PATCH", "PUT", "DELETE"].includes(request.method)) {
+      if (!enforceApiTokenWriteAccess(request, response)) {
+        return;
+      }
       if (!requireCsrf(context, request, response)) {
         return;
       }

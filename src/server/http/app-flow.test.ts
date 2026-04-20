@@ -83,6 +83,13 @@ describe("app flow", () => {
     expect(gameEventsColumns).not.toContain("server_host");
     expect(gameEventsColumns).not.toContain("connection_info");
 
+    const apiTokenColumns = sqlite
+      .prepare("SELECT name FROM pragma_table_info('user_api_tokens') ORDER BY cid")
+      .all()
+      .map((row) => (row as { name: string }).name);
+    expect(apiTokenColumns).toContain("token_hash");
+    expect(apiTokenColumns).toContain("scope");
+
     const tables = sqlite
       .prepare("SELECT name FROM sqlite_master WHERE type = 'table'")
       .all()

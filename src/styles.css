@@ -932,6 +932,41 @@ h2 {
   white-space: pre-wrap;
 }
 
+.api-token-reveal {
+  margin: 8px 0 0;
+  padding: 10px 12px;
+  border-radius: var(--radius-sm);
+  background: var(--paper);
+  border: 1px solid var(--line);
+  font-size: 0.82rem;
+  overflow-x: auto;
+  word-break: break-all;
+}
+
+ul.api-token-list {
+  list-style: none;
+  padding: 0;
+  margin: 12px 0 0;
+}
+
+.api-token-list li {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 10px 0;
+  border-bottom: 1px solid var(--line);
+}
+
+.api-token-list li:last-child {
+  border-bottom: 0;
+}
+
+.small-meta {
+  font-size: 0.82rem;
+  margin-top: 4px;
+}
+
 .status-pill {
   flex: 0 0 auto;
   border-radius: 999px;

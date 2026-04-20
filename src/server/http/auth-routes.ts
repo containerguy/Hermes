@@ -1,9 +1,9 @@
 import { and, desc, eq, gt, isNull, lt } from "drizzle-orm";
 import { Router } from "express";
-import { randomUUID } from "node:crypto";
+import { randomBytes, randomUUID } from "node:crypto";
 import { z } from "zod";
 import { createCsrfToken, CSRF_HEADER, requireCsrf } from "../auth/csrf";
-import { getCurrentSession, publicUser } from "../auth/current-user";
+import { getCurrentSession, publicUser, requireUser } from "../auth/current-user";
 import { deviceSignalsFingerprint, hashDeviceKey, normalizeDeviceSignals } from "../auth/device-key";
 import { resolveDeviceName, validateDeviceName } from "../auth/device-names";
 import { maskInviteCode, tryWriteAuditLog } from "../audit-log";
@@ -25,6 +25,7 @@ import {
   loginChallenges,
   pairingTokens,
   sessions,
+  userApiTokens,
   users
 } from "../db/schema";
 import { ensureActiveEmailAvailable } from "../domain/users";
@@ -73,6 +74,26 @@ const emailChangeSchema = z
 const emailChangeVerifySchema = z.object({
   code: z.string().trim().regex(/^\d{6}$/)
 });
+
+const createApiTokenBodySchema = z.object({
+  label: z.string().trim().max(120).optional(),
+  scope: z.enum(["full", "read_only"])
+});
+
+function serializeApiToken(row: typeof userApiTokens.$inferSelect) {
+  return {
+    id: row.id,
+    label: row.label,
+    scope: row.scope,
+    createdAt: row.createdAt,
+    lastUsedAt: row.lastUsedAt,
+    revokedAt: row.revokedAt
+  };
+}
+
+function createApiTokenRawValue() {
+  return `hm_at_${randomBytes(24).toString("base64url")}`;
+}
 
 const pairRedeemSchema = z.object({
   token: z
@@ -191,6 +212,118 @@ export function createAuthRouter(context: DatabaseContext) {
     }
 
     response.json({ token: createCsrfToken(current.session.id), header: CSRF_HEADER });
+  });
+
+  router.get("/api-tokens", (request, response) => {
+    const user = requireUser(context, request);
+    if (!user) {
+      response.status(401).json({ error: "nicht_angemeldet" });
+      return;
+    }
+
+    const rows = context.db
+      .select()
+      .from(userApiTokens)
+      .where(and(eq(userApiTokens.userId, user.id), isNull(userApiTokens.revokedAt)))
+      .orderBy(desc(userApiTokens.createdAt))
+      .all();
+
+    response.json({ apiTokens: rows.map(serializeApiToken) });
+  });
+
+  router.post("/api-tokens", (request, response) => {
+    const user = requireUser(context, request);
+    if (!user) {
+      response.status(401).json({ error: "nicht_angemeldet" });
+      return;
+    }
+
+    if (request.hermesAuth?.kind === "api_token" && request.hermesAuth.scope === "read_only") {
+      response.status(403).json({ error: "api_token_nur_lesen" });
+      return;
+    }
+
+    const parsed = createApiTokenBodySchema.safeParse(request.body);
+    if (!parsed.success) {
+      response.status(400).json({ error: "ungueltiger_api_token" });
+      return;
+    }
+
+    const rawToken = createApiTokenRawValue();
+    const tokenHash = hashSessionToken(rawToken);
+    const id = randomUUID();
+    const timestamp = nowIso();
+
+    context.db
+      .insert(userApiTokens)
+      .values({
+        id,
+        userId: user.id,
+        tokenHash,
+        label: parsed.data.label?.trim() ? parsed.data.label.trim() : null,
+        scope: parsed.data.scope,
+        createdAt: timestamp,
+        lastUsedAt: null,
+        revokedAt: null
+      })
+      .run();
+
+    const created = context.db.select().from(userApiTokens).where(eq(userApiTokens.id, id)).get();
+
+    tryWriteAuditLog(context, {
+      actor: user,
+      action: "api_token.create",
+      entityType: "api_token",
+      entityId: id,
+      summary: `${user.username} hat ein API-Token (${parsed.data.scope}) angelegt.`,
+      metadata: { scope: parsed.data.scope, label: parsed.data.label ?? null }
+    });
+
+    response.status(201).json({
+      token: rawToken,
+      apiToken: created ? serializeApiToken(created) : undefined
+    });
+  });
+
+  router.delete("/api-tokens/:id", (request, response) => {
+    const user = requireUser(context, request);
+    if (!user) {
+      response.status(401).json({ error: "nicht_angemeldet" });
+      return;
+    }
+
+    if (request.hermesAuth?.kind === "api_token" && request.hermesAuth.scope === "read_only") {
+      response.status(403).json({ error: "api_token_nur_lesen" });
+      return;
+    }
+
+    const row = context.db
+      .select()
+      .from(userApiTokens)
+      .where(and(eq(userApiTokens.id, request.params.id), eq(userApiTokens.userId, user.id)))
+      .get();
+
+    if (!row || row.revokedAt) {
+      response.status(404).json({ error: "api_token_nicht_gefunden" });
+      return;
+    }
+
+    const timestamp = nowIso();
+    context.db
+      .update(userApiTokens)
+      .set({ revokedAt: timestamp })
+      .where(eq(userApiTokens.id, row.id))
+      .run();
+
+    tryWriteAuditLog(context, {
+      actor: user,
+      action: "api_token.revoke",
+      entityType: "api_token",
+      entityId: row.id,
+      summary: `${user.username} hat ein API-Token widerrufen.`
+    });
+
+    response.status(204).send();
   });
 
   router.post("/request-code", async (request, response) => {

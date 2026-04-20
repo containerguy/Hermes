@@ -304,12 +304,33 @@ export const pairingTokens = sqliteTable(
   ]
 );
 
+export const userApiTokens = sqliteTable(
+  "user_api_tokens",
+  {
+    id: text("id").primaryKey(),
+    userId: text("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    tokenHash: text("token_hash").notNull(),
+    label: text("label"),
+    scope: text("scope", { enum: ["full", "read_only"] }).notNull(),
+    createdAt: text("created_at").notNull(),
+    lastUsedAt: text("last_used_at"),
+    revokedAt: text("revoked_at")
+  },
+  (table) => [
+    uniqueIndex("user_api_tokens_token_hash_unique").on(table.tokenHash),
+    index("user_api_tokens_user_id_idx").on(table.userId)
+  ]
+);
+
 export const userRelations = relations(users, ({ many }) => ({
   sessions: many(sessions),
   pushSubscriptions: many(pushSubscriptions),
   participations: many(participations),
   createdEvents: many(gameEvents),
-  inviteCodeUses: many(inviteCodeUses)
+  inviteCodeUses: many(inviteCodeUses),
+  apiTokens: many(userApiTokens)
 }));
 
 export const gameEventRelations = relations(gameEvents, ({ one, many }) => ({

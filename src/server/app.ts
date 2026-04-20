@@ -12,6 +12,8 @@ import { createDb } from "./db/client";
 import { runMigrations } from "./db/migrate";
 import { broadcastEventsChanged } from "./realtime/event-bus";
 import { requireUser } from "./auth/current-user";
+import { hermesAuthMiddleware } from "./auth/hermes-auth";
+import { mountApiDocs } from "./http/api-docs";
 import { pickPublicSettings, readSettings } from "./settings";
 import {
   flushDatabaseSnapshot,
@@ -28,6 +30,8 @@ export async function createHermesApp() {
   app.disable("x-powered-by");
   app.use(express.json({ limit: "1mb" }));
   app.use(cookieParser());
+  app.use(hermesAuthMiddleware(context));
+  mountApiDocs(app);
   app.use((_request, response, next) => {
     response.setHeader("X-Content-Type-Options", "nosniff");
     response.setHeader("Referrer-Policy", "strict-origin-when-cross-origin");

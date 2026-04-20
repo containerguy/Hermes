@@ -216,6 +216,15 @@ export type UserSession = {
   current: boolean;
 };
 
+export type ApiToken = {
+  id: string;
+  label: string | null;
+  scope: "full" | "read_only";
+  createdAt: string;
+  lastUsedAt: string | null;
+  revokedAt: string | null;
+};
+
 export type InviteCode = {
   id: string;
   code: string;

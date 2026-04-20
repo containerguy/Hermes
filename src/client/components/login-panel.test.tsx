@@ -141,6 +141,9 @@ describe("LoginPanel pairing redemption", () => {
       if (path === "/api/auth/sessions") {
         return { sessions: [] };
       }
+      if (path === "/api/auth/api-tokens") {
+        return { apiTokens: [] };
+      }
       return {};
     });
 

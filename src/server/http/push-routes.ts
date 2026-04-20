@@ -3,6 +3,7 @@ import { Router } from "express";
 import { randomUUID } from "node:crypto";
 import { z } from "zod";
 import { getCurrentSession, publicUser, requireUser } from "../auth/current-user";
+import { enforceApiTokenWriteAccess } from "../auth/hermes-auth";
 import type { DatabaseContext } from "../db/client";
 import { pushSubscriptions, users } from "../db/schema";
 import { getVapidPublicKey } from "../push/push-service";
@@ -26,6 +27,15 @@ function nowIso() {
 export function createPushRouter(context: DatabaseContext) {
   const router = Router();
 
+  router.use((request, response, next) => {
+    if (["POST", "PATCH", "PUT", "DELETE"].includes(request.method)) {
+      if (!enforceApiTokenWriteAccess(request, response)) {
+        return;
+      }
+    }
+    next();
+  });
+
   router.get("/public-key", (_request, response) => {
     const publicKey = getVapidPublicKey();
 
@@ -39,9 +49,10 @@ export function createPushRouter(context: DatabaseContext) {
 
   router.post("/subscriptions", (request, response) => {
     const current = getCurrentSession(context, request);
+    const user = requireUser(context, request);
     const parsed = subscriptionSchema.safeParse(request.body);
 
-    if (!current) {
+    if (!user) {
       response.status(401).json({ error: "nicht_angemeldet" });
       return;
     }
@@ -50,6 +61,8 @@ export function createPushRouter(context: DatabaseContext) {
       response.status(400).json({ error: "ungueltige_subscription" });
       return;
     }
+
+    const sessionId = current?.session.id ?? null;
 
     const existing = context.db
       .select()
@@ -62,8 +75,8 @@ export function createPushRouter(context: DatabaseContext) {
       .insert(pushSubscriptions)
       .values({
         id: existing?.id ?? randomUUID(),
-        userId: current.user.id,
-        sessionId: current.session.id,
+        userId: user.id,
+        sessionId,
         endpoint: parsed.data.endpoint,
         p256dh: parsed.data.keys.p256dh,
         auth: parsed.data.keys.auth,
@@ -73,8 +86,8 @@ export function createPushRouter(context: DatabaseContext) {
       .onConflictDoUpdate({
         target: pushSubscriptions.endpoint,
         set: {
-          userId: current.user.id,
-          sessionId: current.session.id,
+          userId: user.id,
+          sessionId,
           p256dh: parsed.data.keys.p256dh,
           auth: parsed.data.keys.auth,
           revokedAt: null
@@ -86,10 +99,10 @@ export function createPushRouter(context: DatabaseContext) {
   });
 
   router.delete("/subscriptions", (request, response) => {
-    const current = getCurrentSession(context, request);
+    const user = requireUser(context, request);
     const parsed = z.object({ endpoint: z.string().url() }).safeParse(request.body);
 
-    if (!current) {
+    if (!user) {
       response.status(401).json({ error: "nicht_angemeldet" });
       return;
     }
@@ -105,7 +118,7 @@ export function createPushRouter(context: DatabaseContext) {
       .where(
         and(
           eq(pushSubscriptions.endpoint, parsed.data.endpoint),
-          eq(pushSubscriptions.userId, current.user.id)
+          eq(pushSubscriptions.userId, user.id)
         )
       )
       .run();

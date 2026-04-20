@@ -3,6 +3,7 @@ import { Router } from "express";
 import { randomUUID } from "node:crypto";
 import { z } from "zod";
 import { requireUser } from "../auth/current-user";
+import { enforceApiTokenWriteAccess } from "../auth/hermes-auth";
 import { tryWriteAuditLog, writeAuditLog } from "../audit-log";
 import type { DatabaseContext } from "../db/client";
 import { appSettings, gameEvents, participations, users } from "../db/schema";
@@ -179,6 +180,15 @@ export function createEventRouter(context: DatabaseContext) {
       return;
     }
 
+    next();
+  });
+
+  router.use((request, response, next) => {
+    if (["POST", "PATCH", "PUT", "DELETE"].includes(request.method)) {
+      if (!enforceApiTokenWriteAccess(request, response)) {
+        return;
+      }
+    }
     next();
   });
 
