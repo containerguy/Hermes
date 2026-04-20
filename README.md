@@ -1,13 +1,13 @@
 # Hermes / Matchdesk / Mitspielzentrale
 
-Codename Hermes ist eine responsive WebApp für die Organisation von Spielrunden. Gestartet für LAN-Parties, können nun auch Turniere für verschiedene Sportarten darüber verwaltet werden. User melden sich mit Username und E-Mail-Einmalcode an, Manager / Organisatoren legen Events an, und Teilnehmer stimmen mit `dabei` oder `nicht dabei` ab.
+Codename Hermes ist eine responsive WebApp für die Organisation von Spielrunden. Gestartet für LAN-Parties, können nun auch Turniere für verschiedene Sportarten darüber verwaltet werden. Die Auswahl findet anhand von Projekttemplates statt. User melden sich mit Username und E-Mail-Einmalcode an, Manager / Organisatoren legen Events an, und Teilnehmer stimmen mit `dabei` oder `nicht dabei` ab.
 
 Build- und Release-Hinweise liegen in [`building.md`](building.md).
 
 
 ## Oberfläche
 
-![Screenshot Overview](screen_mitspielzentrale.png)
+![Screenshot Overview](screen/screen_mitspielzentrale.png)
 
 Die WebApp ist in getrennte Arbeitsbereiche aufgeteilt:
 
