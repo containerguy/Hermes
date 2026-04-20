@@ -151,8 +151,7 @@ export const gameEvents = sqliteTable("game_events", {
   startsAt: text("starts_at").notNull(),
   minPlayers: integer("min_players").notNull(),
   maxPlayers: integer("max_players").notNull(),
-  serverHost: text("server_host"),
-  connectionInfo: text("connection_info"),
+  details: text("details"),
   status: text("status", {
     enum: ["open", "ready", "running", "cancelled", "archived"]
   })

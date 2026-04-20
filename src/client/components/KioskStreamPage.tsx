@@ -286,20 +286,12 @@ export function KioskStreamPage({
             </span>
           </div>
         </div>
-        {event.serverHost || event.connectionInfo ? (
+        {event.details?.trim() ? (
           <div className="event-connection-details kiosk-event-conn">
-            {event.serverHost ? (
-              <div className="event-conn-line">
-                <span className="event-conn-label">{t("events.conn.server")}</span>
-                <span className="event-conn-value">{event.serverHost}</span>
-              </div>
-            ) : null}
-            {event.connectionInfo ? (
-              <div className="event-conn-line">
-                <span className="event-conn-label">{t("events.conn.join")}</span>
-                <span className="event-conn-value">{event.connectionInfo}</span>
-              </div>
-            ) : null}
+            <div className="event-conn-line">
+              <span className="event-conn-label">{t("events.conn.details")}</span>
+              <span className="event-conn-value">{event.details}</span>
+            </div>
           </div>
         ) : (
           <p className="muted kiosk-event-missing">{t("events.conn.missing")}</p>

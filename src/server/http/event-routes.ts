@@ -17,8 +17,7 @@ const updateEventSchema = z.object({
   startsAt: z.string().datetime().optional(),
   minPlayers: z.number().int().min(1).max(256).optional(),
   maxPlayers: z.number().int().min(1).max(256).optional(),
-  serverHost: z.string().trim().max(160).optional(),
-  connectionInfo: z.string().trim().max(2000).optional()
+  details: z.string().trim().max(4000).nullable().optional()
 });
 
 function nowIso() {
@@ -156,8 +155,7 @@ function serializeEvent(
     startsAt: event.startsAt,
     minPlayers: event.minPlayers,
     maxPlayers: event.maxPlayers,
-    serverHost: event.serverHost,
-    connectionInfo: event.connectionInfo,
+    details: event.details,
     status: event.status,
     createdByUserId: event.createdByUserId,
     createdByUsername: creator?.username ?? "unbekannt",
@@ -226,8 +224,7 @@ export function createEventRouter(context: DatabaseContext) {
         startsAt,
         minPlayers: parsed.data.minPlayers,
         maxPlayers: parsed.data.maxPlayers,
-        serverHost: parsed.data.serverHost || null,
-        connectionInfo: parsed.data.connectionInfo || null,
+        details: parsed.data.details?.trim() ? parsed.data.details.trim() : null,
         status: deriveEventStatus({
           status: "open",
           startsAt: new Date(startsAt),
@@ -323,8 +320,12 @@ export function createEventRouter(context: DatabaseContext) {
         startsAt,
         minPlayers,
         maxPlayers,
-        serverHost: parsed.data.serverHost ?? event.serverHost,
-        connectionInfo: parsed.data.connectionInfo ?? event.connectionInfo,
+        details:
+          parsed.data.details === undefined
+            ? event.details
+            : parsed.data.details === null
+              ? null
+              : parsed.data.details.trim() || null,
         status: deriveEventStatus({
           status: event.status,
           startsAt: new Date(startsAt),

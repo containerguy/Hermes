@@ -79,6 +79,9 @@ describe("app flow", () => {
       .map((row) => (row as { name: string }).name);
     expect(gameEventsColumns).toContain("deleted_at");
     expect(gameEventsColumns).toContain("deleted_by_user_id");
+    expect(gameEventsColumns).toContain("details");
+    expect(gameEventsColumns).not.toContain("server_host");
+    expect(gameEventsColumns).not.toContain("connection_info");
 
     const tables = sqlite
       .prepare("SELECT name FROM sqlite_master WHERE type = 'table'")

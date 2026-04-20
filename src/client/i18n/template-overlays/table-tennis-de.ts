@@ -24,8 +24,8 @@ export const tableTennisDe: Partial<Record<MessageKey, string>> = {
     "Sobald ein Organisator ein Match oder Zeitfenster anlegt, erscheinen Disziplin, Start und Hinweise hier.",
   "events.organizer": "Organisation",
   "events.capacity.players": "{joined} / {max} gemeldet",
-  "events.conn.server": "Platz / Tisch",
-  "events.conn.join": "Hinweis zum Finden",
+  "events.form.details": "Details",
+  "events.conn.details": "Details",
   "events.conn.missing":
     "Platz- oder Treffpunkt fehlen noch. Kurz bei der Organisation nachfragen, bevor ihr startet.",
   "events.form.eyebrow": "Neues Match",

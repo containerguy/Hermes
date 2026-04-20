@@ -170,8 +170,7 @@ export function EventBoard({
     startsAt: toDatetimeLocal(new Date(Date.now() + 30 * 60 * 1000).toISOString()),
     minPlayers: 2,
     maxPlayers: 8,
-    serverHost: "",
-    connectionInfo: ""
+    details: ""
   });
   /** null = noch keine Wahl: mit Katalog standardmäßig „Aus Liste“, sonst Freitext */
   const [gameTitleSource, setGameTitleSource] = useState<"catalog" | "custom" | null>(null);
@@ -316,15 +315,13 @@ export function EventBoard({
             eventDraft.startMode === "scheduled"
               ? fromDatetimeLocal(eventDraft.startsAt)
               : undefined,
-          serverHost: eventDraft.serverHost || undefined,
-          connectionInfo: eventDraft.connectionInfo || undefined
+          details: eventDraft.details.trim() || undefined
         })
       });
       setEventDraft({
         ...eventDraft,
         gameTitle: "",
-        serverHost: "",
-        connectionInfo: ""
+        details: ""
       });
       await loadEvents();
       setMessage(t("events.msg.saved"));
@@ -542,20 +539,12 @@ export function EventBoard({
             </dd>
           </div>
         </dl>
-        {event.serverHost || event.connectionInfo ? (
+        {event.details?.trim() ? (
           <div className="event-connection-details">
-            {event.serverHost ? (
-              <div className="event-conn-line">
-                <span className="event-conn-label">{t("events.conn.server")}</span>
-                <span className="event-conn-value">{event.serverHost}</span>
-              </div>
-            ) : null}
-            {event.connectionInfo ? (
-              <div className="event-conn-line">
-                <span className="event-conn-label">{t("events.conn.join")}</span>
-                <span className="event-conn-value">{event.connectionInfo}</span>
-              </div>
-            ) : null}
+            <div className="event-conn-line">
+              <span className="event-conn-label">{t("events.conn.details")}</span>
+              <span className="event-conn-value">{event.details}</span>
+            </div>
           </div>
         ) : (
           <p className="muted event-join-hint">{t("events.conn.missing")}</p>
@@ -805,17 +794,11 @@ export function EventBoard({
         </label>
       </div>
       <label>
-        {t("events.form.server")}
-        <input
-          value={eventDraft.serverHost}
-          onChange={(ev) => setEventDraft({ ...eventDraft, serverHost: ev.target.value })}
-        />
-      </label>
-      <label>
-        {t("events.form.connection")}
-        <input
-          value={eventDraft.connectionInfo}
-          onChange={(ev) => setEventDraft({ ...eventDraft, connectionInfo: ev.target.value })}
+        {t("events.form.details")}
+        <textarea
+          rows={3}
+          value={eventDraft.details}
+          onChange={(ev) => setEventDraft({ ...eventDraft, details: ev.target.value })}
         />
       </label>
       <button type="submit">{t("events.form.submit")}</button>

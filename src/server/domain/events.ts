@@ -15,8 +15,7 @@ export const eventInputSchema = z
     startsAt: z.string().datetime().optional(),
     minPlayers: z.number().int().min(1).max(256),
     maxPlayers: z.number().int().min(1).max(256),
-    serverHost: z.string().trim().max(160).optional(),
-    connectionInfo: z.string().trim().max(2000).optional()
+    details: z.string().trim().max(4000).optional()
   })
   .superRefine((value, context) => {
     if (value.maxPlayers < value.minPlayers) {

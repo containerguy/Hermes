@@ -187,8 +187,7 @@ export type GameEvent = {
   startsAt: string;
   minPlayers: number;
   maxPlayers: number;
-  serverHost: string | null;
-  connectionInfo: string | null;
+  details: string | null;
   status: "open" | "ready" | "running" | "cancelled" | "archived";
   createdByUserId: string;
   createdByUsername: string;

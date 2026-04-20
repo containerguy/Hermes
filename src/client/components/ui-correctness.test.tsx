@@ -85,8 +85,7 @@ describe("ui correctness structure contracts", () => {
               myParticipation: null,
               createdByUserId: "u_manager",
               createdByUsername: "manager",
-              serverHost: null,
-              connectionInfo: null
+              details: null
             }
           ]
         };
@@ -115,7 +114,7 @@ describe("ui correctness structure contracts", () => {
       await flushMicrotasks();
     });
 
-    expect(rendered.container.textContent).toContain("Server- und Join-Hinweise fehlen noch");
+    expect(rendered.container.textContent).toContain("Noch keine Details hinterlegt");
     expect(rendered.container.querySelector(".event-capacity-track")).toBeTruthy();
     expect(rendered.container.textContent).toContain("Runde von");
     expect(rendered.container.textContent).toContain("manager");

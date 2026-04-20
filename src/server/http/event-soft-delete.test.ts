@@ -92,8 +92,7 @@ describe("event soft delete (EVT-04)", () => {
         startsAt,
         minPlayers: 1,
         maxPlayers: 4,
-        serverHost: "secret.example",
-        connectionInfo: "password=supersecret"
+        details: "secret.example\npassword=supersecret"
       })
       .expect(201);
 

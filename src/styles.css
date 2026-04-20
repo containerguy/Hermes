@@ -929,6 +929,7 @@ h2 {
   color: var(--ink);
   overflow-wrap: anywhere;
   word-break: break-word;
+  white-space: pre-wrap;
 }
 
 .status-pill {
