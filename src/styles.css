@@ -2338,3 +2338,23 @@ dd {
   align-items: end;
   margin-top: 6px;
 }
+
+/* Pizza JSON admin */
+.pizza-json-admin__textarea {
+  width: 100%;
+  font-family: ui-monospace, "Menlo", "Consolas", monospace;
+  font-size: 0.85rem;
+  margin-top: 8px;
+}
+.pizza-json-admin__actions {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-top: 8px;
+  align-items: center;
+}
+.pizza-json-admin__upload {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}

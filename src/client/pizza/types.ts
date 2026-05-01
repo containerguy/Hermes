@@ -25,8 +25,8 @@ export interface PizzaItem {
 
 export interface PizzaSession {
   id: string;
-  eventId: string;
   state: PizzaSessionState;
+  label: string | null;
   openedAt: string | null;
   lockedAt: string | null;
   deliveredAt: string | null;
@@ -62,7 +62,6 @@ export interface PizzaGuestTotal {
 }
 
 export interface PizzaPanelState {
-  event: { id: string; gameTitle: string; createdByUserId: string };
   session: PizzaSession | null;
   menu: PizzaItem[];
   myOrder: PizzaOrder | null;

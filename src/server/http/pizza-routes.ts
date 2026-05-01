@@ -5,11 +5,9 @@ import { tryWriteAuditLog } from "../audit-log";
 import { requireUser } from "../auth/current-user";
 import { enforceApiTokenWriteAccess } from "../auth/hermes-auth";
 import type { DatabaseContext } from "../db/client";
-import { gameEvents, pizzaMenuItems, pizzaMenuVariants, users } from "../db/schema";
-import { canManageEvent } from "../domain/users";
+import { pizzaMenuItems, pizzaMenuVariants, users } from "../db/schema";
 import { PizzaLifecycleError } from "../domain/pizza/lifecycle";
 import {
-  countActiveItems,
   deleteVariant,
   getVariantById,
   listActiveMenu,
@@ -21,14 +19,17 @@ import {
 import {
   PizzaOrderError,
   addLine,
-  cancelOpenOrderForUser,
   deleteLine,
   getOrderForUser,
   listOrdersForSession,
   markPayment,
   updateLine
 } from "../domain/pizza/orders";
-import { getOrCreateDraftSession, getSessionForEvent, transitionSession } from "../domain/pizza/sessions";
+import {
+  getActiveSession,
+  getOrCreateDraftSession,
+  transitionSession
+} from "../domain/pizza/sessions";
 import { guestTotals } from "../domain/pizza/totals";
 import { buildKassenlistePdf, buildPizzeriaPdf } from "../pdf/pizza-print";
 import { sendPushToEnabledUsers } from "../push/push-service";
@@ -36,7 +37,8 @@ import { broadcastEventsChanged } from "../realtime/event-bus";
 import { readSettings } from "../settings";
 
 const transitionSchema = z.object({
-  transition: z.enum(["open", "lock", "deliver", "reopen"])
+  transition: z.enum(["open", "lock", "deliver", "reopen"]),
+  label: z.string().trim().max(120).optional()
 });
 
 const addLineSchema = z.object({
@@ -73,15 +75,35 @@ const variantUpsertSchema = z.object({
   sortOrder: z.number().int().optional()
 });
 
-function findEvent(context: DatabaseContext, eventId: string) {
-  return context.db.select().from(gameEvents).where(eq(gameEvents.id, eventId)).get();
-}
+const menuImportSchema = z.object({
+  items: z
+    .array(
+      z.object({
+        id: z.string().optional(),
+        number: z.string().trim().max(16).nullable().optional(),
+        name: z.string().trim().min(1).max(120),
+        ingredients: z.string().trim().max(500).nullable().optional(),
+        allergens: z.string().trim().max(120).nullable().optional(),
+        category: z.enum(["pizza", "pasta"]),
+        active: z.boolean().optional(),
+        sortOrder: z.number().int().optional(),
+        variants: z
+          .array(
+            z.object({
+              id: z.string().optional(),
+              sizeLabel: z.string().trim().max(32).nullable(),
+              priceCents: z.number().int().min(0).max(100_000),
+              sortOrder: z.number().int().optional()
+            })
+          )
+          .max(8)
+      })
+    )
+    .max(500)
+});
 
-function loadSerializedState(context: DatabaseContext, eventId: string, currentUserId: string) {
-  const event = findEvent(context, eventId);
-  if (!event) return null;
-
-  const session = getSessionForEvent(context, eventId);
+function loadSerializedState(context: DatabaseContext, currentUserId: string) {
+  const session = getActiveSession(context);
   const menu = listActiveMenu(context);
   const myOrder = session ? getOrderForUser(context, session.id, currentUserId) : null;
   const allOrders = session ? listOrdersForSession(context, session.id) : [];
@@ -98,12 +120,7 @@ function loadSerializedState(context: DatabaseContext, eventId: string, currentU
   }
 
   return {
-    event: {
-      id: event.id,
-      gameTitle: event.gameTitle,
-      createdByUserId: event.createdByUserId
-    },
-    session,
+    session: session ?? null,
     menu,
     myOrder,
     orders: allOrders.map((order) => ({
@@ -120,6 +137,10 @@ function loadSerializedState(context: DatabaseContext, eventId: string, currentU
       }))
     )
   };
+}
+
+function isManager(role: string): boolean {
+  return role === "admin" || role === "manager";
 }
 
 function handleDomainError(error: unknown, response: import("express").Response) {
@@ -159,24 +180,14 @@ export function createPizzaRouter(context: DatabaseContext) {
     next();
   });
 
-  router.get("/events/:eventId/state", (request, response) => {
+  router.get("/state", (request, response) => {
     const actor = requireUser(context, request)!;
-    const state = loadSerializedState(context, request.params.eventId, actor.id);
-    if (!state) {
-      response.status(404).json({ error: "event_nicht_gefunden" });
-      return;
-    }
-    response.json(state);
+    response.json(loadSerializedState(context, actor.id));
   });
 
-  router.post("/events/:eventId/transitions", (request, response) => {
+  router.post("/transitions", (request, response) => {
     const actor = requireUser(context, request)!;
-    const event = findEvent(context, request.params.eventId);
-    if (!event) {
-      response.status(404).json({ error: "event_nicht_gefunden" });
-      return;
-    }
-    if (!canManageEvent(actor, event)) {
+    if (!isManager(actor.role)) {
       response.status(403).json({ error: "manager_erforderlich" });
       return;
     }
@@ -186,20 +197,20 @@ export function createPizzaRouter(context: DatabaseContext) {
       return;
     }
     try {
-      const session = transitionSession(context, event.id, parsed.data.transition, actor);
+      const session = transitionSession(context, parsed.data.transition, actor, parsed.data.label);
       tryWriteAuditLog(context, {
         actor,
         action: `pizza.session.${parsed.data.transition}`,
         entityType: "pizza_session",
         entityId: session.id,
-        summary: `Pizzabestellung: ${parsed.data.transition} (Event ${event.gameTitle})`
+        summary: `Pizzabestellung: ${parsed.data.transition}`
       });
       broadcastEventsChanged(`pizza_session_${parsed.data.transition}`);
 
       if (parsed.data.transition === "open") {
         sendPushToEnabledUsers(context, {
           title: "Pizzabestellung offen",
-          body: `Bestelle für ${event.gameTitle}, bis Admin schließt`,
+          body: `Bestelle jetzt — Admin schließt manuell.`,
           url: `/#start`
         }).catch(() => undefined);
       }
@@ -213,9 +224,9 @@ export function createPizzaRouter(context: DatabaseContext) {
     }
   });
 
-  router.post("/events/:eventId/lines", (request, response) => {
+  router.post("/lines", (request, response) => {
     const actor = requireUser(context, request)!;
-    const session = getSessionForEvent(context, request.params.eventId);
+    const session = getActiveSession(context);
     if (!session) {
       response.status(404).json({ error: "session_nicht_offen" });
       return;
@@ -286,7 +297,7 @@ export function createPizzaRouter(context: DatabaseContext) {
       response.status(400).json({ error: "ungueltige_methode" });
       return;
     }
-    if (actor.role !== "admin" && actor.role !== "manager") {
+    if (!isManager(actor.role)) {
       response.status(403).json({ error: "manager_erforderlich" });
       return;
     }
@@ -328,13 +339,6 @@ export function createPizzaRouter(context: DatabaseContext) {
       return;
     }
     const id = upsertItem(context, parsed.data);
-    tryWriteAuditLog(context, {
-      actor,
-      action: "pizza.menu.item.upsert",
-      entityType: "pizza_menu_item",
-      entityId: id,
-      summary: `Menüeintrag gespeichert: ${parsed.data.name}`
-    });
     response.json({ id });
   });
 
@@ -350,13 +354,6 @@ export function createPizzaRouter(context: DatabaseContext) {
       return;
     }
     setItemActive(context, request.params.id, active.data.active);
-    tryWriteAuditLog(context, {
-      actor,
-      action: "pizza.menu.item.active",
-      entityType: "pizza_menu_item",
-      entityId: request.params.id,
-      summary: `Menüeintrag ${active.data.active ? "aktiviert" : "deaktiviert"}`
-    });
     response.status(204).end();
   });
 
@@ -385,23 +382,139 @@ export function createPizzaRouter(context: DatabaseContext) {
     response.status(204).end();
   });
 
-  router.get("/events/:eventId/print/pizzeria.pdf", async (request, response) => {
+  router.get("/admin/menu/export", (request, response) => {
     const actor = requireUser(context, request)!;
-    const event = findEvent(context, request.params.eventId);
-    if (!event) {
-      response.status(404).json({ error: "event_nicht_gefunden" });
+    if (actor.role !== "admin") {
+      response.status(403).json({ error: "admin_erforderlich" });
       return;
     }
-    if (!canManageEvent(actor, event)) {
+    const items = listAllMenu(context).map((item) => ({
+      id: item.id,
+      number: item.number,
+      name: item.name,
+      ingredients: item.ingredients,
+      allergens: item.allergens,
+      category: item.category,
+      active: item.active,
+      sortOrder: item.sortOrder,
+      variants: item.variants.map((variant) => ({
+        id: variant.id,
+        sizeLabel: variant.sizeLabel,
+        priceCents: variant.priceCents,
+        sortOrder: variant.sortOrder
+      }))
+    }));
+    response.json({ items });
+  });
+
+  router.put("/admin/menu/import", (request, response) => {
+    const actor = requireUser(context, request)!;
+    if (actor.role !== "admin") {
+      response.status(403).json({ error: "admin_erforderlich" });
+      return;
+    }
+    const parsed = menuImportSchema.safeParse(request.body);
+    if (!parsed.success) {
+      response.status(400).json({
+        error: "ungueltiges_menu",
+        details: parsed.error.issues.slice(0, 5).map((issue) => ({
+          path: issue.path.join("."),
+          message: issue.message
+        }))
+      });
+      return;
+    }
+
+    const seenItemIds = new Set<string>();
+    const seenVariantIds = new Set<string>();
+
+    try {
+      const tx = context.sqlite.transaction(() => {
+        for (const itemInput of parsed.data.items) {
+          const itemId = upsertItem(context, {
+            id: itemInput.id,
+            number: itemInput.number ?? null,
+            name: itemInput.name,
+            ingredients: itemInput.ingredients ?? null,
+            allergens: itemInput.allergens ?? null,
+            category: itemInput.category,
+            active: itemInput.active ?? true,
+            sortOrder: itemInput.sortOrder ?? 0
+          });
+          seenItemIds.add(itemId);
+          for (const variantInput of itemInput.variants) {
+            const variantId = upsertVariant(context, {
+              id: variantInput.id,
+              itemId,
+              sizeLabel: variantInput.sizeLabel,
+              priceCents: variantInput.priceCents,
+              sortOrder: variantInput.sortOrder ?? 0
+            });
+            seenVariantIds.add(variantId);
+          }
+        }
+
+        const allDbItems = context.db.select().from(pizzaMenuItems).all();
+        let deactivated = 0;
+        for (const dbItem of allDbItems) {
+          if (!seenItemIds.has(dbItem.id) && dbItem.active) {
+            setItemActive(context, dbItem.id, false);
+            deactivated += 1;
+          }
+        }
+        const allDbVariants = context.db.select().from(pizzaMenuVariants).all();
+        let variantsRemoved = 0;
+        for (const dbVariant of allDbVariants) {
+          if (seenVariantIds.has(dbVariant.id)) continue;
+          try {
+            deleteVariant(context, dbVariant.id);
+            variantsRemoved += 1;
+          } catch {
+            // referenced by existing order line — leave in place
+          }
+        }
+
+        return { deactivated, variantsRemoved };
+      });
+
+      const stats = tx();
+      tryWriteAuditLog(context, {
+        actor,
+        action: "pizza.menu.import",
+        entityType: "pizza_menu",
+        summary: `Pizza-Menü importiert (${parsed.data.items.length} Einträge)`,
+        metadata: {
+          itemCount: parsed.data.items.length,
+          deactivated: stats.deactivated,
+          variantsRemoved: stats.variantsRemoved
+        }
+      });
+
+      response.json({
+        ok: true,
+        itemCount: parsed.data.items.length,
+        deactivated: stats.deactivated,
+        variantsRemoved: stats.variantsRemoved
+      });
+    } catch (error) {
+      console.error("[Hermes] pizza menu import failed", error);
+      response.status(500).json({ error: "import_fehler" });
+    }
+  });
+
+  router.get("/print/pizzeria.pdf", async (request, response) => {
+    const actor = requireUser(context, request)!;
+    if (!isManager(actor.role)) {
       response.status(403).json({ error: "manager_erforderlich" });
       return;
     }
-    const session = getSessionForEvent(context, event.id);
+    const session = getActiveSession(context);
     if (!session) {
       response.status(404).json({ error: "keine_session" });
       return;
     }
     const orders = listOrdersForSession(context, session.id);
+    const settings = readSettings(context);
 
     type Aggregate = {
       number: string | null;
@@ -454,14 +567,14 @@ export function createPizzaRouter(context: DatabaseContext) {
 
     try {
       const buffer = await buildPizzeriaPdf({
-        eventTitle: event.gameTitle,
+        eventTitle: session.label ?? settings.appName ?? "Pizzabestellung",
         printedAt: new Date(),
         rows
       });
       response.setHeader("Content-Type", "application/pdf");
       response.setHeader(
         "Content-Disposition",
-        `attachment; filename="pizzeria-${event.id}.pdf"`
+        `attachment; filename="pizzeria-${session.id}.pdf"`
       );
       response.send(buffer);
     } catch (error) {
@@ -470,18 +583,13 @@ export function createPizzaRouter(context: DatabaseContext) {
     }
   });
 
-  router.get("/events/:eventId/print/kassenliste.pdf", async (request, response) => {
+  router.get("/print/kassenliste.pdf", async (request, response) => {
     const actor = requireUser(context, request)!;
-    const event = findEvent(context, request.params.eventId);
-    if (!event) {
-      response.status(404).json({ error: "event_nicht_gefunden" });
-      return;
-    }
-    if (!canManageEvent(actor, event)) {
+    if (!isManager(actor.role)) {
       response.status(403).json({ error: "manager_erforderlich" });
       return;
     }
-    const session = getSessionForEvent(context, event.id);
+    const session = getActiveSession(context);
     if (!session) {
       response.status(404).json({ error: "keine_session" });
       return;
@@ -525,7 +633,7 @@ export function createPizzaRouter(context: DatabaseContext) {
 
     try {
       const buffer = await buildKassenlistePdf({
-        eventTitle: event.gameTitle,
+        eventTitle: session.label ?? settings.appName ?? "Pizzabestellung",
         printedAt: new Date(),
         paypalName: settings.pizzaPaypalName || null,
         paypalHandle: settings.pizzaPaypalHandle || null,
@@ -535,7 +643,7 @@ export function createPizzaRouter(context: DatabaseContext) {
       response.setHeader("Content-Type", "application/pdf");
       response.setHeader(
         "Content-Disposition",
-        `attachment; filename="kassenliste-${event.id}.pdf"`
+        `attachment; filename="kassenliste-${session.id}.pdf"`
       );
       response.send(buffer);
     } catch (error) {
@@ -547,4 +655,4 @@ export function createPizzaRouter(context: DatabaseContext) {
   return router;
 }
 
-export { cancelOpenOrderForUser, countActiveItems, getOrCreateDraftSession, pizzaMenuVariants };
+export { getOrCreateDraftSession };

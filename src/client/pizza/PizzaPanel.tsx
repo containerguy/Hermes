@@ -16,10 +16,8 @@ import type {
 } from "./types";
 
 interface PizzaPanelProps {
-  eventId: string;
   currentUserId: string;
   currentUserRole: "user" | "organizer" | "manager" | "admin";
-  myParticipation: "joined" | "declined" | null;
   paypalHandle: string;
   paypalName: string;
   cashRecipient: string;
@@ -36,10 +34,8 @@ function buildPaypalUrl(handle: string, cents: number): string | null {
 }
 
 export function PizzaPanel({
-  eventId,
   currentUserId,
   currentUserRole,
-  myParticipation,
   paypalHandle,
   paypalName,
   cashRecipient
@@ -51,7 +47,7 @@ export function PizzaPanel({
 
   async function reload() {
     try {
-      const next = await fetchPizzaState(eventId);
+      const next = await fetchPizzaState();
       setState(next);
       setError(null);
     } catch (err) {
@@ -66,8 +62,7 @@ export function PizzaPanel({
     const onRefresh = () => void reload();
     window.addEventListener("hermes:events-refresh", onRefresh);
     return () => window.removeEventListener("hermes:events-refresh", onRefresh);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [eventId]);
+  }, []);
 
   const isManager = currentUserRole === "admin" || currentUserRole === "manager";
 
@@ -77,15 +72,18 @@ export function PizzaPanel({
   }, [state]);
 
   if (loading) return <p className="muted pizza-loading">Pizza-Bestellung lädt…</p>;
-  if (!state) return <p className="muted pizza-error">Pizza-Status nicht verfügbar.</p>;
+  if (!state) return null;
 
   const session = state.session;
   const sessionState = session?.state ?? "draft";
-  const canOrder = sessionState === "open" && myParticipation === "joined";
+
+  if (!isManager && sessionState !== "open" && sessionState !== "locked" && sessionState !== "delivered") {
+    return null;
+  }
 
   async function doTransition(transition: PizzaSessionTransition) {
     try {
-      await transitionPizzaSession(eventId, transition);
+      await transitionPizzaSession(transition);
       await reload();
     } catch (err) {
       setError((err as { message?: string }).message ?? "transition_failed");
@@ -95,7 +93,7 @@ export function PizzaPanel({
   return (
     <section className="pizza-panel" aria-label="Pizzabestellung">
       <header className="pizza-panel__header">
-        <h3>Pizzabestellung</h3>
+        <h3>Pizzabestellung{session?.label ? ` — ${session.label}` : ""}</h3>
         <span className={`pizza-panel__pill pizza-panel__pill--${sessionState}`}>
           {labelForState(sessionState)}
         </span>
@@ -107,29 +105,15 @@ export function PizzaPanel({
         </p>
       ) : null}
 
-      {isManager ? (
-        <PizzaAdminControls
-          state={state}
-          onTransition={doTransition}
-          onReload={reload}
-          eventId={eventId}
-        />
-      ) : null}
+      {isManager ? <PizzaAdminControls state={state} onTransition={doTransition} /> : null}
 
-      {sessionState === "open" && canOrder ? (
+      {sessionState === "open" ? (
         <PizzaOrderEditor
           state={state}
           showMenu={showMenu}
           onToggleMenu={() => setShowMenu((v) => !v)}
-          eventId={eventId}
           onChanged={reload}
         />
-      ) : null}
-
-      {sessionState === "open" && myParticipation !== "joined" ? (
-        <p className="muted">
-          Nur Teilnehmer mit Status "dabei" können bestellen. Stimme oben für "dabei" ab.
-        </p>
       ) : null}
 
       {(sessionState === "locked" || sessionState === "delivered") && state.myOrder ? (
@@ -173,11 +157,9 @@ function labelForState(state: string): string {
 interface AdminProps {
   state: PizzaPanelState;
   onTransition: (transition: PizzaSessionTransition) => Promise<void>;
-  onReload: () => Promise<void>;
-  eventId: string;
 }
 
-function PizzaAdminControls({ state, onTransition, eventId }: AdminProps) {
+function PizzaAdminControls({ state, onTransition }: AdminProps) {
   const sessionState = state.session?.state ?? "draft";
 
   return (
@@ -202,7 +184,7 @@ function PizzaAdminControls({ state, onTransition, eventId }: AdminProps) {
           </button>
           <a
             className="secondary pizza-panel__pdf-link"
-            href={`/api/pizza/events/${encodeURIComponent(eventId)}/print/pizzeria.pdf`}
+            href={`/api/pizza/print/pizzeria.pdf`}
             target="_blank"
             rel="noreferrer"
           >
@@ -210,7 +192,7 @@ function PizzaAdminControls({ state, onTransition, eventId }: AdminProps) {
           </a>
           <a
             className="secondary pizza-panel__pdf-link"
-            href={`/api/pizza/events/${encodeURIComponent(eventId)}/print/kassenliste.pdf`}
+            href={`/api/pizza/print/kassenliste.pdf`}
             target="_blank"
             rel="noreferrer"
           >
@@ -219,16 +201,14 @@ function PizzaAdminControls({ state, onTransition, eventId }: AdminProps) {
         </>
       ) : null}
       {sessionState === "delivered" ? (
-        <>
-          <a
-            className="secondary"
-            href={`/api/pizza/events/${encodeURIComponent(eventId)}/print/kassenliste.pdf`}
-            target="_blank"
-            rel="noreferrer"
-          >
-            PDF: Kassenliste
-          </a>
-        </>
+        <a
+          className="secondary"
+          href={`/api/pizza/print/kassenliste.pdf`}
+          target="_blank"
+          rel="noreferrer"
+        >
+          PDF: Kassenliste
+        </a>
       ) : null}
     </div>
   );
@@ -238,11 +218,10 @@ interface OrderEditorProps {
   state: PizzaPanelState;
   showMenu: boolean;
   onToggleMenu: () => void;
-  eventId: string;
   onChanged: () => Promise<void>;
 }
 
-function PizzaOrderEditor({ state, showMenu, onToggleMenu, eventId, onChanged }: OrderEditorProps) {
+function PizzaOrderEditor({ state, showMenu, onToggleMenu, onChanged }: OrderEditorProps) {
   const myLines = state.myOrder?.lines ?? [];
   const myTotal = myLines.reduce((sum, line) => sum + line.qty * line.priceCentsSnapshot, 0);
   const remaining = 3 - myLines.length;
@@ -322,20 +301,17 @@ function PizzaOrderEditor({ state, showMenu, onToggleMenu, eventId, onChanged }:
         </button>
       </div>
 
-      {showMenu && remaining > 0 ? (
-        <PizzaMenuBrowser menu={state.menu} eventId={eventId} onAdded={onChanged} />
-      ) : null}
+      {showMenu && remaining > 0 ? <PizzaMenuBrowser menu={state.menu} onAdded={onChanged} /> : null}
     </div>
   );
 }
 
 interface MenuBrowserProps {
   menu: PizzaItem[];
-  eventId: string;
   onAdded: () => Promise<void>;
 }
 
-function PizzaMenuBrowser({ menu, eventId, onAdded }: MenuBrowserProps) {
+function PizzaMenuBrowser({ menu, onAdded }: MenuBrowserProps) {
   const pizzas = menu.filter((item) => item.category === "pizza");
   const pasta = menu.filter((item) => item.category === "pasta");
   return (
@@ -343,13 +319,13 @@ function PizzaMenuBrowser({ menu, eventId, onAdded }: MenuBrowserProps) {
       {pizzas.length > 0 ? (
         <details open>
           <summary>Pizza ({pizzas.length})</summary>
-          <PizzaMenuList items={pizzas} eventId={eventId} onAdded={onAdded} />
+          <PizzaMenuList items={pizzas} onAdded={onAdded} />
         </details>
       ) : null}
       {pasta.length > 0 ? (
         <details>
           <summary>Pasta &amp; Aufläufe ({pasta.length})</summary>
-          <PizzaMenuList items={pasta} eventId={eventId} onAdded={onAdded} />
+          <PizzaMenuList items={pasta} onAdded={onAdded} />
         </details>
       ) : null}
     </div>
@@ -358,11 +334,9 @@ function PizzaMenuBrowser({ menu, eventId, onAdded }: MenuBrowserProps) {
 
 function PizzaMenuList({
   items,
-  eventId,
   onAdded
 }: {
   items: PizzaItem[];
-  eventId: string;
   onAdded: () => Promise<void>;
 }) {
   return (
@@ -386,7 +360,7 @@ function PizzaMenuList({
                 type="button"
                 className="secondary"
                 onClick={async () => {
-                  await addPizzaLine({ eventId, variantId: variant.id, qty: 1 });
+                  await addPizzaLine({ variantId: variant.id, qty: 1 });
                   await onAdded();
                 }}
               >
@@ -477,9 +451,7 @@ interface OverviewProps {
 
 function AllOrdersOverview({ state, isManager, onPaymentChanged, currentUserId }: OverviewProps) {
   if (state.orders.length === 0) {
-    return (
-      <p className="muted pizza-overview__empty">Noch keine Bestellungen.</p>
-    );
+    return <p className="muted pizza-overview__empty">Noch keine Bestellungen.</p>;
   }
   const totalsByUser = new Map(state.guestTotals.map((g) => [g.userId, g.totalCents]));
   return (

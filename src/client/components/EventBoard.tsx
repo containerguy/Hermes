@@ -7,7 +7,6 @@ import { useBrandIconSrc } from "../lib/BrandingContext";
 import type { MessageKey } from "../i18n/catalog/index";
 import { Cod4KeyGenerator } from "../cod4/Cod4KeyGenerator";
 import { isCod4Game } from "../cod4/isCod4Game";
-import { PizzaPanel } from "../pizza/PizzaPanel";
 
 function toDatetimeLocal(value: string) {
   const date = new Date(value);
@@ -72,19 +71,13 @@ export function EventBoard({
   mode = "events",
   emptyBoardTitle = "",
   emptyBoardBody = "",
-  gameCatalog = [],
-  pizzaPaypalHandle = "",
-  pizzaPaypalName = "",
-  pizzaCashRecipient = ""
+  gameCatalog = []
 }: {
   currentUser: User | null;
   mode?: "events" | "manager";
   emptyBoardTitle?: string;
   emptyBoardBody?: string;
   gameCatalog?: string[];
-  pizzaPaypalHandle?: string;
-  pizzaPaypalName?: string;
-  pizzaCashRecipient?: string;
 }) {
   const { t, locale } = useI18n();
   const markSrc = useBrandIconSrc();
@@ -559,17 +552,6 @@ export function EventBoard({
           <p className="muted event-join-hint">{t("events.conn.missing")}</p>
         )}
         {isCod4Game(event.gameTitle) ? <Cod4KeyGenerator /> : null}
-        {currentUser ? (
-          <PizzaPanel
-            eventId={event.id}
-            currentUserId={currentUser.id}
-            currentUserRole={currentUser.role}
-            myParticipation={event.myParticipation ?? null}
-            paypalHandle={pizzaPaypalHandle}
-            paypalName={pizzaPaypalName}
-            cashRecipient={pizzaCashRecipient}
-          />
-        ) : null}
         {event.status !== "archived" && event.status !== "cancelled" ? (
           <div className="action-row">
             <button

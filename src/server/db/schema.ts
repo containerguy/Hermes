@@ -355,29 +355,23 @@ export const pizzaMenuVariants = sqliteTable(
   (table) => [index("pizza_menu_variants_item_idx").on(table.itemId)]
 );
 
-export const pizzaSessions = sqliteTable(
-  "pizza_sessions",
-  {
-    id: text("id").primaryKey(),
-    eventId: text("event_id")
-      .notNull()
-      .references(() => gameEvents.id, { onDelete: "cascade" }),
-    state: text("state", { enum: ["draft", "open", "locked", "delivered"] })
-      .notNull()
-      .default("draft"),
-    openedAt: text("opened_at"),
-    openedByUserId: text("opened_by_user_id").references(() => users.id, { onDelete: "set null" }),
-    lockedAt: text("locked_at"),
-    lockedByUserId: text("locked_by_user_id").references(() => users.id, { onDelete: "set null" }),
-    deliveredAt: text("delivered_at"),
-    deliveredByUserId: text("delivered_by_user_id").references(() => users.id, {
-      onDelete: "set null"
-    }),
-    createdAt: text("created_at").notNull(),
-    updatedAt: text("updated_at").notNull()
-  },
-  (table) => [uniqueIndex("pizza_sessions_event_unique").on(table.eventId)]
-);
+export const pizzaSessions = sqliteTable("pizza_sessions", {
+  id: text("id").primaryKey(),
+  state: text("state", { enum: ["draft", "open", "locked", "delivered"] })
+    .notNull()
+    .default("draft"),
+  label: text("label"),
+  openedAt: text("opened_at"),
+  openedByUserId: text("opened_by_user_id").references(() => users.id, { onDelete: "set null" }),
+  lockedAt: text("locked_at"),
+  lockedByUserId: text("locked_by_user_id").references(() => users.id, { onDelete: "set null" }),
+  deliveredAt: text("delivered_at"),
+  deliveredByUserId: text("delivered_by_user_id").references(() => users.id, {
+    onDelete: "set null"
+  }),
+  createdAt: text("created_at").notNull(),
+  updatedAt: text("updated_at").notNull()
+});
 
 export const pizzaOrders = sqliteTable(
   "pizza_orders",
