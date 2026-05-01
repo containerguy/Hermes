@@ -2052,6 +2052,11 @@ dd {
   flex-wrap: wrap;
 }
 
+.cod4-copy-status {
+  font-size: 0.92rem;
+  font-weight: 900;
+}
+
 .cod4-copy-status--ok {
   font-size: 0.92rem;
   font-weight: 900;
