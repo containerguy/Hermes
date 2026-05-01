@@ -1141,7 +1141,10 @@ describe("app flow", () => {
       defaultLocale: "de" as const,
       kioskStreamEnabled: false,
       kioskStreamPath: "stream",
-      kioskStreamSecret: ""
+      kioskStreamSecret: "",
+      pizzaPaypalHandle: "",
+      pizzaPaypalName: "",
+      pizzaCashRecipient: ""
     };
 
     await adminAgent

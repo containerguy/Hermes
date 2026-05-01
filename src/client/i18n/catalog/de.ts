@@ -323,6 +323,13 @@ export const deMessages = {
   "events.full.hint": "Vielleicht ist es Zeit für eine neue Runde.",
   "events.empty.eyebrow": "Events",
 
+  "events.cod4.heading": "COD4-Schlüssel",
+  "events.cod4.generate": "COD4-Schlüssel generieren",
+  "events.cod4.copy": "Kopieren",
+  "events.cod4.regenerate": "Neu generieren",
+  "events.cod4.copied": "Kopiert",
+  "events.cod4.copyFailed": "Kopieren fehlgeschlagen — manuell auswählen und kopieren",
+
   "admin.gate.title": "User, Manager und Einstellungen.",
   "admin.gate.body": "Der Adminbereich ist nach Admin-Login verfügbar.",
   "admin.gate.link": "Admin-Login öffnen",

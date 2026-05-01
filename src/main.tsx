@@ -6,6 +6,7 @@ import type { AdminSection, AppReleaseInfo, AppSettings, PublicAppSettings, User
 import { requestJson } from "./client/api/request";
 import { clearCsrfToken, primeCsrfToken } from "./client/api/csrf";
 import { EventBoard } from "./client/components/EventBoard";
+import { PizzaPanel } from "./client/pizza/PizzaPanel";
 import { InfosPage } from "./client/components/InfosPage";
 import { LoginPage } from "./client/components/LoginPage";
 import { AdminPanel } from "./client/components/AdminPanel";
@@ -86,7 +87,10 @@ const defaultSettings: AppSettings = {
   defaultLocale: "de",
   kioskStreamEnabled: false,
   kioskStreamPath: "stream",
-  kioskStreamSecret: ""
+  kioskStreamSecret: "",
+  pizzaPaypalHandle: "",
+  pizzaPaypalName: "",
+  pizzaCashRecipient: ""
 };
 
 function applyTheme(settings: AppSettings) {
@@ -399,13 +403,24 @@ function AppShell({
     }
 
     return (
-      <EventBoard
-        currentUser={currentUser}
-        mode={eventBoardMode}
-        emptyBoardTitle={appSettings.shellEventsEmptyTitle}
-        emptyBoardBody={appSettings.shellEventsEmptyBody}
-        gameCatalog={appSettings.gameCatalog}
-      />
+      <>
+        {currentUser ? (
+          <PizzaPanel
+            currentUserId={currentUser.id}
+            currentUserRole={currentUser.role}
+            paypalHandle={appSettings.pizzaPaypalHandle}
+            paypalName={appSettings.pizzaPaypalName}
+            cashRecipient={appSettings.pizzaCashRecipient}
+          />
+        ) : null}
+        <EventBoard
+          currentUser={currentUser}
+          mode={eventBoardMode}
+          emptyBoardTitle={appSettings.shellEventsEmptyTitle}
+          emptyBoardBody={appSettings.shellEventsEmptyBody}
+          gameCatalog={appSettings.gameCatalog}
+        />
+      </>
     );
   }
 
