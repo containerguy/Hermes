@@ -6,7 +6,8 @@ import { requireUser } from "../auth/current-user";
 import { enforceApiTokenWriteAccess } from "../auth/hermes-auth";
 import { tryWriteAuditLog, writeAuditLog } from "../audit-log";
 import type { DatabaseContext } from "../db/client";
-import { appSettings, gameEvents, participations, users } from "../db/schema";
+import { appSettings, gameEvents, participations, pizzaSessions, users } from "../db/schema";
+import { cancelOpenOrderForUser } from "../domain/pizza/orders";
 import { deriveEventStatus, eventInputSchema, shouldAutoArchive } from "../domain/events";
 import { canCreateEvent, canManageEvent } from "../domain/users";
 import { sendPushToEnabledUsers, sendPushToOperators } from "../push/push-service";
@@ -551,6 +552,16 @@ export function createEventRouter(context: DatabaseContext) {
         previousParticipation: existingStatus
       }
     });
+    if (parsed.data.status === "declined") {
+      const pizzaSession = context.db
+        .select()
+        .from(pizzaSessions)
+        .where(eq(pizzaSessions.eventId, event.id))
+        .get();
+      if (pizzaSession && pizzaSession.state === "open") {
+        cancelOpenOrderForUser(context, pizzaSession.id, actor.id);
+      }
+    }
     broadcastEventsChanged("participation_updated");
     if (previousStatus !== nextStatus && updated) {
       void sendPushToEnabledUsers(context, {
