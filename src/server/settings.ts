@@ -63,7 +63,13 @@ const settingsObjectSchema = z.object({
   /** Ein Pfadsegment ohne Schrägstriche, z. B. stream oder display */
   kioskStreamPath: kioskPathSegmentSchema,
   /** Geheimer Zugriffsschlüssel (Query id), min. 12 Zeichen wenn Kiosk aktiv */
-  kioskStreamSecret: z.string().max(128)
+  kioskStreamSecret: z.string().max(128),
+  /** PayPal-Handle für Pizzabestellungs-Kassenliste (paypal.me/<handle>). Leer = kein Link. */
+  pizzaPaypalHandle: z.string().trim().max(80),
+  /** Anzeigename für PayPal-Empfänger in Kassenliste. Leer = kein Hinweis. */
+  pizzaPaypalName: z.string().trim().max(120),
+  /** Bargeld-Empfänger Hinweis in Kassenliste. Leer = kein Hinweis. */
+  pizzaCashRecipient: z.string().trim().max(120)
 });
 
 export const settingsSchema = settingsObjectSchema.superRefine((data, ctx) => {
@@ -107,6 +113,9 @@ export type PublicHermesSettings = Pick<
   | "defaultLocale"
   | "kioskStreamEnabled"
   | "kioskStreamPath"
+  | "pizzaPaypalHandle"
+  | "pizzaPaypalName"
+  | "pizzaCashRecipient"
 >;
 
 export function pickPublicSettings(full: HermesSettings): PublicHermesSettings {
@@ -129,7 +138,10 @@ export function pickPublicSettings(full: HermesSettings): PublicHermesSettings {
     infosMarkdown: full.infosMarkdown,
     defaultLocale: full.defaultLocale,
     kioskStreamEnabled: full.kioskStreamEnabled,
-    kioskStreamPath: full.kioskStreamPath
+    kioskStreamPath: full.kioskStreamPath,
+    pizzaPaypalHandle: full.pizzaPaypalHandle,
+    pizzaPaypalName: full.pizzaPaypalName,
+    pizzaCashRecipient: full.pizzaCashRecipient
   };
 }
 
@@ -156,7 +168,10 @@ export const defaultSettings: HermesSettings = {
   defaultLocale: "de",
   kioskStreamEnabled: false,
   kioskStreamPath: "stream",
-  kioskStreamSecret: ""
+  kioskStreamSecret: "",
+  pizzaPaypalHandle: "",
+  pizzaPaypalName: "",
+  pizzaCashRecipient: ""
 };
 
 function nowIso() {

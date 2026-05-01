@@ -324,6 +324,102 @@ export const userApiTokens = sqliteTable(
   ]
 );
 
+export const pizzaMenuItems = sqliteTable(
+  "pizza_menu_items",
+  {
+    id: text("id").primaryKey(),
+    number: text("number"),
+    name: text("name").notNull(),
+    ingredients: text("ingredients"),
+    allergens: text("allergens"),
+    category: text("category", { enum: ["pizza", "pasta"] }).notNull().default("pizza"),
+    active: integer("active", { mode: "boolean" }).notNull().default(true),
+    sortOrder: integer("sort_order").notNull().default(0),
+    createdAt: text("created_at").notNull(),
+    updatedAt: text("updated_at").notNull()
+  },
+  (table) => [index("pizza_menu_items_active_sort_idx").on(table.active, table.sortOrder)]
+);
+
+export const pizzaMenuVariants = sqliteTable(
+  "pizza_menu_variants",
+  {
+    id: text("id").primaryKey(),
+    itemId: text("item_id")
+      .notNull()
+      .references(() => pizzaMenuItems.id, { onDelete: "cascade" }),
+    sizeLabel: text("size_label"),
+    priceCents: integer("price_cents").notNull(),
+    sortOrder: integer("sort_order").notNull().default(0)
+  },
+  (table) => [index("pizza_menu_variants_item_idx").on(table.itemId)]
+);
+
+export const pizzaSessions = sqliteTable(
+  "pizza_sessions",
+  {
+    id: text("id").primaryKey(),
+    eventId: text("event_id")
+      .notNull()
+      .references(() => gameEvents.id, { onDelete: "cascade" }),
+    state: text("state", { enum: ["draft", "open", "locked", "delivered"] })
+      .notNull()
+      .default("draft"),
+    openedAt: text("opened_at"),
+    openedByUserId: text("opened_by_user_id").references(() => users.id, { onDelete: "set null" }),
+    lockedAt: text("locked_at"),
+    lockedByUserId: text("locked_by_user_id").references(() => users.id, { onDelete: "set null" }),
+    deliveredAt: text("delivered_at"),
+    deliveredByUserId: text("delivered_by_user_id").references(() => users.id, {
+      onDelete: "set null"
+    }),
+    createdAt: text("created_at").notNull(),
+    updatedAt: text("updated_at").notNull()
+  },
+  (table) => [uniqueIndex("pizza_sessions_event_unique").on(table.eventId)]
+);
+
+export const pizzaOrders = sqliteTable(
+  "pizza_orders",
+  {
+    id: text("id").primaryKey(),
+    sessionId: text("session_id")
+      .notNull()
+      .references(() => pizzaSessions.id, { onDelete: "cascade" }),
+    userId: text("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    paymentStatus: text("payment_status", {
+      enum: ["unpaid", "paid_paypal", "paid_cash"]
+    })
+      .notNull()
+      .default("unpaid"),
+    paidAt: text("paid_at"),
+    paidByAdminId: text("paid_by_admin_id").references(() => users.id, { onDelete: "set null" }),
+    createdAt: text("created_at").notNull(),
+    updatedAt: text("updated_at").notNull()
+  },
+  (table) => [uniqueIndex("pizza_orders_session_user_unique").on(table.sessionId, table.userId)]
+);
+
+export const pizzaOrderLines = sqliteTable(
+  "pizza_order_lines",
+  {
+    id: text("id").primaryKey(),
+    orderId: text("order_id")
+      .notNull()
+      .references(() => pizzaOrders.id, { onDelete: "cascade" }),
+    variantId: text("variant_id")
+      .notNull()
+      .references(() => pizzaMenuVariants.id, { onDelete: "restrict" }),
+    qty: integer("qty").notNull(),
+    priceCentsSnapshot: integer("price_cents_snapshot").notNull(),
+    customNote: text("custom_note"),
+    createdAt: text("created_at").notNull()
+  },
+  (table) => [index("pizza_order_lines_order_idx").on(table.orderId)]
+);
+
 export const userRelations = relations(users, ({ many }) => ({
   sessions: many(sessions),
   pushSubscriptions: many(pushSubscriptions),
