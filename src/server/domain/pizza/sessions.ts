@@ -1,4 +1,4 @@
-import { eq } from "drizzle-orm";
+import { desc, eq } from "drizzle-orm";
 import { randomUUID } from "node:crypto";
 import type { DatabaseContext } from "../../db/client";
 import { pizzaSessions } from "../../db/schema";
@@ -9,17 +9,18 @@ function nowIso() {
   return new Date().toISOString();
 }
 
-export function getSessionForEvent(context: DatabaseContext, eventId: string) {
+export function getActiveSession(context: DatabaseContext) {
   return context.db
     .select()
     .from(pizzaSessions)
-    .where(eq(pizzaSessions.eventId, eventId))
-    .get();
+    .orderBy(desc(pizzaSessions.createdAt))
+    .limit(1)
+    .all()[0];
 }
 
-export function getOrCreateDraftSession(context: DatabaseContext, eventId: string) {
-  const existing = getSessionForEvent(context, eventId);
-  if (existing) return existing;
+export function getOrCreateDraftSession(context: DatabaseContext) {
+  const existing = getActiveSession(context);
+  if (existing && existing.state !== "delivered") return existing;
 
   const id = randomUUID();
   const now = nowIso();
@@ -27,22 +28,25 @@ export function getOrCreateDraftSession(context: DatabaseContext, eventId: strin
     .insert(pizzaSessions)
     .values({
       id,
-      eventId,
       state: "draft",
       createdAt: now,
       updatedAt: now
     })
     .run();
-  return getSessionForEvent(context, eventId)!;
+  return context.db.select().from(pizzaSessions).where(eq(pizzaSessions.id, id)).get()!;
+}
+
+export function getSessionById(context: DatabaseContext, sessionId: string) {
+  return context.db.select().from(pizzaSessions).where(eq(pizzaSessions.id, sessionId)).get();
 }
 
 export function transitionSession(
   context: DatabaseContext,
-  eventId: string,
   transition: PizzaSessionTransition,
-  actor: { id: string }
+  actor: { id: string },
+  label?: string | null
 ) {
-  const session = getOrCreateDraftSession(context, eventId);
+  const session = getOrCreateDraftSession(context);
 
   if (transition === "open") {
     if (countActiveItems(context) === 0) {
@@ -65,6 +69,7 @@ export function transitionSession(
     update.lockedByUserId = null;
     update.deliveredAt = null;
     update.deliveredByUserId = null;
+    if (typeof label === "string") update.label = label.trim() || null;
   } else if (transition === "lock") {
     update.lockedAt = now;
     update.lockedByUserId = actor.id;
@@ -78,5 +83,5 @@ export function transitionSession(
 
   context.db.update(pizzaSessions).set(update).where(eq(pizzaSessions.id, session.id)).run();
 
-  return getSessionForEvent(context, eventId)!;
+  return getSessionById(context, session.id)!;
 }

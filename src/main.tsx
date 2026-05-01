@@ -6,6 +6,7 @@ import type { AdminSection, AppReleaseInfo, AppSettings, PublicAppSettings, User
 import { requestJson } from "./client/api/request";
 import { clearCsrfToken, primeCsrfToken } from "./client/api/csrf";
 import { EventBoard } from "./client/components/EventBoard";
+import { PizzaPanel } from "./client/pizza/PizzaPanel";
 import { InfosPage } from "./client/components/InfosPage";
 import { LoginPage } from "./client/components/LoginPage";
 import { AdminPanel } from "./client/components/AdminPanel";
@@ -402,16 +403,24 @@ function AppShell({
     }
 
     return (
-      <EventBoard
-        currentUser={currentUser}
-        mode={eventBoardMode}
-        emptyBoardTitle={appSettings.shellEventsEmptyTitle}
-        emptyBoardBody={appSettings.shellEventsEmptyBody}
-        gameCatalog={appSettings.gameCatalog}
-        pizzaPaypalHandle={appSettings.pizzaPaypalHandle}
-        pizzaPaypalName={appSettings.pizzaPaypalName}
-        pizzaCashRecipient={appSettings.pizzaCashRecipient}
-      />
+      <>
+        {currentUser ? (
+          <PizzaPanel
+            currentUserId={currentUser.id}
+            currentUserRole={currentUser.role}
+            paypalHandle={appSettings.pizzaPaypalHandle}
+            paypalName={appSettings.pizzaPaypalName}
+            cashRecipient={appSettings.pizzaCashRecipient}
+          />
+        ) : null}
+        <EventBoard
+          currentUser={currentUser}
+          mode={eventBoardMode}
+          emptyBoardTitle={appSettings.shellEventsEmptyTitle}
+          emptyBoardBody={appSettings.shellEventsEmptyBody}
+          gameCatalog={appSettings.gameCatalog}
+        />
+      </>
     );
   }
 

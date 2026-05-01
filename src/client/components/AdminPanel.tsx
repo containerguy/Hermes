@@ -19,7 +19,7 @@ import { requestJson } from "../api/request";
 import { ApiError, getErrorMessage } from "../errors/errors";
 import { useI18n } from "../i18n/I18nContext";
 import { useBrandIconSrc } from "../lib/BrandingContext";
-import { PizzaMenuAdmin } from "../pizza/PizzaMenuAdmin";
+import { PizzaMenuJsonAdmin } from "../pizza/PizzaMenuJsonAdmin";
 
 function toDatetimeLocal(value: string) {
   const date = new Date(value);
@@ -1366,7 +1366,7 @@ export function AdminPanel({
           </div>
         ) : null}
       </section>
-      <PizzaMenuAdmin />
+      <PizzaMenuJsonAdmin />
         </>
       ) : null}
 

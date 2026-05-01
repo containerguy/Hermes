@@ -1,12 +1,7 @@
 import { and, asc, eq } from "drizzle-orm";
 import { randomUUID } from "node:crypto";
 import type { DatabaseContext } from "../../db/client";
-import {
-  participations,
-  pizzaOrderLines,
-  pizzaOrders,
-  pizzaSessions
-} from "../../db/schema";
+import { pizzaOrderLines, pizzaOrders, pizzaSessions } from "../../db/schema";
 import { canMarkPayment, canPlaceOrder } from "./lifecycle";
 import { getVariantWithItem } from "./menu";
 import {
@@ -35,21 +30,6 @@ export class PizzaOrderError extends Error {
 function assertSessionOpen(state: string) {
   if (!canPlaceOrder(state as never)) {
     throw new PizzaOrderError("session_not_open", "Bestellung ist nicht offen");
-  }
-}
-
-function assertUserDabei(context: DatabaseContext, eventId: string, userId: string) {
-  const part = context.db
-    .select()
-    .from(participations)
-    .where(and(eq(participations.eventId, eventId), eq(participations.userId, userId)))
-    .get();
-  if (!part || part.status !== "joined") {
-    throw new PizzaOrderError(
-      "not_dabei",
-      "Nur Teilnehmer mit Status 'dabei' können bestellen",
-      403
-    );
   }
 }
 
@@ -107,7 +87,6 @@ export interface AddLineInput {
 export function addLine(context: DatabaseContext, input: AddLineInput) {
   const session = getSession(context, input.sessionId);
   assertSessionOpen(session.state);
-  assertUserDabei(context, session.eventId, input.userId);
   assertValidQty(input.qty);
   const note = normalizeNote(input.customNote);
   assertValidNote(note);
