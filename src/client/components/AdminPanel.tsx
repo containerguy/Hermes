@@ -19,6 +19,7 @@ import { requestJson } from "../api/request";
 import { ApiError, getErrorMessage } from "../errors/errors";
 import { useI18n } from "../i18n/I18nContext";
 import { useBrandIconSrc } from "../lib/BrandingContext";
+import { PizzaMenuAdmin } from "../pizza/PizzaMenuAdmin";
 
 function toDatetimeLocal(value: string) {
   const date = new Date(value);
@@ -1200,6 +1201,46 @@ export function AdminPanel({
             />
           </div>
         </section>
+        <fieldset className="admin-fieldset">
+          <legend>Pizzabestellung</legend>
+          <p className="muted">
+            Werte werden in der Kassenliste und auf der "Mein Anteil"-Seite genutzt. Leer = kein
+            Hinweis.
+          </p>
+          <label>
+            PayPal-Handle (paypal.me/&lt;handle&gt;)
+            <input
+              value={settings.pizzaPaypalHandle}
+              onChange={(event) =>
+                setSettings({ ...settings, pizzaPaypalHandle: event.target.value })
+              }
+              maxLength={80}
+              placeholder="renekeller"
+            />
+          </label>
+          <label>
+            PayPal-Empfänger Anzeigename
+            <input
+              value={settings.pizzaPaypalName}
+              onChange={(event) =>
+                setSettings({ ...settings, pizzaPaypalName: event.target.value })
+              }
+              maxLength={120}
+              placeholder="Rene Keller"
+            />
+          </label>
+          <label>
+            Bargeld-Empfänger Hinweis
+            <input
+              value={settings.pizzaCashRecipient}
+              onChange={(event) =>
+                setSettings({ ...settings, pizzaCashRecipient: event.target.value })
+              }
+              maxLength={120}
+              placeholder="Rene"
+            />
+          </label>
+        </fieldset>
         <button type="submit">{t("admin.settings.save")}</button>
       </form>
 
@@ -1325,6 +1366,7 @@ export function AdminPanel({
           </div>
         ) : null}
       </section>
+      <PizzaMenuAdmin />
         </>
       ) : null}
 
