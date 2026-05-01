@@ -1,91 +1,123 @@
 # External Integrations
 
-## Overview
+**Analysis Date:** 2026-05-01
 
-Hermes is mostly self-contained: the active application state lives in local SQLite, and the server owns auth, sessions, event state, settings, and audit logs. External integrations are used for snapshot persistence, email delivery, browser push notifications, browser realtime/PWA APIs, and CI/container publishing.
+## APIs & External Services
 
-## S3-Compatible Snapshot Storage
+**Object Storage (S3-compatible):**
+- Wasabi (default endpoint `https://s3.eu-central-2.wasabisys.com`, bucket `hermes-storage`, region `eu-central-2`) — Stores/restores the SQLite snapshot for cross-deploy persistence
+  - SDK/Client: `@aws-sdk/client-s3` (`PutObjectCommand`, `GetObjectCommand`, `ListObjectsV2Command`, `DeleteObjectCommand`) in `src/server/storage/s3-storage.ts`
+  - Auth: credentials JSON file path in `HERMES_S3_CREDS_FILE` (mounted as `./s3.creds:/run/secrets/s3.creds:ro` in `docker-compose.yml`)
+  - Selectable via `HERMES_STORAGE_BACKEND=s3|disabled`
+  - Snapshot key configurable via `HERMES_S3_DB_KEY`; restore behavior controlled by `HERMES_S3_RESTORE_MODE` (e.g. `if-missing`)
+  - Uploaded automatically after non-GET responses via `scheduleDatabaseSnapshot` in `src/server/app.ts`
 
-- Purpose: persistent backup/restore of the local SQLite database as a snapshot object.
-- Implementation: `src/server/storage/s3-storage.ts` uses `@aws-sdk/client-s3` with `S3Client`, `GetObjectCommand`, and `PutObjectCommand`.
-- Enablement: storage is active only when `HERMES_STORAGE_BACKEND=s3`.
-- Configuration variables: `HERMES_S3_BUCKET`, `HERMES_S3_REGION`, `HERMES_S3_ENDPOINT`, `HERMES_S3_DB_KEY`, `HERMES_S3_RESTORE_MODE`, `HERMES_S3_CREDS_FILE`, `HERMES_S3_ACCESS_KEY_ID`, `HERMES_S3_SECRET_ACCESS_KEY`, `AWS_ACCESS_KEY_ID`, and `AWS_SECRET_ACCESS_KEY`.
-- Default-compatible target: `.env.example`, `docker-compose.yml`, `README.md`, and `building.md` point at a Wasabi S3-compatible endpoint in region `eu-central-2` with a SQLite object key.
-- Credentials: `src/server/storage/s3-storage.ts` accepts credentials from env vars or a credentials file and supports several key names plus two bare-line formats. Do not commit real credential files.
-- Startup restore: `restoreDatabaseFromStorageIfNeeded()` in `src/server/storage/s3-storage.ts` downloads the snapshot before migrations if S3 is enabled and restore mode permits it.
-- Write persistence: `src/server/app.ts` schedules a snapshot after successful non-GET/non-HEAD/non-OPTIONS responses; `scheduleDatabaseSnapshot()` debounces uploads by one second.
-- Shutdown persistence: `src/server/index.ts` calls the app close hook, which flushes pending S3 snapshots before closing SQLite.
-- Manual admin operations: `POST /api/admin/backup` and `POST /api/admin/restore` in `src/server/http/admin-routes.ts` call `persistDatabaseSnapshot()` and `restoreDatabaseSnapshotIntoLive()`.
-- Restore behavior: live restore attaches a downloaded SQLite snapshot and replaces known restorable tables listed in `src/server/storage/s3-storage.ts`.
-- Operational limit: `README.md` and `building.md` explicitly describe S3 as snapshot storage, not a multi-instance locking database backend.
+**Email (SMTP):**
+- Outbound SMTP relay — Delivers login OTP and email-change OTP to users (`src/server/mail/mailer.ts`)
+  - SDK/Client: `nodemailer` `createTransport`
+  - Auth: `HERMES_SMTP_USER` / `HERMES_SMTP_PASSWORD`
+  - Modes: `HERMES_MAIL_MODE=console` (logs to stdout) or `smtp`
+  - Security selector: `HERMES_SMTP_SECURITY=tls|starttls|none` (with legacy `HERMES_SMTP_SECURE` fallback)
+  - Functions: `sendLoginCode`, `sendEmailChangeCode`
 
-## SMTP Email Delivery
+**Web Push:**
+- Browser push services (FCM / Mozilla AutoPush / WNS — provider-agnostic via VAPID) — Push notifications to subscribed devices (`src/server/push/push-service.ts`)
+  - SDK/Client: `web-push` (`webpush.setVapidDetails`)
+  - Auth: VAPID keys `HERMES_VAPID_PUBLIC_KEY`, `HERMES_VAPID_PRIVATE_KEY`, contact `HERMES_VAPID_SUBJECT`
+  - Public key exposed to clients via push routes for subscription registration (`src/server/http/push-routes.ts`)
+  - Service worker handler: `src/shared/sw.js`
 
-- Purpose: deliver one-time login codes and registration login codes.
-- Implementation: `src/server/mail/mailer.ts` uses Nodemailer.
-- Call sites: `src/server/http/auth-routes.ts` calls `sendLoginCode()` during `/api/auth/request-code` and `/api/auth/register`.
-- Modes: `HERMES_MAIL_MODE=console` logs local login codes; `HERMES_MAIL_MODE=smtp` sends through SMTP.
-- Configuration variables: `HERMES_MAIL_MODE`, `HERMES_MAIL_FROM`, `HERMES_SMTP_HOST`, `HERMES_SMTP_PORT`, `HERMES_SMTP_SECURE`, `HERMES_SMTP_SECURITY`, `HERMES_SMTP_USER`, and `HERMES_SMTP_PASSWORD`.
-- TLS behavior: `src/server/mail/mailer.ts` supports implicit TLS, STARTTLS, no TLS, and legacy `HERMES_SMTP_SECURE`; it warns if `HERMES_SMTP_SECURE=true` is used on a non-465 port.
-- Failure handling: auth routes return a mail delivery error if SMTP sending fails, while logging details server-side.
-- Local test escape hatch: `HERMES_DEV_LOGIN_CODE` in `src/server/http/auth-routes.ts` can pin the OTP value for development/tests and is documented as non-production in `.env.example`.
+**API Documentation (Swagger UI):**
+- unpkg.com CDN — Loads Swagger UI assets (`swagger-ui.css`, `swagger-ui-bundle.js`) version 5.11.0 from `https://unpkg.com/swagger-ui-dist@5.11.0/...` for the `/api/docs` page (`src/server/http/api-docs.ts`)
+  - CSP relaxed for the `/api/docs` route only to allow unpkg + inline boot script
+  - Spec served from `/api/openapi.yaml`, sourced from `src/server/openapi/hermes-api.yaml` (also copied into `dist-server/openapi/` at build)
 
-## Web Push And Browser Notifications
+## Data Storage
 
-- Purpose: notify users about new events, event cancellations/archives, and status changes.
-- Server implementation: `src/server/push/push-service.ts` uses `web-push`.
-- Push routes: `src/server/http/push-routes.ts` exposes `/api/push/public-key`, `/api/push/subscriptions`, and `/api/push/preferences`.
-- Client implementation: `src/main.tsx` registers `public/sw.js`, asks browser notification permission, subscribes through `registration.pushManager.subscribe()`, and sends the subscription to the server.
-- Service worker: `public/sw.js` handles `push` and `notificationclick`, displays notifications with icon/badge data, and opens or focuses the target URL.
-- VAPID configuration: `HERMES_VAPID_SUBJECT`, `HERMES_VAPID_PUBLIC_KEY`, and `HERMES_VAPID_PRIVATE_KEY`.
-- Storage: push subscriptions are stored in SQLite table `push_subscriptions` defined in `src/server/db/schema.ts`.
-- Subscription lifecycle: stale subscriptions are revoked when `web-push` returns HTTP 404 or 410 in `src/server/push/push-service.ts`.
-- Event triggers: `src/server/http/event-routes.ts` sends push notifications when events are created, cancelled, archived, or transition to a different status after participation changes.
-- Browser requirement: `README.md` notes push requires a secure context; localhost works for local testing, ordinary HTTP LAN addresses generally do not.
+**Databases:**
+- SQLite (file-backed, WAL mode)
+  - Connection: `HERMES_DB_PATH` (defaults to `./data/hermes.sqlite`; container default `/data/hermes.sqlite`)
+  - Client: `better-sqlite3` wrapped by `drizzle-orm/better-sqlite3` in `src/server/db/client.ts`
+  - Schema: `src/server/db/schema.ts`
+  - Migrations: SQL files in `src/server/db/migrations/`, applied by `src/server/db/migrate.ts`
 
-## Server-Sent Events
+**File Storage:**
+- Local filesystem `/data` volume in container (the SQLite DB itself is the only persisted file)
+- Periodic full-DB snapshot pushed to S3 (see above)
 
-- Purpose: live event-board updates without a separate websocket service.
-- Server implementation: `src/server/realtime/event-bus.ts` maintains connected Express responses and writes SSE frames.
-- Route: `src/server/http/realtime-routes.ts` exposes `/api/realtime/events` and requires an authenticated user.
-- Client: `src/main.tsx` creates `new EventSource("/api/realtime/events", { withCredentials: true })`.
-- Broadcasts: `src/server/http/event-routes.ts` and the status interval in `src/server/app.ts` call `broadcastEventsChanged()` after event, participation, archive/cancel, and status-refresh changes.
-- Fallback: `src/main.tsx` keeps a 30-second polling interval active around the SSE connection and marks UI state as polling on SSE error.
+**Caching:**
+- None (in-memory only — e.g. SSE client map in `src/server/realtime/event-bus.ts`, snapshot debounce timer in `src/server/storage/s3-storage.ts`)
 
-## Browser PWA APIs
+## Authentication & Identity
 
-- Manifest: `public/manifest.webmanifest` defines app name, standalone display, colors, and SVG icon.
-- Service worker: `public/sw.js` claims clients on activation and handles push notification display/click behavior.
-- Client registration: `src/main.tsx` registers `/sw.js` only when enabling notifications.
-- Installation/deployment note: the server in `src/server/app.ts` serves `dist/` and the static `public` assets after Vite build; HTTPS termination is outside this app.
+**Auth Provider:**
+- Custom passwordless OTP — In-house implementation
+  - Implementation: `src/server/auth/` (`otp.ts`, `sessions.ts`, `hermes-auth.ts`, `current-user.ts`, `device-key.ts`, `pairing-tokens.ts`, `csrf.ts`, `rate-limits.ts`)
+  - Session cookies parsed via `cookie-parser`; CSRF token signing via `HERMES_CSRF_SECRET`
+  - Cookie `Secure` flag controlled by `HERMES_COOKIE_SECURE`
+  - Bootstrap admin from env (`HERMES_ADMIN_USERNAME` / `HERMES_ADMIN_EMAIL` / `HERMES_ADMIN_PHONE`) via `src/server/db/bootstrap-admin.ts`
+  - API tokens supported (see `src/server/http/api-tokens.test.ts`)
+  - Device pairing via short-lived tokens (`src/server/auth/pairing-tokens.ts`)
 
-## GitHub Actions And Container Registry
+## Monitoring & Observability
 
-- Workflow: `.github/workflows/docker-image.yml`.
-- Triggers: pull requests to `main`, pushes to `main`, tags matching `v*`, and manual `workflow_dispatch`.
-- Verification job: installs with `npm ci`, runs `npm test`, runs `npm run build`, and audits production dependencies.
-- Actions are pinned to Node-24-ready major versions: `actions/checkout@v5`, `actions/setup-node@v5`, `docker/setup-buildx-action@v4`, `docker/login-action@v4`, `docker/metadata-action@v6`, and `docker/build-push-action@v7`.
-- Docker job uses the pinned Docker actions above to build metadata and image artifacts.
-- Registry: images publish to GitHub Container Registry as `ghcr.io/containerguy/hermes` except on pull request builds.
-- Tags: workflow metadata produces `latest` on the default branch, branch tags, version tags, and `sha-` commit tags.
-- Permissions: workflow grants `contents: read` and `packages: write` for package publishing.
+**Error Tracking:**
+- None (errors written to stdout via `console.error` / `console.warn`)
 
-## CI Node 24 Migration
+**Logs:**
+- `console.*` to stdout/stderr; collected by container runtime
+- Application audit log persisted to SQLite (`src/server/audit-log.ts`, `audit_logs` table in `src/server/db/schema.ts`)
 
-- Rationale: GitHub-hosted JavaScript actions are migrating from Node 20 to Node 24; proactive action pinning avoids a release-day CI break.
-- Early opt-in: workflow-level `FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true` is enabled to fail fast on incompatible JavaScript actions during PR validation.
-- Date context: GitHub runtime migration target window is June 2026; Hermes adopts compatibility pins ahead of that window.
+**Health:**
+- `GET /api/health` returns `{ ok: true }` (`src/server/app.ts`); used by Docker `HEALTHCHECK` directive in `Dockerfile`
 
-## Docker Runtime Integrations
+## CI/CD & Deployment
 
-- Image build: `Dockerfile` builds frontend/server assets, prunes dev dependencies, exposes port 3000, and declares `/data` as a volume.
-- Health check: `Dockerfile` uses Node `fetch()` against `http://127.0.0.1:3000/api/health`.
-- Compose service: `docker-compose.yml` builds `hermes:local`, reads `.env`, exposes port 3000, mounts a named volume for SQLite, and mounts a local S3 credentials file read-only.
-- Runtime env: `docker-compose.yml` sets host, port, database path, S3 backend, S3 bucket/region/endpoint/key, credential file path, and restore mode.
+**Hosting:**
+- Self-hosted Docker container; image published to GitHub Container Registry (`ghcr.io/containerguy/hermes`)
 
-## Local Files And Secrets Boundary
+**CI Pipeline:**
+- GitHub Actions workflow `.github/workflows/docker-image.yml`
+  - `verify` job: `npm ci`, `npm test`, `npm run build`, `npm audit --omit=dev`
+  - `docker` job: `docker/setup-buildx-action@v4`, `docker/login-action@v4` (GHCR with `GITHUB_TOKEN`), `docker/metadata-action@v6`, `docker/build-push-action@v7`
+  - Triggers: `push` to `main`, `v*` tags, `pull_request` to `main`, `workflow_dispatch`
+  - Tagging strategy: `latest` (default branch), branch name, tag name, `sha-<short>`
+  - Builds `linux/amd64` only; uses GHA build cache (`type=gha`)
 
-- `.env.example` documents configuration names and placeholder values only.
-- `.env` is loaded by `src/server/env.ts` if present, but should remain local.
-- `s3.creds` is referenced by `README.md`, `building.md`, and `docker-compose.yml`; it should remain local and mounted read-only in Docker.
-- No real credential values should be recorded in `.planning/codebase/STACK.md` or `.planning/codebase/INTEGRATIONS.md`.
+## Environment Configuration
+
+**Required env vars (production):**
+- Server: `HERMES_HOST`, `HERMES_PORT`, `HERMES_DB_PATH`, `HERMES_CSRF_SECRET`, `HERMES_COOKIE_SECURE`
+- Storage: `HERMES_STORAGE_BACKEND`, `HERMES_S3_BUCKET`, `HERMES_S3_REGION`, `HERMES_S3_ENDPOINT`, `HERMES_S3_CREDS_FILE`, `HERMES_S3_DB_KEY`, `HERMES_S3_RESTORE_MODE`
+- Mail: `HERMES_MAIL_MODE`, `HERMES_MAIL_FROM`, `HERMES_SMTP_HOST`, `HERMES_SMTP_PORT`, `HERMES_SMTP_SECURITY` (or `HERMES_SMTP_SECURE`), `HERMES_SMTP_USER`, `HERMES_SMTP_PASSWORD`
+- Push: `HERMES_VAPID_SUBJECT`, `HERMES_VAPID_PUBLIC_KEY`, `HERMES_VAPID_PRIVATE_KEY`
+- Bootstrap admin: `HERMES_ADMIN_USERNAME`, `HERMES_ADMIN_EMAIL`, `HERMES_ADMIN_PHONE`
+- Optional: `HERMES_SOURCE_REPO_URL`, `HERMES_DEV_LOGIN_CODE`
+
+**Secrets location:**
+- Local dev: `.env` file (parsed by `src/server/env.ts`; contents never read by tooling)
+- Container: env vars via `docker-compose.yml` `env_file:` and `environment:`; S3 credentials mounted at `/run/secrets/s3.creds`
+- CI: `secrets.GITHUB_TOKEN` for GHCR push (no other long-lived secrets in workflow)
+
+## Webhooks & Callbacks
+
+**Incoming:**
+- None (no webhook endpoints registered in `src/server/http/`)
+
+**Outgoing:**
+- Web Push endpoints (browser-supplied subscription URLs) — sent from `src/server/push/push-service.ts`
+- SMTP submissions — sent from `src/server/mail/mailer.ts`
+- S3 PUT/GET/LIST/DELETE — sent from `src/server/storage/s3-storage.ts`
+
+## Realtime
+
+**Server-Sent Events (SSE):**
+- In-process broadcast bus `src/server/realtime/event-bus.ts` (`registerEventsClient`, `broadcastEventsChanged`)
+- Mounted under `/api/realtime` (`src/server/http/realtime-routes.ts`)
+- 25s heartbeat events; 15s client retry hint
+- Triggered by event mutations (`createEventRouter`) and a 30s `setInterval` status refresh in `src/server/app.ts`
+- Single-process only — no Redis/pub-sub fan-out
+
+---
+
+*Integration audit: 2026-05-01*

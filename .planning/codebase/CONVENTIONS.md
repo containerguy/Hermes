@@ -1,87 +1,171 @@
 # Coding Conventions
 
-## Project Shape
+**Analysis Date:** 2026-05-01
 
-- Hermes is a TypeScript ESM project: `package.json` sets `"type": "module"` and `tsconfig.json` uses `module: "ESNext"`, `moduleResolution: "Bundler"`, `target: "ES2022"`, `strict: true`, and `jsx: "react-jsx"`.
-- The codebase is split into a React/Vite frontend in `src/main.tsx` and `src/styles.css`, plus an Express/SQLite backend under `src/server/`.
-- Server modules are organized by concern:
-  - HTTP routers: `src/server/http/auth-routes.ts`, `src/server/http/admin-routes.ts`, `src/server/http/event-routes.ts`, `src/server/http/push-routes.ts`, `src/server/http/realtime-routes.ts`
-  - Domain rules: `src/server/domain/events.ts`, `src/server/domain/users.ts`
-  - Persistence: `src/server/db/client.ts`, `src/server/db/schema.ts`, `src/server/db/migrate.ts`, `src/server/db/migrations/*.sql`
-  - Auth/session helpers: `src/server/auth/current-user.ts`, `src/server/auth/sessions.ts`, `src/server/auth/otp.ts`
-  - Integrations and cross-cutting services: `src/server/mail/mailer.ts`, `src/server/push/push-service.ts`, `src/server/storage/s3-storage.ts`, `src/server/realtime/event-bus.ts`, `src/server/audit-log.ts`, `src/server/settings.ts`
+## Naming Patterns
 
-## TypeScript Style
+**Files:**
+- Server source: kebab-case `.ts` files — `auth-routes.ts`, `event-side-effects.ts`, `current-user.ts`, `push-service.ts` under `src/server/**`
+- React components: PascalCase `.tsx` files — `LoginPanel.tsx`, `AdminPanel.tsx` under `src/client/components/`
+- Tests: co-located alongside source, suffix `.test.ts` / `.test.tsx` (e.g. `src/server/auth/otp.test.ts`, `src/client/components/login-panel.test.tsx`)
+- E2E specs: `.spec.ts` under `e2e/` (e.g. `e2e/hermes-flow.spec.ts`)
+- SQL migrations: zero-padded numeric prefix + snake_case description — `NNNN_*.sql` (e.g. `src/server/db/migrations/0015_user_api_tokens.sql`); applied lexicographically by `src/server/db/migrate.ts`
 
-- Imports use ESM syntax throughout. Type-only imports are explicit, for example `import type { DatabaseContext } from "../db/client";` in route modules.
-- Runtime validation is done with Zod at API and domain boundaries. Examples:
-  - `eventInputSchema` in `src/server/domain/events.ts`
-  - route-local schemas such as `requestCodeSchema`, `verifyCodeSchema`, and `registerSchema` in `src/server/http/auth-routes.ts`
-  - `settingsSchema` usage in `src/server/http/admin-routes.ts`
-- Inferred types are preferred where practical. Drizzle table row types use `typeof table.$inferSelect`, for example `issueLoginChallenge(context, user: typeof users.$inferSelect)` in `src/server/http/auth-routes.ts`.
-- Helper functions are file-local unless reused elsewhere. Common examples include `nowIso()`, `fallbackPhoneNumber()`, `normalizeInviteCode()`, and serializer helpers in route modules.
-- Timestamps are stored and exchanged as ISO strings using `new Date().toISOString()`.
-- IDs are generated with `randomUUID()` for database entities, while session tokens use `randomBytes(32).toString("base64url")` in `src/server/auth/sessions.ts`.
+**Functions:**
+- camelCase verbs: `createHermesApp`, `requireUser`, `issueLoginChallenge`, `serializeInviteCode`, `scheduleDatabaseSnapshot`
+- React components and factory functions exported as PascalCase: `App`, `EventBoard`, `LoginPanel`, `createXRouter`
+- Predicates use `can*` / `should*` / `is*` / `has*`: `canCreateEvent()`, `canManageEvent()`, `shouldAutoArchive()` in `src/server/domain/`
 
-## Backend HTTP Patterns
+**Variables:**
+- camelCase locals (`databasePath`, `started`, `baseUrl`)
+- SCREAMING_SNAKE_CASE for module constants and exported header names: `CSRF_HEADER`, `PAIR_TOKEN_TTL_MS` (`src/server/auth/csrf.ts`, `src/server/auth/pairing-tokens.ts`)
+- Environment variable names: `HERMES_*` prefix throughout (`HERMES_DB_PATH`, `HERMES_COOKIE_SECURE`, `HERMES_MAIL_MODE`, `HERMES_DEV_LOGIN_CODE`, `HERMES_VAPID_PUBLIC_KEY`)
 
-- `src/server/app.ts` owns Express app composition. It disables `x-powered-by`, installs `express.json({ limit: "1mb" })`, installs `cookieParser()`, mounts API routers under `/api/*`, serves `dist` when present, and exposes a `close()` lifecycle hook for tests and shutdown.
-- Routers are created with `createXRouter(context: DatabaseContext)` and receive the shared SQLite/Drizzle context instead of creating their own database connections.
-- Authentication is checked through `requireUser()`, `requireAdmin()`, or `getCurrentSession()` from `src/server/auth/current-user.ts`.
-- Route handlers use early returns after every response. This keeps control flow flat and avoids fall-through after `response.status(...).json(...)` or `response.status(...).send()`.
-- Validation failures generally return `400` with a German machine-readable error code, such as `ungueltiges_event`, `ungueltiger_user`, or `ungueltige_settings`.
-- Auth/permission failures use `401` for unauthenticated users and `403` for authenticated users without required role, with codes such as `nicht_angemeldet`, `admin_erforderlich`, `manager_erforderlich`, or `verboten`.
-- State conflicts use `409`, for example duplicate users, full events, and attempts to mutate completed events.
-- Integration or persistence failures are logged with `console.error("[Hermes] ...", error)` and returned as stable error codes, for example `mailversand_fehlgeschlagen`, `backup_fehlgeschlagen`, and `restore_fehlgeschlagen`.
-- Response payloads wrap named resources: `{ user: ... }`, `{ users: ... }`, `{ event: ... }`, `{ events: ... }`, `{ settings: ... }`, `{ inviteCode: ... }`, `{ auditLogs: ... }`. Empty successful deletes usually use `204`.
+**Types:**
+- PascalCase interfaces and type aliases: `DatabaseContext`, `AppSettings`, `User`, `StartedApp`
+- Drizzle row types via `typeof table.$inferSelect` (e.g. `typeof users.$inferSelect` in `src/server/http/auth-routes.ts`)
+- API error codes: lowercase German snake_case strings — `ungueltiges_event`, `nicht_angemeldet`, `admin_erforderlich`, `mailversand_fehlgeschlagen`
 
-## Database Patterns
+## Code Style
 
-- SQLite is accessed through `better-sqlite3` plus Drizzle. `src/server/db/client.ts` enables WAL mode and foreign keys via pragmas.
-- Drizzle schema definitions live in `src/server/db/schema.ts`, while executable migrations are plain SQL files in `src/server/db/migrations/`.
-- Migrations are applied by `runMigrations()` in `src/server/db/migrate.ts`. Applied filenames are tracked in the `schema_migrations` table and migration files are sorted lexicographically, so filenames use numeric prefixes such as `0001_initial.sql`.
-- Schema changes should update both `src/server/db/schema.ts` and a new SQL migration under `src/server/db/migrations/`.
-- Multi-statement mutations use `context.sqlite.transaction(() => { ... })()` where atomicity matters, for example registration, login verification, user deletion, and migration application.
-- Drizzle is used for most CRUD. Raw SQL is used for aggregate counts, restore operations, and migration internals, for example `COUNT(*)` in `serializeInviteCode()` and `countJoined()`.
-- Soft deletion is used for users. `src/server/http/admin-routes.ts` anonymizes deleted users and sets `deletedAt`; authentication and user listing filter with `isNull(users.deletedAt)`.
-- Audit logging is part of most business actions. Route handlers call `writeAuditLog()` with an actor, action string, entity fields, human summary, and optional metadata.
+**Formatting:**
+- No Prettier or Biome config present in repo (no `.prettierrc*`, `biome.json`)
+- 2-space indentation throughout `.ts`/`.tsx` files
+- Double-quoted strings (e.g. `import { Router } from "express";`)
+- Trailing semicolons enforced by convention
+- Object/array trailing commas omitted in single-line definitions, used in multi-line where natural
 
-## Frontend React Patterns
+**Linting:**
+- No ESLint config present (no `.eslintrc*`, `eslint.config.*`)
+- TypeScript strict mode is the primary correctness gate — `tsconfig.json` enables `strict: true`, `forceConsistentCasingInFileNames: true`, `isolatedModules: true`, `noEmit: true`
+- Type-checking runs via `tsc --noEmit` as part of `npm run build` (`package.json`)
 
-- The frontend is a single React file in `src/main.tsx` with local TypeScript types for API resources, page state, and settings.
-- Routing is hash-based. `routes` defines page metadata, and `getPageFromHash()` maps `window.location.hash` to a `PageId`.
-- Server calls go through `requestJson<T>()`, which sends cookies with `credentials: "include"`, sets `Content-Type: application/json`, maps JSON `{ error }` responses to thrown `Error`s, and treats `204` as `undefined`.
-- UI state uses React hooks directly (`useState`, `useEffect`) rather than a global store.
-- Forms use controlled inputs and `FormEvent<HTMLFormElement>` handlers.
-- User-facing errors are translated through `errorMessages` in `src/main.tsx`; backend error codes should be added there when introducing new API errors.
-- Live event updates use `EventSource("/api/realtime/events", { withCredentials: true })` with a 30-second polling fallback in `EventBoard`.
-- Theme settings are applied through CSS custom properties in `applyTheme()`, mapping settings to variables such as `--teal`, `--rose`, `--amber`, `--blue`, and `--surface`.
+## Import Organization
 
-## CSS Conventions
+**Order (observed in `src/server/http/auth-routes.ts`):**
+1. Third-party packages (`drizzle-orm`, `express`, `zod`)
+2. Node built-ins with `node:` protocol (`node:crypto`, `node:fs`, `node:os`, `node:path`)
+3. Internal relative imports grouped by feature (`../auth/csrf`, `../db/schema`, `../mail/mailer`)
+4. Type-only imports use `import type { ... }` (e.g. `import type { DatabaseContext } from "../db/client"`)
 
-- Styling is centralized in `src/styles.css`; there is no CSS module or CSS-in-JS pattern.
-- Design tokens are CSS variables on `:root`, including colors, shadows, and text colors.
-- Layout relies on CSS Grid/Flexbox with responsive constraints. Examples include `.page-shell`, `.page-hero`, `.manager-board`, `.events-board .event-list`, `.topbar`, and `.nav-links`.
-- Common controls share base selectors: `button`, `.text-link`, `input`, `select`, and `label`.
-- Cards and panels share a grouped rule for `event-form`, `event-card`, `login-panel`, `admin-panel`, `access-panel`, and `auth-visual`.
-- Radius is consistently `8px` for controls, cards, icons, and navigation pills.
-- Accessibility-oriented sizing is visible in controls: buttons and inputs use `min-height: 44px`; Playwright tests select by labels, roles, and visible text, so labels and button names are part of the test contract.
+**Path Aliases:**
+- None configured. All internal imports use relative paths (`../db/schema`, `./otp`).
+
+**Module System:**
+- ESM throughout. `package.json` declares `"type": "module"`; `tsconfig.json` uses `module: "ESNext"` and `moduleResolution: "Bundler"`.
+
+## Error Handling
+
+**HTTP error codes (German, machine-readable):**
+- `400` validation: `ungueltiges_event`, `ungueltiger_user`, `ungueltige_settings`, `leerer_profil_patch`
+- `401` unauthenticated: `nicht_angemeldet`
+- `403` forbidden: `admin_erforderlich`, `manager_erforderlich`, `verboten`
+- `409` conflict: duplicates, full events, completed-event mutations
+- `500` infrastructure: `mailversand_fehlgeschlagen`, `backup_fehlgeschlagen`, `restore_fehlgeschlagen`
+
+**Patterns:**
+- Validation: Zod schemas at the top of each route module (`src/server/http/auth-routes.ts` lines 36-80) with `.parse()` / `.safeParse()` at the boundary
+- Route handlers use **early returns** after every `response.status(...).json(...)` to avoid fall-through
+- Response shape on error: `{ error: "<code>" }`
+- Async handlers wrap risky side effects in `try { ... } catch (error) { console.error("[Hermes] ...", error); return response.status(500).json({ error: "..." }); }`
+- Client maps backend codes to user-facing strings via `errorMessages` in `src/main.tsx`; client throws `ApiError` from `src/client/errors/errors.ts` (used in `src/client/components/login-panel.test.tsx`)
+
+**Response payload conventions:**
+- Wrap named resources: `{ user }`, `{ users }`, `{ event }`, `{ events }`, `{ settings }`, `{ inviteCode }`, `{ auditLogs }`
+- Empty successful deletes return `204`
+
+## Logging
+
+**Framework:** `console` only — no logger library
+
+**Patterns:**
+- Prefix every log line with `[Hermes]` for grep-ability
+- `console.error("[Hermes] <context>", error)` for failures (e.g. `src/server/audit-log.ts:47`, `src/server/http/auth-routes.ts:392`, `src/server/storage/s3-storage.ts:524`)
+- `console.warn("[Hermes] ...")` for degraded states (e.g. `src/server/push/push-service.ts:48` "Push skipped: VAPID keys are missing.")
+- `console.log("[Hermes] ...")` for lifecycle events (server start in `src/server/index.ts:8`, snapshot restore in `src/server/storage/s3-storage.ts:760`)
+- **Never log secret values.** Mailer logs the dev OTP only when `HERMES_MAIL_MODE=console` (`src/server/mail/mailer.ts:56`); credentials are described by source/format only.
+
+## Async Patterns
+
+- `async`/`await` throughout — no `.then()` chains in source
+- Express handlers are `async` arrow/function expressions; errors are caught locally (no global error middleware seen in `src/server/app.ts`)
+- Multi-statement DB mutations wrapped in `context.sqlite.transaction(() => { ... })()` for atomicity (registration, login verification, user deletion, migration application — see AGENTS.md§Database Patterns)
+- Background work (S3 snapshot upload, status refresh) uses debounced/scheduled functions: `scheduleDatabaseSnapshot()`, `refreshEventStatuses()` 30 s loop in `src/server/app.ts`
+- Server lifecycle exposes `close()` so tests and SIGINT/SIGTERM handlers (`src/server/index.ts`) can flush snapshots and close SQLite cleanly
+
+## Comments
+
+**When to Comment:**
+- Source files are largely self-documenting; comments are sparse and reserved for non-obvious behavior
+- Migration files contain inline SQL only — no header comments observed
+- No JSDoc/TSDoc generation pipeline; types carry the documentation load
+
+## Function Design
+
+**Size:** Route handlers favor flat control flow with early returns; helpers extracted as file-local functions (`nowIso()`, `fallbackPhoneNumber()`, `normalizeInviteCode()`).
+
+**Parameters:**
+- Routers receive a shared `DatabaseContext`: `createXRouter(context: DatabaseContext)` (see `src/server/http/auth-routes.ts`, all `*-routes.ts` files)
+- Domain helpers take explicit `context` first, then domain inputs — never reach into globals for the DB
+
+**Return Values:**
+- Async functions return promises of plain objects matching API shapes
+- Validators return `boolean` or throw via Zod
+- Drizzle queries return inferred row types; serializer helpers shape them into API DTOs
+
+## Module Design
+
+**Exports:**
+- Named exports throughout — no default exports for routes, services, or utilities
+- Default exports reserved for config files (`vite.config.ts`, `playwright.config.ts`)
+
+**Barrel Files:** Not used. All imports reach directly into the implementing module.
+
+**Router factory pattern:** Every HTTP module exports `createXRouter(context)` rather than a singleton router; this keeps the DB context injectable for tests (see `src/server/http/auth-routes.ts`, `event-routes.ts`, `admin-routes.ts`, `push-routes.ts`, `realtime-routes.ts`).
+
+## Configuration Files
+
+- `package.json` — scripts, dependencies, ESM declaration
+- `tsconfig.json` — strict TS, ES2022 target, JSX `react-jsx`, bundler resolution
+- `vite.config.ts` — React plugin, fixed ports 5173 (dev) / 4173 (preview), `strictPort: true`
+- `playwright.config.ts` — `testDir: "./e2e"`, Desktop Chrome device, `fullyParallel: false`, 30 s timeout
+- `Dockerfile` — two-stage Node 22 build, prunes dev deps, exposes `:3000`, healthchecks `/api/health`
+- `docker-compose.yml` — local image, `hermes-data` volume, S3 env defaults
+- `.github/workflows/docker-image.yml` — CI: `npm ci`, `npm test`, `npm run build`, `npm audit --omit=dev`, then build/publish image
+- `.env.example` — documents every required `HERMES_*` env var (no real secrets in repo)
+
+## Commit Conventions
+
+**Format:** [Conventional Commits](https://www.conventionalcommits.org/) — `type(scope): description`
+
+**Observed types:** `feat`, `fix`, `chore`, `docs`, `style`, `refactor`
+
+**Observed scopes:** real code areas only — `auth`, `events`, `nav`, `kiosk`, `db`, `api`, `ui`, `footer`, `settings`, `roles`, `release`
+
+**Examples from `git log`:**
+- `feat(api): user API tokens (full/read-only), Bearer auth, OpenAPI + Swagger UI`
+- `fix(db): Migrationen mit DROP users — foreign_keys vor Transaktion aus`
+- `style(footer): GitHub mark + Source Release text in black, no footer fill`
+- `chore(release): v0.9.0`
+
+**Subject lines:** under ~72 chars, imperative mood, no trailing period. German and English both appear in the subject body and are accepted.
+
+## Migration Naming
+
+- Pattern: `NNNN_<snake_case_description>.sql` under `src/server/db/migrations/`
+- Sequence is zero-padded 4-digit (currently `0001`–`0015`); `src/server/db/migrate.ts` sorts lexicographically and records applied filenames in `schema_migrations`
+- Each migration is plain SQL (no Drizzle migration generator). Schema changes must update **both** `src/server/db/schema.ts` (Drizzle definitions) **and** add a new numeric SQL file
+- `npm run build:server` copies migrations into both `dist-server/migrations/` and `dist-server/db/migrations/` for runtime resolution
 
 ## Environment And Secrets Handling
 
-- `src/server/env.ts` loads a local `.env` file manually and does not override already-set environment variables.
-- Required environment variables should be read with `readRequiredEnv(name)` so missing values fail clearly.
-- Optional configuration is read from `process.env` at the point of use, for example cookie security in `src/server/auth/sessions.ts`, storage mode in `src/server/storage/s3-storage.ts`, and database path in `src/server/env.ts`.
-- Do not log secret values. Existing error messages mention missing credential sources and supported key formats, but do not print credential contents.
-- Tests set disposable environment variables directly and use temporary SQLite files under `os.tmpdir()`.
+- `src/server/env.ts` reads a local `.env` manually and never overrides already-set process env values
+- Required vars use `readRequiredEnv(name)` so missing values fail loudly
+- Cookie security toggled via `HERMES_COOKIE_SECURE` in `src/server/auth/sessions.ts`
+- Storage backend selected via `HERMES_STORAGE_BACKEND` in `src/server/storage/s3-storage.ts`
+- DB path via `getDatabasePath()` (defaults to `data/hermes.sqlite`)
+- Tests set disposable env vars directly and use temporary SQLite files under `os.tmpdir()` (see `src/server/http/app-flow.test.ts:36-46`)
 
-## Build And Script Conventions
+---
 
-- Main scripts in `package.json`:
-  - `npm run dev`: Vite dev server on `0.0.0.0`.
-  - `npm run build`: Type-checks with `tsc --noEmit`, builds the Vite frontend, then bundles server entrypoints.
-  - `npm run build:server`: bundles `src/server/index.ts` and `src/server/db/bootstrap-admin.ts` with esbuild, keeps packages external, and copies SQL migrations into `dist-server`.
-  - `npm run server`: runs `src/server/index.ts` through `tsx`.
-  - `npm run db:migrate`: runs `src/server/db/migrate.ts`.
-  - `npm test`: runs Vitest against `src`.
-  - `npm run test:e2e`: builds first, then runs Playwright.
+*Convention analysis: 2026-05-01*

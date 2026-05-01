@@ -1,74 +1,102 @@
 # Technology Stack
 
-## Runtime And Language
+**Analysis Date:** 2026-05-01
 
-- Primary language: TypeScript with strict checking configured in `tsconfig.json`.
-- Runtime target: Node.js 22. The Docker image uses `node:22-bookworm-slim` in `Dockerfile`, and CI sets `NODE_VERSION: "22"` in `.github/workflows/docker-image.yml`.
-- Module format: ESM via `"type": "module"` in `package.json`.
-- Browser target: modern DOM APIs through `lib: ["DOM", "DOM.Iterable", "ES2022"]` in `tsconfig.json`.
+## Languages
 
-## Frontend
+**Primary:**
+- TypeScript 5.9.3 — All client (`src/client/`) and server (`src/server/`) code; strict mode (see `tsconfig.json`)
 
-- UI framework: React 19 (`react`, `react-dom`) mounted from `src/main.tsx`.
-- Build tool: Vite 7 with `@vitejs/plugin-react` configured in `vite.config.ts`.
-- Client routing: hash-based page sections in `src/main.tsx` for `#events`, `#login`, `#manager`, and `#admin`; there is no separate router package.
-- Styling: plain CSS in `src/styles.css`.
-- PWA surface: `public/manifest.webmanifest`, `public/sw.js`, and `public/icon.svg`.
-- Client API access: direct `fetch` helper in `src/main.tsx` with `credentials: "include"` for cookie-backed sessions.
-- Realtime client: `EventSource` in `src/main.tsx` connects to `/api/realtime/events` and falls back to periodic polling every 30 seconds.
-- Web Push client: `src/main.tsx` registers `/sw.js`, requests `Notification` permission, subscribes through `PushManager`, and posts subscriptions to `/api/push/subscriptions`.
+**Secondary:**
+- JavaScript (ESM) — Service worker `src/shared/sw.js`
+- SQL — Drizzle migrations in `src/server/db/migrations/*.sql`
+- YAML — OpenAPI spec `src/server/openapi/hermes-api.yaml`, GitHub Actions `.github/workflows/docker-image.yml`
+- HTML — Single root template `index.html`
 
-## Backend
+## Runtime
 
-- HTTP framework: Express 5 in `src/server/app.ts`.
-- Server entrypoint: `src/server/index.ts` reads `HERMES_HOST` and `HERMES_PORT`, starts the Express app, and flushes persistence on `SIGINT`/`SIGTERM`.
-- App composition: `src/server/app.ts` wires JSON parsing, cookies, health checks, settings, auth, admin, events, push, realtime, static assets, and SPA fallback.
-- Cookie parsing: `cookie-parser` is installed in `package.json` and mounted in `src/server/app.ts`.
-- Request validation: Zod schemas are used in route/domain modules such as `src/server/http/auth-routes.ts`, `src/server/http/admin-routes.ts`, `src/server/http/event-routes.ts`, `src/server/http/push-routes.ts`, `src/server/domain/events.ts`, and `src/server/settings.ts`.
-- Auth model: username plus email one-time code in `src/server/http/auth-routes.ts`, OTP generation/hash/verify in `src/server/auth/otp.ts`, and session cookies in `src/server/auth/sessions.ts`.
-- Authorization model: roles `user`, `manager`, and `admin` are represented in `src/server/db/schema.ts` and checked in `src/server/domain/users.ts`, `src/server/auth/current-user.ts`, and route modules.
-- Realtime model: Server-Sent Events are implemented in `src/server/realtime/event-bus.ts` and exposed by `src/server/http/realtime-routes.ts`.
+**Environment:**
+- Node.js 22 (Docker base `node:22-bookworm-slim` in `Dockerfile`; CI pinned via `NODE_VERSION: "22"` in `.github/workflows/docker-image.yml`)
+- Browser runtime: modern evergreen (target ES2022, see `tsconfig.json`)
 
-## Data Layer
+**Package Manager:**
+- npm (lockfile `package-lock.json` present at repo root)
+- Lockfile: present
+- No `.nvmrc` detected (Node version pinned in Dockerfile + CI workflow)
 
-- Database: SQLite through `better-sqlite3`.
-- ORM/query layer: Drizzle ORM with `drizzle-orm/better-sqlite3` in `src/server/db/client.ts` and table definitions in `src/server/db/schema.ts`.
-- Database path: `getDatabasePath()` in `src/server/env.ts` reads `HERMES_DB_PATH` and defaults to `data/hermes.sqlite` under the process cwd.
-- SQLite pragmas: `src/server/db/client.ts` enables WAL mode and foreign keys.
-- Migrations: SQL files live in `src/server/db/migrations/`; `src/server/db/migrate.ts` applies sorted `.sql` files and records them in `schema_migrations`.
-- Main tables: users, login challenges, sessions, push subscriptions, game events, participations, app settings, audit logs, invite codes, invite uses, and schema migrations in `src/server/db/schema.ts`.
-- App settings: typed settings live in SQLite table `app_settings` and are read/written through `src/server/settings.ts`.
+## Frameworks
 
-## Build And Packaging
+**Core (server):**
+- Express 5.2.1 — HTTP server (`src/server/app.ts`, route modules under `src/server/http/`)
+- Drizzle ORM 0.45.2 — SQLite typed access (`src/server/db/client.ts`, schema in `src/server/db/schema.ts`)
+- better-sqlite3 12.9.0 — Synchronous SQLite driver (`src/server/db/client.ts`)
+- Zod 4.3.6 — Request/payload validation (used across `src/server/http/*`)
+- cookie-parser 1.4.7 — Cookie middleware (`src/server/app.ts`)
 
-- Main build script: `npm run build` runs TypeScript checking, Vite frontend build, and server bundling as declared in `package.json`.
-- Server bundling: `npm run build:server` uses esbuild to bundle `src/server/index.ts` and `src/server/db/bootstrap-admin.ts` into `dist-server/`, while copying SQL migrations into both `dist-server/migrations/` and `dist-server/db/migrations/`.
-- Frontend output: Vite writes the browser app to `dist/`.
-- Runtime start: `npm start` runs `node dist-server/index.js`.
-- Development commands: `npm run dev` starts Vite on host `0.0.0.0`; `npm run server` runs the TypeScript server through `tsx`.
-- Docker build: `Dockerfile` uses a two-stage Node 22 build/runtime image, prunes dev dependencies, exposes port 3000, stores data under `/data`, and health-checks `/api/health`.
-- Docker Compose: `docker-compose.yml` builds `hermes:local`, maps port `3000:3000`, mounts `hermes-data:/data`, mounts `./s3.creds` read-only, and sets S3-oriented environment defaults.
+**Core (client):**
+- React 19.2.3 + ReactDOM 19.2.3 — UI (`src/client/components/`, entry `src/main.tsx`)
+- react-markdown 10.1.0 — Markdown rendering in components
+- qrcode-generator 1.4.4 — QR codes for kiosk/pairing flows
 
-## Testing And Quality
+**Testing:**
+- Vitest 4.1.4 — Unit/integration tests (run via `npm test` → `vitest run src`)
+- jsdom 29.0.2 — DOM env for component/service-worker tests (`src/server/push/service-worker-push.test.ts`)
+- Supertest 7.2.2 (`@types/supertest`) — HTTP assertions against the Express app
+- Playwright 1.59.1 — E2E tests in `e2e/` (config `playwright.config.ts`, runs Desktop Chrome)
 
-- Unit/integration test runner: Vitest 4 via `npm test`, scoped to `src`.
-- HTTP tests: Supertest is used in `src/server/http/app-flow.test.ts`.
-- Existing focused tests: `src/server/auth/otp.test.ts`, `src/server/domain/events.test.ts`, `src/server/http/app-flow.test.ts`, and `src/server/storage/s3-storage.test.ts`.
-- Browser E2E: Playwright configured in `playwright.config.ts`; `npm run test:e2e` builds first and then runs `playwright test`.
-- CI verification: `.github/workflows/docker-image.yml` runs `npm ci`, `npm test`, `npm run build`, and `npm audit --omit=dev` before Docker image build/publish.
+**Build / Dev:**
+- Vite 7.3.0 + `@vitejs/plugin-react` 5.1.1 — Client dev server and bundler (`vite.config.ts`, ports 5173 dev / 4173 preview)
+- esbuild 0.28.0 — Server bundler (see `build:server` script in `package.json`)
+- tsx 4.21.0 — TypeScript execution for `dev`/`server`/migration scripts
+- TypeScript compiler — Type-check only (`tsc --noEmit` step in `build`)
 
-## Configuration Surface
+## Key Dependencies
 
-- Local env loading: `src/server/env.ts` reads `.env` manually if present and does not override already-set process env values.
-- Example config: `.env.example` documents database path, server port, cookie security, S3, admin bootstrap, SMTP, VAPID, and local dev login code variables.
-- Admin bootstrap: `src/server/db/bootstrap-admin.ts` requires admin phone, username, and email env variables, then creates or updates the primary admin.
-- Cookie security: `src/server/auth/sessions.ts` sets `httpOnly`, `sameSite: "lax"`, and `secure` based on `HERMES_COOKIE_SECURE`.
-- Production notes: `README.md` and `building.md` document local start, Docker start, S3 behavior, mail, push, backup/restore, and CI image publishing.
+**Critical:**
+- `@aws-sdk/client-s3` ^3.1030.0 — S3-compatible snapshot persistence (`src/server/storage/s3-storage.ts`)
+- `web-push` ^3.6.7 — Web Push notifications via VAPID (`src/server/push/push-service.ts`)
+- `nodemailer` ^8.0.5 — SMTP delivery for OTP emails (`src/server/mail/mailer.ts`)
+- `better-sqlite3` ^12.9.0 — Primary datastore driver
+- `drizzle-orm` ^0.45.2 — Query builder + schema definition
+- `express` ^5.2.1 — HTTP layer
 
-## Deployment Shape
+**Infrastructure:**
+- Docker multi-stage build (`Dockerfile`) — Build stage compiles, runtime stage runs `node dist-server/index.js`
+- docker-compose (`docker-compose.yml`) — Local stack; mounts `./s3.creds` and `hermes-data` volume
 
-- Intended runtime: a single Node/Express instance with local SQLite as the active database.
-- Static serving: `src/server/app.ts` serves `dist/` if present and falls back to `index.html` for non-API paths.
-- Health endpoint: `/api/health` is implemented in `src/server/app.ts` and used by the Docker `HEALTHCHECK`.
-- Container registry: `.github/workflows/docker-image.yml` publishes `ghcr.io/containerguy/hermes` on pushes to `main`, version tags, and manual dispatch; pull requests build without pushing.
-- Operational caveat: `README.md` and `building.md` state S3 is snapshot storage, not a locking backend for multiple simultaneous writers.
+## Configuration
+
+**Environment:**
+- `.env.example` documents all `HERMES_*` variables
+- Loaded by custom parser in `src/server/env.ts` (no `dotenv` dep)
+- Required at runtime: `HERMES_PORT`, `HERMES_HOST`, `HERMES_DB_PATH`, `HERMES_CSRF_SECRET`
+- S3: `HERMES_STORAGE_BACKEND`, `HERMES_S3_BUCKET`, `HERMES_S3_REGION`, `HERMES_S3_ENDPOINT`, `HERMES_S3_CREDS_FILE`, `HERMES_S3_DB_KEY`, `HERMES_S3_RESTORE_MODE`
+- Mail: `HERMES_MAIL_MODE` (`console`|`smtp`), `HERMES_MAIL_FROM`, `HERMES_SMTP_HOST`, `HERMES_SMTP_PORT`, `HERMES_SMTP_SECURE`, `HERMES_SMTP_SECURITY`, `HERMES_SMTP_USER`, `HERMES_SMTP_PASSWORD`
+- Push: `HERMES_VAPID_SUBJECT`, `HERMES_VAPID_PUBLIC_KEY`, `HERMES_VAPID_PRIVATE_KEY`
+- Bootstrap: `HERMES_ADMIN_USERNAME`, `HERMES_ADMIN_EMAIL`, `HERMES_ADMIN_PHONE`
+- Cookies: `HERMES_COOKIE_SECURE`
+- Optional dev override: `HERMES_DEV_LOGIN_CODE`
+
+**Build:**
+- `tsconfig.json` — strict TS, ES2022, JSX `react-jsx`, `moduleResolution: Bundler`, `noEmit: true`
+- `vite.config.ts` — React plugin only, fixed dev/preview ports
+- `playwright.config.ts` — `e2e/` dir, single worker (`fullyParallel: false`), Desktop Chrome
+- No ESLint, Prettier, or Biome config detected
+
+## Platform Requirements
+
+**Development:**
+- Node.js 22+, npm
+- Local SQLite file at `./data/hermes.sqlite`
+- Optional `s3.creds` file for snapshot testing
+- Mail mode `console` writes OTPs to stdout
+
+**Production:**
+- Linux/amd64 container (`docker build --platform linux/amd64`) published to GHCR `ghcr.io/containerguy/hermes`
+- Persistent volume for `/data` (SQLite WAL DB)
+- Outbound network for S3 endpoint (Wasabi by default), SMTP relay, and Web Push providers
+- HTTP port 3000 exposed; healthcheck `GET /api/health`
+
+---
+
+*Stack analysis: 2026-05-01*

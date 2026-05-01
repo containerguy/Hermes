@@ -1,73 +1,244 @@
 # Testing Patterns
 
-## Test Commands
+**Analysis Date:** 2026-05-01
 
-- Unit and integration tests run with `npm test`, which maps to `vitest run src` in `package.json`.
-- End-to-end tests run with `npm run test:e2e`, which builds first through `npm run build` and then runs `playwright test`.
-- The build pipeline in `package.json` includes `tsc --noEmit`, so type safety is verified as part of `npm run build` and before E2E tests.
-- Playwright configuration lives in `playwright.config.ts`. It uses `testDir: "./e2e"`, `timeout: 30_000`, `fullyParallel: false`, Desktop Chrome defaults, `trace: "on-first-retry"`, and the list reporter.
+## Test Framework
 
-## Current Test Inventory
+**Runner:**
+- Vitest 4 (`vitest@^4.1.4` in `package.json`)
+- No standalone `vitest.config.ts` — runner uses defaults plus per-file environment hints (`/* @vitest-environment jsdom */` in client tests)
+- `jsdom@^29.0.2` provides the DOM for React component tests
 
-- `src/server/auth/otp.test.ts`: small unit coverage for OTP generation and hash verification.
-- `src/server/domain/events.test.ts`: pure domain coverage for event validation, status derivation, and auto-archive timing.
-- `src/server/storage/s3-storage.test.ts`: unit coverage for credential-file parsing formats without using live S3.
-- `src/server/http/app-flow.test.ts`: Supertest integration coverage for login, admin user management, settings, invites, sessions, event creation, participation capacity, audit logs, and backup endpoint behavior.
-- `e2e/hermes-flow.spec.ts`: browser flow coverage for admin login, user creation, manager event creation, user login, and joining an event.
+**Assertion Library:**
+- Built-in `expect` from `vitest`
 
-## Vitest Conventions
+**HTTP testing:**
+- `supertest@^7.2.2` for Express integration tests (e.g. `src/server/http/app-flow.test.ts`)
 
-- Tests use Vitest globals imported explicitly: `describe`, `it`, `expect`, `beforeEach`, `afterEach`.
-- Server integration tests use `supertest` and `request.agent()` to retain cookies across requests.
-- Tests that need the full app call `bootstrapAdmin()` from `src/server/db/bootstrap-admin.ts` and `createHermesApp()` from `src/server/app.ts`.
-- Temporary SQLite databases are created with `path.join(os.tmpdir(), ...)` and `randomUUID()` to isolate each test run.
-- SQLite sidecar files are cleaned up explicitly after app shutdown by removing the main file plus `-wal` and `-shm`.
-- Environment variables are set inside test setup before bootstrapping the app. Tests delete optional integration env vars such as storage and VAPID settings to keep behavior deterministic.
-- `started.close()` from `createHermesApp()` is called in teardown to flush snapshots, clear intervals, and close the SQLite handle.
-- Assertions frequently combine HTTP status checks with body assertions using Supertest `.expect(status)` and `.expect((response) => { ... })`.
+**E2E:**
+- `@playwright/test@^1.59.1` configured in `playwright.config.ts`
 
-## Integration Test Shape
+**Run Commands:**
+```bash
+npm test                  # vitest run src  (one-shot, all unit + integration)
+npm run test:e2e          # npm run build && playwright test
+npm run verify            # npm test && npm run build && npm audit --omit=dev
+npm run verify:ci         # npm ci && npm test && npm run build && npm audit --omit=dev
+```
 
-- `src/server/http/app-flow.test.ts` covers a long user journey rather than isolated endpoints. The flow logs in an admin, creates users, changes settings, creates an invite, registers and deletes an invited user, creates an event as a manager, enforces capacity, records participation changes, and checks audit summaries.
-- The helper `login(agent, username)` requests a login code, verifies the fixed test code, and returns the response user. It relies on `HERMES_DEV_LOGIN_CODE` being set in test setup.
-- Integration tests prefer real route handlers, real migrations, and real SQLite over mocks.
-- Test data uses realistic German-facing labels and usernames, but email domains are non-production test domains.
-- The app-level tests intentionally exercise auth cookies, role checks, database writes, and audit logging together.
+There is no watch-mode script defined — invoke `npx vitest` directly for watch mode.
 
-## Playwright E2E Conventions
+## Test File Organization
 
-- `e2e/hermes-flow.spec.ts` starts the actual Express app in `test.beforeAll()` and listens on an ephemeral local port with `server.listen(0, "127.0.0.1")`.
-- The Playwright `baseURL` in `playwright.config.ts` is a placeholder; the spec builds its own `baseUrl` from the runtime port and navigates with explicit URLs.
-- The E2E login helper selects by accessible labels and roles:
-  - `page.getByLabel("Username")`
-  - `page.getByRole("button", { name: "Code senden" })`
-  - `page.getByLabel("Einmalcode")`
-  - `page.getByRole("button", { name: "Einloggen" })`
-- Browser assertions use visible text, roles, headings, and labels, so user-facing copy changes can break E2E tests.
-- E2E setup mirrors integration setup: temporary SQLite database, bootstrap admin, console mail mode, fixed dev login code, no S3 storage, and no VAPID keys.
-- E2E teardown closes the HTTP server, calls the app close hook, and removes SQLite sidecar files.
+**Location:**
+- Unit and integration tests are **co-located** next to source files under `src/`
+- E2E tests live under `e2e/` (separate from `src/`)
 
-## What To Test For New Work
+**Naming:**
+- Vitest: `*.test.ts` / `*.test.tsx`
+- Playwright: `*.spec.ts`
 
-- Pure domain rules should get focused Vitest tests near the domain module, following `src/server/domain/events.test.ts`.
-- Route behavior should get Supertest coverage when it touches auth, roles, validation, database writes, audit logs, sessions, invites, settings, backup/restore, push preferences, or event participation.
-- Browser tests should be reserved for critical end-to-end workflows that depend on real UI behavior, routing, labels, cookies, and server integration.
-- Database schema changes should be exercised through app startup or migration-aware integration tests, since `createHermesApp()` runs `runMigrations()`.
-- Any new backend error code should be covered at the route level and added to the frontend `errorMessages` map in `src/main.tsx` when it can reach users.
-- Any new user-facing form should be testable by accessible labels and roles, consistent with `e2e/hermes-flow.spec.ts`.
+**Layout (current files):**
+```
+src/
+├── client/
+│   ├── api/csrf.test.ts
+│   ├── components/
+│   │   ├── admin-panel.test.tsx
+│   │   ├── login-panel.test.tsx
+│   │   └── ui-correctness.test.tsx
+│   └── lib/runtime-context.test.ts
+└── server/
+    ├── auth/otp.test.ts
+    ├── domain/
+    │   ├── events.test.ts
+    │   └── users.test.ts
+    ├── http/
+    │   ├── api-tokens.test.ts
+    │   ├── app-flow.test.ts
+    │   ├── auth-device-recognition.test.ts
+    │   ├── auth-pair.test.ts
+    │   ├── event-capacity.test.ts
+    │   ├── event-side-effects.test.ts
+    │   └── event-soft-delete.test.ts
+    ├── push/
+    │   ├── push-service-cleanup.test.ts
+    │   └── service-worker-push.test.ts
+    ├── storage/s3-storage.test.ts
+    └── version-info.test.ts
+e2e/
+└── hermes-flow.spec.ts
+```
 
-## Test Isolation And Data Hygiene
+The `npm test` script scopes to `src` (`vitest run src`), so `e2e/` is excluded from the unit test run.
 
-- Prefer temporary databases via `HERMES_DB_PATH` for tests; do not point tests at local development or production data.
-- Do not use real S3, mail, push, or credential values in tests. Existing tests use console mail mode and delete storage/push env vars when the integration is not under test.
-- Credential parsing tests in `src/server/storage/s3-storage.test.ts` use dummy placeholder strings only; keep that pattern for future credential-format coverage.
-- Clean up all filesystem artifacts created by tests, including SQLite WAL and shared-memory files.
-- Avoid relying on wall-clock local time where possible. Existing domain tests pass explicit `Date` values into `deriveEventStatus()` and `shouldAutoArchive()`.
+## Test Structure
 
-## Known Coverage Gaps
+**Suite Organization (Vitest):**
+```typescript
+// src/server/auth/otp.test.ts
+import { describe, expect, it } from "vitest";
+import { generateOtp, hashOtp, verifyOtp } from "./otp";
 
-- There are no frontend component unit tests; frontend behavior is currently covered only through `e2e/hermes-flow.spec.ts`.
-- API coverage is broad for the main app flow, but many individual error branches in `src/server/http/*-routes.ts` are not isolated by focused tests.
-- Push subscription routes in `src/server/http/push-routes.ts`, realtime SSE behavior in `src/server/http/realtime-routes.ts`, and mail delivery behavior in `src/server/mail/mailer.ts` have limited or no direct tests.
-- S3 snapshot upload/restore behavior in `src/server/storage/s3-storage.ts` is not integration-tested against a real or fake S3 service; only credential parsing has unit tests.
-- Migration ordering and idempotency are exercised indirectly through app startup, but there are no dedicated migration tests for every SQL file under `src/server/db/migrations/`.
+describe("otp", () => {
+  it("generates six digit codes", () => {
+    expect(generateOtp()).toMatch(/^\d{6}$/);
+  });
+
+  it("verifies only the original code", () => {
+    const hash = hashOtp("123456");
+    expect(verifyOtp("123456", hash)).toBe(true);
+    expect(verifyOtp("654321", hash)).toBe(false);
+  });
+});
+```
+
+**Patterns:**
+- `describe`/`it` style with co-located helpers above the suite
+- `beforeEach`/`afterEach` provision a fresh SQLite file per HTTP integration test (see `src/server/http/app-flow.test.ts:33-59`)
+- Custom timeouts passed as third arg to `beforeEach` for slow setup (`30_000` ms in `app-flow.test.ts:49`)
+- Each test cleans up by closing the started app and `fs.rmSync`-ing the SQLite + `-wal` + `-shm` sidecars
+
+## Mocking
+
+**Framework:** Built-in `vi` from `vitest`
+
+**Patterns:**
+```typescript
+// src/client/components/login-panel.test.tsx
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+
+vi.mock("../api/request", () => ({
+  requestJson: vi.fn()
+}));
+
+vi.mock("../api/csrf", () => ({
+  clearCsrfToken: vi.fn(),
+  primeCsrfToken: vi.fn()
+}));
+```
+
+**What to Mock:**
+- Outbound network calls from React components (`requestJson`, CSRF helpers)
+- Third-party SDK boundaries when they are not the unit under test
+
+**What NOT to Mock:**
+- The real Express app — HTTP integration tests boot `createHermesApp()` against a temp SQLite file and hit it with `supertest` rather than mocking handlers
+- The SQLite database — tests run real Drizzle queries against a fresh `os.tmpdir()` file per test
+- The mail transport in tests — driven by `HERMES_MAIL_MODE=console` + `HERMES_DEV_LOGIN_CODE=123456` so OTP `"123456"` is always accepted
+
+## Fixtures and Factories
+
+**Test Data:**
+- No central fixtures directory. Each test inlines the data it needs.
+- HTTP tests share small login helpers near the top of the file:
+
+```typescript
+// src/server/http/app-flow.test.ts:18-26
+async function login(agent: ReturnType<typeof request.agent>, username: string) {
+  await agent.post("/api/auth/request-code").send({ username }).expect(202);
+  const response = await agent
+    .post("/api/auth/verify-code")
+    .send({ username, code: "123456", deviceName: "test" })
+    .expect(200);
+  return response.body.user as { id: string; role: string };
+}
+```
+
+- React component tests provide a `defaultSettings` object (`src/client/components/login-panel.test.tsx:54+`) and helper `renderIntoDocument()` for jsdom rendering
+
+**Setup helpers:**
+- `bootstrapAdmin()` from `src/server/db/bootstrap-admin.ts` is reused by both `app-flow.test.ts` and `e2e/hermes-flow.spec.ts` to seed the initial admin
+- Disposable env vars are set inside `beforeEach`/`beforeAll` and the `HERMES_STORAGE_BACKEND` / VAPID vars are explicitly `delete`d to keep tests hermetic
+
+## Coverage
+
+**Requirements:** None enforced. No coverage script in `package.json`; no coverage threshold config.
+
+**View Coverage:**
+```bash
+npx vitest run --coverage   # ad-hoc; not wired into CI
+```
+
+## Test Types
+
+**Unit Tests:**
+- Pure logic: `src/server/auth/otp.test.ts` (OTP generation/hashing), `src/server/domain/events.test.ts` (status derivation), `src/server/domain/users.test.ts` (role permissions), `src/server/version-info.test.ts`
+- Storage credential parsing: `src/server/storage/s3-storage.test.ts`
+- Client utilities: `src/client/lib/runtime-context.test.ts`, `src/client/api/csrf.test.ts`
+
+**Integration Tests:**
+- HTTP layer driven through Supertest against a real `createHermesApp()` instance with a temp SQLite file. Cover login (`app-flow.test.ts`), API tokens (`api-tokens.test.ts`), device pairing (`auth-pair.test.ts`), device recognition (`auth-device-recognition.test.ts`), event capacity (`event-capacity.test.ts`), event side effects (`event-side-effects.test.ts`), event soft delete (`event-soft-delete.test.ts`)
+- Push pipeline: `src/server/push/service-worker-push.test.ts`, `push-service-cleanup.test.ts`
+
+**Component Tests:**
+- React components rendered into jsdom via `createRoot` + `act` — `src/client/components/login-panel.test.tsx`, `admin-panel.test.tsx`, `ui-correctness.test.tsx`
+- File-level pragma `/* @vitest-environment jsdom */` switches environment per file
+
+**E2E Tests:**
+- Playwright single spec at `e2e/hermes-flow.spec.ts`
+- Boots a real Express app on `127.0.0.1:0` (random port) against a temp SQLite database, bootstraps admin, then exercises admin → manager → user flow through the browser
+- Uses German UI labels via `getByLabel("Username")`, `getByRole("button", { name: "Code senden" })`, etc. — UI labels are part of the test contract
+- Configured `fullyParallel: false` and 30 s timeout in `playwright.config.ts`
+- **Known limitation:** E2E run requires Playwright system libraries (e.g. `libnspr4.so`). On hosts without them, run `npx playwright install-deps chromium` (sudo needed on most systems) — documented in `building.md:99-105`. CI does **not** currently run Playwright tests; only `npm test` is executed.
+
+## CI Test Workflow
+
+`.github/workflows/docker-image.yml` defines two jobs:
+
+**`verify` job (runs on every push to `main`, every PR, and version tags):**
+1. `actions/checkout@v5`
+2. `actions/setup-node@v5` with Node 22 + npm cache
+3. `npm ci`
+4. `npm test` — Vitest only (E2E excluded)
+5. `npm run build` — `tsc --noEmit` + Vite build + esbuild server bundle
+6. `npm audit --omit=dev` — production dependency audit
+
+**`docker` job (depends on `verify`):**
+- Builds and pushes `ghcr.io/containerguy/hermes` for non-PR triggers
+
+**E2E in CI:** not executed. Playwright runs are local-only because installing system libraries (`libnspr4` and friends) is not part of the workflow.
+
+## Common Patterns
+
+**Async Testing:**
+```typescript
+// HTTP request via supertest agent
+const agent = request.agent(started!.app);
+await agent.post("/api/auth/request-code").send({ username }).expect(202);
+```
+
+**React act() wrapping:**
+```typescript
+await act(async () => {
+  root.render(<I18nProvider locale="de">{element}</I18nProvider>);
+  await flushMicrotasks();
+});
+```
+
+**Microtask flushing helper for component tests:**
+```typescript
+async function flushMicrotasks() {
+  for (let index = 0; index < 10; index += 1) {
+    await Promise.resolve();
+  }
+}
+```
+
+**Per-test temp database lifecycle:**
+```typescript
+databasePath = path.join(os.tmpdir(), `hermes-test-${randomUUID()}.sqlite`);
+process.env.HERMES_DB_PATH = databasePath;
+// ... run test ...
+for (const suffix of ["", "-wal", "-shm"]) {
+  fs.rmSync(`${databasePath}${suffix}`, { force: true });
+}
+```
+
+**Error Testing:**
+- Validate HTTP error codes with `expect(response.body.error).toBe("ungueltiger_user")` style checks
+- Client-side: tests assert on thrown `ApiError` instances from `src/client/errors/errors.ts`
+
+---
+
+*Testing analysis: 2026-05-01*
