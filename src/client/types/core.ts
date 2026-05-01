@@ -57,6 +57,12 @@ export type AppSettings = {
   kioskStreamPath: string;
   /** Geheimer Zugriffsschlüssel; nur in Admin-API sichtbar, nicht in /api/settings/public */
   kioskStreamSecret: string;
+  /** PayPal-Handle (paypal.me/<handle>) für die Pizzabestellungs-Kassenliste. */
+  pizzaPaypalHandle: string;
+  /** Anzeigename für PayPal-Empfänger im Anteilsbildschirm. */
+  pizzaPaypalName: string;
+  /** Bargeld-Empfänger-Hinweis im Anteilsbildschirm. */
+  pizzaCashRecipient: string;
 };
 
 /** Build-/Release-Infos aus dem Server (package.json + optional Repo-URL). */
@@ -87,6 +93,9 @@ export type PublicAppSettings = Pick<
   | "defaultLocale"
   | "kioskStreamEnabled"
   | "kioskStreamPath"
+  | "pizzaPaypalHandle"
+  | "pizzaPaypalName"
+  | "pizzaCashRecipient"
 >;
 
 export type AdminSection =

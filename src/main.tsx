@@ -86,7 +86,10 @@ const defaultSettings: AppSettings = {
   defaultLocale: "de",
   kioskStreamEnabled: false,
   kioskStreamPath: "stream",
-  kioskStreamSecret: ""
+  kioskStreamSecret: "",
+  pizzaPaypalHandle: "",
+  pizzaPaypalName: "",
+  pizzaCashRecipient: ""
 };
 
 function applyTheme(settings: AppSettings) {
@@ -405,6 +408,9 @@ function AppShell({
         emptyBoardTitle={appSettings.shellEventsEmptyTitle}
         emptyBoardBody={appSettings.shellEventsEmptyBody}
         gameCatalog={appSettings.gameCatalog}
+        pizzaPaypalHandle={appSettings.pizzaPaypalHandle}
+        pizzaPaypalName={appSettings.pizzaPaypalName}
+        pizzaCashRecipient={appSettings.pizzaCashRecipient}
       />
     );
   }
