@@ -2025,7 +2025,7 @@ dd {
   text-transform: uppercase;
   color: var(--teal);
   letter-spacing: 0;
-  margin: 0 0 4px;
+  margin: 0;
 }
 
 .cod4-key-output {
