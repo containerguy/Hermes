@@ -37,6 +37,7 @@ pnpm-debug.log*
 # ── GSD baseline (auto-generated) ──
 .gsd
 .gsd-id
+.planning/
 .bg-shell/
 Thumbs.db
 *.swp

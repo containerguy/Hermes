@@ -5,6 +5,8 @@ import { ApiError, getErrorMessage } from "../errors/errors";
 import { useI18n } from "../i18n/I18nContext";
 import { useBrandIconSrc } from "../lib/BrandingContext";
 import type { MessageKey } from "../i18n/catalog/index";
+import { Cod4KeyGenerator } from "../cod4/Cod4KeyGenerator";
+import { isCod4Game } from "../cod4/isCod4Game";
 
 function toDatetimeLocal(value: string) {
   const date = new Date(value);
@@ -549,6 +551,7 @@ export function EventBoard({
         ) : (
           <p className="muted event-join-hint">{t("events.conn.missing")}</p>
         )}
+        {isCod4Game(event.gameTitle) ? <Cod4KeyGenerator /> : null}
         {event.status !== "archived" && event.status !== "cancelled" ? (
           <div className="action-row">
             <button
