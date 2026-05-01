@@ -324,6 +324,13 @@ export const enMessages: { [K in keyof typeof deMessages]: string } = {
   "events.full.hint": "Maybe time for a new round.",
   "events.empty.eyebrow": "Events",
 
+  "events.cod4.heading": "COD4 Key",
+  "events.cod4.generate": "Generate COD4 Key",
+  "events.cod4.copy": "Copy",
+  "events.cod4.regenerate": "Regenerate",
+  "events.cod4.copied": "Copied",
+  "events.cod4.copyFailed": "Copy failed — select and copy manually",
+
   "admin.gate.title": "Users, managers, and settings.",
   "admin.gate.body": "The admin area is available after admin sign-in.",
   "admin.gate.link": "Open admin login",
