@@ -2045,6 +2045,12 @@ dd {
   user-select: all;
 }
 
+.cod4-key-output:focus-visible {
+  outline: 3px solid rgba(15, 118, 110, 0.18);
+  border-color: var(--teal);
+  outline-offset: 2px;
+}
+
 .cod4-key-actions {
   display: flex;
   align-items: center;
