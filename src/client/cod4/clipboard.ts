@@ -15,11 +15,14 @@ export async function copyToClipboard(text: string): Promise<boolean> {
     ta.value = text;
     ta.style.cssText = "position:fixed;top:-9999px;left:-9999px;opacity:0;";
     document.body.appendChild(ta);
-    ta.focus();
-    ta.setSelectionRange(0, text.length);
-    const ok = document.execCommand("copy");
-    document.body.removeChild(ta);
-    return ok;
+    try {
+      ta.focus();
+      ta.setSelectionRange(0, text.length);
+      const ok = document.execCommand("copy");
+      return ok;
+    } finally {
+      document.body.removeChild(ta);
+    }
   } catch {
     return false;
   }
