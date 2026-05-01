@@ -2283,3 +2283,58 @@ dd {
   gap: 6px;
   margin-top: 6px;
 }
+
+/* Pizza admin */
+.pizza-admin__list {
+  list-style: none;
+  padding: 0;
+  margin: 12px 0 0;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.pizza-admin__row {
+  border: 1px solid rgba(0, 0, 0, 0.08);
+  border-radius: 10px;
+  padding: 10px 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.pizza-admin__row--inactive {
+  opacity: 0.55;
+}
+.pizza-admin__row-grid {
+  display: grid;
+  grid-template-columns: 80px 1fr 120px 80px;
+  gap: 8px 12px;
+}
+.pizza-admin__wide {
+  grid-column: 1 / -1;
+}
+.pizza-admin__row-actions {
+  display: flex;
+  gap: 8px;
+}
+.pizza-admin__variants ul {
+  list-style: none;
+  padding: 0;
+  margin: 6px 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.pizza-admin__variants li {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+.pizza-admin__new-variant,
+.pizza-admin__new {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  align-items: end;
+  margin-top: 6px;
+}
