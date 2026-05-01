@@ -66,7 +66,10 @@ const defaultSettings: AppSettings = {
   defaultLocale: "de",
   kioskStreamEnabled: false,
   kioskStreamPath: "stream",
-  kioskStreamSecret: ""
+  kioskStreamSecret: "",
+  pizzaPaypalHandle: "",
+  pizzaPaypalName: "",
+  pizzaCashRecipient: ""
 };
 
 export function AdminPanel({

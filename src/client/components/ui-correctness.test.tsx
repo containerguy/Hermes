@@ -164,7 +164,10 @@ describe("ui correctness structure contracts", () => {
       defaultLocale: "de",
       kioskStreamEnabled: false,
       kioskStreamPath: "stream",
-      kioskStreamSecret: ""
+      kioskStreamSecret: "",
+      pizzaPaypalHandle: "",
+      pizzaPaypalName: "",
+      pizzaCashRecipient: ""
     };
 
     requestJsonMock.mockImplementation(async (path: string) => {

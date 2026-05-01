@@ -74,7 +74,10 @@ const defaultSettings: AppSettings = {
   defaultLocale: "de",
   kioskStreamEnabled: false,
   kioskStreamPath: "stream",
-  kioskStreamSecret: ""
+  kioskStreamSecret: "",
+  pizzaPaypalHandle: "",
+  pizzaPaypalName: "",
+  pizzaCashRecipient: ""
 };
 
 const redeemedUser: User = {
