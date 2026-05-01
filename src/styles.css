@@ -2009,3 +2009,63 @@ dd {
   margin: 0;
   font-size: 0.95rem;
 }
+
+/* ── COD4 Key Generator ────────────────────────────────── */
+.cod4-section {
+  margin-top: 16px;
+  padding-top: 16px;
+  border-top: 1px solid var(--line);
+  display: grid;
+  gap: 16px;
+}
+
+.cod4-section__heading {
+  font-size: 0.78rem;
+  font-weight: 900;
+  text-transform: uppercase;
+  color: var(--teal);
+  letter-spacing: 0;
+  margin: 0 0 4px;
+}
+
+.cod4-key-output {
+  display: block;
+  font-family: ui-monospace, "Cascadia Code", "Source Code Pro", Menlo, Consolas, monospace;
+  font-size: 1rem;
+  font-weight: 900;
+  line-height: 1.4;
+  letter-spacing: 0.05em;
+  padding: 8px 16px;
+  border-radius: var(--radius-sm);
+  background: var(--paper);
+  border: 1px solid var(--line);
+  color: var(--ink);
+  overflow-x: auto;
+  word-break: break-all;
+  user-select: all;
+}
+
+.cod4-key-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.cod4-copy-status--ok {
+  font-size: 0.92rem;
+  font-weight: 900;
+  color: var(--green);
+  background: #dff5e8;
+  border-radius: 8px;
+  padding: 4px 8px;
+}
+
+.cod4-copy-status--error {
+  font-size: 0.92rem;
+  font-weight: 900;
+  color: var(--rose);
+  background: #ffe2e7;
+  border-radius: 8px;
+  padding: 4px 8px;
+}
