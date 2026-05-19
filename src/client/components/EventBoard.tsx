@@ -7,64 +7,14 @@ import { useBrandIconSrc } from "../lib/BrandingContext";
 import type { MessageKey } from "../i18n/catalog/index";
 import { Cod4KeyGenerator } from "../cod4/Cod4KeyGenerator";
 import { isCod4Game } from "../cod4/isCod4Game";
-
-function toDatetimeLocal(value: string) {
-  const date = new Date(value);
-  const local = new Date(date.getTime() - date.getTimezoneOffset() * 60_000);
-  return local.toISOString().slice(0, 16);
-}
-
-function fromDatetimeLocal(value: string) {
-  return new Date(value).toISOString();
-}
-
-function getEventStatusClass(event: GameEvent) {
-  if (
-    event.status !== "archived" &&
-    event.status !== "cancelled" &&
-    event.joinedCount >= event.maxPlayers
-  ) {
-    return "full";
-  }
-
-  return event.status;
-}
-
-function isSameLocalCalendarDay(a: Date, b: Date): boolean {
-  return (
-    a.getFullYear() === b.getFullYear() &&
-    a.getMonth() === b.getMonth() &&
-    a.getDate() === b.getDate()
-  );
-}
-
-function capacityPercent(event: GameEvent): number {
-  if (event.maxPlayers <= 0) {
-    return 0;
-  }
-  return Math.min(100, Math.round((event.joinedCount / event.maxPlayers) * 100));
-}
-
-/** Kompakte Kachel-Ansicht für schmale Viewports und installierte PWA (display-mode: standalone). */
-function useCompactTouchShell() {
-  const [compact, setCompact] = useState(false);
-  useEffect(() => {
-    if (typeof window.matchMedia !== "function") {
-      return;
-    }
-    try {
-      const mq = window.matchMedia("(max-width: 768px), (display-mode: standalone)");
-      const apply = () => setCompact(mq.matches);
-      apply();
-      mq.addEventListener("change", apply);
-      return () => mq.removeEventListener("change", apply);
-    } catch {
-      setCompact(false);
-    }
-    return undefined;
-  }, []);
-  return compact;
-}
+import {
+  capacityPercent,
+  fromDatetimeLocal,
+  getEventStatusClass,
+  isSameLocalCalendarDay,
+  toDatetimeLocal
+} from "../lib/event-format";
+import { useCompactTouchShell } from "../lib/useCompactTouchShell";
 
 export function EventBoard({
   currentUser,
