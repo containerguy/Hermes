@@ -1,4 +1,4 @@
-export const DEVICE_KEY_STORAGE_KEY = "hermes_device_key_v1";
+const DEVICE_KEY_STORAGE_KEY = "hermes_device_key_v1";
 const DEVICE_KEY_BYTES = 16;
 const DEVICE_KEY_PATTERN = /^[A-Za-z0-9_-]{22,44}$/;
 
