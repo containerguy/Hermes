@@ -1,6 +1,6 @@
 import { asc, desc, eq, isNull } from "drizzle-orm";
 import { Router } from "express";
-import { randomBytes, randomUUID } from "node:crypto";
+import { randomUUID } from "node:crypto";
 import { z } from "zod";
 import { requireCsrf } from "../auth/csrf";
 import { publicUser, requireAdmin, requireUser } from "../auth/current-user";
@@ -15,7 +15,7 @@ import {
 } from "../auth/rate-limits";
 import type { DatabaseContext } from "../db/client";
 import { gameEvents, inviteCodes, participations, pushSubscriptions, sessions, users } from "../db/schema";
-import { ensureActiveEmailAvailable, ensureActiveIdentityAvailable, userRoleSchema } from "../domain/users";
+import { ensureActiveIdentityAvailable, userRoleSchema } from "../domain/users";
 import {
   analyzeBulkImport,
   buildBulkImportAuditMetadata,
@@ -25,6 +25,12 @@ import {
   commitBulkImportAnalysis,
   fallbackPhoneNumber
 } from "../domain/users/bulk-import";
+import {
+  generateInviteCode,
+  getInviteUsedCount,
+  normalizeInviteCode,
+  serializeInviteCode
+} from "../domain/users/invites";
 import { broadcastEventsChanged } from "../realtime/event-bus";
 import {
   getS3LocationDetails,
@@ -88,53 +94,6 @@ const userExportBundleSchema = z.object({
 function nowIso() {
   return new Date().toISOString();
 }
-
-function normalizeInviteCode(code: string) {
-  return code.trim().toUpperCase();
-}
-
-function generateInviteCode() {
-  // 10 random bytes = 80 bits entropy; encoded as 16 Crockford-base32 characters.
-  const bytes = randomBytes(10);
-  const alphabet = "0123456789ABCDEFGHJKMNPQRSTVWXYZ";
-  let out = "";
-  let buffer = 0;
-  let bits = 0;
-
-  for (const byte of bytes) {
-    buffer = (buffer << 8) | byte;
-    bits += 8;
-    while (bits >= 5) {
-      bits -= 5;
-      out += alphabet[(buffer >> bits) & 31] ?? "0";
-    }
-  }
-
-  if (bits > 0) {
-    out += alphabet[(buffer << (5 - bits)) & 31] ?? "0";
-  }
-
-  return out.slice(0, 16);
-}
-
-function serializeInviteCode(context: DatabaseContext, invite: typeof inviteCodes.$inferSelect) {
-  const row = context.sqlite
-    .prepare("SELECT COUNT(*) AS count FROM invite_code_uses WHERE invite_code_id = ?")
-    .get(invite.id) as { count: number };
-
-  return {
-    ...invite,
-    usedCount: row.count
-  };
-}
-
-function getInviteUsedCount(context: DatabaseContext, inviteCodeId: string) {
-  const row = context.sqlite
-    .prepare("SELECT COUNT(*) AS count FROM invite_code_uses WHERE invite_code_id = ?")
-    .get(inviteCodeId) as { count: number };
-  return row.count;
-}
-
 
 export function createAdminRouter(context: DatabaseContext) {
   const router = Router();
