@@ -45,6 +45,14 @@ import {
   renameUserSession,
   revokeUserSession
 } from "../domain/auth/sessions";
+import {
+  emailChangeSchema,
+  emailChangeVerifySchema,
+  profileSchema,
+  requestEmailChange,
+  updateProfile,
+  verifyEmailChange
+} from "../domain/auth/profile";
 
 const requestCodeSchema = z.object({
   username: z.string().trim().min(1).max(80)
@@ -66,26 +74,6 @@ const registerSchema = z.object({
   username: z.string().trim().min(1).max(80),
   email: z.string().trim().email().max(160),
   locale: z.enum(["de", "en"]).optional()
-});
-
-const profileSchema = z
-  .object({
-    displayName: z.string().trim().min(1).max(80).optional(),
-    locale: z.union([z.enum(["de", "en"]), z.null()]).optional()
-  })
-  .refine((data) => data.displayName !== undefined || data.locale !== undefined, {
-    message: "leerer_profil_patch"
-  });
-
-const emailChangeSchema = z
-  .object({
-    newEmail: z.string().trim().email().max(160).optional(),
-    email: z.string().trim().email().max(160).optional()
-  })
-  .refine((value) => Boolean(value.newEmail ?? value.email), { message: "newEmail required" });
-
-const emailChangeVerifySchema = z.object({
-  code: z.string().trim().regex(/^\d{6}$/)
 });
 
 const pairRedeemSchema = z.object({
@@ -723,188 +711,55 @@ export function createAuthRouter(context: DatabaseContext) {
 
   router.patch("/profile", (request, response) => {
     const current = getCurrentSession(context, request);
-
     if (!current) {
       response.status(401).json({ error: "nicht_angemeldet" });
       return;
     }
-
     const parsed = profileSchema.safeParse(request.body);
     if (!parsed.success) {
       response.status(400).json({ error: "ungueltiger_profilname" });
       return;
     }
-
-    const timestamp = nowIso();
-    const patch: { displayName?: string; locale?: string | null; updatedAt: string } = {
-      updatedAt: timestamp
-    };
-    if (parsed.data.displayName !== undefined) {
-      patch.displayName = parsed.data.displayName;
-    }
-    if (parsed.data.locale !== undefined) {
-      patch.locale = parsed.data.locale;
-    }
-
-    context.db.update(users).set(patch).where(eq(users.id, current.user.id)).run();
-
-    const updated = context.db.select().from(users).where(eq(users.id, current.user.id)).get();
-    tryWriteAuditLog(context, {
-      actor: current.user,
-      action: "user.profile_update",
-      entityType: "user",
-      entityId: current.user.id,
-      summary: `${current.user.username} hat sein Profil aktualisiert.`,
-      metadata: {
-        displayName: parsed.data.displayName,
-        locale: parsed.data.locale
-      }
-    });
-
-    response.json({ user: updated ? publicUser(updated) : publicUser(current.user) });
+    const updated = updateProfile(context, current, parsed.data);
+    response.json({ user: publicUser(updated) });
   });
 
   router.post("/email-change", async (request, response) => {
     const current = getCurrentSession(context, request);
-
     if (!current) {
       response.status(401).json({ error: "nicht_angemeldet" });
       return;
     }
-
     const parsed = emailChangeSchema.safeParse(request.body);
     if (!parsed.success) {
       response.status(400).json({ error: "ungueltige_email" });
       return;
     }
-
-    const newEmail = (parsed.data.newEmail ?? parsed.data.email ?? "").trim();
-    const emailCheck = ensureActiveEmailAvailable(context, newEmail, { excludeUserId: current.user.id });
-    if (!emailCheck.ok) {
-      response.status(409).json({ error: emailCheck.error });
+    const result = await requestEmailChange(context, current, parsed.data);
+    if (!result.ok) {
+      response.status(result.status).json({ error: result.error });
       return;
     }
-
-    const timestamp = nowIso();
-    const challengeId = randomUUID();
-    const code = process.env.HERMES_DEV_LOGIN_CODE ?? generateOtp();
-
-    context.sqlite.transaction(() => {
-      context.db
-        .delete(emailChangeChallenges)
-        .where(and(eq(emailChangeChallenges.userId, current.user.id), lt(emailChangeChallenges.expiresAt, timestamp)))
-        .run();
-
-      context.db
-        .update(emailChangeChallenges)
-        .set({ consumedAt: timestamp })
-        .where(and(eq(emailChangeChallenges.userId, current.user.id), isNull(emailChangeChallenges.consumedAt)))
-        .run();
-
-      context.db
-        .insert(emailChangeChallenges)
-        .values({
-          id: challengeId,
-          userId: current.user.id,
-          newEmail,
-          codeHash: hashOtp(code),
-          expiresAt: new Date(Date.now() + 10 * 60 * 1000).toISOString(),
-          consumedAt: null,
-          sentAt: null,
-          createdAt: timestamp
-        })
-        .run();
-    })();
-
-    try {
-      await sendEmailChangeCode({ to: newEmail, username: current.user.username, code });
-      context.db
-        .update(emailChangeChallenges)
-        .set({ sentAt: nowIso() })
-        .where(eq(emailChangeChallenges.id, challengeId))
-        .run();
-    } catch (error) {
-      console.error("[Hermes] Failed to send email-change code", error);
-      response.status(502).json({ error: "mailversand_fehlgeschlagen" });
-      return;
-    }
-
     response.status(202).json({ ok: true });
   });
 
   router.post("/email-change/verify", (request, response) => {
     const current = getCurrentSession(context, request);
-
     if (!current) {
       response.status(401).json({ error: "nicht_angemeldet" });
       return;
     }
-
     const parsed = emailChangeVerifySchema.safeParse(request.body);
     if (!parsed.success) {
       response.status(400).json({ error: "ungueltiger_code" });
       return;
     }
-
-    const timestamp = nowIso();
-    const challenge = context.db
-      .select()
-      .from(emailChangeChallenges)
-      .where(
-        and(
-          eq(emailChangeChallenges.userId, current.user.id),
-          isNull(emailChangeChallenges.consumedAt),
-          gt(emailChangeChallenges.expiresAt, timestamp)
-        )
-      )
-      .orderBy(desc(emailChangeChallenges.createdAt))
-      .get();
-
-    if (!challenge || !verifyOtp(parsed.data.code, challenge.codeHash)) {
-      response.status(401).json({ error: "code_abgelehnt" });
+    const result = verifyEmailChange(context, current, parsed.data.code);
+    if (!result.ok) {
+      response.status(result.status).json({ error: result.error });
       return;
     }
-
-    const emailCheck = ensureActiveEmailAvailable(context, challenge.newEmail, {
-      excludeUserId: current.user.id
-    });
-    if (!emailCheck.ok) {
-      response.status(409).json({ error: emailCheck.error });
-      return;
-    }
-
-    context.sqlite.transaction(() => {
-      context.db
-        .update(users)
-        .set({ email: challenge.newEmail, updatedAt: timestamp })
-        .where(eq(users.id, current.user.id))
-        .run();
-
-      context.db
-        .update(emailChangeChallenges)
-        .set({ consumedAt: timestamp })
-        .where(eq(emailChangeChallenges.id, challenge.id))
-        .run();
-
-      context.db
-        .update(sessions)
-        .set({ revokedAt: timestamp })
-        .where(eq(sessions.userId, current.user.id))
-        .run();
-    })();
-
-    const updated = context.db.select().from(users).where(eq(users.id, current.user.id)).get();
-    const domain = challenge.newEmail.split("@", 2)[1] ?? null;
-    tryWriteAuditLog(context, {
-      actor: current.user,
-      action: "user.email_change_confirm",
-      entityType: "user",
-      entityId: current.user.id,
-      summary: `${current.user.username} hat seine E-Mail-Adresse aktualisiert.`,
-      metadata: domain ? { newEmailDomain: domain } : undefined
-    });
-
-    response.json({ user: updated ? publicUser(updated) : publicUser(current.user) });
+    response.json({ user: publicUser(result.user) });
   });
 
   router.get("/sessions", (request, response) => {
