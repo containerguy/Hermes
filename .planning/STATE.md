@@ -2,10 +2,10 @@
 gsd_state_version: 1.0
 milestone: v1.2
 milestone_name: Post-LAN Quality of Life
-status: verifying
-stopped_at: Completed 09-04-client-pairing-ux-PLAN.md
-last_updated: "2026-04-16T20:54:42.632Z"
-last_activity: 2026-04-16
+status: paused-after-phase-9
+stopped_at: Completed 09-04-client-pairing-ux-PLAN.md; pizza ordering shipped out-of-band
+last_updated: "2026-05-18"
+last_activity: 2026-05-16
 progress:
   total_phases: 5
   completed_phases: 1
@@ -25,66 +25,53 @@ See: .planning/PROJECT.md (updated 2026-04-15)
 
 ## Current Position
 
-Phase: 09 (device-recognition-and-pairing) — EXECUTING
+Phase: 09 (device-recognition-and-pairing) — COMPLETE
 Plan: 4 of 4
-Status: Phase complete — ready for verification
-Last activity: 2026-04-16
+Status: Phase complete; v1.2 paused after Phase 9. Pizza ordering shipped out-of-band (see phases/14-pizza-ordering/).
+Last activity: 2026-05-16 (pizza session globalization refactor)
 
-Progress: [==........] 21% (3 of 14 plans executed)
+Progress: [===.......] 29% (4 of 14 plans executed)
 
 ### Plan Roster (v1.2)
 
-| Phase | Plans | Key Migration | Checker Verdict |
-|-------|-------|---------------|-----------------|
-| 9 — Device Recognition & Pairing | 4 | `0010_device_pairing.sql` | PASS-WITH-WARNINGS (fixed) |
-| 10 — Theme System & Copy Refresh | 5 | `0011_theme_background_settings.sql` | PASS-WITH-WARNINGS (fixed) |
-| 11 — Bulk User Import | 2 | — | PASS-WITH-WARNINGS (fixed) |
-| 12 — Audio & Haptic Notifications | 2 | `0012_audio_haptic_prefs.sql` | PASS-WITH-WARNINGS (fixed) |
-| 13 — CI Node 24 Readiness | 1 | — | PASS |
+| Phase | Plans | Key Migration | Status |
+|-------|-------|---------------|--------|
+| 9 — Device Recognition & Pairing | 4 | `0010_device_pairing.sql` | COMPLETE (all 4 SUMMARY files present) |
+| 10 — Theme System & Copy Refresh | 5 | `0011_theme_background_settings.sql` (planned) | Not started — PLAN files only |
+| 11 — Bulk User Import | 2 | — | Not started — PLAN files only |
+| 12 — Audio & Haptic Notifications | 2 | `0012_audio_haptic_prefs.sql` (planned) | Not started — PLAN files only |
+| 13 — CI Node 24 Readiness | 1 | — | Not started — PLAN file only |
+
+### Out-of-band work shipped after Phase 9
+
+Pizza ordering system landed in `main` between 2026-05-01 and 2026-05-16 without a v1.2 phase track. See `phases/14-pizza-ordering/` for retrospective documentation. Migrations `0016`-`0018` were assigned by the pizza work, not the planned v1.2 migrations listed above; renumber the planned migrations when those phases execute.
 
 ## Performance Metrics
 
 **Velocity:**
 
-- Total plans completed: 11
-- Average duration: n/a
-- Total execution time: 0.0 hours
+- v1.0 + v1.1 plans completed: 27 (phases 1-8)
+- v1.2 plans completed: 4 of 14 (phase 9 only)
+- Out-of-band work: pizza ordering system, 4 commits between 2026-05-01 and 2026-05-16
 
-**By Phase:**
+**Per-plan execution log** (durations are approximate; tooling no longer tracks):
 
-| Phase | Plans | Total | Avg/Plan |
-|-------|-------|-------|----------|
-| 7. UX Polish – UI Correctness | 1 | 1 | n/a |
-| 8. Admin Event Soft Delete | 1 | 1 | n/a |
-| 1. Auth, Profile, And Invite Hardening | 0 | 6 | n/a |
-| 2. Event And Invite Consistency | 0 | 3 | n/a |
-| 3. Backup And Restore Safety | 0 | 3 | n/a |
-| 4. PWA And Realtime Reliability | 0 | 3 | n/a |
-| 5. Frontend And Admin UI Modularization | 0 | 4 | n/a |
-| 6. Release Verification And Documentation | 0 | 3 | n/a |
-| 01 | 8 | - | - |
-| 2 | 3 | - | - |
-
-**Recent Trend:**
-
-- Last 5 plans: none
-- Trend: n/a
-
-*Updated after each plan completion*
-| Phase 01 P01-02 | 10m | 3 tasks | 5 files |
-| Phase 01 P01-07 | 5m | 2 tasks | 6 files |
-| Phase 01 P01-04 | 6m | 4 tasks | 4 files |
-| Phase 01 P01-03 | 40m | 4 tasks | 7 files |
-| Phase 01 P01-05 | 311s | 3 tasks | 2 files |
-| Phase 01-auth-profile-and-invite-hardening P01-08 | 25min | 1 tasks | 2 files |
-| Phase 01 P01-06 | 170s | 3 tasks | 5 files |
-| Phase 02 P01 | 3m | 2 tasks | 2 files |
-| Phase 02 P02 | 4m | 2 tasks | 2 files |
-| Phase 02 P03 | 6m | 3 tasks | 4 files |
-| Phase 09 P01 | 6min | 4 tasks | 6 files |
-| Phase 09 P02 | 3min | 2 tasks | 2 files |
-| Phase 09 P03 | 8min | 3 tasks | 3 files |
-| Phase 09-device-recognition-and-pairing P04 | 15min | 4 tasks | 8 files |
+| Plan | Duration | Tasks | Files |
+|------|----------|-------|-------|
+| Phase 01 P01-02 | 10m | 3 | 5 |
+| Phase 01 P01-03 | 40m | 4 | 7 |
+| Phase 01 P01-04 | 6m | 4 | 4 |
+| Phase 01 P01-05 | 5m | 3 | 2 |
+| Phase 01 P01-06 | 3m | 3 | 5 |
+| Phase 01 P01-07 | 5m | 2 | 6 |
+| Phase 01 P01-08 | 25m | 1 | 2 |
+| Phase 02 P01 | 3m | 2 | 2 |
+| Phase 02 P02 | 4m | 2 | 2 |
+| Phase 02 P03 | 6m | 3 | 4 |
+| Phase 09 P01 | 6m | 4 | 6 |
+| Phase 09 P02 | 3m | 2 | 2 |
+| Phase 09 P03 | 8m | 3 | 3 |
+| Phase 09 P04 | 15m | 4 | 8 |
 
 ## Accumulated Context
 

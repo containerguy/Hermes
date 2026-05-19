@@ -2,8 +2,8 @@
 
 ## Milestones
 
-- ✅ **v1.0 Hermes v1 Release Hardening** — Phases 1–6 (shipped 2026-04-16). Archive: `.planning/milestones/v1.0-ROADMAP.md`
-- ✅ **v1.1 UX Polish** — Phases 7–8 (shipped 2026-04-16). Archive: `.planning/milestones/v1.1-ROADMAP.md`
+- ✅ **v1.0 Hermes v1 Release Hardening** — Phases 1–6 (shipped 2026-04-16). Archive: `.planning/archive/v1.0-ROADMAP.md`
+- ✅ **v1.1 UX Polish** — Phases 7–8 (shipped 2026-04-16). Archive: `.planning/archive/v1.1-ROADMAP.md`
 
 ## Current Milestone: v1.2 Post-LAN Quality of Life
 
@@ -17,7 +17,7 @@
 
 ## Phases
 
-- [ ] **Phase 9: Device Recognition and Session-Bound Pairing** - Recognize the same device on re-login and let an authenticated user pair an additional device via a short-lived QR/link token without a second email OTP.
+- [x] **Phase 9: Device Recognition and Session-Bound Pairing** - Recognize the same device on re-login and let an authenticated user pair an additional device via a short-lived QR/link token without a second email OTP. *(completed 2026-04-16)*
 - [ ] **Phase 10: Admin Theme System, Backgrounds, and Copy Refresh** - Admin-selectable gaming theme presets plus custom CSS-token themes, background-image selection from S3 presets, and a project-wide copy refresh to a modern/concise/clear voice.
 - [ ] **Phase 11: Admin Bulk User Import** - CSV/JSON bulk import in AdminPanel with preview, dry-run, Zod validation, duplicate detection, transactional write, and aggregated audit logging.
 - [ ] **Phase 12: Audio and Haptic Notification UX** - Surface audio + haptic affordances in Web Push payloads and the in-app realtime path, with feature-detected, settings-toggleable behavior.
@@ -102,14 +102,18 @@ Plans:
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
-| 9. Device Recognition and Session-Bound Pairing | 3/4 | In progress | — |
+| 9. Device Recognition and Session-Bound Pairing | 4/4 | Complete | 2026-04-16 |
 | 10. Admin Theme System, Backgrounds, and Copy Refresh | 0/5 | Not started | — |
 | 11. Admin Bulk User Import | 0/2 | Not started | — |
 | 12. Audio and Haptic Notification UX | 0/2 | Not started | — |
-| 13. CI Node 24 Readiness | 0/0 | Not started | — |
+| 13. CI Node 24 Readiness | 0/1 | Not started | — |
+
+## Out-of-band: Pizza Ordering System
+
+Shipped between 2026-05-01 and 2026-05-16 without a v1.2 phase track (4 commits). Migrations `0016`-`0018` were assigned to pizza, displacing the originally-planned migration numbers for phases 10 and 12. Retrospective documentation: `phases/14-pizza-ordering/`.
 
 ## Next
 
 Next up:
 
-- Execute 09-04-client-pairing-ux-PLAN.md (AUTH-01/AUTH-02 client) — device-key.ts, QrCanvas, LoginPanel "Add a device" panel, `?pair=<token>` redemption-on-mount, German error copy
+- v1.2 is paused after Phase 9. Resuming would mean Phase 10 (Theme System) per the original sequence. Renumber the theme/audio migrations before starting (next free number is `0019`).

@@ -30,48 +30,97 @@ Primary runtime paths:
 
 ## Client Architecture
 
-The browser app is a single React file in `src/main.tsx`. It uses hash routing rather than a router package. The route definitions are local to the file and map to `#events`, `#login`, `#manager`, and `#admin`.
+The browser app uses hash routing (no router package). Route map: `#events`, `#login`, `#manager`, `#admin`, `#infos`, `#kiosk`. Legacy hash redirects are handled in `src/main.tsx` via `legacyAdminHashToSection`.
 
-Important client responsibilities:
+Top-level composition (`src/main.tsx`):
 
-- `requestJson()` wraps `fetch()` with `credentials: "include"` so cookie sessions work across API calls.
-- `App()` owns top-level state for the current route, logged-in user, and settings.
-- `EventBoard()` loads `/api/events`, opens an `EventSource` to `/api/realtime/events`, falls back to 30-second polling, creates events in manager mode, updates event start times, cancels/archives events, and manages participation.
-- `LoginPanel()` handles email OTP login, invite registration, logout, session revocation, and Web Push subscription setup.
-- `AdminPanel()` handles user management, invite codes, audit log display, settings updates, and backup/restore actions.
-- `applyTheme()` maps server-managed settings to CSS custom properties used by `src/styles.css`.
+- `App()` owns route/user/settings state and renders the page component for the current hash.
+- Wraps the tree in `BrandingContext` (`src/client/lib/BrandingContext.tsx`) and `I18nContext` (`src/client/i18n/I18nContext.tsx`).
+- Calls `applyTheme()` to map server-managed settings to CSS custom properties used by `src/styles.css`.
 
-There is no client-side state library. Server responses are treated as the source of truth and components reload their relevant collections after mutations.
+Page components (`src/client/components/`):
+
+- `EventBoard.tsx` — loads `/api/events`, opens `EventSource` to `/api/realtime/events`, 30-second polling fallback, creates events in manager mode, updates event start times, cancels/archives events, manages participation. Renders the global `PizzaPanel` above the event list when a pizza session exists. Conditionally renders `Cod4KeyGenerator` for events whose game matches `isCod4Game()`.
+- `LoginPanel.tsx` — email OTP login, invite registration, logout, session list/rename/revoke, "Add a device" pairing flow (mint pair-token + QR code), redemption-on-mount from `?pair=<token>`, "Dieses Gerät vergessen", profile + email change, Web Push subscription, API token CRUD.
+- `AdminPanel.tsx` — section-routed by `adminSection` (`users` / `betrieb` / `design` / `infos` / `sicherheit` / `invites` / `audit`). Covers user management, bulk import, settings, backup/restore, rate-limit list + allowlist, invite-code CRUD, audit log, theme + brand + game-catalog config, pizza settings + JSON menu editor.
+- `ManagerPage.tsx`, `LoginPage.tsx`, `InfosPage.tsx`, `KioskStreamPage.tsx` — shell pages.
+- `QrCanvas.tsx` — dependency-light canvas QR renderer (`qrcode-generator`).
+
+Client helpers:
+
+- `src/client/api/request.ts` — typed `requestJson()` wraps `fetch()` with `credentials: "include"` and parses errors into `ApiError`.
+- `src/client/api/csrf.ts` — fetches and caches a CSRF token; required for state-changing requests.
+- `src/client/api/device-key.ts` — per-origin 128-bit device key in `localStorage` (key `hermes_device_key_v1`), graceful fallback to ephemeral per-load key; `getDeviceContext()` returns `{ deviceKey, pwa }`.
+- `src/client/errors/errors.ts` — `getErrorMessage(code)` + German + English error catalogs.
+- `src/client/lib/runtime-context.ts` — secure-context, PWA display-mode, iOS-Safari heuristics.
+
+There is no client-side state library. Server responses are treated as the source of truth and components reload their relevant collections after mutations. Several top-level components are oversized (`AdminPanel.tsx` ~1796, `LoginPanel.tsx` ~1077, `EventBoard.tsx` ~892) and are slated for sub-component extraction in a separate cleanup pass.
+
+### Per-game integration points
+
+`src/client/cod4/` is the reference pattern for per-game feature integrations: `isCod4Game()` matches the event's game name, `Cod4KeyGenerator.tsx` is conditionally rendered inside the event detail. Future per-game features should follow the same shape (small module folder with a name-matcher + a feature component, wired into `EventBoard`).
 
 ## API Layer
 
 API routes are mounted in `src/server/app.ts`:
 
-- `/api/health` returns basic liveness.
-- `/api/settings` returns public settings from `src/server/settings.ts`.
-- `/api/auth` is implemented by `src/server/http/auth-routes.ts`.
-- `/api/admin` is implemented by `src/server/http/admin-routes.ts`.
-- `/api/events` is implemented by `src/server/http/event-routes.ts`.
-- `/api/push` is implemented by `src/server/http/push-routes.ts`.
-- `/api/realtime` is implemented by `src/server/http/realtime-routes.ts`.
+- `/api/health` — liveness.
+- `/api/settings` — public settings from `src/server/settings.ts`.
+- `/api/auth` — `auth-routes.ts`.
+- `/api/admin` — `admin-routes.ts`.
+- `/api/events` — `event-routes.ts`.
+- `/api/pizza` — `pizza-routes.ts`.
+- `/api/push` — `push-routes.ts`.
+- `/api/realtime` — `realtime-routes.ts`.
+- `/api/kiosk` — `kiosk-routes.ts`.
+- `/api-docs` — Swagger UI served by `api-docs.ts` against `openapi/hermes-api.yaml`.
 
-The route modules own request validation with Zod, database writes, audit logging, and response serialization. They call small shared helpers for cross-cutting behavior rather than using a service layer.
+The route modules own request validation with Zod, database writes, audit logging, and response serialization. Pizza routes follow a service-layer pattern (`domain/pizza/*` carries the logic). `admin-routes.ts`, `auth-routes.ts`, and `event-routes.ts` are still mostly monolithic and slated for service-layer extraction.
+
+Cross-cutting middleware lives in `src/server/auth/hermes-auth.ts`. It populates `request.hermesAuth` from either the `hermes_session` cookie or an `Authorization: Bearer <token>` header (Bearer takes precedence). `request.hermesAuth.kind` is `"session"` or `"api_token"`; for API tokens it also carries `scope` (`"full"` or `"read_only"`). Bearer requests bypass CSRF (see `auth/csrf.ts`).
 
 ## Authentication And Authorization
 
-Authentication is session-cookie based:
+Two authentication mechanisms coexist, unified by `src/server/auth/hermes-auth.ts`:
 
-- `src/server/auth/sessions.ts` creates base64url session tokens, sets/clears the `hermes_session` cookie, and honors `HERMES_COOKIE_SECURE`.
-- `src/server/auth/otp.ts` generates six-digit one-time codes and stores/verifies scrypt hashes.
-- `src/server/auth/current-user.ts` resolves the current session from the cookie, joins `sessions` to `users`, rejects revoked sessions/deleted users, updates `lastSeenAt`, and exposes `requireUser()`/`requireAdmin()`.
-- `src/server/http/auth-routes.ts` creates login challenges, sends email codes, verifies codes, creates sessions, lists sessions, revokes sessions, logs out, and supports invite-based registration when settings allow it.
+**Cookie sessions:**
 
-Authorization is role based:
+- `auth/sessions.ts` — base64url session tokens, `hermes_session` cookie, honors `HERMES_COOKIE_SECURE`.
+- `auth/otp.ts` — six-digit OTPs, scrypt hashing.
+- `auth/current-user.ts` — resolves session from cookie, joins `sessions` to `users`, rejects revoked sessions / deleted users, updates `lastSeenAt`, exposes `requireUser()` / `requireAdmin()`.
+- `http/auth-routes.ts` — creates login challenges, sends email codes, verifies codes (with optional `deviceKey` + `pwa`), creates sessions, lists/rename/revoke sessions, logout, invite-based registration when settings allow.
 
-- Roles are `user`, `manager`, and `admin` in `src/server/domain/users.ts`.
-- Managers and admins can create events through `canCreateEvent()`.
-- Admins, managers, and event creators can manage an event through `canManageEvent()`.
-- Admin APIs enforce admin access in `src/server/http/admin-routes.ts` before route handlers run.
+**API tokens (Bearer):**
+
+- `db/schema.ts` — `userApiTokens` table; `tokenHash`, `scope` (`full` / `read_only`), `revokedAt`, `lastUsedAt`.
+- `http/auth-routes.ts` — `POST/GET/DELETE /api/auth/api-tokens` for CRUD; mint returns the plaintext once.
+- `auth/hermes-auth.ts` — `enforceApiTokenWriteAccess()` rejects write methods for `read_only` tokens with `api_token_nur_lesen`.
+- Bearer requests bypass CSRF; cookie requests require `x-hermes-csrf` (see `auth/csrf.ts` — HMAC-SHA256 over session id, GET-only mint at `/api/auth/csrf`).
+
+**Rate limits:** `auth/rate-limits.ts` persists per-scope counters in `rateLimitEntries`; admin-managed allowlist in `rateLimitAllowlist`. Used for OTP request flooding, login verify, pair-token mint, and pair-redeem.
+
+**Authorization** is role-based:
+
+- Roles: `user`, `organizer`, `manager`, `admin` (CHECK constraint enforced via migrations `0012` + `0013`).
+- `domain/users.ts` — `canCreateEvent()`, `canManageEvent()`, role-assignment helpers.
+- Admin APIs in `http/admin-routes.ts` gate on `requireAdmin()` before handlers run.
+
+## Device recognition and pairing
+
+Two related flows, both tracked in `db/schema.ts`:
+
+- `sessions.deviceKeyHash` carries an HMAC-SHA256 of the client's per-origin device key (`HERMES_DEVICE_KEY_SECRET`).
+- `pairingTokens` carries short-lived pair tokens (HMAC with `HERMES_PAIR_TOKEN_SECRET`, 10-min TTL, single-use).
+
+**Same-device re-login** (`auth-routes.ts: verify-code`): when the submitted `deviceKey` hashes to an existing non-revoked session for the same user, that session is updated in place rather than creating a new row. Audit code `auth.login_recognized` distinguishes this from a fresh `auth.login`. Falls back to UA-signal heuristics only when exactly one non-revoked, non-key-bound candidate matches (ambiguity inserts a new row).
+
+**Add-a-device pairing**:
+
+- `POST /api/auth/pair-token` (auth + CSRF + rate-limited) mints an opaque token tied to the origin session.
+- The client renders the token as a QR (`QrCanvas.tsx`) and a link (`#login?pair=<token>`).
+- `POST /api/auth/pair-redeem` (public, CSRF-exempt, single-use, atomic) accepts the token + new device's `deviceKey` and creates a new session for the same user. The origin session stays alive.
+- Four stable error codes: `pair_token_invalid`, `pair_token_expired`, `pair_token_consumed`, `pair_origin_revoked`.
+- Audit codes: `device_paired`, `device_pair_failed` (no raw deviceKey in metadata).
 
 ## Event Domain
 
@@ -93,12 +142,18 @@ Event rules live mostly in `src/server/domain/events.ts`:
 
 The database is SQLite through `better-sqlite3` with Drizzle query builders:
 
-- `src/server/db/client.ts` creates the SQLite file directory, opens the database, enables WAL mode and foreign keys, and returns `{ sqlite, db }`.
-- The database path comes from `getDatabasePath()` in `src/server/env.ts`, defaulting to `data/hermes.sqlite`.
-- `src/server/db/schema.ts` defines tables for users, login challenges, sessions, push subscriptions, game events, participations, app settings, audit logs, invite codes, and invite code uses.
-- SQL migrations are stored in `src/server/db/migrations/*.sql`.
-- `src/server/db/migrate.ts` tracks applied migration filenames in `schema_migrations` and can run as a CLI entrypoint.
-- `src/server/db/bootstrap-admin.ts` is bundled as a separate server utility and used by tests to create the initial admin.
+- `db/client.ts` — creates the SQLite file directory, opens the database, enables WAL mode + foreign keys, returns `{ sqlite, db }`.
+- Database path: `getDatabasePath()` in `env.ts`, default `data/hermes.sqlite`.
+- `db/schema.ts` defines tables grouped as:
+  - **Auth/users**: `users`, `loginChallenges`, `sessions`, `emailChangeChallenges`, `inviteCodes`, `inviteCodeUses`, `pairingTokens`, `userApiTokens`, `rateLimitEntries`, `rateLimitAllowlist`.
+  - **Events**: `gameEvents`, `participations`.
+  - **Settings/audit**: `appSettings`, `auditLogs`.
+  - **Push**: `pushSubscriptions`.
+  - **Storage**: `storageBackupStatus`, `storageRestoreRecoveries`.
+  - **Pizza**: `pizzaSessions`, `pizzaMenuItems`, `pizzaMenuVariants`, `pizzaOrders`, `pizzaOrderLines`.
+- Migrations in `db/migrations/*.sql` (0001–0018); see `STRUCTURE.md` for the full list.
+- `db/migrate.ts` tracks applied filenames in `schema_migrations` and runs as a CLI entrypoint.
+- `db/bootstrap-admin.ts` is bundled separately and used by tests + first-time setup.
 
 The code mixes Drizzle query builders with direct `better-sqlite3` statements where aggregate counts or restore operations are simpler.
 
@@ -155,15 +210,31 @@ Do not place credential values in planning docs. The code reads credentials from
 
 `Dockerfile` uses a Node 22 build stage, prunes dev dependencies, and runs the production server with `/data/hermes.sqlite` as the default DB path. `docker-compose.yml` builds the local image, maps port 3000, mounts a named `/data` volume, and configures S3-compatible storage via environment variables and a mounted credentials file path.
 
+## Pizza Ordering System
+
+LAN-party-wide pizza ordering (`/api/pizza/*`), introduced 2026-05 — see `.planning/phases/14-pizza-ordering/` for the full retrospective. Key shape:
+
+- **One global session** at a time. `pizzaSessions` has no `event_id` (dropped in migration `0018`); admins/managers open → guests order → manager locks → marks delivered.
+- **Menu**: `pizzaMenuItems` (name, category, sort order, ingredients/allergens, active flag) + `pizzaMenuVariants` (size, price in cents). One item has many variants. Da Rosario seed is the only seeded menu (migration `0017`).
+- **Orders**: per-user, capped at `PIZZA_MAX_LINES_PER_ORDER = 3` lines per session. Each line has qty 1-3 + optional 200-char note. Price snapshot at line write time (`pizza_order_lines.price_cents`).
+- **Authorization**: anyone with a session can order while status is `open` (no dabei-gate). Manager actions gated by `canManageEvent()` against the originating event's manager set (yes, even though the pizza session is LAN-wide, the manager check still routes through event permissions).
+- **Outputs**: two PDFs via `pdf/pizza-print.ts`:
+  - **Pizzeria call sheet** — aggregated by item number, no guest names.
+  - **Kassenliste** — per guest, payment status (paypal/cash/unpaid), paypal.me deep link if `pizzaPaypalHandle` setting is configured.
+- **Errors**: domain-typed (`PizzaOrderError`, `PizzaLifecycleError`, `PizzaOrderLimitError`) translated to HTTP responses by `handleDomainError()` in `http/pizza-routes.ts`. Slated to extend a shared `AppError` base in a follow-up cleanup pass.
+
+Settings keys: `pizzaPaypalHandle`, `pizzaPaypalName`, `pizzaCashRecipient` (all default empty; feature is dormant until configured).
+
 ## Testing Architecture
 
-Tests are split by scope:
+See `.planning/codebase/TESTING.md` for the current test inventory and conventions. Tests are split by scope:
 
-- Unit tests cover OTP hashing in `src/server/auth/otp.test.ts`.
-- Domain tests cover event validation/status rules in `src/server/domain/events.test.ts`.
-- Storage tests cover S3 credential parsing in `src/server/storage/s3-storage.test.ts`.
-- HTTP integration tests in `src/server/http/app-flow.test.ts` exercise login, admin role management, event creation, and capacity enforcement.
-- Playwright E2E in `e2e/hermes-flow.spec.ts` starts the real app on a temporary SQLite file, bootstraps an admin, logs in multiple users, and verifies the admin/manager/user flow in the browser.
+- Domain tests cover pure rules (events, users, pizza lifecycle/limits/totals).
+- HTTP integration tests cover route flows under realistic auth + audit + push side effects.
+- Client tests cover login, admin, and ui-correctness via a `react-dom/client` + `act` harness.
+- Playwright E2E covers the cross-role browser flow.
+
+Known coverage gaps are tracked in `TESTING.md` (security-critical auth modules, oversized route files, pizza route surface, realtime SSE).
 
 ## Architectural Constraints And Planning Notes
 
