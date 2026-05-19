@@ -6,7 +6,6 @@ import { requireUser } from "../auth/current-user";
 import { enforceApiTokenWriteAccess } from "../auth/hermes-auth";
 import type { DatabaseContext } from "../db/client";
 import { pizzaMenuItems, pizzaMenuVariants, users } from "../db/schema";
-import { PizzaLifecycleError } from "../domain/pizza/lifecycle";
 import {
   deleteVariant,
   getVariantById,
@@ -17,7 +16,6 @@ import {
   upsertVariant
 } from "../domain/pizza/menu";
 import {
-  PizzaOrderError,
   addLine,
   deleteLine,
   getOrderForUser,
@@ -35,6 +33,7 @@ import { buildKassenlistePdf, buildPizzeriaPdf } from "../pdf/pizza-print";
 import { sendPushToEnabledUsers } from "../push/push-service";
 import { broadcastEventsChanged } from "../realtime/event-bus";
 import { readSettings } from "../settings";
+import { handleDomainError } from "./errors";
 
 const transitionSchema = z.object({
   transition: z.enum(["open", "lock", "deliver", "reopen"]),
@@ -141,25 +140,6 @@ function loadSerializedState(context: DatabaseContext, currentUserId: string) {
 
 function isManager(role: string): boolean {
   return role === "admin" || role === "manager";
-}
-
-function handleDomainError(error: unknown, response: import("express").Response) {
-  if (error instanceof PizzaOrderError) {
-    response.status(error.status).json({ error: error.code });
-    return true;
-  }
-  if (error instanceof PizzaLifecycleError) {
-    response.status(409).json({ error: error.code });
-    return true;
-  }
-  if (error instanceof Error) {
-    const code = (error as unknown as { code?: unknown }).code;
-    if (typeof code === "string") {
-      response.status(400).json({ error: code });
-      return true;
-    }
-  }
-  return false;
 }
 
 export function createPizzaRouter(context: DatabaseContext) {

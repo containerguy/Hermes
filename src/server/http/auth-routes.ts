@@ -18,6 +18,7 @@ import {
 } from "../auth/sessions";
 import { generateOtp, hashOtp, verifyOtp } from "../auth/otp";
 import type { DatabaseContext } from "../db/client";
+import { AppError } from "./errors";
 import {
   emailChangeChallenges,
   inviteCodes,
@@ -131,15 +132,15 @@ function getInviteRegisterRateLimitKey(input: { sourceIp?: string; inviteCode?: 
   return `ip:${ip}|invite:${normalized}`;
 }
 
-class InviteExhaustedError extends Error {
+class InviteExhaustedError extends AppError {
   constructor() {
-    super("invite_exhausted");
+    super("invite_ausgeschoepft", "invite_exhausted", 403);
   }
 }
 
-class InviteInvalidError extends Error {
+class InviteInvalidError extends AppError {
   constructor() {
-    super("invite_invalid");
+    super("invite_ungueltig", "invite_invalid", 403);
   }
 }
 

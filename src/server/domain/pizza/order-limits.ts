@@ -1,14 +1,13 @@
+import { AppError } from "../../http/errors";
+
 export const PIZZA_MAX_LINES_PER_ORDER = 3;
 export const PIZZA_MIN_QTY = 1;
 export const PIZZA_MAX_QTY = 3;
 export const PIZZA_NOTE_MAX_LEN = 200;
 
-export class PizzaOrderLimitError extends Error {
-  readonly code: string;
-
+export class PizzaOrderLimitError extends AppError {
   constructor(code: string, message: string) {
-    super(message);
-    this.code = code;
+    super(code, message, 400);
   }
 }
 

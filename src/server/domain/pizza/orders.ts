@@ -2,6 +2,7 @@ import { and, asc, eq } from "drizzle-orm";
 import { randomUUID } from "node:crypto";
 import type { DatabaseContext } from "../../db/client";
 import { pizzaOrderLines, pizzaOrders, pizzaSessions } from "../../db/schema";
+import { AppError } from "../../http/errors";
 import { canMarkPayment, canPlaceOrder } from "./lifecycle";
 import { getVariantWithItem } from "./menu";
 import {
@@ -16,14 +17,9 @@ function nowIso() {
   return new Date().toISOString();
 }
 
-export class PizzaOrderError extends Error {
-  readonly code: string;
-  readonly status: number;
-
+export class PizzaOrderError extends AppError {
   constructor(code: string, message: string, status = 400) {
-    super(message);
-    this.code = code;
-    this.status = status;
+    super(code, message, status);
   }
 }
 

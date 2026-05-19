@@ -1,3 +1,5 @@
+import { AppError } from "../../http/errors";
+
 export type PizzaSessionState = "draft" | "open" | "locked" | "delivered";
 
 export type PizzaSessionTransition = "open" | "lock" | "deliver" | "reopen";
@@ -9,12 +11,9 @@ const TRANSITIONS: Record<PizzaSessionTransition, { from: PizzaSessionState; to:
   reopen: { from: "locked", to: "open" }
 };
 
-export class PizzaLifecycleError extends Error {
-  readonly code: string;
-
+export class PizzaLifecycleError extends AppError {
   constructor(code: string, message: string) {
-    super(message);
-    this.code = code;
+    super(code, message, 409);
   }
 }
 
