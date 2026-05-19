@@ -1,11 +1,10 @@
-import { asc, desc, eq, isNull } from "drizzle-orm";
+import { asc, eq, isNull } from "drizzle-orm";
 import { Router } from "express";
-import { randomUUID } from "node:crypto";
 import { z } from "zod";
 import { requireCsrf } from "../auth/csrf";
 import { publicUser, requireAdmin, requireUser } from "../auth/current-user";
 import { enforceApiTokenWriteAccess } from "../auth/hermes-auth";
-import { listAuditLogs, maskInviteCode, tryWriteAuditLog } from "../audit-log";
+import { listAuditLogs, tryWriteAuditLog } from "../audit-log";
 import {
   addRateLimitAllowlist,
   clearRateLimitBlock,
@@ -14,7 +13,7 @@ import {
   listRateLimitEntries
 } from "../auth/rate-limits";
 import type { DatabaseContext } from "../db/client";
-import { gameEvents, inviteCodes, users } from "../db/schema";
+import { gameEvents, users } from "../db/schema";
 import {
   analyzeBulkImport,
   buildBulkImportAuditMetadata,
@@ -24,10 +23,14 @@ import {
   commitBulkImportAnalysis
 } from "../domain/users/bulk-import";
 import {
-  generateInviteCode,
-  getInviteUsedCount,
-  normalizeInviteCode,
-  serializeInviteCode
+  createInviteCodeSchema,
+  createInviteCodeService,
+  deactivateInviteCodeService,
+  deleteUnusedInviteCodeService,
+  listInviteCodes,
+  reactivateInviteCodeService,
+  updateInviteCodeSchema,
+  updateInviteCodeService
 } from "../domain/users/invites";
 import {
   createUser,
@@ -44,20 +47,6 @@ import {
   readBackupStatus
 } from "../storage/s3-storage";
 import { readSettings, settingsPartialSchema, settingsSchema, writeSettings } from "../settings";
-
-const createInviteCodeSchema = z.object({
-  code: z.string().trim().min(1).max(80).optional(),
-  customCode: z.string().trim().min(1).max(80).optional(),
-  label: z.string().trim().min(1).max(120),
-  maxUses: z.number().int().min(1).max(500).nullable().optional(),
-  expiresAt: z.string().datetime().nullable().optional()
-});
-
-const updateInviteCodeSchema = z.object({
-  label: z.string().trim().min(1).max(120).optional(),
-  maxUses: z.number().int().min(1).max(500).nullable().optional(),
-  expiresAt: z.string().datetime().nullable().optional()
-});
 
 const allowlistSchema = z.object({
   ipOrCidr: z.string().trim().min(1).max(80),
@@ -501,13 +490,7 @@ export function createAdminRouter(context: DatabaseContext) {
   });
 
   router.get("/invite-codes", (_request, response) => {
-    const invites = context.db
-      .select()
-      .from(inviteCodes)
-      .orderBy(desc(inviteCodes.createdAt))
-      .all();
-
-    response.json({ inviteCodes: invites.map((invite) => serializeInviteCode(context, invite)) });
+    response.json({ inviteCodes: listInviteCodes(context) });
   });
 
   router.post("/invite-codes", (request, response) => {
@@ -518,65 +501,17 @@ export function createAdminRouter(context: DatabaseContext) {
       response.status(403).json({ error: "admin_erforderlich" });
       return;
     }
-
     if (!parsed.success) {
       response.status(400).json({ error: "ungueltiger_invite_code" });
       return;
     }
 
-    if (parsed.data.code !== undefined || parsed.data.customCode !== undefined) {
-      response.status(400).json({ error: "invite_code_custom_deaktiviert" });
+    const result = createInviteCodeService(context, admin, parsed.data);
+    if (!result.ok) {
+      response.status(result.status).json({ error: result.error });
       return;
     }
-
-    const timestamp = nowIso();
-    const id = randomUUID();
-    const code = normalizeInviteCode(generateInviteCode());
-    const maxUses = parsed.data.maxUses === undefined ? 300 : parsed.data.maxUses;
-    const expiresAt =
-      parsed.data.expiresAt === undefined
-        ? new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString()
-        : parsed.data.expiresAt;
-
-    try {
-      context.db
-        .insert(inviteCodes)
-        .values({
-          id,
-          code,
-          label: parsed.data.label,
-          maxUses,
-          expiresAt,
-          revokedAt: null,
-          createdByUserId: admin.id,
-          createdAt: timestamp,
-          updatedAt: timestamp
-        })
-        .run();
-    } catch (error) {
-      console.error("[Hermes] Failed to create invite code", error);
-      response.status(409).json({ error: "invite_code_existiert" });
-      return;
-    }
-
-    const created = context.db.select().from(inviteCodes).where(eq(inviteCodes.id, id)).get();
-    tryWriteAuditLog(context, {
-      actor: admin,
-      action: "invite.create",
-      entityType: "invite_code",
-      entityId: id,
-      summary: `${admin.username} hat Invite ${parsed.data.label} erstellt.`,
-      metadata: {
-        inviteCodeId: id,
-        inviteLabel: parsed.data.label,
-        inviteMaskedCode: maskInviteCode(code),
-        maxUses,
-        expiresAt
-      }
-    });
-    response.status(201).json({
-      inviteCode: created ? serializeInviteCode(context, created) : undefined
-    });
+    response.status(201).json({ inviteCode: result.invite });
   });
 
   router.patch("/invite-codes/:id", (request, response) => {
@@ -587,194 +522,58 @@ export function createAdminRouter(context: DatabaseContext) {
       response.status(403).json({ error: "admin_erforderlich" });
       return;
     }
-
     if (!parsed.success) {
       response.status(400).json({ error: "ungueltiger_invite_code" });
       return;
     }
 
-    const existing = context.db
-      .select()
-      .from(inviteCodes)
-      .where(eq(inviteCodes.id, request.params.id))
-      .get();
-
-    if (!existing) {
-      response.status(404).json({ error: "invite_code_nicht_gefunden" });
+    const result = updateInviteCodeService(context, admin, request.params.id, parsed.data);
+    if (!result.ok) {
+      response.status(result.status).json({ error: result.error });
       return;
     }
-
-    const usedCount = getInviteUsedCount(context, existing.id);
-    if (
-      parsed.data.maxUses !== undefined &&
-      parsed.data.maxUses !== null &&
-      parsed.data.maxUses < usedCount
-    ) {
-      response.status(409).json({ error: "invite_max_uses_unter_used_count" });
-      return;
-    }
-
-    context.db
-      .update(inviteCodes)
-      .set({ ...parsed.data, updatedAt: nowIso() })
-      .where(eq(inviteCodes.id, existing.id))
-      .run();
-
-    const updated = context.db.select().from(inviteCodes).where(eq(inviteCodes.id, existing.id)).get();
-    tryWriteAuditLog(context, {
-      actor: admin,
-      action: "invite.update",
-      entityType: "invite_code",
-      entityId: existing.id,
-      summary: `${admin.username} hat Invite ${existing.label} aktualisiert.`,
-      metadata: {
-        inviteCodeId: existing.id,
-        inviteLabel: updated?.label ?? existing.label,
-        inviteMaskedCode: maskInviteCode(existing.code),
-        changes: parsed.data
-      }
-    });
-
-    response.json({
-      inviteCode: updated ? serializeInviteCode(context, updated) : undefined
-    });
+    response.json({ inviteCode: result.invite });
   });
 
   router.post("/invite-codes/:id/deactivate", (request, response) => {
     const admin = requireAdmin(context, request);
-    const invite = context.db
-      .select()
-      .from(inviteCodes)
-      .where(eq(inviteCodes.id, request.params.id))
-      .get();
-
     if (!admin) {
       response.status(403).json({ error: "admin_erforderlich" });
       return;
     }
-
-    if (!invite) {
-      response.status(404).json({ error: "invite_code_nicht_gefunden" });
+    const result = deactivateInviteCodeService(context, admin, request.params.id);
+    if (!result.ok) {
+      response.status(result.status).json({ error: result.error });
       return;
     }
-
-    const timestamp = nowIso();
-    const revokedAt = invite.revokedAt ?? timestamp;
-    context.db
-      .update(inviteCodes)
-      .set({ revokedAt, updatedAt: timestamp })
-      .where(eq(inviteCodes.id, invite.id))
-      .run();
-
-    tryWriteAuditLog(context, {
-      actor: admin,
-      action: "invite.deactivate",
-      entityType: "invite_code",
-      entityId: invite.id,
-      summary: `${admin.username} hat Invite ${invite.label} deaktiviert.`,
-      metadata: {
-        inviteCodeId: invite.id,
-        inviteLabel: invite.label,
-        inviteMaskedCode: maskInviteCode(invite.code)
-      }
-    });
-
-    const updated = context.db.select().from(inviteCodes).where(eq(inviteCodes.id, invite.id)).get();
-    response.json({ inviteCode: updated ? serializeInviteCode(context, updated) : undefined });
+    response.json({ inviteCode: result.invite });
   });
 
   router.post("/invite-codes/:id/reactivate", (request, response) => {
     const admin = requireAdmin(context, request);
-    const invite = context.db
-      .select()
-      .from(inviteCodes)
-      .where(eq(inviteCodes.id, request.params.id))
-      .get();
-
     if (!admin) {
       response.status(403).json({ error: "admin_erforderlich" });
       return;
     }
-
-    if (!invite) {
-      response.status(404).json({ error: "invite_code_nicht_gefunden" });
+    const result = reactivateInviteCodeService(context, admin, request.params.id);
+    if (!result.ok) {
+      response.status(result.status).json({ error: result.error });
       return;
     }
-
-    const now = nowIso();
-    if (invite.expiresAt && invite.expiresAt < now) {
-      response.status(409).json({ error: "invite_abgelaufen" });
-      return;
-    }
-
-    const usedCount = getInviteUsedCount(context, invite.id);
-    if (invite.maxUses !== null && usedCount >= invite.maxUses) {
-      response.status(409).json({ error: "invite_ausgeschoepft" });
-      return;
-    }
-
-    context.db
-      .update(inviteCodes)
-      .set({ revokedAt: null, updatedAt: nowIso() })
-      .where(eq(inviteCodes.id, invite.id))
-      .run();
-
-    tryWriteAuditLog(context, {
-      actor: admin,
-      action: "invite.reactivate",
-      entityType: "invite_code",
-      entityId: invite.id,
-      summary: `${admin.username} hat Invite ${invite.label} reaktiviert.`,
-      metadata: {
-        inviteCodeId: invite.id,
-        inviteLabel: invite.label,
-        inviteMaskedCode: maskInviteCode(invite.code)
-      }
-    });
-
-    const updated = context.db.select().from(inviteCodes).where(eq(inviteCodes.id, invite.id)).get();
-    response.json({ inviteCode: updated ? serializeInviteCode(context, updated) : undefined });
+    response.json({ inviteCode: result.invite });
   });
 
   router.delete("/invite-codes/:id", (request, response) => {
     const admin = requireAdmin(context, request);
-    const invite = context.db
-      .select()
-      .from(inviteCodes)
-      .where(eq(inviteCodes.id, request.params.id))
-      .get();
-
     if (!admin) {
       response.status(403).json({ error: "admin_erforderlich" });
       return;
     }
-
-    if (!invite) {
-      response.status(404).json({ error: "invite_code_nicht_gefunden" });
+    const result = deleteUnusedInviteCodeService(context, admin, request.params.id);
+    if (!result.ok) {
+      response.status(result.status).json({ error: result.error });
       return;
     }
-
-    const usedCount = getInviteUsedCount(context, invite.id);
-    if (usedCount > 0) {
-      response.status(409).json({ error: "invite_hat_nutzungen" });
-      return;
-    }
-
-    context.db.delete(inviteCodes).where(eq(inviteCodes.id, invite.id)).run();
-
-    tryWriteAuditLog(context, {
-      actor: admin,
-      action: "invite.delete_unused",
-      entityType: "invite_code",
-      entityId: invite.id,
-      summary: `${admin.username} hat Invite ${invite.label} gelöscht.`,
-      metadata: {
-        inviteCodeId: invite.id,
-        inviteLabel: invite.label,
-        inviteMaskedCode: maskInviteCode(invite.code)
-      }
-    });
-
     response.status(204).send();
   });
 
