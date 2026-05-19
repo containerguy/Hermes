@@ -19,10 +19,13 @@ import { requestJson } from "../api/request";
 import { ApiError, getErrorMessage } from "../errors/errors";
 import { useI18n } from "../i18n/I18nContext";
 import { useBrandIconSrc } from "../lib/BrandingContext";
-import { PizzaMenuJsonAdmin } from "../pizza/PizzaMenuJsonAdmin";
 import { AdminPanelAudit } from "./AdminPanelAudit";
+import { AdminPanelBetrieb } from "./AdminPanelBetrieb";
 import { AdminPanelDesign } from "./AdminPanelDesign";
 import { AdminPanelInfos } from "./AdminPanelInfos";
+import { AdminPanelInvites } from "./AdminPanelInvites";
+import { AdminPanelSicherheit } from "./AdminPanelSicherheit";
+import { AdminPanelUsers } from "./AdminPanelUsers";
 
 function toDatetimeLocal(value: string) {
   const date = new Date(value);
@@ -39,12 +42,6 @@ function parseGameCatalogDraft(source: string): string[] {
     .split("\n")
     .map((line) => line.trim())
     .filter(Boolean);
-}
-
-function generateKioskStreamSecret(): string {
-  const bytes = new Uint8Array(16);
-  crypto.getRandomValues(bytes);
-  return Array.from(bytes, (b) => b.toString(16).padStart(2, "")).join("");
 }
 
 const defaultSettings: AppSettings = {
@@ -708,670 +705,51 @@ export function AdminPanel({
       {error ? <p className="error admin-panel-notice">{error}</p> : null}
 
       {adminSection === "users" ? (
-        <>
-          <header className="admin-section-head">
-            <p className="eyebrow">{t("main.admin.nav.users")}</p>
-            <h2>{t("admin.users.title")}</h2>
-            <p className="muted">{t("admin.users.intro")}</p>
-          </header>
-          <section className="invite-panel" aria-label={t("admin.exportUsers.title")}>
-            <p className="eyebrow">{t("admin.exportUsers.eyebrow")}</p>
-            <h2>{t("admin.exportUsers.title")}</h2>
-            <p className="muted">{t("admin.exportUsers.help")}</p>
-            <div className="action-row">
-              <button
-                type="button"
-                onClick={() =>
-                  void downloadJsonAttachment("/api/admin/users/export", "hermes-users.json")
-                }
-              >
-                {t("admin.exportUsers.export")}
-              </button>
-              <button
-                type="button"
-                className="secondary"
-                onClick={() => usersExportImportRef.current?.click()}
-                disabled={bulkImportBusy}
-              >
-                {t("admin.exportUsers.import")}
-              </button>
-              <input
-                ref={usersExportImportRef}
-                type="file"
-                accept="application/json,.json"
-                style={{ display: "none" }}
-                onChange={(event) => {
-                  const file = event.target.files?.[0];
-                  if (file) {
-                    void runUsersExportImport(file);
-                  }
-                }}
-              />
-            </div>
-          </section>
-          <form id="admin-users" onSubmit={createUser} className="admin-form admin-user-create-form">
-        <label>
-          {t("login.field.username")}
-          <input
-            value={newUser.username}
-            onChange={(event) => setNewUser({ ...newUser, username: event.target.value })}
-            required
-          />
-        </label>
-        <label>
-          {t("login.field.email")}
-          <input
-            type="email"
-            value={newUser.email}
-            onChange={(event) => setNewUser({ ...newUser, email: event.target.value })}
-            required
-          />
-        </label>
-        <label>
-          {t("main.hero.role")}
-          <select
-            value={newUser.role}
-            onChange={(event) => setNewUser({ ...newUser, role: event.target.value as User["role"] })}
-          >
-            <option value="user">{t("admin.role.user")}</option>
-            <option value="organizer">{t("admin.role.organizer")}</option>
-            <option value="manager">{t("admin.role.manager")}</option>
-            <option value="admin">{t("admin.role.admin")}</option>
-          </select>
-        </label>
-        <button type="submit">{t("admin.user.create")}</button>
-      </form>
-
-      <section className="invite-panel" aria-label={t("admin.bulk.title")}>
-        <p className="eyebrow">{t("admin.bulk.eyebrow")}</p>
-        <h2>{t("admin.bulk.title")}</h2>
-        <p className="muted">{t("admin.bulk.intro")}</p>
-        <form onSubmit={previewBulkImport} className="admin-form" aria-label={t("admin.bulk.formAria")}>
-          <label>
-            {t("admin.bulk.format")}
-            <select
-              aria-label={t("admin.bulk.formatAria")}
-              value={bulkImportDraft.format}
-              onChange={(event) => {
-                setBulkImportDraft({
-                  format: event.target.value as BulkImportFormat,
-                  source: bulkImportDraft.source
-                });
-                setBulkImportPreview(null);
-              }}
-            >
-              <option value="csv">CSV</option>
-              <option value="json">JSON</option>
-            </select>
-          </label>
-          <label>
-            {t("admin.bulk.data")}
-            <textarea
-              aria-label={t("admin.bulk.dataAria")}
-              value={bulkImportDraft.source}
-              onChange={(event) => {
-                setBulkImportDraft({ ...bulkImportDraft, source: event.target.value });
-                setBulkImportPreview(null);
-              }}
-              rows={8}
-              placeholder={
-                bulkImportDraft.format === "csv"
-                  ? "username,email,role\nanna,anna@example.test,user"
-                  : '[{"username":"anna","email":"anna@example.test","role":"user"}]'
-              }
-              required
-            />
-          </label>
-          <div className="action-row">
-            <button type="submit" disabled={bulkImportBusy || bulkImportDraft.source.trim().length === 0}>
-              {t("admin.bulk.preview")}
-            </button>
-            <button
-              type="button"
-              className="secondary"
-              onClick={() => void commitBulkImport()}
-              disabled={bulkImportBusy || !bulkImportCanCommit}
-            >
-              {t("admin.bulk.commit")}
-            </button>
-          </div>
-        </form>
-
-        {bulkImportPreview ? (
-          <div className="device-list" aria-label={t("admin.bulk.previewAria")}>
-            <article className="device-row">
-              <div>
-                <strong>{t("admin.bulk.summary")}</strong>
-                <span>{t("admin.bulk.summaryFormat", { fmt: bulkImportPreview.format.toUpperCase() })}</span>
-                <span>
-                  {t("admin.bulk.rowsTotal")} {bulkImportPreview.totalRows}
-                </span>
-                <span>
-                  {t("admin.bulk.candidates")} {bulkImportPreview.acceptedRows}
-                </span>
-                <span>{bulkImportSummary(bulkImportPreview)}</span>
-              </div>
-            </article>
-
-            <article className="device-row" aria-label={t("admin.bulk.blockingAria")}>
-              <div>
-                <strong>{t("admin.bulk.blocking")}</strong>
-                {bulkImportPreview.issues.length > 0 ? (
-                  <ul>
-                    {bulkImportPreview.issues.map((issue, index) => (
-                      <li key={`${issue.row}-${issue.field}-${index}`}>
-                        {t("admin.bulk.issueRow", { row: issue.row, message: issue.message })}
-                      </li>
-                    ))}
-                  </ul>
-                ) : (
-                  <span>{t("admin.bulk.noBlocking")}</span>
-                )}
-              </div>
-            </article>
-
-            <article className="device-row" aria-label={t("admin.bulk.candidatesAria")}>
-              <div>
-                <strong>{t("admin.bulk.importable")}</strong>
-                {bulkImportPreview.validCandidates.length > 0 ? (
-                  <ul>
-                    {bulkImportPreview.validCandidates.map((candidate) => (
-                      <li key={`${candidate.username}-${candidate.email}`}>
-                        {candidate.username} · {candidate.email} · {candidate.role}
-                      </li>
-                    ))}
-                  </ul>
-                ) : (
-                  <span>{t("admin.bulk.noneYet")}</span>
-                )}
-              </div>
-            </article>
-          </div>
-        ) : null}
-      </section>
-
-      <div className="admin-list" aria-label={t("admin.user.listAria")}>
-        {users.map((user) => (
-          <div className="admin-list-row" key={user.id}>
-            <div>
-              <strong>{user.username}</strong>
-              <span>{user.email}</span>
-            </div>
-            <select
-              value={user.role}
-              onChange={(event) => updateRole(user.id, event.target.value as User["role"])}
-            >
-              <option value="user">{t("admin.role.user")}</option>
-              <option value="organizer">{t("admin.role.organizer")}</option>
-              <option value="manager">{t("admin.role.manager")}</option>
-              <option value="admin">{t("admin.role.admin")}</option>
-            </select>
-            <button
-              type="button"
-              className="secondary danger"
-              onClick={() => deleteUser(user)}
-              disabled={user.id === currentUser?.id}
-            >
-              {t("admin.user.delete")}
-            </button>
-          </div>
-        ))}
-      </div>
-        </>
+        <AdminPanelUsers
+          users={users}
+          currentUser={currentUser}
+          newUser={newUser}
+          bulkImportDraft={bulkImportDraft}
+          bulkImportPreview={bulkImportPreview}
+          bulkImportBusy={bulkImportBusy}
+          bulkImportCanCommit={bulkImportCanCommit}
+          usersExportImportRef={usersExportImportRef}
+          bulkImportSummary={bulkImportSummary}
+          onNewUserChange={setNewUser}
+          onBulkImportDraftChange={setBulkImportDraft}
+          onClearBulkImportPreview={() => setBulkImportPreview(null)}
+          onCreateUser={createUser}
+          onUpdateRole={updateRole}
+          onDeleteUser={deleteUser}
+          onDownloadJsonAttachment={(p, n) => void downloadJsonAttachment(p, n)}
+          onRunUsersExportImport={(f) => void runUsersExportImport(f)}
+          onPreviewBulkImport={previewBulkImport}
+          onCommitBulkImport={() => void commitBulkImport()}
+        />
       ) : null}
 
       {adminSection === "betrieb" ? (
-        <>
-          <header className="admin-section-head">
-            <p className="eyebrow">{t("main.admin.nav.ops")}</p>
-            <h2>{t("admin.betrieb.title")}</h2>
-          </header>
-          <form id="admin-betrieb" onSubmit={saveSettings} className="admin-form">
-        <label>
-          {t("admin.label.appName")}
-          <input
-            value={settings.appName}
-            onChange={(event) => setSettings({ ...settings, appName: event.target.value })}
-            maxLength={80}
-            placeholder={t("brand.displayName")}
-          />
-        </label>
-        <p className="muted">{t("admin.help.appName")}</p>
-        <label>
-          {t("admin.label.brandMark")}
-          <select
-            value={settings.brandMark}
-            onChange={(event) =>
-              setSettings({
-                ...settings,
-                brandMark: event.target.value as AppSettings["brandMark"]
-              })
-            }
-          >
-            <option value="mitspiel">{t("admin.brandMark.mitspiel")}</option>
-            <option value="hermes">{t("admin.brandMark.hermes")}</option>
-          </select>
-        </label>
-        <p className="muted">{t("admin.help.brandMark")}</p>
-        <label>
-          {t("admin.label.archiveHours")}
-          <input
-            type="number"
-            min={1}
-            max={72}
-            value={settings.eventAutoArchiveHours}
-            onChange={(event) =>
-              setSettings({
-                ...settings,
-                eventAutoArchiveHours: Number(event.target.value)
-              })
-            }
-            required
-          />
-        </label>
-        <label className="checkbox-label">
-          <input
-            type="checkbox"
-            checked={settings.defaultNotificationsEnabled}
-            onChange={(event) =>
-              setSettings({
-                ...settings,
-                defaultNotificationsEnabled: event.target.checked
-              })
-            }
-          />
-          {t("admin.label.notifyDefault")}
-        </label>
-               <label className="checkbox-label">
-          <input
-            type="checkbox"
-            checked={settings.publicRegistrationEnabled}
-            onChange={(event) =>
-              setSettings({
-                ...settings,
-                publicRegistrationEnabled: event.target.checked
-              })
-            }
-          />
-          {t("admin.label.publicReg")}
-        </label>
-        <label className="checkbox-label">
-          <input
-            type="checkbox"
-            checked={settings.s3SnapshotEnabled}
-            onChange={(event) =>
-              setSettings({
-                ...settings,
-                s3SnapshotEnabled: event.target.checked
-              })
-            }
-          />
-          {t("admin.label.s3snap")}
-        </label>
-        <p className="muted">{t("admin.help.s3snap")}</p>
-        <label>
-          {t("admin.projectTemplate.label")}
-          <select
-            value={settings.projectTemplate}
-            onChange={(event) =>
-              setSettings({
-                ...settings,
-                projectTemplate: event.target.value as AppSettings["projectTemplate"]
-              })
-            }
-          >
-            <option value="lan_party">{t("admin.projectTemplate.lan_party")}</option>
-            <option value="table_tennis">{t("admin.projectTemplate.table_tennis")}</option>
-          </select>
-        </label>
-        <p className="muted">{t("admin.projectTemplate.help")}</p>
-        <label>
-          {t("admin.label.defaultLocale")}
-          <select
-            value={settings.defaultLocale}
-            onChange={(event) =>
-              setSettings({
-                ...settings,
-                defaultLocale: event.target.value as AppSettings["defaultLocale"]
-              })
-            }
-          >
-            <option value="de">{t("admin.locale.de")}</option>
-            <option value="en">{t("admin.locale.en")}</option>
-          </select>
-        </label>
-        <p className="muted">{t("admin.help.defaultLocale")}</p>
-        <p className="eyebrow admin-kiosk-eyebrow">{t("admin.kiosk.title")}</p>
-        <p className="muted">{t("admin.kiosk.help")}</p>
-        <label className="checkbox-label">
-          <input
-            type="checkbox"
-            checked={settings.kioskStreamEnabled}
-            onChange={(event) =>
-              setSettings({
-                ...settings,
-                kioskStreamEnabled: event.target.checked
-              })
-            }
-          />
-          {t("admin.kiosk.enabled")}
-        </label>
-        <label>
-          {t("admin.kiosk.path")}
-          <input
-            value={settings.kioskStreamPath}
-            onChange={(event) =>
-              setSettings({ ...settings, kioskStreamPath: event.target.value.trim() })
-            }
-            maxLength={63}
-            pattern="[a-zA-Z0-9][a-zA-Z0-9_-]*"
-            spellCheck={false}
-            autoComplete="off"
-            placeholder="stream"
-          />
-        </label>
-        <label>
-          {t("admin.kiosk.secret")}
-          <input
-            type="password"
-            value={settings.kioskStreamSecret}
-            onChange={(event) =>
-              setSettings({ ...settings, kioskStreamSecret: event.target.value })
-            }
-            maxLength={128}
-            spellCheck={false}
-            autoComplete="new-password"
-            placeholder={t("admin.kiosk.secretPlaceholder")}
-          />
-        </label>
-        <div className="action-row">
-          <button
-            type="button"
-            className="secondary"
-            onClick={() =>
-              setSettings({ ...settings, kioskStreamSecret: generateKioskStreamSecret() })
-            }
-          >
-            {t("admin.kiosk.generate")}
-          </button>
-          <button
-            type="button"
-            className="secondary"
-            onClick={async () => {
-              const path = settings.kioskStreamPath.trim().replace(/^\/+|\/+$/g, "") || "stream";
-              const origin = window.location.origin;
-              const url = `${origin}/${path}?id=${encodeURIComponent(settings.kioskStreamSecret)}`;
-              try {
-                await navigator.clipboard.writeText(url);
-                setMessage(t("admin.kiosk.copied"));
-                setError("");
-              } catch {
-                setError(t("admin.kiosk.copyFailed"));
-              }
-            }}
-          >
-            {t("admin.kiosk.copyUrl")}
-          </button>
-        </div>
-        <p className="muted">{t("admin.shell.help")}</p>
-        <label>
-          {t("admin.shell.heroTitle")}
-          <input
-            value={settings.shellStartTitle}
-            onChange={(event) =>
-              setSettings({ ...settings, shellStartTitle: event.target.value })
-            }
-            maxLength={240}
-            placeholder={t("main.route.events.title")}
-          />
-        </label>
-        <label>
-          {t("admin.shell.heroDesc")}
-          <textarea
-            value={settings.shellStartDescription}
-            onChange={(event) =>
-              setSettings({ ...settings, shellStartDescription: event.target.value })
-            }
-            maxLength={2000}
-            rows={4}
-            placeholder={t("main.route.events.description")}
-          />
-        </label>
-        <label>
-          {t("admin.shell.emptyTitle")}
-          <input
-            value={settings.shellEventsEmptyTitle}
-            onChange={(event) =>
-              setSettings({ ...settings, shellEventsEmptyTitle: event.target.value })
-            }
-            maxLength={240}
-            placeholder={t("events.empty.defaultTitle")}
-          />
-        </label>
-        <label>
-          {t("admin.shell.emptyBody")}
-          <textarea
-            value={settings.shellEventsEmptyBody}
-            onChange={(event) =>
-              setSettings({ ...settings, shellEventsEmptyBody: event.target.value })
-            }
-            maxLength={2000}
-            rows={3}
-            placeholder={t("events.empty.defaultBody")}
-          />
-        </label>
-        <label>
-          {t("admin.catalog.label")}
-          <textarea
-            value={gameCatalogDraft}
-            onChange={(event) => setGameCatalogDraft(event.target.value)}
-            rows={6}
-            placeholder={"Counter-Strike 2\nLeague of Legends"}
-          />
-        </label>
-        <p className="muted">{t("admin.catalog.help")}</p>
-        <section className="admin-ops" aria-label={t("admin.portability.title")}>
-          <p className="eyebrow">{t("admin.portability.eyebrow")}</p>
-          <h3>{t("admin.portability.title")}</h3>
-          <p className="muted">{t("admin.portability.help")}</p>
-          <div className="action-row">
-            <button
-              type="button"
-              onClick={() =>
-                void downloadJsonAttachment("/api/admin/settings/export", "hermes-settings.json")
-              }
-            >
-              {t("admin.settings.export")}
-            </button>
-            <button
-              type="button"
-              className="secondary"
-              onClick={() => settingsImportRef.current?.click()}
-            >
-              {t("admin.settings.import")}
-            </button>
-            <input
-              ref={settingsImportRef}
-              type="file"
-              accept="application/json,.json"
-              style={{ display: "none" }}
-              onChange={(event) => {
-                const file = event.target.files?.[0];
-                if (file) {
-                  void runSettingsImport(file);
-                }
-              }}
-            />
-          </div>
-        </section>
-        <fieldset className="admin-fieldset">
-          <legend>Pizzabestellung</legend>
-          <p className="muted">
-            Werte werden in der Kassenliste und auf der "Mein Anteil"-Seite genutzt. Leer = kein
-            Hinweis.
-          </p>
-          <label>
-            PayPal-Handle (paypal.me/&lt;handle&gt;)
-            <input
-              value={settings.pizzaPaypalHandle}
-              onChange={(event) =>
-                setSettings({ ...settings, pizzaPaypalHandle: event.target.value })
-              }
-              maxLength={80}
-              placeholder="renekeller"
-            />
-          </label>
-          <label>
-            PayPal-Empfänger Anzeigename
-            <input
-              value={settings.pizzaPaypalName}
-              onChange={(event) =>
-                setSettings({ ...settings, pizzaPaypalName: event.target.value })
-              }
-              maxLength={120}
-              placeholder="Rene Keller"
-            />
-          </label>
-          <label>
-            Bargeld-Empfänger Hinweis
-            <input
-              value={settings.pizzaCashRecipient}
-              onChange={(event) =>
-                setSettings({ ...settings, pizzaCashRecipient: event.target.value })
-              }
-              maxLength={120}
-              placeholder="Rene"
-            />
-          </label>
-        </fieldset>
-        <button type="submit">{t("admin.settings.save")}</button>
-      </form>
-
-      <section className="admin-ops" aria-label={t("admin.storage.title")}>
-        <p className="eyebrow">{t("admin.storage.eyebrow")}</p>
-        <h2>{t("admin.storage.title")}</h2>
-        <p className="muted">{t("admin.storage.intro1")}</p>
-        <p className="muted">{t("admin.storage.intro2")}</p>
-        {storage?.backend === "disabled" ? (
-          storage?.envS3Configured ? (
-            <p className="muted">{t("admin.storage.disabled.app")}</p>
-          ) : (
-            <p className="muted">{t("admin.storage.disabled.env")}</p>
-          )
-        ) : (
-          <div className="device-list" aria-label={t("admin.storage.backupStatus")}>
-            <article className="device-row">
-              <div>
-                <strong>{t("admin.storage.backupStatus")}</strong>
-                <span>
-                  {t("admin.storage.lastOk")}{" "}
-                  {storage?.backupStatus?.lastSuccessAt
-                    ? new Date(storage.backupStatus.lastSuccessAt).toLocaleString(dateTag)
-                    : "—"}
-                </span>
-                <span>
-                  {t("admin.storage.lastErr")}{" "}
-                  {storage?.backupStatus?.lastFailureAt
-                    ? new Date(storage.backupStatus.lastFailureAt).toLocaleString(dateTag)
-                    : "—"}
-                </span>
-                <span>
-                  {t("admin.storage.errCode")}{" "}
-                  {storage?.backupStatus?.failureCode ? storage.backupStatus.failureCode : "—"}
-                </span>
-                <span>
-                  {t("admin.storage.hint")}{" "}
-                  {storage?.backupStatus?.failureSummary ? storage.backupStatus.failureSummary : "—"}
-                </span>
-                <span>
-                  {t("admin.storage.target")}{" "}
-                  {storage?.location
-                    ? `s3://${storage.location.bucket}/${storage.location.key} (${storage.location.region})`
-                    : "—"}
-                </span>
-                <span>
-                  {t("admin.storage.endpoint")} {storage?.location?.endpoint ?? "—"}
-                </span>
-              </div>
-            </article>
-          </div>
-        )}
-        <div className="action-row">
-          <button type="button" onClick={runBackup} disabled={opsBusy}>
-            {t("admin.storage.backupRun")}
-          </button>
-          <button type="button" className="secondary" onClick={runRestore} disabled={opsBusy}>
-            {t("admin.storage.restoreRun")}
-          </button>
-        </div>
-        {restoreRecovery ? (
-          <p className="muted">
-            {t("admin.storage.recovery")} <strong>{restoreRecovery.id}</strong> ·{" "}
-            <code>{restoreRecovery.key}</code>
-          </p>
-        ) : null}
-        {restoreDiagnostics ? (
-          <div className="device-list" aria-label={t("admin.storage.diagTitle")}>
-            <article className="device-row">
-              <div>
-                <strong>{t("admin.storage.diagTitle")}</strong>
-                <span>
-                  {t("admin.storage.diagType")} {restoreDiagnostics.kind}
-                </span>
-                <span>
-                  {t("admin.storage.diagHint")} {restoreDiagnostics.summary}
-                </span>
-                {restoreDiagnostics.migrations ? (
-                  <span>
-                    {t("admin.storage.diagMigrations", {
-                      live: restoreDiagnostics.migrations.liveLatest ?? "—",
-                      snap: restoreDiagnostics.migrations.snapshotLatest ?? "—"
-                    })}
-                  </span>
-                ) : null}
-                {restoreDiagnostics.missingTables?.length ? (
-                  <span>
-                    {t("admin.storage.diagMissing", {
-                      tables: restoreDiagnostics.missingTables.slice(0, 10).join(", ")
-                    })}
-                  </span>
-                ) : null}
-                {restoreDiagnostics.columnMismatches?.length ? (
-                  <span>
-                    {t("admin.storage.diagColumns", {
-                      detail: restoreDiagnostics.columnMismatches
-                        .slice(0, 5)
-                        .map(
-                          (m) =>
-                            `${m.table} (missing: ${m.missingInSnapshot.slice(0, 6).join(", ")})`
-                        )
-                        .join(" · ")
-                    })}
-                  </span>
-                ) : null}
-                {restoreDiagnostics.foreignKeyFailures?.length ? (
-                  <span>
-                    {t("admin.storage.diagFk", {
-                      detail: restoreDiagnostics.foreignKeyFailures
-                        .slice(0, 5)
-                        .map((fk) => `${fk.table}#${fk.rowid} -> ${fk.parent}`)
-                        .join(" · ")
-                    })}
-                  </span>
-                ) : null}
-                {restoreDiagnostics.snapshot ? (
-                  <span>
-                    Snapshot: s3://{restoreDiagnostics.snapshot.bucket}/{restoreDiagnostics.snapshot.key}
-                  </span>
-                ) : null}
-              </div>
-            </article>
-          </div>
-        ) : null}
-      </section>
-      <PizzaMenuJsonAdmin />
-        </>
+        <AdminPanelBetrieb
+          settings={settings}
+          gameCatalogDraft={gameCatalogDraft}
+          storage={storage}
+          restoreDiagnostics={restoreDiagnostics}
+          restoreRecovery={restoreRecovery}
+          opsBusy={opsBusy}
+          dateTag={dateTag}
+          settingsImportRef={settingsImportRef}
+          onSettingsChange={setSettings}
+          onGameCatalogDraftChange={setGameCatalogDraft}
+          onSaveSettings={saveSettings}
+          onMessage={setMessage}
+          onError={setError}
+          onDownloadJsonAttachment={(p, n) => void downloadJsonAttachment(p, n)}
+          onRunSettingsImport={(f) => void runSettingsImport(f)}
+          onRunBackup={runBackup}
+          onRunRestore={runRestore}
+        />
       ) : null}
+
 
       {adminSection === "design" ? (
         <AdminPanelDesign settings={settings} onSettingsChange={setSettings} onSubmit={saveSettings} />
@@ -1382,286 +760,34 @@ export function AdminPanel({
       ) : null}
 
       {adminSection === "sicherheit" ? (
-        <section
-        id="admin-sicherheit"
-        className="rate-limit-panel"
-        aria-label={t("admin.rate.sectionAria")}
-      >
-        <div className="section-title-row">
-          <div>
-            <p className="eyebrow">{t("admin.rate.eyebrow")}</p>
-            <h2>{t("admin.rate.title")}</h2>
-          </div>
-          <button
-            type="button"
-            className="secondary"
-            onClick={() => loadAdminData()}
-            disabled={rateLimitBusy}
-          >
-            {t("loginProfile.devicesRefresh")}
-          </button>
-        </div>
-        <p className="muted">{t("admin.rate.intro")}</p>
-
-        <div className="device-list" aria-label={t("admin.rate.listAria")}>
-          {activeRateLimits.map((entry) => (
-            <article className="device-row" key={entry.id}>
-              <div>
-                <strong>{entry.scope}</strong>
-                <span>
-                  {t("admin.rate.key")} {entry.key.slice(0, 10)}…
-                </span>
-                <span>
-                  {t("admin.rate.attempts")} {entry.attemptCount}
-                </span>
-                <time dateTime={entry.blockedUntil ?? undefined}>
-                  {t("admin.rate.blockedUntil")}{" "}
-                  {entry.blockedUntil ? new Date(entry.blockedUntil).toLocaleString(dateTag) : "—"}
-                </time>
-              </div>
-              <div className="device-actions">
-                <button
-                  type="button"
-                  className="secondary danger"
-                  onClick={() => clearRateLimitEntry(entry)}
-                  disabled={rateLimitBusy}
-                >
-                  {t("admin.rate.clearLock")}
-                </button>
-              </div>
-            </article>
-          ))}
-          {activeRateLimits.length === 0 ? (
-            <article className="device-row">
-              <strong>{t("admin.rate.noneActive")}</strong>
-              <span>{t("admin.rate.noneHint")}</span>
-            </article>
-          ) : null}
-        </div>
-
-        <form
-          onSubmit={addAllowlistEntry}
-          className="admin-form inline-form"
-          aria-label={t("admin.rate.allowlistFormAria")}
-        >
-          <label>
-            {t("admin.rate.allowlistIp")}
-            <input
-              value={allowlistDraft.ipOrCidr}
-              onChange={(event) =>
-                setAllowlistDraft({ ...allowlistDraft, ipOrCidr: event.target.value })
-              }
-              required
-            />
-          </label>
-          <label>
-            {t("admin.rate.allowlistNote")}
-            <input
-              value={allowlistDraft.note}
-              onChange={(event) => setAllowlistDraft({ ...allowlistDraft, note: event.target.value })}
-              required
-            />
-          </label>
-          <button type="submit" disabled={rateLimitBusy}>
-            {t("admin.rate.allowlistSave")}
-          </button>
-        </form>
-
-        <div className="device-list" aria-label={t("admin.rate.allowlistAria")}>
-          {rateLimitAllowlist.map((entry) => (
-            <article className="device-row" key={entry.id}>
-              <div>
-                <strong>{entry.ipOrCidr}</strong>
-                <span>{entry.note ?? t("admin.rate.allowlistNoLabel")}</span>
-                <time dateTime={entry.updatedAt}>
-                  {t("admin.rate.allowlistUpdated")}{" "}
-                  {new Date(entry.updatedAt).toLocaleString(dateTag)}
-                </time>
-              </div>
-              <div className="device-actions">
-                <button
-                  type="button"
-                  className="secondary danger"
-                  onClick={() => deleteAllowlistEntry(entry)}
-                  disabled={rateLimitBusy}
-                >
-                  {t("admin.rate.allowlistRemove")}
-                </button>
-              </div>
-            </article>
-          ))}
-          {rateLimitAllowlist.length === 0 ? (
-            <article className="device-row">
-              <strong>{t("admin.allowlist.empty")}</strong>
-              <span>{t("admin.allowlist.emptyHint")}</span>
-            </article>
-          ) : null}
-        </div>
-      </section>
+        <AdminPanelSicherheit
+          activeRateLimits={activeRateLimits}
+          rateLimitAllowlist={rateLimitAllowlist}
+          allowlistDraft={allowlistDraft}
+          rateLimitBusy={rateLimitBusy}
+          dateTag={dateTag}
+          onAllowlistDraftChange={setAllowlistDraft}
+          onAddAllowlistEntry={addAllowlistEntry}
+          onDeleteAllowlistEntry={deleteAllowlistEntry}
+          onClearRateLimitEntry={clearRateLimitEntry}
+          onRefresh={() => loadAdminData()}
+        />
       ) : null}
 
       {adminSection === "invites" ? (
-        <section id="admin-invites" className="invite-panel" aria-label={t("admin.invites.sectionAria")}>
-        <p className="eyebrow">{t("main.admin.nav.invites")}</p>
-        <h2>{t("admin.invites.title")}</h2>
-        <p className="muted">{t("admin.invites.help")}</p>
-        <form onSubmit={createInviteCode} className="admin-form inline-form">
-          <label>
-            {t("admin.invites.fieldName")}
-            <input
-              value={newInvite.label}
-              onChange={(event) => setNewInvite({ ...newInvite, label: event.target.value })}
-              placeholder={t("admin.invites.placeholderName")}
-              required
-            />
-          </label>
-          <label>
-            {t("admin.invites.fieldMaxUses")}
-            <input
-              type="number"
-              min={1}
-              max={500}
-              value={newInvite.maxUses}
-              onChange={(event) => setNewInvite({ ...newInvite, maxUses: event.target.value })}
-              placeholder={t("admin.invites.placeholderMax")}
-            />
-          </label>
-          <label>
-            {t("admin.invites.fieldExpires")}
-            <input
-              type="datetime-local"
-              value={newInvite.expiresAt}
-              onChange={(event) => setNewInvite({ ...newInvite, expiresAt: event.target.value })}
-              placeholder={t("admin.invites.placeholderExpires")}
-            />
-          </label>
-          <button type="submit">{t("admin.invites.create")}</button>
-        </form>
-        <div className="invite-list">
-          {inviteCodes.map((invite) => (
-            <article className="invite-row" key={invite.id}>
-              <div>
-                <strong>{invite.label}</strong>
-                <code>{invite.code}</code>
-                <span>
-                  {t("admin.invites.used", {
-                    used: invite.usedCount,
-                    max: invite.maxUses ?? "∞"
-                  })}
-                  {invite.expiresAt
-                    ? t("admin.invites.validUntil", {
-                        at: new Date(invite.expiresAt).toLocaleString(dateTag)
-                      })
-                    : ""}
-                  {invite.revokedAt ? t("admin.invites.revoked") : ""}
-                </span>
-                <div className="form-grid">
-                  <label>
-                    {t("admin.invites.rowLabel")}
-                    <input
-                      value={inviteDrafts[invite.id]?.label ?? invite.label}
-                      onChange={(event) =>
-                        setInviteDrafts({
-                          ...inviteDrafts,
-                          [invite.id]: {
-                            label: event.target.value,
-                            maxUses:
-                              inviteDrafts[invite.id]?.maxUses ??
-                              (invite.maxUses === null ? "" : String(invite.maxUses)),
-                            expiresAt:
-                              inviteDrafts[invite.id]?.expiresAt ??
-                              (invite.expiresAt ? toDatetimeLocal(invite.expiresAt) : "")
-                          }
-                        })
-                      }
-                    />
-                  </label>
-                  <label>
-                    {t("admin.invites.rowMaxEmpty")}
-                    <input
-                      type="number"
-                      min={1}
-                      max={500}
-                      value={
-                        inviteDrafts[invite.id]?.maxUses ??
-                        (invite.maxUses === null ? "" : String(invite.maxUses))
-                      }
-                      onChange={(event) =>
-                        setInviteDrafts({
-                          ...inviteDrafts,
-                          [invite.id]: {
-                            label: inviteDrafts[invite.id]?.label ?? invite.label,
-                            maxUses: event.target.value,
-                            expiresAt:
-                              inviteDrafts[invite.id]?.expiresAt ??
-                              (invite.expiresAt ? toDatetimeLocal(invite.expiresAt) : "")
-                          }
-                        })
-                      }
-                    />
-                  </label>
-                  <label>
-                    {t("admin.invites.rowExpiresEmpty")}
-                    <input
-                      type="datetime-local"
-                      value={
-                        inviteDrafts[invite.id]?.expiresAt ??
-                        (invite.expiresAt ? toDatetimeLocal(invite.expiresAt) : "")
-                      }
-                      onChange={(event) =>
-                        setInviteDrafts({
-                          ...inviteDrafts,
-                          [invite.id]: {
-                            label: inviteDrafts[invite.id]?.label ?? invite.label,
-                            maxUses:
-                              inviteDrafts[invite.id]?.maxUses ??
-                              (invite.maxUses === null ? "" : String(invite.maxUses)),
-                            expiresAt: event.target.value
-                          }
-                        })
-                      }
-                    />
-                  </label>
-                </div>
-              </div>
-              <div className="device-actions">
-                <button type="button" className="secondary" onClick={() => updateInviteCode(invite)}>
-                  {t("admin.invites.save")}
-                </button>
-                <button
-                  type="button"
-                  className="secondary"
-                  onClick={() => deactivateInviteCode(invite)}
-                  disabled={Boolean(invite.revokedAt)}
-                >
-                  {t("admin.invites.deactivate")}
-                </button>
-                <button
-                  type="button"
-                  className="secondary"
-                  onClick={() => reactivateInviteCode(invite)}
-                  disabled={!invite.revokedAt}
-                >
-                  {t("admin.invites.reactivate")}
-                </button>
-                <button
-                  type="button"
-                  className="secondary danger"
-                  onClick={() => deleteUnusedInviteCode(invite)}
-                >
-                  {t("admin.user.delete")}
-                </button>
-              </div>
-            </article>
-          ))}
-          {inviteCodes.length === 0 ? (
-            <article className="invite-row">
-              <strong>{t("admin.invites.empty")}</strong>
-              <span>{t("admin.invites.emptyHint")}</span>
-            </article>
-          ) : null}
-        </div>
-      </section>
+        <AdminPanelInvites
+          inviteCodes={inviteCodes}
+          newInvite={newInvite}
+          inviteDrafts={inviteDrafts}
+          dateTag={dateTag}
+          onNewInviteChange={setNewInvite}
+          onInviteDraftsChange={setInviteDrafts}
+          onCreate={createInviteCode}
+          onUpdate={updateInviteCode}
+          onDeactivate={deactivateInviteCode}
+          onReactivate={reactivateInviteCode}
+          onDeleteUnused={deleteUnusedInviteCode}
+        />
       ) : null}
 
       {adminSection === "audit" ? (
