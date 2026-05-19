@@ -19,7 +19,7 @@ info:
     als Fallback verwendet (explizit nur Cookie *oder* gültiger Bearer).
 
     Öffentlich ohne Login: `GET /api/health`, `GET /api/settings/public`, `GET /api/openapi.yaml`, `GET /api/docs`, Kiosk-Pfad (falls aktiviert).
-  version: 0.9.0
+  version: 0.10.0
 
 servers:
   - url: /
@@ -83,7 +83,7 @@ paths:
                     properties:
                       version:
                         type: string
-                        example: "0.9.0"
+                        example: "0.10.0"
                       repoUrl:
                         type: string
                         format: uri
