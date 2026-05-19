@@ -20,6 +20,9 @@ import { ApiError, getErrorMessage } from "../errors/errors";
 import { useI18n } from "../i18n/I18nContext";
 import { useBrandIconSrc } from "../lib/BrandingContext";
 import { PizzaMenuJsonAdmin } from "../pizza/PizzaMenuJsonAdmin";
+import { AdminPanelAudit } from "./AdminPanelAudit";
+import { AdminPanelDesign } from "./AdminPanelDesign";
+import { AdminPanelInfos } from "./AdminPanelInfos";
 
 function toDatetimeLocal(value: string) {
   const date = new Date(value);
@@ -1371,106 +1374,11 @@ export function AdminPanel({
       ) : null}
 
       {adminSection === "design" ? (
-        <>
-          <header className="admin-section-head">
-            <p className="eyebrow">{t("main.admin.nav.design")}</p>
-            <h2>{t("admin.design.title")}</h2>
-          </header>
-          <form id="admin-design" onSubmit={saveSettings} className="admin-form">
-            <p className="muted">{t("admin.design.help")}</p>
-            <p className="muted">{t("admin.design.help2")}</p>
-            <div className="color-grid" aria-label={t("admin.design.colorsAria")}>
-              <label>
-                {t("admin.design.primary")}
-                <input
-                  type="color"
-                  value={settings.themePrimaryColor}
-                  onChange={(event) =>
-                    setSettings({ ...settings, themePrimaryColor: event.target.value })
-                  }
-                />
-              </label>
-              <label>
-                {t("admin.design.login")}
-                <input
-                  type="color"
-                  value={settings.themeLoginColor}
-                  onChange={(event) =>
-                    setSettings({ ...settings, themeLoginColor: event.target.value })
-                  }
-                />
-              </label>
-              <label>
-                {t("admin.design.manager")}
-                <input
-                  type="color"
-                  value={settings.themeManagerColor}
-                  onChange={(event) =>
-                    setSettings({ ...settings, themeManagerColor: event.target.value })
-                  }
-                />
-              </label>
-              <label>
-                {t("admin.design.admin")}
-                <input
-                  type="color"
-                  value={settings.themeAdminColor}
-                  onChange={(event) =>
-                    setSettings({ ...settings, themeAdminColor: event.target.value })
-                  }
-                />
-              </label>
-              <label>
-                {t("admin.design.surface")}
-                <input
-                  type="color"
-                  value={settings.themeSurfaceColor}
-                  onChange={(event) =>
-                    setSettings({ ...settings, themeSurfaceColor: event.target.value })
-                  }
-                />
-              </label>
-            </div>
-            <button type="submit">{t("admin.settings.save")}</button>
-          </form>
-        </>
+        <AdminPanelDesign settings={settings} onSettingsChange={setSettings} onSubmit={saveSettings} />
       ) : null}
 
       {adminSection === "infos" ? (
-        <>
-          <header className="admin-section-head">
-            <p className="eyebrow">{t("main.admin.nav.infos")}</p>
-            <h2>{t("admin.infos.title")}</h2>
-            <p className="muted">{t("admin.infos.help")}</p>
-          </header>
-          <form id="admin-infos" onSubmit={saveSettings} className="admin-form">
-            <label className="checkbox-label">
-              <input
-                type="checkbox"
-                checked={settings.infosEnabled}
-                onChange={(event) =>
-                  setSettings({ ...settings, infosEnabled: event.target.checked })
-                }
-              />
-              {t("admin.infos.menuCheck")}
-            </label>
-            <label>
-              {t("admin.infos.markdownLabel")}
-              <textarea
-                value={settings.infosMarkdown}
-                onChange={(event) =>
-                  setSettings({ ...settings, infosMarkdown: event.target.value })
-                }
-                rows={18}
-                maxLength={100_000}
-                spellCheck="true"
-                aria-label={t("admin.infos.markdownAria")}
-                placeholder={t("admin.infos.markdownPlaceholder")}
-              />
-            </label>
-            <button type="submit">{t("admin.settings.save")}</button>
-          </form>
-        </>
+        <AdminPanelInfos settings={settings} onSettingsChange={setSettings} onSubmit={saveSettings} />
       ) : null}
 
       {adminSection === "sicherheit" ? (
@@ -1757,39 +1665,7 @@ export function AdminPanel({
       ) : null}
 
       {adminSection === "audit" ? (
-        <section id="admin-audit" className="audit-panel" aria-label={t("admin.audit.sectionAria")}>
-        <div className="section-title-row">
-          <div>
-            <p className="eyebrow">{t("main.admin.nav.audit")}</p>
-            <h2>{t("admin.audit.title")}</h2>
-            <p className="muted">{t("admin.audit.intro")}</p>
-          </div>
-          <button type="button" className="secondary" onClick={() => loadAdminData()}>
-            {t("loginProfile.devicesRefresh")}
-          </button>
-        </div>
-        <div className="audit-list">
-          {auditLogs.map((entry) => (
-            <article className="audit-row" key={entry.id}>
-              <time dateTime={entry.createdAt}>
-                {new Date(entry.createdAt).toLocaleString(dateTag)}
-              </time>
-              <strong>{entry.summary}</strong>
-              <span>
-                {[entry.action, entry.actorUsername ?? t("admin.audit.actorSystem")]
-                  .filter(Boolean)
-                  .join(" | ")}
-              </span>
-            </article>
-          ))}
-          {auditLogs.length === 0 ? (
-            <article className="audit-row">
-              <strong>{t("admin.audit.empty")}</strong>
-              <span>{t("admin.audit.emptyHint")}</span>
-            </article>
-          ) : null}
-        </div>
-      </section>
+        <AdminPanelAudit auditLogs={auditLogs} dateTag={dateTag} onRefresh={() => loadAdminData()} />
       ) : null}
     </section>
   );
