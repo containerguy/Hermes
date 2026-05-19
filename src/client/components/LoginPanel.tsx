@@ -13,42 +13,16 @@ import {
 } from "../lib/runtime-context";
 import { browserLanguageToLocale } from "../../shared/locale";
 import { QrCanvas } from "./QrCanvas";
+import { ApiTokensSection } from "./ApiTokensSection";
+import { DevicePairingSection } from "./DevicePairingSection";
+import { PushNotificationsSection } from "./PushNotificationsSection";
+import { SessionsSection } from "./SessionsSection";
+import { getPushSupport, urlBase64ToUint8Array } from "../lib/push-support";
 
 type BeforeInstallPromptChrome = Event & {
   prompt: () => Promise<void>;
   userChoice: Promise<{ outcome: string }>;
 };
-
-function urlBase64ToUint8Array(base64String: string) {
-  const padding = "=".repeat((4 - (base64String.length % 4)) % 4);
-  const base64 = (base64String + padding).replace(/-/g, "+").replace(/_/g, "/");
-  const rawData = window.atob(base64);
-  const outputArray = new Uint8Array(rawData.length);
-
-  for (let index = 0; index < rawData.length; index += 1) {
-    outputArray[index] = rawData.charCodeAt(index);
-  }
-
-  return outputArray;
-}
-
-function getPushSupport() {
-  const isSecure = window.isSecureContext;
-  const hasServiceWorker = "serviceWorker" in navigator;
-  const hasPushManager = "PushManager" in window;
-  const hasNotification = "Notification" in window;
-  const permission = hasNotification ? Notification.permission : "unsupported";
-  const hasApis = hasServiceWorker && hasPushManager && hasNotification;
-  return {
-    isSecure,
-    hasServiceWorker,
-    hasPushManager,
-    hasNotification,
-    permission,
-    hasApis,
-    canAttemptSubscribe: isSecure && hasApis
-  };
-}
 
 export function LoginPanel({
   currentUser,
@@ -643,291 +617,45 @@ export function LoginPanel({
           </form>
         </section>
 
-        <section className="device-panel" aria-label={t("loginProfile.apiTokensEyebrow")}>
-          <div className="section-title-row">
-            <div>
-              <p className="eyebrow">{t("loginProfile.apiTokensEyebrow")}</p>
-              <h3>{t("loginProfile.apiTokensTitle")}</h3>
-              <p className="muted">{t("loginProfile.apiTokensHelp")}</p>
-            </div>
-          </div>
-
-          <form onSubmit={createApiToken} className="admin-form">
-            <label>
-              {t("loginProfile.apiTokenLabel")}
-              <input
-                value={apiTokenLabel}
-                onChange={(event) => setApiTokenLabel(event.target.value)}
-                autoComplete="off"
-              />
-            </label>
-            <label>
-              {t("loginProfile.apiTokenScope")}
-              <select
-                value={apiTokenScope}
-                onChange={(event) =>
-                  setApiTokenScope(event.target.value as "full" | "read_only")
-                }
-              >
-                <option value="full">{t("loginProfile.apiTokenScopeFull")}</option>
-                <option value="read_only">{t("loginProfile.apiTokenScopeReadOnly")}</option>
-              </select>
-            </label>
-            <button type="submit" disabled={busy}>
-              {t("loginProfile.apiTokenCreate")}
-            </button>
-          </form>
-
-          {newApiTokenPlaintext ? (
-            <div className="access-panel compact" role="status">
-              <p className="eyebrow">{t("loginProfile.apiTokenReveal")}</p>
-              <pre className="api-token-reveal">{newApiTokenPlaintext}</pre>
-              <p className="muted">{t("loginProfile.apiTokenCopyHint")}</p>
-            </div>
-          ) : null}
-
-          {(apiTokens ?? []).length === 0 ? (
-            <p className="muted">{t("loginProfile.apiTokenListEmpty")}</p>
-          ) : (
-            <ul className="account-list api-token-list">
-              {(apiTokens ?? []).map((token) => (
-                <li key={token.id}>
-                  <div>
-                    <strong>{token.label || token.id.slice(0, 8)}</strong>
-                    <span className="muted">
-                      {" "}
-                      · {token.scope === "full" ? t("loginProfile.apiTokenScopeFull") : t("loginProfile.apiTokenScopeReadOnly")}
-                    </span>
-                    <div className="muted small-meta">
-                      {t("loginProfile.apiTokenCreated")}:{" "}
-                      {new Date(token.createdAt).toLocaleString(dateLocale)}
-                      {token.lastUsedAt
-                        ? ` · ${t("loginProfile.apiTokenLastUsed")}: ${new Date(token.lastUsedAt).toLocaleString(dateLocale)}`
-                        : null}
-                    </div>
-                  </div>
-                  <button
-                    type="button"
-                    className="secondary danger"
-                    disabled={busy}
-                    onClick={() => void revokeApiToken(token.id)}
-                  >
-                    {t("loginProfile.apiTokenRevoke")}
-                  </button>
-                </li>
-              ))}
-            </ul>
-          )}
-        </section>
+        <ApiTokensSection
+          apiTokens={apiTokens}
+          apiTokenLabel={apiTokenLabel}
+          apiTokenScope={apiTokenScope}
+          newApiTokenPlaintext={newApiTokenPlaintext}
+          busy={busy}
+          onLabelChange={setApiTokenLabel}
+          onScopeChange={setApiTokenScope}
+          onCreate={createApiToken}
+          onRevoke={(id) => void revokeApiToken(id)}
+        />
 
         {message ? <p className="notice">{message}</p> : null}
         {error ? <p className="error">{error}</p> : null}
-        <section className="device-panel" aria-label={t("loginProfile.notificationsEyebrow")}>
-          <div className="section-title-row">
-            <div>
-              <p className="eyebrow">{t("loginProfile.notificationsEyebrow")}</p>
-              <h2>{t("loginProfile.notificationsTitle")}</h2>
-            </div>
-          </div>
-          <div
-            className={`runtime-callout runtime-callout--${secureInfo.isSecureContext ? "ok" : "warn"}`}
-            role="status"
-          >
-            <p className="runtime-callout__title">{secureInfo.headline}</p>
-            <p className="muted runtime-callout__body">{secureInfo.body}</p>
-          </div>
-          <div className="install-hint-card" aria-label={t("loginProfile.installEyebrow")}>
-            <p className="install-hint-card__eyebrow">{t("loginProfile.installEyebrow")}</p>
-            <p className="install-hint-card__title">{t("loginProfile.installTitle")}</p>
-            {isPwaDisplayMode() ? (
-              <p className="muted install-hint-card__body">{t("loginProfile.installPwaBody")}</p>
-            ) : deferredInstall ? (
-              <>
-                <p className="muted install-hint-card__body">{t("loginProfile.installDeferredBody")}</p>
-                <button
-                  type="button"
-                  className="secondary install-app-button"
-                  onClick={() => void runInstallPrompt()}
-                  disabled={busy}
-                >
-                  {t("loginProfile.installButton")}
-                </button>
-              </>
-            ) : isLikelyIosSafari() ? (
-              <ol className="install-steps">
-                <li>{t("loginProfile.iosStep1")}</li>
-                <li>{t("loginProfile.iosStep2")}</li>
-              </ol>
-            ) : (
-              <ol className="install-steps">
-                <li>{t("loginProfile.chromeStep1")}</li>
-                <li>{t("loginProfile.chromeStep2")}</li>
-              </ol>
-            )}
-          </div>
-          <p className="muted">{t("loginProfile.pushExplain1")}</p>
-          <p className="muted">{t("loginProfile.pushExplain2")}</p>
-          <dl className="account-list">
-            <div>
-              <dt>{t("loginProfile.dt.secureContext")}</dt>
-              <dd>
-                {secureInfo.isSecureContext ? t("loginProfile.secure.ok") : t("loginProfile.secure.missing")}
-              </dd>
-            </div>
-            <div>
-              <dt>{t("loginProfile.dt.browserApis")}</dt>
-              <dd>
-                {pushSupport.hasApis ? "ok" : t("loginProfile.push.missingApis")}
-              </dd>
-            </div>
-            <div>
-              <dt>{t("loginProfile.dt.permission")}</dt>
-              <dd>
-                {pushSupport.permission === "unsupported"
-                  ? t("loginProfile.perm.unavailable")
-                  : pushSupport.permission === "default"
-                    ? t("loginProfile.perm.default")
-                    : pushSupport.permission}
-              </dd>
-            </div>
-          </dl>
-        </section>
-        <div className="action-row">
-          <button type="button" onClick={enableNotifications} disabled={busy}>
-            {t("loginProfile.notifyOn")}
-          </button>
-          <button type="button" className="secondary" onClick={disableNotifications} disabled={busy}>
-            {t("loginProfile.notifyOff")}
-          </button>
-        </div>
-        <section className="device-panel" aria-label={t("loginProfile.devicesEyebrow")}>
-          <div className="section-title-row">
-            <div>
-              <p className="eyebrow">{t("loginProfile.devicesEyebrow")}</p>
-              <h2>{t("loginProfile.devicesTitle")}</h2>
-              <p className="muted">{t("loginProfile.devicesHelp")}</p>
-            </div>
-            <button type="button" className="secondary" onClick={() => loadSessions()} disabled={busy}>
-              {t("loginProfile.devicesRefresh")}
-            </button>
-          </div>
-          <div className="device-list">
-            {sessions.map((session) => (
-              <article className="device-row" key={session.id}>
-                <div>
-                  <strong>
-                    {session.current ? t("loginProfile.device.current") : t("loginProfile.device.generic")}
-                  </strong>
-                  <label>
-                    {t("loginProfile.device.nameField")}
-                    <input
-                      value={sessionNames[session.id] ?? session.deviceName ?? ""}
-                      onChange={(event) =>
-                        setSessionNames({ ...sessionNames, [session.id]: event.target.value })
-                      }
-                      disabled={busy}
-                      required
-                    />
-                  </label>
-                  <span>{session.userAgent || t("loginProfile.device.noUa")}</span>
-                  <time dateTime={session.lastSeenAt}>
-                    {t("loginProfile.device.lastActive")}{" "}
-                    {new Date(session.lastSeenAt).toLocaleString(dateLocale)}
-                  </time>
-                </div>
-                <div className="device-actions">
-                  <button
-                    type="button"
-                    className="secondary"
-                    onClick={() => renameSession(session.id)}
-                    disabled={busy}
-                  >
-                    {t("loginProfile.device.saveName")}
-                  </button>
-                  <button
-                    type="button"
-                    className="secondary"
-                    onClick={() => revokeSession(session.id)}
-                    disabled={busy}
-                  >
-                    {t("loginProfile.device.signOut")}
-                  </button>
-                  {session.current ? (
-                    <button
-                      type="button"
-                      className="secondary"
-                      onClick={forgetDevice}
-                      disabled={busy}
-                    >
-                      {t("loginProfile.device.forget")}
-                    </button>
-                  ) : null}
-                </div>
-              </article>
-            ))}
-            {sessions.length === 0 ? (
-              <article className="device-row">
-                <strong>{t("loginProfile.devicesEmptyTitle")}</strong>
-                <span>{t("loginProfile.devicesEmptyHint")}</span>
-              </article>
-            ) : null}
-          </div>
-        </section>
-        <section className="device-panel" aria-label={t("loginProfile.pair.sectionAria")}>
-          <div className="section-title-row">
-            <div>
-              <p className="eyebrow">{t("loginProfile.pairEyebrow")}</p>
-              <h2>{t("loginProfile.pair.titleConnect")}</h2>
-              <p className="muted">{t("loginProfile.pair.helpConnect")}</p>
-            </div>
-            {pairingToken ? (
-              <button
-                type="button"
-                className="secondary"
-                onClick={clearPairingToken}
-                disabled={busy}
-              >
-                {t("loginProfile.pair.close")}
-              </button>
-            ) : null}
-          </div>
-          {pairingToken ? (
-            (() => {
-              const pairUrl = `${window.location.origin}${window.location.pathname}#login?pair=${pairingToken}`;
-              return (
-                <div className="pair-token-panel">
-                  <QrCanvas payload={pairUrl} pixelSize={256} label={t("loginProfile.pair.qrLabel")} />
-                  <a
-                    href={pairUrl}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="pair-link"
-                  >
-                    {pairUrl}
-                  </a>
-                  {pairingExpiresAt ? (
-                    <time dateTime={pairingExpiresAt} className="pair-expires">
-                      {t("loginProfile.pair.validUntil")}{" "}
-                      {new Date(pairingExpiresAt).toLocaleString(dateLocale)}
-                    </time>
-                  ) : null}
-                  <div className="action-row">
-                    <button type="button" onClick={mintPairingToken} disabled={busy}>
-                      {t("loginProfile.pairNewCode")}
-                    </button>
-                  </div>
-                </div>
-              );
-            })()
-          ) : (
-            <div className="action-row">
-              <button type="button" onClick={mintPairingToken} disabled={busy}>
-                {t("loginProfile.pairGenerate")}
-              </button>
-            </div>
-          )}
-          {redeemStatus === "done" ? <p className="notice">{t("login.msg.pairDone")}</p> : null}
-        </section>
+        <PushNotificationsSection
+          deferredInstall={deferredInstall}
+          busy={busy}
+          onRunInstallPrompt={() => void runInstallPrompt()}
+          onEnable={() => void enableNotifications()}
+          onDisable={() => void disableNotifications()}
+        />
+        <SessionsSection
+          sessions={sessions}
+          sessionNames={sessionNames}
+          busy={busy}
+          onSessionNamesChange={setSessionNames}
+          onRefresh={() => void loadSessions()}
+          onRename={(id) => void renameSession(id)}
+          onRevoke={(id) => void revokeSession(id)}
+          onForgetDevice={() => void forgetDevice()}
+        />
+        <DevicePairingSection
+          pairingToken={pairingToken}
+          pairingExpiresAt={pairingExpiresAt}
+          redeemStatus={redeemStatus}
+          busy={busy}
+          onMint={() => void mintPairingToken()}
+          onClear={clearPairingToken}
+        />
         <section className="device-panel account-summary-panel" aria-label={t("loginProfile.accountEyebrow")}>
           <p className="eyebrow">{t("loginProfile.accountEyebrow")}</p>
           <h3>
