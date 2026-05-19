@@ -39,6 +39,12 @@ import {
   listActiveApiTokens,
   revokeApiToken
 } from "../domain/auth/api-tokens";
+import {
+  listUserSessions,
+  renameSessionSchema,
+  renameUserSession,
+  revokeUserSession
+} from "../domain/auth/sessions";
 
 const requestCodeSchema = z.object({
   username: z.string().trim().min(1).max(80)
@@ -903,132 +909,47 @@ export function createAuthRouter(context: DatabaseContext) {
 
   router.get("/sessions", (request, response) => {
     const current = getCurrentSession(context, request);
-
     if (!current) {
       response.status(401).json({ error: "nicht_angemeldet" });
       return;
     }
-
-    const userSessions = context.db
-      .select()
-      .from(sessions)
-      .where(and(eq(sessions.userId, current.user.id), isNull(sessions.revokedAt)))
-      .orderBy(desc(sessions.lastSeenAt))
-      .all();
-
-    response.json({
-      sessions: userSessions.map((session) => ({
-        id: session.id,
-        deviceName: session.deviceName,
-        userAgent: session.userAgent,
-        lastSeenAt: session.lastSeenAt,
-        createdAt: session.createdAt,
-        current: session.id === current.session.id
-      }))
-    });
+    response.json({ sessions: listUserSessions(context, current) });
   });
 
   router.patch("/sessions/:id", (request, response) => {
     const current = getCurrentSession(context, request);
-
     if (!current) {
       response.status(401).json({ error: "nicht_angemeldet" });
       return;
     }
-
-    const parsed = z.object({ deviceName: z.string() }).safeParse(request.body);
+    const parsed = renameSessionSchema.safeParse(request.body);
     if (!parsed.success) {
       response.status(400).json({ error: "ungueltiger_geraetename" });
       return;
     }
-
-    const validated = validateDeviceName(parsed.data.deviceName);
-    if (!validated.ok) {
-      response.status(400).json({ error: validated.error });
+    const result = renameUserSession(context, current, request.params.id, parsed.data.deviceName);
+    if (!result.ok) {
+      response.status(result.status).json({ error: result.error });
       return;
     }
-
-    const target = context.db
-      .select()
-      .from(sessions)
-      .where(and(eq(sessions.id, request.params.id), eq(sessions.userId, current.user.id), isNull(sessions.revokedAt)))
-      .get();
-
-    if (!target) {
-      response.status(404).json({ error: "session_nicht_gefunden" });
-      return;
-    }
-
-    context.db
-      .update(sessions)
-      .set({ deviceName: validated.name })
-      .where(eq(sessions.id, target.id))
-      .run();
-
-    const updated = context.db.select().from(sessions).where(eq(sessions.id, target.id)).get();
-
-    tryWriteAuditLog(context, {
-      actor: current.user,
-      action: "auth.session_rename",
-      entityType: "session",
-      entityId: target.id,
-      summary: `${current.user.username} hat ein Gerät umbenannt.`,
-      metadata: { deviceName: validated.name, current: target.id === current.session.id }
-    });
-
-    response.json({
-      session: updated
-        ? {
-            id: updated.id,
-            deviceName: updated.deviceName,
-            userAgent: updated.userAgent,
-            lastSeenAt: updated.lastSeenAt,
-            createdAt: updated.createdAt,
-            current: updated.id === current.session.id
-          }
-        : undefined
-    });
+    response.json({ session: result.session });
   });
 
   router.delete("/sessions/:id", (request, response) => {
     const current = getCurrentSession(context, request);
-
     if (!current) {
       response.status(401).json({ error: "nicht_angemeldet" });
       return;
     }
-
-    const target = context.db
-      .select()
-      .from(sessions)
-      .where(and(eq(sessions.id, request.params.id), eq(sessions.userId, current.user.id)))
-      .get();
-
-    if (!target) {
-      response.status(404).json({ error: "session_nicht_gefunden" });
+    const result = revokeUserSession(context, current, request.params.id);
+    if (!result.ok) {
+      response.status(result.status).json({ error: result.error });
       return;
     }
-
-    context.db
-      .update(sessions)
-      .set({ revokedAt: nowIso() })
-      .where(eq(sessions.id, target.id))
-      .run();
-
-    tryWriteAuditLog(context, {
-      actor: current.user,
-      action: "auth.session_revoke",
-      entityType: "session",
-      entityId: target.id,
-      summary: `${current.user.username} hat ein Gerät abgemeldet.`,
-      metadata: { deviceName: target.deviceName, current: target.id === current.session.id }
-    });
-
-    if (target.id === current.session.id) {
+    if (result.revokedCurrent) {
       clearSessionCookie(response);
     }
-
-    response.json({ revokedCurrent: target.id === current.session.id });
+    response.json({ revokedCurrent: result.revokedCurrent });
   });
 
   router.post("/pair-token", (request, response) => {
