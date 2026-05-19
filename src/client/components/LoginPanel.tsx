@@ -6,16 +6,13 @@ import { forgetDeviceKey, getDeviceContext } from "../api/device-key";
 import { getErrorMessage } from "../errors/errors";
 import { useI18n } from "../i18n/I18nContext";
 import type { MessageKey } from "../i18n/catalog/index";
-import {
-  getSecureContextInfo,
-  isLikelyIosSafari,
-  isPwaDisplayMode
-} from "../lib/runtime-context";
 import { browserLanguageToLocale } from "../../shared/locale";
-import { QrCanvas } from "./QrCanvas";
 import { ApiTokensSection } from "./ApiTokensSection";
 import { DevicePairingSection } from "./DevicePairingSection";
+import { LoginStep } from "./LoginStep";
+import { ProfileSection } from "./ProfileSection";
 import { PushNotificationsSection } from "./PushNotificationsSection";
+import { RegisterStep } from "./RegisterStep";
 import { SessionsSection } from "./SessionsSection";
 import { getPushSupport, urlBase64ToUint8Array } from "../lib/push-support";
 
@@ -537,9 +534,6 @@ export function LoginPanel({
   }
 
   if (currentUser) {
-    const pushSupport = getPushSupport();
-    const secureInfo = getSecureContextInfo(window, locale);
-    const dateLocale = locale === "en" ? "en-US" : "de-DE";
     return (
       <section className="login-panel" id="login" aria-label={t("loginProfile.sectionAria")}>
         <header className="login-panel-intro">
@@ -548,74 +542,20 @@ export function LoginPanel({
           <p className="muted">{t("loginProfile.introBody")}</p>
         </header>
 
-        <section className="device-panel" aria-label={t("loginProfile.profileSectionAria")}>
-          <div className="section-title-row">
-            <div>
-              <p className="eyebrow">{t("loginProfile.profileEyebrow")}</p>
-              <h3>{t("loginProfile.profileTitle")}</h3>
-              <p className="muted">{t("loginProfile.profileHelp")}</p>
-            </div>
-          </div>
-
-          <form onSubmit={updateProfile} className="admin-form">
-            <label>
-              {t("loginProfile.displayName")}
-              <input
-                value={displayNameDraft}
-                onChange={(event) => setDisplayNameDraft(event.target.value)}
-                required
-              />
-            </label>
-            <label>
-              {t("loginProfile.localeLabel")}
-              <select
-                value={localeDraft}
-                onChange={(event) => setLocaleDraft(event.target.value as "" | "de" | "en")}
-              >
-                <option value="">{t("loginProfile.localeAuto")}</option>
-                <option value="de">{t("loginProfile.locale.de")}</option>
-                <option value="en">{t("loginProfile.locale.en")}</option>
-              </select>
-            </label>
-            <p className="muted">{t("loginProfile.localeHelp")}</p>
-            <button type="submit" disabled={busy}>
-              {t("loginProfile.saveProfile")}
-            </button>
-          </form>
-
-          <form onSubmit={requestEmailChange} className="admin-form">
-            <label>
-              {t("loginProfile.newEmail")}
-              <input
-                type="email"
-                value={emailDraft}
-                onChange={(event) => setEmailDraft(event.target.value)}
-                required
-              />
-            </label>
-            <button type="submit" disabled={busy}>
-              {t("loginProfile.sendEmailCode")}
-            </button>
-          </form>
-
-          <form onSubmit={verifyEmailChange} className="admin-form">
-            <label>
-              {t("loginProfile.emailCode")}
-              <input
-                autoComplete="one-time-code"
-                inputMode="numeric"
-                maxLength={6}
-                pattern="[0-9]{6}"
-                value={emailVerifyCode}
-                onChange={(event) => setEmailVerifyCode(event.target.value)}
-                required
-              />
-            </label>
-            <button type="submit" disabled={busy}>
-              {t("loginProfile.confirmEmail")}
-            </button>
-          </form>
-        </section>
+        <ProfileSection
+          displayNameDraft={displayNameDraft}
+          localeDraft={localeDraft}
+          emailDraft={emailDraft}
+          emailVerifyCode={emailVerifyCode}
+          busy={busy}
+          onDisplayNameChange={setDisplayNameDraft}
+          onLocaleChange={setLocaleDraft}
+          onEmailChange={setEmailDraft}
+          onEmailVerifyCodeChange={setEmailVerifyCode}
+          onUpdateProfile={updateProfile}
+          onRequestEmailChange={requestEmailChange}
+          onVerifyEmailChange={verifyEmailChange}
+        />
 
         <ApiTokensSection
           apiTokens={apiTokens}
@@ -703,101 +643,33 @@ export function LoginPanel({
             : t("login.help.verify")}
       </p>
       {mode === "register" ? (
-        <form onSubmit={registerUser}>
-          <label>
-            {t("login.field.invite")}
-            <input
-              value={registration.inviteCode}
-              onChange={(event) =>
-                setRegistration({ ...registration, inviteCode: event.target.value })
-              }
-              required
-            />
-          </label>
-          <label>
-            {t("login.field.username")}
-            <input
-              autoComplete="username"
-              value={registration.username}
-              onChange={(event) =>
-                setRegistration({ ...registration, username: event.target.value })
-              }
-              required
-            />
-          </label>
-          <label>
-            {t("login.field.email")}
-            <input
-              type="email"
-              value={registration.email}
-              onChange={(event) => setRegistration({ ...registration, email: event.target.value })}
-              required
-            />
-          </label>
-          {message ? <p className="notice">{message}</p> : null}
-          {error ? <p className="error">{error}</p> : null}
-          <div className="action-row">
-            <button type="button" className="secondary" onClick={() => setMode("login")}>
-              {t("login.backToLogin")}
-            </button>
-            <button type="submit" disabled={busy}>
-              {t("login.register.submit")}
-            </button>
-          </div>
-        </form>
+        <RegisterStep
+          registration={registration}
+          message={message}
+          error={error}
+          busy={busy}
+          onRegistrationChange={setRegistration}
+          onSubmit={registerUser}
+          onBack={() => setMode("login")}
+        />
       ) : (
-        <form onSubmit={step === "request" ? requestCode : verifyCode}>
-          <label>
-            {t("login.field.username")}
-            <input
-              autoComplete="username"
-              value={username}
-              onChange={(event) => setUsername(event.target.value)}
-              required
-            />
-          </label>
-          {step === "verify" ? (
-            <>
-              <label>
-                {t("login.field.code")}
-                <input
-                  autoComplete="one-time-code"
-                  inputMode="numeric"
-                  maxLength={6}
-                  pattern="[0-9]{6}"
-                  value={code}
-                  onChange={(event) => setCode(event.target.value)}
-                  required
-                />
-              </label>
-              <label>
-                {t("login.field.deviceName")}
-                <input
-                  placeholder={t("login.deviceName.placeholder")}
-                  value={deviceName}
-                  onChange={(event) => setDeviceName(event.target.value)}
-                />
-              </label>
-            </>
-          ) : null}
-          {message ? <p className="notice">{message}</p> : null}
-          {error ? <p className="error">{error}</p> : null}
-          <div className="action-row">
-            {step === "verify" ? (
-              <button type="button" className="secondary" onClick={() => setStep("request")}>
-                {t("login.back")}
-              </button>
-            ) : null}
-            <button type="submit" disabled={busy}>
-              {step === "request" ? t("login.sendCode") : t("login.signIn")}
-            </button>
-          </div>
-          {settings.publicRegistrationEnabled ? (
-            <button type="button" className="secondary" onClick={() => setMode("register")}>
-              {t("login.register.cta")}
-            </button>
-          ) : null}
-        </form>
+        <LoginStep
+          step={step}
+          username={username}
+          code={code}
+          deviceName={deviceName}
+          message={message}
+          error={error}
+          busy={busy}
+          publicRegistrationEnabled={settings.publicRegistrationEnabled}
+          onUsernameChange={setUsername}
+          onCodeChange={setCode}
+          onDeviceNameChange={setDeviceName}
+          onBackToRequest={() => setStep("request")}
+          onSwitchToRegister={() => setMode("register")}
+          onRequest={requestCode}
+          onVerify={verifyCode}
+        />
       )}
     </section>
   );
