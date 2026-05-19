@@ -14,16 +14,14 @@ import {
   listRateLimitEntries
 } from "../auth/rate-limits";
 import type { DatabaseContext } from "../db/client";
-import { gameEvents, inviteCodes, participations, pushSubscriptions, sessions, users } from "../db/schema";
-import { ensureActiveIdentityAvailable, userRoleSchema } from "../domain/users";
+import { gameEvents, inviteCodes, users } from "../db/schema";
 import {
   analyzeBulkImport,
   buildBulkImportAuditMetadata,
   buildBulkImportResponse,
   bulkImportRequestSchema,
   bulkImportRowSchema,
-  commitBulkImportAnalysis,
-  fallbackPhoneNumber
+  commitBulkImportAnalysis
 } from "../domain/users/bulk-import";
 import {
   generateInviteCode,
@@ -31,6 +29,13 @@ import {
   normalizeInviteCode,
   serializeInviteCode
 } from "../domain/users/invites";
+import {
+  createUser,
+  createUserSchema,
+  softDeleteUser,
+  updateUser,
+  updateUserSchema
+} from "../domain/users/management";
 import { broadcastEventsChanged } from "../realtime/event-bus";
 import {
   getS3LocationDetails,
@@ -44,23 +49,6 @@ import {
   toSafeRestoreDiagnostics
 } from "../storage/s3-storage";
 import { readSettings, settingsPartialSchema, settingsSchema, writeSettings } from "../settings";
-
-const createUserSchema = z.object({
-  phoneNumber: z.string().trim().min(3).max(40).optional(),
-  username: z.string().trim().min(1).max(80),
-  displayName: z.string().trim().min(1).max(80).optional(),
-  email: z.string().trim().email().max(160),
-  role: userRoleSchema.default("user")
-});
-
-const updateUserSchema = z.object({
-  phoneNumber: z.string().trim().min(3).max(40).optional(),
-  username: z.string().trim().min(1).max(80).optional(),
-  displayName: z.string().trim().min(1).max(80).optional(),
-  email: z.string().trim().email().max(160).optional(),
-  role: userRoleSchema.optional(),
-  notificationsEnabled: z.boolean().optional()
-});
 
 const createInviteCodeSchema = z.object({
   code: z.string().trim().min(1).max(80).optional(),
@@ -392,196 +380,47 @@ export function createAdminRouter(context: DatabaseContext) {
       response.status(403).json({ error: "admin_erforderlich" });
       return;
     }
-
     if (!parsed.success) {
       response.status(400).json({ error: "ungueltiger_user" });
       return;
     }
 
-    const identityCheck = ensureActiveIdentityAvailable(context, {
-      username: parsed.data.username,
-      email: parsed.data.email
-    });
-    if (!identityCheck.ok) {
-      response.status(409).json({ error: identityCheck.error });
+    const result = createUser(context, admin, parsed.data);
+    if (!result.ok) {
+      response.status(result.status).json({ error: result.error });
       return;
     }
-
-    const timestamp = nowIso();
-    const id = randomUUID();
-
-    try {
-      context.db
-        .insert(users)
-        .values({
-          id,
-          phoneNumber: parsed.data.phoneNumber ?? fallbackPhoneNumber(id),
-          username: parsed.data.username,
-          displayName: parsed.data.displayName ?? parsed.data.username,
-          email: parsed.data.email,
-          role: parsed.data.role,
-          notificationsEnabled: readSettings(context).defaultNotificationsEnabled,
-          createdByUserId: admin.id,
-          createdAt: timestamp,
-          updatedAt: timestamp
-        })
-        .run();
-    } catch (error) {
-      console.error("[Hermes] Failed to create user", error);
-      response.status(409).json({ error: "user_existiert_bereits" });
-      return;
-    }
-
-    const created = context.db.select().from(users).where(eq(users.id, id)).get();
-    tryWriteAuditLog(context, {
-      actor: admin,
-      action: "user.create",
-      entityType: "user",
-      entityId: id,
-      summary: `${admin.username} hat User ${parsed.data.username} angelegt.`,
-      metadata: {
-        username: parsed.data.username,
-        displayName: parsed.data.displayName ?? parsed.data.username,
-        email: parsed.data.email,
-        role: parsed.data.role
-      }
-    });
-    response.status(201).json({ user: created ? publicUser(created) : undefined });
+    response.status(201).json({ user: publicUser(result.user) });
   });
 
   router.patch("/users/:id", (request, response) => {
     const parsed = updateUserSchema.safeParse(request.body);
-
     if (!parsed.success) {
       response.status(400).json({ error: "ungueltiger_user" });
       return;
     }
 
-    const existing = context.db.select().from(users).where(eq(users.id, request.params.id)).get();
-
-    if (!existing) {
-      response.status(404).json({ error: "user_nicht_gefunden" });
-      return;
-    }
-
-    if (parsed.data.username !== undefined || parsed.data.email !== undefined) {
-      const identityCheck = ensureActiveIdentityAvailable(
-        context,
-        {
-          username: parsed.data.username ?? existing.username,
-          email: parsed.data.email ?? existing.email
-        },
-        { excludeUserId: existing.id }
-      );
-      if (!identityCheck.ok) {
-        response.status(409).json({ error: identityCheck.error });
-        return;
-      }
-    }
-
-    const shouldRevokeSessions =
-      (parsed.data.role !== undefined && parsed.data.role !== existing.role) ||
-      (parsed.data.email !== undefined && parsed.data.email !== existing.email);
-
-    try {
-      const updatedAt = nowIso();
-      context.sqlite.transaction(() => {
-        context.db
-          .update(users)
-          .set({
-            ...parsed.data,
-            updatedAt
-          })
-          .where(eq(users.id, existing.id))
-          .run();
-
-        if (shouldRevokeSessions) {
-          context.db
-            .update(sessions)
-            .set({ revokedAt: updatedAt })
-            .where(eq(sessions.userId, existing.id))
-            .run();
-        }
-      })();
-    } catch (error) {
-      console.error("[Hermes] Failed to update user", error);
-      response.status(409).json({ error: "user_update_konflikt" });
-      return;
-    }
-
-    const updated = context.db.select().from(users).where(eq(users.id, existing.id)).get();
     const admin = requireAdmin(context, request);
-    tryWriteAuditLog(context, {
-      actor: admin,
-      action: "user.update",
-      entityType: "user",
-      entityId: existing.id,
-      summary: `${admin?.username ?? "Admin"} hat User ${existing.username} aktualisiert.`,
-      metadata: parsed.data
-    });
-    response.json({ user: updated ? publicUser(updated) : undefined });
+    const result = updateUser(context, admin ?? undefined, request.params.id, parsed.data);
+    if (!result.ok) {
+      response.status(result.status).json({ error: result.error });
+      return;
+    }
+    response.json({ user: publicUser(result.user) });
   });
 
   router.delete("/users/:id", (request, response) => {
     const admin = requireAdmin(context, request);
-    const existing = context.db.select().from(users).where(eq(users.id, request.params.id)).get();
-
     if (!admin) {
       response.status(403).json({ error: "admin_erforderlich" });
       return;
     }
 
-    if (!existing || existing.deletedAt) {
-      response.status(404).json({ error: "user_nicht_gefunden" });
+    const result = softDeleteUser(context, admin, request.params.id);
+    if (!result.ok) {
+      response.status(result.status).json({ error: result.error });
       return;
     }
-
-    if (existing.id === admin.id) {
-      response.status(409).json({ error: "eigener_user_nicht_loeschbar" });
-      return;
-    }
-
-    const timestamp = nowIso();
-
-    context.sqlite.transaction(() => {
-      context.db
-        .delete(participations)
-        .where(eq(participations.userId, existing.id))
-        .run();
-      context.db
-        .update(pushSubscriptions)
-        .set({ revokedAt: timestamp })
-        .where(eq(pushSubscriptions.userId, existing.id))
-        .run();
-      context.db
-        .update(sessions)
-        .set({ revokedAt: timestamp })
-        .where(eq(sessions.userId, existing.id))
-        .run();
-      context.db
-        .update(users)
-        .set({
-          phoneNumber: `deleted:${existing.id}`,
-          username: `deleted-${existing.id.slice(0, 8)}`,
-          email: `deleted-${existing.id}@deleted.hermes.local`,
-          role: "user",
-          notificationsEnabled: false,
-          deletedAt: timestamp,
-          updatedAt: timestamp
-        })
-        .where(eq(users.id, existing.id))
-        .run();
-    })();
-
-    tryWriteAuditLog(context, {
-      actor: admin,
-      action: "user.delete",
-      entityType: "user",
-      entityId: existing.id,
-      summary: `${admin.username} hat User ${existing.username} gelöscht.`,
-      metadata: { username: existing.username, email: existing.email }
-    });
-
     response.status(204).send();
   });
 
