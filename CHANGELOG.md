@@ -4,6 +4,64 @@ Versions are annotated tags `vX.Y.Z` on `main`. Each entry mirrors the
 `chore(release): vX.Y.Z` commit that bumps `package.json`,
 `package-lock.json`, and `src/server/openapi/hermes-api.yaml`.
 
+## v0.11.0 — Pizza ordering as opt-in feature (2026-05-20)
+
+### Behavior change (admin action required on upgrade)
+
+**Pizza ordering is now off by default.** Existing installs lose access
+to `/api/pizza/*` and the start-page pizza panel on upgrade until an
+admin enables the feature in `Admin → Betrieb → Pizzabestellung
+(optionales Modul) → "Pizzabestellung aktivieren"`.
+
+This matches the user request: pizza is now an opt-in module rather
+than a standard part of the app.
+
+### Server
+
+- New setting `featuresPizzaEnabled: boolean` (default `false`) on
+  `HermesSettings` and `PublicHermesSettings`.
+- `createPizzaRouter` adds a feature-gate middleware at the top:
+  when the setting is `false`, every route returns
+  `404 { error: "feature_deaktiviert" }`. Disabled feature is
+  indistinguishable from a missing endpoint.
+- No changes to the pizza domain modules — only the HTTP layer is
+  gated. Re-enabling the feature restores the full surface immediately.
+
+### Client
+
+- `src/main.tsx` only mounts `<PizzaPanel>` when both `currentUser` and
+  `settings.featuresPizzaEnabled` are truthy.
+- `AdminPanelBetrieb` only renders `<PizzaMenuJsonAdmin>` when the
+  feature is on.
+- The Pizza fieldset in `AdminPanelBetrieb` is restructured:
+  - Always-visible checkbox "Pizzabestellung aktivieren" (the feature
+    toggle).
+  - PayPal/Cash recipient inputs only render when the feature is on
+    (no point configuring payment settings for a disabled feature).
+- All admin-side pizza labels are now localized via new
+  `admin.features.pizza.*` keys (legend, enable label, help text,
+  payment help text, paypal handle/name, cash recipient).
+
+### i18n status
+
+- **Audit complete**: the admin-side pizza fieldset is fully
+  localized.
+- **Known gap (deferred to a future release)**:
+  `src/client/pizza/PizzaPanel.tsx` (559 lines) and
+  `src/client/pizza/PizzaMenuJsonAdmin.tsx` (131 lines) are
+  hardcoded German with zero `useI18n` calls. Approximately 60–80
+  translation keys would be needed for a full sweep. Tracked as a
+  follow-up — the feature toggle ships independently because both
+  surfaces are admin-gated and the gap pre-existed.
+
+### Test fixtures
+
+- The three client test files (`admin-panel.test.tsx`,
+  `login-panel.test.tsx`, `ui-correctness.test.tsx`) and the
+  server `app-flow.test.ts` settings fixture extended with
+  `featuresPizzaEnabled: false`. Suite still 30/30 files, 186/186
+  tests, type-check clean.
+
 ## v0.10.0 — Internal restructure (2026-05-19)
 
 A large internal cleanup pass. **No user-visible behavior changes.** Every
