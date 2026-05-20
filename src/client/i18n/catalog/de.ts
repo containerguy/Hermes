@@ -408,6 +408,15 @@ export const deMessages = {
   "admin.kiosk.copyUrl": "Vollständige URL kopieren",
   "admin.kiosk.copied": "URL in die Zwischenablage kopiert.",
   "admin.kiosk.copyFailed": "Zwischenablage nicht verfügbar — URL manuell kopieren.",
+  "admin.features.pizza.legend": "Pizzabestellung (optionales Modul)",
+  "admin.features.pizza.enable": "Pizzabestellung aktivieren",
+  "admin.features.pizza.help":
+    "Wenn aktiv, erscheint im Startbereich ein Panel zum Bestellen und in der Admin-Oberfläche der Menü-Editor. Standardmäßig deaktiviert.",
+  "admin.features.pizza.paymentHelp":
+    "Werte werden in der Kassenliste und auf der „Mein Anteil“-Seite genutzt. Leer = kein Hinweis.",
+  "admin.features.pizza.paypalHandle": "PayPal-Handle (paypal.me/<handle>)",
+  "admin.features.pizza.paypalName": "PayPal-Empfänger Anzeigename",
+  "admin.features.pizza.cashRecipient": "Bargeld-Empfänger Hinweis",
   "admin.locale.de": "Deutsch",
   "admin.locale.en": "English",
   "admin.shell.help":

@@ -75,6 +75,7 @@ const defaultSettings: AppSettings = {
   kioskStreamEnabled: false,
   kioskStreamPath: "stream",
   kioskStreamSecret: "",
+  featuresPizzaEnabled: false,
   pizzaPaypalHandle: "",
   pizzaPaypalName: "",
   pizzaCashRecipient: ""

@@ -88,6 +88,7 @@ const defaultSettings: AppSettings = {
   kioskStreamEnabled: false,
   kioskStreamPath: "stream",
   kioskStreamSecret: "",
+  featuresPizzaEnabled: false,
   pizzaPaypalHandle: "",
   pizzaPaypalName: "",
   pizzaCashRecipient: ""
@@ -404,7 +405,7 @@ function AppShell({
 
     return (
       <>
-        {currentUser ? (
+        {currentUser && appSettings.featuresPizzaEnabled ? (
           <PizzaPanel
             currentUserId={currentUser.id}
             currentUserRole={currentUser.role}

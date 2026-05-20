@@ -64,6 +64,12 @@ const settingsObjectSchema = z.object({
   kioskStreamPath: kioskPathSegmentSchema,
   /** Geheimer Zugriffsschlüssel (Query id), min. 12 Zeichen wenn Kiosk aktiv */
   kioskStreamSecret: z.string().max(128),
+  /**
+   * Pizzabestellung als optionales Feature.
+   * Standard `false`: Modul nicht aktiv, Routen liefern 404, UI bleibt verborgen.
+   * Admin muss das Feature explizit aktivieren.
+   */
+  featuresPizzaEnabled: z.boolean(),
   /** PayPal-Handle für Pizzabestellungs-Kassenliste (paypal.me/<handle>). Leer = kein Link. */
   pizzaPaypalHandle: z.string().trim().max(80),
   /** Anzeigename für PayPal-Empfänger in Kassenliste. Leer = kein Hinweis. */
@@ -113,6 +119,7 @@ export type PublicHermesSettings = Pick<
   | "defaultLocale"
   | "kioskStreamEnabled"
   | "kioskStreamPath"
+  | "featuresPizzaEnabled"
   | "pizzaPaypalHandle"
   | "pizzaPaypalName"
   | "pizzaCashRecipient"
@@ -139,6 +146,7 @@ export function pickPublicSettings(full: HermesSettings): PublicHermesSettings {
     defaultLocale: full.defaultLocale,
     kioskStreamEnabled: full.kioskStreamEnabled,
     kioskStreamPath: full.kioskStreamPath,
+    featuresPizzaEnabled: full.featuresPizzaEnabled,
     pizzaPaypalHandle: full.pizzaPaypalHandle,
     pizzaPaypalName: full.pizzaPaypalName,
     pizzaCashRecipient: full.pizzaCashRecipient
@@ -169,6 +177,7 @@ export const defaultSettings: HermesSettings = {
   kioskStreamEnabled: false,
   kioskStreamPath: "stream",
   kioskStreamSecret: "",
+  featuresPizzaEnabled: false,
   pizzaPaypalHandle: "",
   pizzaPaypalName: "",
   pizzaCashRecipient: ""

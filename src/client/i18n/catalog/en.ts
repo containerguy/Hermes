@@ -410,6 +410,15 @@ export const enMessages: { [K in keyof typeof deMessages]: string } = {
   "admin.kiosk.copyUrl": "Copy full URL",
   "admin.kiosk.copied": "URL copied to clipboard.",
   "admin.kiosk.copyFailed": "Clipboard unavailable — copy the URL manually.",
+  "admin.features.pizza.legend": "Pizza ordering (optional module)",
+  "admin.features.pizza.enable": "Enable pizza ordering",
+  "admin.features.pizza.help":
+    "When on, a pizza-ordering panel appears on the start page and the menu editor appears in the admin UI. Off by default.",
+  "admin.features.pizza.paymentHelp":
+    "These values appear on the cashier list and the \"My share\" page. Leave empty to omit.",
+  "admin.features.pizza.paypalHandle": "PayPal handle (paypal.me/<handle>)",
+  "admin.features.pizza.paypalName": "PayPal recipient display name",
+  "admin.features.pizza.cashRecipient": "Cash recipient note",
   "admin.locale.de": "German",
   "admin.locale.en": "English",
   "admin.shell.help":

@@ -145,6 +145,14 @@ function isManager(role: string): boolean {
 export function createPizzaRouter(context: DatabaseContext) {
   const router = Router();
 
+  router.use((_request, response, next) => {
+    if (!readSettings(context).featuresPizzaEnabled) {
+      response.status(404).json({ error: "feature_deaktiviert" });
+      return;
+    }
+    next();
+  });
+
   router.use((request, response, next) => {
     if (!requireUser(context, request)) {
       response.status(401).json({ error: "nicht_angemeldet" });

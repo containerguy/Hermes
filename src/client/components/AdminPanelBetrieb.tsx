@@ -338,44 +338,56 @@ export function AdminPanelBetrieb({
           </div>
         </section>
         <fieldset className="admin-fieldset">
-          <legend>Pizzabestellung</legend>
-          <p className="muted">
-            Werte werden in der Kassenliste und auf der "Mein Anteil"-Seite genutzt. Leer = kein
-            Hinweis.
-          </p>
-          <label>
-            PayPal-Handle (paypal.me/&lt;handle&gt;)
+          <legend>{t("admin.features.pizza.legend")}</legend>
+          <label className="checkbox-label">
             <input
-              value={settings.pizzaPaypalHandle}
+              type="checkbox"
+              checked={settings.featuresPizzaEnabled}
               onChange={(event) =>
-                onSettingsChange({ ...settings, pizzaPaypalHandle: event.target.value })
+                onSettingsChange({ ...settings, featuresPizzaEnabled: event.target.checked })
               }
-              maxLength={80}
-              placeholder="renekeller"
             />
+            {t("admin.features.pizza.enable")}
           </label>
-          <label>
-            PayPal-Empfänger Anzeigename
-            <input
-              value={settings.pizzaPaypalName}
-              onChange={(event) =>
-                onSettingsChange({ ...settings, pizzaPaypalName: event.target.value })
-              }
-              maxLength={120}
-              placeholder="Rene Keller"
-            />
-          </label>
-          <label>
-            Bargeld-Empfänger Hinweis
-            <input
-              value={settings.pizzaCashRecipient}
-              onChange={(event) =>
-                onSettingsChange({ ...settings, pizzaCashRecipient: event.target.value })
-              }
-              maxLength={120}
-              placeholder="Rene"
-            />
-          </label>
+          <p className="muted">{t("admin.features.pizza.help")}</p>
+          {settings.featuresPizzaEnabled ? (
+            <>
+              <p className="muted">{t("admin.features.pizza.paymentHelp")}</p>
+              <label>
+                {t("admin.features.pizza.paypalHandle")}
+                <input
+                  value={settings.pizzaPaypalHandle}
+                  onChange={(event) =>
+                    onSettingsChange({ ...settings, pizzaPaypalHandle: event.target.value })
+                  }
+                  maxLength={80}
+                  placeholder="renekeller"
+                />
+              </label>
+              <label>
+                {t("admin.features.pizza.paypalName")}
+                <input
+                  value={settings.pizzaPaypalName}
+                  onChange={(event) =>
+                    onSettingsChange({ ...settings, pizzaPaypalName: event.target.value })
+                  }
+                  maxLength={120}
+                  placeholder="Rene Keller"
+                />
+              </label>
+              <label>
+                {t("admin.features.pizza.cashRecipient")}
+                <input
+                  value={settings.pizzaCashRecipient}
+                  onChange={(event) =>
+                    onSettingsChange({ ...settings, pizzaCashRecipient: event.target.value })
+                  }
+                  maxLength={120}
+                  placeholder="Rene"
+                />
+              </label>
+            </>
+          ) : null}
         </fieldset>
         <button type="submit">{t("admin.settings.save")}</button>
       </form>
@@ -503,7 +515,7 @@ export function AdminPanelBetrieb({
           </div>
         ) : null}
       </section>
-      <PizzaMenuJsonAdmin />
+      {settings.featuresPizzaEnabled ? <PizzaMenuJsonAdmin /> : null}
     </>
   );
 }
