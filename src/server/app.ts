@@ -10,6 +10,7 @@ import { createRealtimeRouter } from "./http/realtime-routes";
 import { createKioskRouter } from "./http/kiosk-routes";
 import { createPizzaRouter } from "./http/pizza-routes";
 import { createAmpIntegrationRouter } from "./http/amp-routes";
+import { startAmpStatusService, stopAmpStatusService } from "./integrations/amp/amp-status";
 import { createDb } from "./db/client";
 import { runMigrations } from "./db/migrate";
 import { broadcastEventsChanged } from "./realtime/event-bus";
@@ -113,6 +114,10 @@ export async function createHermesApp() {
     }
   }, 30_000);
 
+  // Phase 15: AMP-Statusdienst. Pollt nur, wenn das Modul aktiv ist und Bindungen existieren.
+  // Unter Vitest ohne eigenen Takt (Tests stoßen Polls explizit über pollNow an).
+  startAmpStatusService(context, process.env.VITEST ? { intervalMs: 60 * 60 * 1000 } : undefined);
+
   const staticDirectory = path.join(process.cwd(), "dist");
   if (fs.existsSync(staticDirectory)) {
     app.use(express.static(staticDirectory));
@@ -130,6 +135,7 @@ export async function createHermesApp() {
     app,
     close: async () => {
       clearInterval(statusInterval);
+      stopAmpStatusService();
       await flushDatabaseSnapshot(context.sqlite);
       context.sqlite.close();
     }

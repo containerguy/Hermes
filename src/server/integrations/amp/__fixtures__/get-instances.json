@@ -1,0 +1,1541 @@
+[
+  {
+    "Id": 1,
+    "InstanceId": "eae97b6d-50cf-44ee-8cc0-4c8f73f8d0e0",
+    "FriendlyName": "cs2.lanparty.familie-keller.info",
+    "Description": "",
+    "Disabled": false,
+    "IsRemote": true,
+    "Platform": {
+      "CPUInfo": {
+        "Sockets": 1,
+        "Cores": 6,
+        "Threads": 6,
+        "Vendor": "AuthenticAMD",
+        "ModelName": "AMD EPYC-Rome-v4 Processor (no XSAVES)",
+        "TotalCores": 6,
+        "TotalThreads": 6
+      },
+      "InstalledRAMMB": 11960,
+      "OS": 2,
+      "PlatformName": "Ubuntu 24.04.5",
+      "SystemType": 1,
+      "Virtualization": 0,
+      "DockerNetworkIsHostMode": false,
+      "HasMemoryLimit": false
+    },
+    "Datastores": [
+      {
+        "Id": 1,
+        "FriendlyName": "Default Datastore"
+      }
+    ],
+    "CreatesInContainers": false,
+    "State": 20,
+    "StateReason": "",
+    "CanCreate": true,
+    "LastUpdated": "2026-10-15T19:49:00.6183781Z",
+    "LastPollUpdate": "2026-10-15T19:49:00.6159925Z",
+    "LastPushUpdate": "2026-10-15T18:55:00.4517476Z",
+    "PushUpdateThrottleInterval": "00:00:30",
+    "PollUpdateThrottleInterval": "00:01:00",
+    "PushIsCurrent": false,
+    "CanPollUpdate": false,
+    "AvailableInstances": [
+      {
+        "InstanceID": "eae97b6d-50cf-44ee-8cc0-4c8f73f8d0e0",
+        "TargetID": "eae97b6d-50cf-44ee-8cc0-4c8f73f8d0e0",
+        "InstanceName": "ADS01",
+        "FriendlyName": "ADS01",
+        "WelcomeMessage": null,
+        "Description": null,
+        "Module": "ADS",
+        "ModuleDisplayName": null,
+        "AMPVersion": "0.0.0.0",
+        "IsHTTPS": false,
+        "IP": "0.0.0.0",
+        "ApplicationIP": null,
+        "IsMultiIPAware": false,
+        "Port": 8080,
+        "Daemon": false,
+        "DaemonAutostart": true,
+        "ExcludeFromFirewall": false,
+        "UseHostModeNetwork": false,
+        "Running": true,
+        "AppState": -1,
+        "Tags": [],
+        "DiskUsageMB": 0,
+        "Group": "",
+        "Order": 10,
+        "ReleaseStream": 10,
+        "ManagementMode": 0,
+        "Suspended": false,
+        "IsContainerInstance": false,
+        "ContainerMemoryMB": 0,
+        "ContainerSwapMB": 0,
+        "ContainerMemoryPolicy": 0,
+        "ContainerCPUs": 0.0,
+        "SpecificDockerImage": null,
+        "Metrics": {},
+        "ApplicationEndpoints": [
+          {
+            "DisplayName": "Game Server Address",
+            "Endpoint": "0.0.0.0:12820",
+            "Uri": ""
+          },
+          {
+            "DisplayName": "SFTP Server",
+            "Endpoint": "0.0.0.0:2223",
+            "Uri": "sftp://0.0.0.0:2223"
+          }
+        ],
+        "DeploymentArgs": {
+          "FileManagerPlugin.SFTP.SFTPIPBinding": "0.0.0.0",
+          "FileManagerPlugin.SFTP.SFTPPortNumber": "2223",
+          "Core.AMP.AdvertisedAddressIncludesPort": "true"
+        },
+        "CustomMountBinds": {},
+        "ExtraContainerPackages": [],
+        "DisplayImageSource": null
+      },
+      {
+        "InstanceID": "41ced466-4be7-404f-b9e0-a950f4595f57",
+        "TargetID": "eae97b6d-50cf-44ee-8cc0-4c8f73f8d0e0",
+        "InstanceName": "Counter-Strike201",
+        "FriendlyName": "Counter-Strike2",
+        "WelcomeMessage": null,
+        "Description": null,
+        "Module": "GenericModule",
+        "ModuleDisplayName": "Counter-Strike 2",
+        "AMPVersion": "0.0.0.0",
+        "IsHTTPS": false,
+        "IP": "0.0.0.0",
+        "ApplicationIP": "0.0.0.0",
+        "IsMultiIPAware": true,
+        "Port": 8081,
+        "Daemon": false,
+        "DaemonAutostart": false,
+        "ExcludeFromFirewall": false,
+        "UseHostModeNetwork": true,
+        "Running": true,
+        "AppState": 20,
+        "Tags": [],
+        "DiskUsageMB": 0,
+        "Group": "",
+        "Order": 20,
+        "ReleaseStream": 10,
+        "ManagementMode": 10,
+        "Suspended": false,
+        "IsContainerInstance": false,
+        "ContainerMemoryMB": 0,
+        "ContainerSwapMB": 0,
+        "ContainerMemoryPolicy": 0,
+        "ContainerCPUs": 0.0,
+        "SpecificDockerImage": "cubecoders/ampbase:debian-12",
+        "Metrics": {
+          "CPU Usage": {
+            "RawValue": 0,
+            "MaxValue": 100,
+            "Percent": 0,
+            "Units": "%",
+            "Color": "#239B2D",
+            "Color2": "#239B2D",
+            "Color3": "#FFF",
+            "ShortName": null
+          },
+          "Memory Usage": {
+            "RawValue": 795,
+            "MaxValue": 11960,
+            "Percent": 6,
+            "Units": "MB",
+            "Color": "#246BA0",
+            "Color2": null,
+            "Color3": "#FFF",
+            "ShortName": null
+          },
+          "Active Users": {
+            "RawValue": 0,
+            "MaxValue": 32,
+            "Percent": 0,
+            "Units": "",
+            "Color": "#7B249E",
+            "Color2": null,
+            "Color3": "#FFF",
+            "ShortName": null
+          }
+        },
+        "ApplicationEndpoints": [
+          {
+            "DisplayName": "Application Address",
+            "Endpoint": "0.0.0.0:27015",
+            "Uri": "steam://connect/0.0.0.0:27015"
+          },
+          {
+            "DisplayName": "SFTP Server",
+            "Endpoint": "0.0.0.0:2224",
+            "Uri": "steam://connect/0.0.0.0:27015"
+          },
+          {
+            "DisplayName": "Unknown Endpoint",
+            "Endpoint": "0.0.0.0:27015",
+            "Uri": "steam://connect/0.0.0.0:27015"
+          },
+          {
+            "DisplayName": "Unknown Endpoint",
+            "Endpoint": "0.0.0.0:27015",
+            "Uri": "steam://connect/0.0.0.0:27015"
+          },
+          {
+            "DisplayName": "Unknown Endpoint",
+            "Endpoint": "0.0.0.0:27015",
+            "Uri": "steam://connect/0.0.0.0:27015"
+          },
+          {
+            "DisplayName": "Unknown Endpoint",
+            "Endpoint": "0.0.0.0:27015",
+            "Uri": "steam://connect/0.0.0.0:27015"
+          },
+          {
+            "DisplayName": "Unknown Endpoint",
+            "Endpoint": "0.0.0.0:27015",
+            "Uri": "steam://connect/0.0.0.0:27015"
+          }
+        ],
+        "DeploymentArgs": {
+          "GenericModule.Meta.DisplayName": "Counter-Strike 2",
+          "GenericModule.Meta.Description": "Counter-Strike 2 Dedicated Server",
+          "GenericModule.Meta.OS": "Windows, Linux",
+          "GenericModule.Meta.AarchSupport": "NotSupported",
+          "GenericModule.Meta.Arch": "x86_64",
+          "GenericModule.Meta.URL": "https://www.counter-strike.net/cs2",
+          "GenericModule.Meta.DisplayImageSource": "steam:730",
+          "GenericModule.Meta.EndpointURIFormat": "steam://connect/{ip}:{GenericModule.App.Ports.$ServerPort}",
+          "GenericModule.Meta.ConfigManifest": "counter-strike2config.json",
+          "GenericModule.Meta.MetaConfigManifest": "counter-strike2metaconfig.json",
+          "GenericModule.Meta.ConfigRoot": "counter-strike2.kvp",
+          "GenericModule.Meta.MinAMPVersion": "0.0.0.0",
+          "GenericModule.Meta.SpecificDockerImage": "cubecoders/ampbase:debian-12",
+          "GenericModule.Meta.DockerRequired": "False",
+          "GenericModule.Meta.DockerBaseReadOnly": "False",
+          "GenericModule.Meta.ContainerPolicy": "Supported",
+          "GenericModule.Meta.ContainerPolicyReason": "",
+          "GenericModule.Meta.ExtraSetupStepsURI": "",
+          "GenericModule.Meta.Prerequisites": "[]",
+          "GenericModule.Meta.ExtraContainerPackages": "[]",
+          "GenericModule.Meta.ConfigReleaseState": "NotSpecified",
+          "GenericModule.Meta.NoCommercialUsage": "False",
+          "GenericModule.Meta.ConfigVersion": "6",
+          "GenericModule.Meta.ReleaseNotes": "",
+          "GenericModule.Meta.BreakingReleaseNotes": "",
+          "GenericModule.Meta.AppConfigId": "3446bb16-65ea-45fc-993b-cac42f15bd2b",
+          "GenericModule.Meta.AppIsMultiIPAware": "True",
+          "GenericModule.App.ApplicationIPBinding": "0.0.0.0",
+          "GenericModule.App.Ports": "[{\"Protocol\":2,\"Port\":27015,\"Offset\":0,\"Range\":1,\"MinListening\":0,\"RangeSeparator\":\"-\",\"Ref\":\"ServerPort\",\"Name\":\"Game and RCON Port\",\"Description\":\"Port for game and RCON traffic\",\"IsDelayedOpen\":false,\"Hidden\":false,\"ChildPorts\":null,\"Required\":false}]",
+          "GenericModule.App.PrimaryApplicationPortRef": "ServerPort",
+          "GenericModule.Meta.OriginalSource": "CubeCoders-AMPTemplates-main",
+          "FileManagerPlugin.SFTP.SFTPIPBinding": "0.0.0.0",
+          "FileManagerPlugin.SFTP.SFTPPortNumber": "2224",
+          "Core.AMP.AdvertisedAddressIncludesPort": "true"
+        },
+        "CustomMountBinds": {},
+        "ExtraContainerPackages": [],
+        "DisplayImageSource": "steam:730"
+      }
+    ],
+    "AvailableIPs": [
+      "0.0.0.0",
+      "::",
+      "192.168.200.8",
+      "0.0.0.0"
+    ],
+    "Tags": [],
+    "TagsList": "[]",
+    "URL": "http://cs2.lanparty.familie-keller.info:8080",
+    "Fitness": null
+  },
+  {
+    "Id": 3,
+    "InstanceId": "b95ad917-ac13-42ef-9385-5a4bb780326d",
+    "FriendlyName": "factorio.lanparty.familie-keller.info:8080",
+    "Description": null,
+    "Disabled": false,
+    "IsRemote": true,
+    "Platform": {
+      "CPUInfo": {
+        "Sockets": 1,
+        "Cores": 4,
+        "Threads": 4,
+        "Vendor": "AuthenticAMD",
+        "ModelName": "AMD EPYC-Rome-v4 Processor (no XSAVES)",
+        "TotalCores": 4,
+        "TotalThreads": 4
+      },
+      "InstalledRAMMB": 7941,
+      "OS": 2,
+      "PlatformName": "Ubuntu 24.04.5",
+      "SystemType": 1,
+      "Virtualization": 0,
+      "DockerNetworkIsHostMode": false,
+      "HasMemoryLimit": false
+    },
+    "Datastores": [
+      {
+        "Id": 1,
+        "FriendlyName": "Default Datastore"
+      }
+    ],
+    "CreatesInContainers": false,
+    "State": 20,
+    "StateReason": "",
+    "CanCreate": true,
+    "LastUpdated": "2026-10-15T19:49:00.6202333Z",
+    "LastPollUpdate": "2026-10-15T19:49:00.6185986Z",
+    "LastPushUpdate": "2026-10-15T10:42:00.3514354Z",
+    "PushUpdateThrottleInterval": "00:00:30",
+    "PollUpdateThrottleInterval": "00:01:00",
+    "PushIsCurrent": false,
+    "CanPollUpdate": false,
+    "AvailableInstances": [
+      {
+        "InstanceID": "b95ad917-ac13-42ef-9385-5a4bb780326d",
+        "TargetID": "b95ad917-ac13-42ef-9385-5a4bb780326d",
+        "InstanceName": "ADS01",
+        "FriendlyName": "ADS01",
+        "WelcomeMessage": null,
+        "Description": null,
+        "Module": "ADS",
+        "ModuleDisplayName": null,
+        "AMPVersion": "0.0.0.0",
+        "IsHTTPS": false,
+        "IP": "0.0.0.0",
+        "ApplicationIP": null,
+        "IsMultiIPAware": false,
+        "Port": 8080,
+        "Daemon": false,
+        "DaemonAutostart": true,
+        "ExcludeFromFirewall": false,
+        "UseHostModeNetwork": false,
+        "Running": true,
+        "AppState": -1,
+        "Tags": [],
+        "DiskUsageMB": 0,
+        "Group": "",
+        "Order": 10,
+        "ReleaseStream": 10,
+        "ManagementMode": 0,
+        "Suspended": false,
+        "IsContainerInstance": false,
+        "ContainerMemoryMB": 0,
+        "ContainerSwapMB": 0,
+        "ContainerMemoryPolicy": 0,
+        "ContainerCPUs": 0.0,
+        "SpecificDockerImage": null,
+        "Metrics": {},
+        "ApplicationEndpoints": [
+          {
+            "DisplayName": "Game Server Address",
+            "Endpoint": "0.0.0.0:12820",
+            "Uri": ""
+          },
+          {
+            "DisplayName": "SFTP Server",
+            "Endpoint": "0.0.0.0:2223",
+            "Uri": "sftp://0.0.0.0:2223"
+          }
+        ],
+        "DeploymentArgs": {
+          "FileManagerPlugin.SFTP.SFTPIPBinding": "0.0.0.0",
+          "FileManagerPlugin.SFTP.SFTPPortNumber": "2223",
+          "Core.AMP.AdvertisedAddressIncludesPort": "true"
+        },
+        "CustomMountBinds": {},
+        "ExtraContainerPackages": [],
+        "DisplayImageSource": null
+      },
+      {
+        "InstanceID": "2567f80f-e02d-4241-a209-c4b42f8369e5",
+        "TargetID": "08e9e07c-6c73-490c-9c30-45a3f9b4147b",
+        "InstanceName": "Factorio01",
+        "FriendlyName": "Factorio",
+        "WelcomeMessage": null,
+        "Description": null,
+        "Module": "GenericModule",
+        "ModuleDisplayName": "Factorio",
+        "AMPVersion": "0.0.0.0",
+        "IsHTTPS": false,
+        "IP": "0.0.0.0",
+        "ApplicationIP": "0.0.0.0",
+        "IsMultiIPAware": true,
+        "Port": 8081,
+        "Daemon": false,
+        "DaemonAutostart": true,
+        "ExcludeFromFirewall": false,
+        "UseHostModeNetwork": true,
+        "Running": true,
+        "AppState": 20,
+        "Tags": [],
+        "DiskUsageMB": 0,
+        "Group": "",
+        "Order": 0,
+        "ReleaseStream": 10,
+        "ManagementMode": 10,
+        "Suspended": false,
+        "IsContainerInstance": false,
+        "ContainerMemoryMB": 0,
+        "ContainerSwapMB": 0,
+        "ContainerMemoryPolicy": 0,
+        "ContainerCPUs": 0.0,
+        "SpecificDockerImage": "cubecoders/ampbase:debian",
+        "Metrics": {
+          "CPU Usage": {
+            "RawValue": 0,
+            "MaxValue": 100,
+            "Percent": 0,
+            "Units": "%",
+            "Color": "#239B2D",
+            "Color2": "#239B2D",
+            "Color3": "#FFF",
+            "ShortName": null
+          },
+          "Memory Usage": {
+            "RawValue": 373,
+            "MaxValue": 7941,
+            "Percent": 4,
+            "Units": "MB",
+            "Color": "#246BA0",
+            "Color2": null,
+            "Color3": "#FFF",
+            "ShortName": null
+          },
+          "Active Users": {
+            "RawValue": 0,
+            "MaxValue": 0,
+            "Percent": 0,
+            "Units": "",
+            "Color": "#7B249E",
+            "Color2": null,
+            "Color3": "#FFF",
+            "ShortName": null
+          }
+        },
+        "ApplicationEndpoints": [
+          {
+            "DisplayName": "Application Address",
+            "Endpoint": "0.0.0.0:34197",
+            "Uri": ""
+          },
+          {
+            "DisplayName": "SFTP Server",
+            "Endpoint": "0.0.0.0:2224",
+            "Uri": ""
+          },
+          {
+            "DisplayName": "Unknown Endpoint",
+            "Endpoint": "0.0.0.0:34197",
+            "Uri": ""
+          },
+          {
+            "DisplayName": "Unknown Endpoint",
+            "Endpoint": "0.0.0.0:34197",
+            "Uri": ""
+          },
+          {
+            "DisplayName": "Unknown Endpoint",
+            "Endpoint": "0.0.0.0:34197",
+            "Uri": ""
+          },
+          {
+            "DisplayName": "Unknown Endpoint",
+            "Endpoint": "0.0.0.0:34197",
+            "Uri": ""
+          },
+          {
+            "DisplayName": "Unknown Endpoint",
+            "Endpoint": "0.0.0.0:34197",
+            "Uri": ""
+          },
+          {
+            "DisplayName": "SFTP Server",
+            "Endpoint": "0.0.0.0:2224",
+            "Uri": ""
+          },
+          {
+            "DisplayName": "Unknown Endpoint",
+            "Endpoint": "0.0.0.0:34197",
+            "Uri": ""
+          },
+          {
+            "DisplayName": "Unknown Endpoint",
+            "Endpoint": "0.0.0.0:34197",
+            "Uri": ""
+          },
+          {
+            "DisplayName": "Unknown Endpoint",
+            "Endpoint": "0.0.0.0:34197",
+            "Uri": ""
+          },
+          {
+            "DisplayName": "Unknown Endpoint",
+            "Endpoint": "0.0.0.0:34197",
+            "Uri": ""
+          },
+          {
+            "DisplayName": "Unknown Endpoint",
+            "Endpoint": "0.0.0.0:34197",
+            "Uri": ""
+          }
+        ],
+        "DeploymentArgs": {
+          "GenericModule.Meta.DisplayName": "Factorio",
+          "GenericModule.Meta.Description": "Factorio Dedicated Server",
+          "GenericModule.Meta.OS": "Windows, Linux",
+          "GenericModule.Meta.AarchSupport": "Emulated",
+          "GenericModule.Meta.Arch": "x86_64",
+          "GenericModule.Meta.URL": "https://factorio.com/",
+          "GenericModule.Meta.DisplayImageSource": "steam:427520",
+          "GenericModule.Meta.EndpointURIFormat": "",
+          "GenericModule.Meta.ConfigManifest": "factorioconfig.json",
+          "GenericModule.Meta.MetaConfigManifest": "factoriometaconfig.json",
+          "GenericModule.Meta.ConfigRoot": "factorio.kvp",
+          "GenericModule.Meta.MinAMPVersion": "0.0.0.0",
+          "GenericModule.Meta.SpecificDockerImage": "cubecoders/ampbase:debian",
+          "GenericModule.Meta.DockerRequired": "False",
+          "GenericModule.Meta.DockerBaseReadOnly": "False",
+          "GenericModule.Meta.ContainerPolicy": "Supported",
+          "GenericModule.Meta.ContainerPolicyReason": "",
+          "GenericModule.Meta.ExtraSetupStepsURI": "",
+          "GenericModule.Meta.Prerequisites": "[]",
+          "GenericModule.Meta.ExtraContainerPackages": "[]",
+          "GenericModule.Meta.ConfigReleaseState": "NotSpecified",
+          "GenericModule.Meta.NoCommercialUsage": "False",
+          "GenericModule.Meta.ConfigVersion": "4",
+          "GenericModule.Meta.ReleaseNotes": "",
+          "GenericModule.Meta.BreakingReleaseNotes": "",
+          "GenericModule.Meta.AppConfigId": "50882765-e275-413b-91a6-28f0fd821fde",
+          "GenericModule.Meta.ImportableExtensions": "[]",
+          "GenericModule.Meta.AppIsMultiIPAware": "True",
+          "GenericModule.App.ApplicationIPBinding": "0.0.0.0",
+          "GenericModule.App.Ports": "[{\"Protocol\":1,\"Port\":34197,\"Offset\":0,\"Range\":1,\"MinListening\":0,\"RangeSeparator\":\"-\",\"Ref\":\"ServerPort\",\"Name\":\"Server Port\",\"Description\":\"Port for game traffic\",\"IsDelayedOpen\":false,\"Hidden\":false,\"ChildPorts\":null,\"Required\":false},{\"Protocol\":0,\"Port\":7777,\"Offset\":0,\"Range\":1,\"MinListening\":0,\"RangeSeparator\":\"-\",\"Ref\":\"RCONPort\",\"Name\":\"RCON Port\",\"Description\":\"Port for RCON traffic\",\"IsDelayedOpen\":false,\"Hidden\":false,\"ChildPorts\":null,\"Required\":false}]",
+          "GenericModule.App.PrimaryApplicationPortRef": "ServerPort",
+          "GenericModule.Meta.OriginalSource": "CubeCoders-AMPTemplates-main",
+          "FileManagerPlugin.SFTP.SFTPIPBinding": "0.0.0.0",
+          "FileManagerPlugin.SFTP.SFTPPortNumber": "2224",
+          "Core.AMP.AdvertisedAddressIncludesPort": "true"
+        },
+        "CustomMountBinds": {},
+        "ExtraContainerPackages": [],
+        "DisplayImageSource": "steam:427520"
+      }
+    ],
+    "AvailableIPs": [
+      "0.0.0.0",
+      "::",
+      "192.168.200.9",
+      "0.0.0.0"
+    ],
+    "Tags": [],
+    "TagsList": "[]",
+    "URL": "http://factorio.lanparty.familie-keller.info:8080",
+    "Fitness": null
+  },
+  {
+    "Id": 2,
+    "InstanceId": "d57b457d-9a57-44ca-81ce-e03df7b11c7a",
+    "FriendlyName": "minecraft.lanparty.familie-keller.info:8080",
+    "Description": null,
+    "Disabled": false,
+    "IsRemote": true,
+    "Platform": {
+      "CPUInfo": {
+        "Sockets": 1,
+        "Cores": 4,
+        "Threads": 4,
+        "Vendor": "AuthenticAMD",
+        "ModelName": "AMD EPYC-Rome-v4 Processor (no XSAVES)",
+        "TotalCores": 4,
+        "TotalThreads": 4
+      },
+      "InstalledRAMMB": 9945,
+      "OS": 2,
+      "PlatformName": "Ubuntu 24.04.5",
+      "SystemType": 1,
+      "Virtualization": 0,
+      "DockerNetworkIsHostMode": false,
+      "HasMemoryLimit": false
+    },
+    "Datastores": [
+      {
+        "Id": 1,
+        "FriendlyName": "Default Datastore"
+      }
+    ],
+    "CreatesInContainers": false,
+    "State": 20,
+    "StateReason": "",
+    "CanCreate": true,
+    "LastUpdated": "2026-10-15T19:49:00.622334Z",
+    "LastPollUpdate": "2026-10-15T19:49:00.6204361Z",
+    "LastPushUpdate": "2026-10-15T09:49:00.9992754Z",
+    "PushUpdateThrottleInterval": "00:00:30",
+    "PollUpdateThrottleInterval": "00:01:00",
+    "PushIsCurrent": false,
+    "CanPollUpdate": false,
+    "AvailableInstances": [
+      {
+        "InstanceID": "d57b457d-9a57-44ca-81ce-e03df7b11c7a",
+        "TargetID": "d57b457d-9a57-44ca-81ce-e03df7b11c7a",
+        "InstanceName": "ADS01",
+        "FriendlyName": "ADS01",
+        "WelcomeMessage": null,
+        "Description": null,
+        "Module": "ADS",
+        "ModuleDisplayName": null,
+        "AMPVersion": "0.0.0.0",
+        "IsHTTPS": false,
+        "IP": "0.0.0.0",
+        "ApplicationIP": null,
+        "IsMultiIPAware": false,
+        "Port": 8080,
+        "Daemon": false,
+        "DaemonAutostart": true,
+        "ExcludeFromFirewall": false,
+        "UseHostModeNetwork": false,
+        "Running": true,
+        "AppState": -1,
+        "Tags": [],
+        "DiskUsageMB": 0,
+        "Group": "",
+        "Order": 10,
+        "ReleaseStream": 10,
+        "ManagementMode": 0,
+        "Suspended": false,
+        "IsContainerInstance": false,
+        "ContainerMemoryMB": 0,
+        "ContainerSwapMB": 0,
+        "ContainerMemoryPolicy": 0,
+        "ContainerCPUs": 0.0,
+        "SpecificDockerImage": null,
+        "Metrics": {},
+        "ApplicationEndpoints": [
+          {
+            "DisplayName": "Game Server Address",
+            "Endpoint": "0.0.0.0:12820",
+            "Uri": ""
+          },
+          {
+            "DisplayName": "SFTP Server",
+            "Endpoint": "0.0.0.0:2223",
+            "Uri": "sftp://0.0.0.0:2223"
+          }
+        ],
+        "DeploymentArgs": {
+          "FileManagerPlugin.SFTP.SFTPIPBinding": "0.0.0.0",
+          "FileManagerPlugin.SFTP.SFTPPortNumber": "2223",
+          "Core.AMP.AdvertisedAddressIncludesPort": "true"
+        },
+        "CustomMountBinds": {},
+        "ExtraContainerPackages": [],
+        "DisplayImageSource": null
+      },
+      {
+        "InstanceID": "a71bab7c-1213-44a0-9d07-383b36db8588",
+        "TargetID": "d57b457d-9a57-44ca-81ce-e03df7b11c7a",
+        "InstanceName": "Minecraft01",
+        "FriendlyName": "Minecraft",
+        "WelcomeMessage": null,
+        "Description": null,
+        "Module": "Minecraft",
+        "ModuleDisplayName": null,
+        "AMPVersion": "0.0.0.0",
+        "IsHTTPS": false,
+        "IP": "0.0.0.0",
+        "ApplicationIP": "0.0.0.0",
+        "IsMultiIPAware": true,
+        "Port": 8081,
+        "Daemon": false,
+        "DaemonAutostart": false,
+        "ExcludeFromFirewall": false,
+        "UseHostModeNetwork": true,
+        "Running": true,
+        "AppState": 0,
+        "Tags": [],
+        "DiskUsageMB": 0,
+        "Group": "",
+        "Order": 20,
+        "ReleaseStream": 10,
+        "ManagementMode": 10,
+        "Suspended": false,
+        "IsContainerInstance": false,
+        "ContainerMemoryMB": 0,
+        "ContainerSwapMB": 0,
+        "ContainerMemoryPolicy": 0,
+        "ContainerCPUs": 0.0,
+        "SpecificDockerImage": null,
+        "Metrics": {
+          "CPU Usage": {
+            "RawValue": 0,
+            "MaxValue": 100,
+            "Percent": 0,
+            "Units": "%",
+            "Color": "#239B2D",
+            "Color2": "#239B2D",
+            "Color3": "#FFF",
+            "ShortName": null
+          },
+          "Memory Usage": {
+            "RawValue": 0,
+            "MaxValue": 1024,
+            "Percent": 0,
+            "Units": "MB",
+            "Color": "#246BA0",
+            "Color2": null,
+            "Color3": "#FFF",
+            "ShortName": null
+          },
+          "Active Users": {
+            "RawValue": 0,
+            "MaxValue": 20,
+            "Percent": 0,
+            "Units": "",
+            "Color": "#7B249E",
+            "Color2": null,
+            "Color3": "#FFF",
+            "ShortName": null
+          }
+        },
+        "ApplicationEndpoints": [
+          {
+            "DisplayName": "Minecraft Server Address",
+            "Endpoint": "0.0.0.0:25565",
+            "Uri": ""
+          },
+          {
+            "DisplayName": "SFTP Server",
+            "Endpoint": "0.0.0.0:2224",
+            "Uri": "sftp://0.0.0.0:2224"
+          }
+        ],
+        "DeploymentArgs": {
+          "FileManagerPlugin.SFTP.SFTPIPBinding": "0.0.0.0",
+          "MinecraftModule.Minecraft.ServerIPBinding": "0.0.0.0",
+          "FileManagerPlugin.SFTP.SFTPPortNumber": "2224",
+          "MinecraftModule.Minecraft.PortNumber": "25565",
+          "Core.AMP.AdvertisedAddressIncludesPort": "true"
+        },
+        "CustomMountBinds": {},
+        "ExtraContainerPackages": [],
+        "DisplayImageSource": "internal:MinecraftJava"
+      }
+    ],
+    "AvailableIPs": [
+      "0.0.0.0",
+      "::",
+      "192.168.200.7",
+      "0.0.0.0"
+    ],
+    "Tags": [],
+    "TagsList": "[]",
+    "URL": "http://minecraft.lanparty.familie-keller.info:8080",
+    "Fitness": null
+  },
+  {
+    "Id": 4,
+    "InstanceId": "86364c2d-8b74-431a-be6d-9f1a31770bbf",
+    "FriendlyName": "retro.lanparty.familie-keller.info:8080",
+    "Description": null,
+    "Disabled": false,
+    "IsRemote": true,
+    "Platform": {
+      "CPUInfo": {
+        "Sockets": 1,
+        "Cores": 6,
+        "Threads": 6,
+        "Vendor": "GenuineIntel",
+        "ModelName": "Intel Xeon E312xx (Sandy Bridge)",
+        "TotalCores": 6,
+        "TotalThreads": 6
+      },
+      "InstalledRAMMB": 11960,
+      "OS": 2,
+      "PlatformName": "Ubuntu 24.04.5",
+      "SystemType": 1,
+      "Virtualization": 0,
+      "DockerNetworkIsHostMode": false,
+      "HasMemoryLimit": false
+    },
+    "Datastores": [
+      {
+        "Id": 1,
+        "FriendlyName": "Default Datastore"
+      }
+    ],
+    "CreatesInContainers": true,
+    "State": 20,
+    "StateReason": "",
+    "CanCreate": true,
+    "LastUpdated": "2026-10-15T19:49:00.6240317Z",
+    "LastPollUpdate": "2026-10-15T19:49:00.6225243Z",
+    "LastPushUpdate": "2026-10-15T18:55:00.8320947Z",
+    "PushUpdateThrottleInterval": "00:00:30",
+    "PollUpdateThrottleInterval": "00:01:00",
+    "PushIsCurrent": false,
+    "CanPollUpdate": false,
+    "AvailableInstances": [
+      {
+        "InstanceID": "86364c2d-8b74-431a-be6d-9f1a31770bbf",
+        "TargetID": "86364c2d-8b74-431a-be6d-9f1a31770bbf",
+        "InstanceName": "ADS01",
+        "FriendlyName": "ADS01",
+        "WelcomeMessage": null,
+        "Description": null,
+        "Module": "ADS",
+        "ModuleDisplayName": null,
+        "AMPVersion": "0.0.0.0",
+        "IsHTTPS": false,
+        "IP": "0.0.0.0",
+        "ApplicationIP": null,
+        "IsMultiIPAware": false,
+        "Port": 8080,
+        "Daemon": false,
+        "DaemonAutostart": true,
+        "ExcludeFromFirewall": false,
+        "UseHostModeNetwork": false,
+        "Running": true,
+        "AppState": -1,
+        "Tags": [],
+        "DiskUsageMB": 0,
+        "Group": "",
+        "Order": 10,
+        "ReleaseStream": 10,
+        "ManagementMode": 0,
+        "Suspended": false,
+        "IsContainerInstance": false,
+        "ContainerMemoryMB": 0,
+        "ContainerSwapMB": 0,
+        "ContainerMemoryPolicy": 0,
+        "ContainerCPUs": 0.0,
+        "SpecificDockerImage": null,
+        "Metrics": {},
+        "ApplicationEndpoints": [
+          {
+            "DisplayName": "Game Server Address",
+            "Endpoint": "0.0.0.0:12820",
+            "Uri": ""
+          },
+          {
+            "DisplayName": "SFTP Server",
+            "Endpoint": "0.0.0.0:2223",
+            "Uri": "sftp://0.0.0.0:2223"
+          }
+        ],
+        "DeploymentArgs": {
+          "FileManagerPlugin.SFTP.SFTPIPBinding": "0.0.0.0",
+          "FileManagerPlugin.SFTP.SFTPPortNumber": "2223",
+          "Core.AMP.AdvertisedAddressIncludesPort": "true"
+        },
+        "CustomMountBinds": {},
+        "ExtraContainerPackages": [],
+        "DisplayImageSource": null
+      },
+      {
+        "InstanceID": "2f6e902e-30dd-4c34-b189-1a18101d294f",
+        "TargetID": "08e9e07c-6c73-490c-9c30-45a3f9b4147b",
+        "InstanceName": "CS1601",
+        "FriendlyName": "CS16",
+        "WelcomeMessage": null,
+        "Description": null,
+        "Module": "GenericModule",
+        "ModuleDisplayName": "Counter-Strike 1.6",
+        "AMPVersion": "0.0.0.0",
+        "IsHTTPS": false,
+        "IP": "0.0.0.0",
+        "ApplicationIP": "0.0.0.0",
+        "IsMultiIPAware": true,
+        "Port": 8081,
+        "Daemon": false,
+        "DaemonAutostart": true,
+        "ExcludeFromFirewall": false,
+        "UseHostModeNetwork": false,
+        "Running": true,
+        "AppState": 20,
+        "Tags": [],
+        "DiskUsageMB": 0,
+        "Group": "",
+        "Order": 0,
+        "ReleaseStream": 10,
+        "ManagementMode": 10,
+        "Suspended": false,
+        "IsContainerInstance": true,
+        "ContainerMemoryMB": 0,
+        "ContainerSwapMB": 0,
+        "ContainerMemoryPolicy": 0,
+        "ContainerCPUs": 0.0,
+        "SpecificDockerImage": "cubecoders/ampbase:debian-12",
+        "Metrics": {
+          "CPU Usage": {
+            "RawValue": 0,
+            "MaxValue": 100,
+            "Percent": 0,
+            "Units": "%",
+            "Color": "#239B2D",
+            "Color2": "#239B2D",
+            "Color3": "#FFF",
+            "ShortName": null
+          },
+          "Memory Usage": {
+            "RawValue": 122,
+            "MaxValue": 11960,
+            "Percent": 1,
+            "Units": "MB",
+            "Color": "#246BA0",
+            "Color2": null,
+            "Color3": "#FFF",
+            "ShortName": null
+          },
+          "Active Users": {
+            "RawValue": 0,
+            "MaxValue": 24,
+            "Percent": 0,
+            "Units": "",
+            "Color": "#7B249E",
+            "Color2": null,
+            "Color3": "#FFF",
+            "ShortName": null
+          }
+        },
+        "ApplicationEndpoints": [
+          {
+            "DisplayName": "Application Address",
+            "Endpoint": "0.0.0.0:27015",
+            "Uri": "steam://connect/0.0.0.0:27015"
+          },
+          {
+            "DisplayName": "SFTP Server",
+            "Endpoint": "0.0.0.0:2224",
+            "Uri": "steam://connect/0.0.0.0:2224"
+          },
+          {
+            "DisplayName": "Unknown Endpoint",
+            "Endpoint": "0.0.0.0:27015",
+            "Uri": "steam://connect/0.0.0.0:27015"
+          },
+          {
+            "DisplayName": "Unknown Endpoint",
+            "Endpoint": "0.0.0.0:27015",
+            "Uri": "steam://connect/0.0.0.0:27015"
+          },
+          {
+            "DisplayName": "Unknown Endpoint",
+            "Endpoint": "0.0.0.0:27015",
+            "Uri": "steam://connect/0.0.0.0:27015"
+          },
+          {
+            "DisplayName": "Unknown Endpoint",
+            "Endpoint": "0.0.0.0:27015",
+            "Uri": "steam://connect/0.0.0.0:27015"
+          },
+          {
+            "DisplayName": "Unknown Endpoint",
+            "Endpoint": "0.0.0.0:27015",
+            "Uri": "steam://connect/0.0.0.0:27015"
+          },
+          {
+            "DisplayName": "SFTP Server",
+            "Endpoint": "0.0.0.0:2224",
+            "Uri": "steam://connect/0.0.0.0:2224"
+          },
+          {
+            "DisplayName": "Unknown Endpoint",
+            "Endpoint": "0.0.0.0:27015",
+            "Uri": "steam://connect/0.0.0.0:27015"
+          },
+          {
+            "DisplayName": "Unknown Endpoint",
+            "Endpoint": "0.0.0.0:27015",
+            "Uri": "steam://connect/0.0.0.0:27015"
+          },
+          {
+            "DisplayName": "Unknown Endpoint",
+            "Endpoint": "0.0.0.0:27015",
+            "Uri": "steam://connect/0.0.0.0:27015"
+          },
+          {
+            "DisplayName": "Unknown Endpoint",
+            "Endpoint": "0.0.0.0:27015",
+            "Uri": "steam://connect/0.0.0.0:27015"
+          },
+          {
+            "DisplayName": "Unknown Endpoint",
+            "Endpoint": "0.0.0.0:27015",
+            "Uri": "steam://connect/0.0.0.0:27015"
+          }
+        ],
+        "DeploymentArgs": {
+          "GenericModule.Meta.DisplayName": "Counter-Strike 1.6",
+          "GenericModule.Meta.Description": "Counter-Strike 1.6 Dedicated Server",
+          "GenericModule.Meta.OS": "Windows, Linux",
+          "GenericModule.Meta.AarchSupport": "NotSupported",
+          "GenericModule.Meta.Arch": "x86_64",
+          "GenericModule.Meta.URL": "https://store.steampowered.com/app/10/CounterStrike/",
+          "GenericModule.Meta.DisplayImageSource": "steam:10",
+          "GenericModule.Meta.EndpointURIFormat": "steam://connect/{0}",
+          "GenericModule.Meta.ConfigManifest": "counter-strike16config.json",
+          "GenericModule.Meta.MetaConfigManifest": "counter-strike16metaconfig.json",
+          "GenericModule.Meta.ConfigRoot": "counter-strike16.kvp",
+          "GenericModule.Meta.MinAMPVersion": "0.0.0.0",
+          "GenericModule.Meta.SpecificDockerImage": "cubecoders/ampbase:debian-12",
+          "GenericModule.Meta.DockerRequired": "False",
+          "GenericModule.Meta.DockerBaseReadOnly": "False",
+          "GenericModule.Meta.ContainerPolicy": "Supported",
+          "GenericModule.Meta.ContainerPolicyReason": "",
+          "GenericModule.Meta.ExtraSetupStepsURI": "",
+          "GenericModule.Meta.Prerequisites": "[]",
+          "GenericModule.Meta.ExtraContainerPackages": "[]",
+          "GenericModule.Meta.ConfigReleaseState": "NotSpecified",
+          "GenericModule.Meta.NoCommercialUsage": "False",
+          "GenericModule.Meta.AppConfigId": "081b373a-90d8-437b-ae32-0781f6eed658",
+          "GenericModule.Meta.ConfigVersion": "8",
+          "GenericModule.Meta.ReleaseNotes": "",
+          "GenericModule.Meta.BreakingReleaseNotes": "",
+          "GenericModule.Meta.AppIsMultiIPAware": "True",
+          "GenericModule.App.ApplicationIPBinding": "0.0.0.0",
+          "GenericModule.App.Ports": "[{\"Protocol\":1,\"Port\":27015,\"Offset\":0,\"Range\":1,\"MinListening\":0,\"RangeSeparator\":\"-\",\"Ref\":\"GameRCONPort\",\"Name\":\"Game and RCON Port\",\"Description\":\"Port for game and RCON traffic\",\"IsDelayedOpen\":false,\"Hidden\":false,\"ChildPorts\":null,\"Required\":false}]",
+          "GenericModule.App.PrimaryApplicationPortRef": "GameRCONPort",
+          "GenericModule.Meta.OriginalSource": "CubeCoders-AMPTemplates-main",
+          "FileManagerPlugin.SFTP.SFTPIPBinding": "0.0.0.0",
+          "FileManagerPlugin.SFTP.SFTPPortNumber": "2224",
+          "Core.AMP.AdvertisedAddressIncludesPort": "true"
+        },
+        "CustomMountBinds": {},
+        "ExtraContainerPackages": [],
+        "DisplayImageSource": "steam:10"
+      },
+      {
+        "InstanceID": "f7516ff3-60b0-4d7f-9eee-8c13e64fa827",
+        "TargetID": "08e9e07c-6c73-490c-9c30-45a3f9b4147b",
+        "InstanceName": "CoD401",
+        "FriendlyName": "CoD4",
+        "WelcomeMessage": null,
+        "Description": null,
+        "Module": "GenericModule",
+        "ModuleDisplayName": "Call of Duty 4: Modern Warfare",
+        "AMPVersion": "0.0.0.0",
+        "IsHTTPS": false,
+        "IP": "0.0.0.0",
+        "ApplicationIP": "0.0.0.0",
+        "IsMultiIPAware": false,
+        "Port": 8082,
+        "Daemon": false,
+        "DaemonAutostart": true,
+        "ExcludeFromFirewall": false,
+        "UseHostModeNetwork": false,
+        "Running": true,
+        "AppState": 0,
+        "Tags": [],
+        "DiskUsageMB": 0,
+        "Group": "",
+        "Order": 0,
+        "ReleaseStream": 10,
+        "ManagementMode": 10,
+        "Suspended": false,
+        "IsContainerInstance": true,
+        "ContainerMemoryMB": 0,
+        "ContainerSwapMB": 0,
+        "ContainerMemoryPolicy": 0,
+        "ContainerCPUs": 0.0,
+        "SpecificDockerImage": "cubecoders/ampbase:wine-stable",
+        "Metrics": {
+          "CPU Usage": {
+            "RawValue": 0,
+            "MaxValue": 100,
+            "Percent": 0,
+            "Units": "%",
+            "Color": "#239B2D",
+            "Color2": "#239B2D",
+            "Color3": "#FFF",
+            "ShortName": null
+          },
+          "Memory Usage": {
+            "RawValue": 0,
+            "MaxValue": 11960,
+            "Percent": 0,
+            "Units": "MB",
+            "Color": "#246BA0",
+            "Color2": null,
+            "Color3": "#FFF",
+            "ShortName": null
+          },
+          "Active Users": {
+            "RawValue": 0,
+            "MaxValue": 32,
+            "Percent": 0,
+            "Units": "",
+            "Color": "#7B249E",
+            "Color2": null,
+            "Color3": "#FFF",
+            "ShortName": null
+          }
+        },
+        "ApplicationEndpoints": [
+          {
+            "DisplayName": "Application Address",
+            "Endpoint": "0.0.0.0:28960",
+            "Uri": "steam://connect/0.0.0.0:20810"
+          },
+          {
+            "DisplayName": "SFTP Server",
+            "Endpoint": "0.0.0.0:2225",
+            "Uri": "steam://connect/0.0.0.0:20810"
+          },
+          {
+            "DisplayName": "Unknown Endpoint",
+            "Endpoint": "0.0.0.0:28960",
+            "Uri": "steam://connect/0.0.0.0:20810"
+          },
+          {
+            "DisplayName": "Unknown Endpoint",
+            "Endpoint": "0.0.0.0:28960",
+            "Uri": "steam://connect/0.0.0.0:20810"
+          },
+          {
+            "DisplayName": "Unknown Endpoint",
+            "Endpoint": "0.0.0.0:28960",
+            "Uri": "steam://connect/0.0.0.0:20810"
+          },
+          {
+            "DisplayName": "Unknown Endpoint",
+            "Endpoint": "0.0.0.0:28960",
+            "Uri": "steam://connect/0.0.0.0:20810"
+          },
+          {
+            "DisplayName": "Unknown Endpoint",
+            "Endpoint": "0.0.0.0:28960",
+            "Uri": "steam://connect/0.0.0.0:20810"
+          },
+          {
+            "DisplayName": "SFTP Server",
+            "Endpoint": "0.0.0.0:2225",
+            "Uri": "steam://connect/0.0.0.0:20810"
+          },
+          {
+            "DisplayName": "Unknown Endpoint",
+            "Endpoint": "0.0.0.0:28960",
+            "Uri": "steam://connect/0.0.0.0:20810"
+          },
+          {
+            "DisplayName": "Unknown Endpoint",
+            "Endpoint": "0.0.0.0:28960",
+            "Uri": "steam://connect/0.0.0.0:20810"
+          },
+          {
+            "DisplayName": "Unknown Endpoint",
+            "Endpoint": "0.0.0.0:28960",
+            "Uri": "steam://connect/0.0.0.0:20810"
+          },
+          {
+            "DisplayName": "Unknown Endpoint",
+            "Endpoint": "0.0.0.0:28960",
+            "Uri": "steam://connect/0.0.0.0:20810"
+          },
+          {
+            "DisplayName": "Unknown Endpoint",
+            "Endpoint": "0.0.0.0:28960",
+            "Uri": "steam://connect/0.0.0.0:20810"
+          }
+        ],
+        "DeploymentArgs": {
+          "GenericModule.Meta.DisplayName": "Call of Duty 4: Modern Warfare",
+          "GenericModule.Meta.Description": "Call of Duty 4: Modern Warfare Dedicated Server",
+          "GenericModule.Meta.OS": "Windows, Linux",
+          "GenericModule.Meta.Arch": "x86_64",
+          "GenericModule.Meta.URL": "",
+          "GenericModule.Meta.DisplayImageSource": "steam:7940",
+          "GenericModule.Meta.EndpointURIFormat": "steam://connect/{ip}:{GenericModule.App.Ports.$MasterPort}",
+          "GenericModule.Meta.ConfigManifest": "call-of-duty4mwconfig.json",
+          "GenericModule.Meta.MetaConfigManifest": "call-of-duty4mwmetaconfig.json",
+          "GenericModule.Meta.ConfigRoot": "call-of-duty4mw.kvp",
+          "GenericModule.Meta.MinAMPVersion": "0.0.0.0",
+          "GenericModule.Meta.SpecificDockerImage": "cubecoders/ampbase:wine-stable",
+          "GenericModule.Meta.DockerRequired": "False",
+          "GenericModule.Meta.ContainerPolicy": "SupportedOnWindows, RecommendedOnLinux",
+          "GenericModule.Meta.ContainerPolicyReason": "The server requires Wine (ideally latest stable from winehq.org) to run on Linux. Using a container avoids the need for you to install this dependency on the host.",
+          "GenericModule.Meta.Prerequisites": "[]",
+          "GenericModule.Meta.ExtraContainerPackages": "[]",
+          "GenericModule.Meta.ConfigReleaseState": "NotSpecified",
+          "GenericModule.Meta.NoCommercialUsage": "False",
+          "GenericModule.Meta.ConfigVersion": "5",
+          "GenericModule.Meta.AppConfigId": "31213330-971c-4538-aebb-6abb44c3d9d2",
+          "GenericModule.Meta.AppIsMultiIPAware": "False",
+          "GenericModule.App.ApplicationIPBinding": "0.0.0.0",
+          "GenericModule.App.Ports": "[{\"Protocol\":1,\"Port\":28960,\"Offset\":0,\"Range\":1,\"MinListening\":0,\"RangeSeparator\":\"-\",\"Ref\":\"GamePort\",\"Name\":\"Game Port\",\"Description\":\"Port for game traffic\",\"IsDelayedOpen\":false,\"Hidden\":false,\"ChildPorts\":null,\"Required\":false},{\"Protocol\":1,\"Port\":20800,\"Offset\":0,\"Range\":1,\"MinListening\":0,\"RangeSeparator\":\"-\",\"Ref\":\"AuthPort\",\"Name\":\"Authentication Port\",\"Description\":\"Port for Steam authentication traffic\",\"IsDelayedOpen\":false,\"Hidden\":false,\"ChildPorts\":null,\"Required\":false},{\"Protocol\":1,\"Port\":20810,\"Offset\":0,\"Range\":1,\"MinListening\":0,\"RangeSeparator\":\"-\",\"Ref\":\"MasterPort\",\"Name\":\"Master Port\",\"Description\":\"Port for Steam master server or browser traffic\",\"IsDelayedOpen\":false,\"Hidden\":false,\"ChildPorts\":null,\"Required\":false}]",
+          "GenericModule.App.PrimaryApplicationPortRef": "GamePort",
+          "GenericModule.Meta.OriginalSource": "CubeCoders-AMPTemplates-main",
+          "FileManagerPlugin.SFTP.SFTPIPBinding": "0.0.0.0",
+          "FileManagerPlugin.SFTP.SFTPPortNumber": "2225",
+          "Core.AMP.AdvertisedAddressIncludesPort": "true"
+        },
+        "CustomMountBinds": {},
+        "ExtraContainerPackages": [],
+        "DisplayImageSource": "steam:7940"
+      },
+      {
+        "InstanceID": "101af5b6-f2e5-4483-81bc-2a03df6a4092",
+        "TargetID": "08e9e07c-6c73-490c-9c30-45a3f9b4147b",
+        "InstanceName": "Soldat01",
+        "FriendlyName": "Soldat",
+        "WelcomeMessage": null,
+        "Description": null,
+        "Module": "GenericModule",
+        "ModuleDisplayName": "Soldat",
+        "AMPVersion": "0.0.0.0",
+        "IsHTTPS": false,
+        "IP": "0.0.0.0",
+        "ApplicationIP": "0.0.0.0",
+        "IsMultiIPAware": true,
+        "Port": 8083,
+        "Daemon": false,
+        "DaemonAutostart": true,
+        "ExcludeFromFirewall": false,
+        "UseHostModeNetwork": false,
+        "Running": true,
+        "AppState": 20,
+        "Tags": [],
+        "DiskUsageMB": 0,
+        "Group": "",
+        "Order": 0,
+        "ReleaseStream": 10,
+        "ManagementMode": 10,
+        "Suspended": false,
+        "IsContainerInstance": true,
+        "ContainerMemoryMB": 0,
+        "ContainerSwapMB": 0,
+        "ContainerMemoryPolicy": 0,
+        "ContainerCPUs": 0.0,
+        "SpecificDockerImage": "cubecoders/ampbase:debian",
+        "Metrics": {
+          "CPU Usage": {
+            "RawValue": 0,
+            "MaxValue": 100,
+            "Percent": 0,
+            "Units": "%",
+            "Color": "#239B2D",
+            "Color2": "#239B2D",
+            "Color3": "#FFF",
+            "ShortName": null
+          },
+          "Memory Usage": {
+            "RawValue": 28,
+            "MaxValue": 11960,
+            "Percent": 0,
+            "Units": "MB",
+            "Color": "#246BA0",
+            "Color2": null,
+            "Color3": "#FFF",
+            "ShortName": null
+          },
+          "Active Users": {
+            "RawValue": 0,
+            "MaxValue": 10,
+            "Percent": 0,
+            "Units": "",
+            "Color": "#7B249E",
+            "Color2": null,
+            "Color3": "#FFF",
+            "ShortName": null
+          }
+        },
+        "ApplicationEndpoints": [
+          {
+            "DisplayName": "Application Address",
+            "Endpoint": "0.0.0.0:23073",
+            "Uri": ""
+          },
+          {
+            "DisplayName": "SFTP Server",
+            "Endpoint": "0.0.0.0:2226",
+            "Uri": ""
+          },
+          {
+            "DisplayName": "Unknown Endpoint",
+            "Endpoint": "0.0.0.0:23073",
+            "Uri": ""
+          },
+          {
+            "DisplayName": "Unknown Endpoint",
+            "Endpoint": "0.0.0.0:23073",
+            "Uri": ""
+          },
+          {
+            "DisplayName": "Unknown Endpoint",
+            "Endpoint": "0.0.0.0:23073",
+            "Uri": ""
+          },
+          {
+            "DisplayName": "Unknown Endpoint",
+            "Endpoint": "0.0.0.0:23073",
+            "Uri": ""
+          },
+          {
+            "DisplayName": "Unknown Endpoint",
+            "Endpoint": "0.0.0.0:23073",
+            "Uri": ""
+          },
+          {
+            "DisplayName": "SFTP Server",
+            "Endpoint": "0.0.0.0:2226",
+            "Uri": ""
+          },
+          {
+            "DisplayName": "Unknown Endpoint",
+            "Endpoint": "0.0.0.0:23073",
+            "Uri": ""
+          },
+          {
+            "DisplayName": "Unknown Endpoint",
+            "Endpoint": "0.0.0.0:23073",
+            "Uri": ""
+          },
+          {
+            "DisplayName": "Unknown Endpoint",
+            "Endpoint": "0.0.0.0:23073",
+            "Uri": ""
+          },
+          {
+            "DisplayName": "Unknown Endpoint",
+            "Endpoint": "0.0.0.0:23073",
+            "Uri": ""
+          },
+          {
+            "DisplayName": "Unknown Endpoint",
+            "Endpoint": "0.0.0.0:23073",
+            "Uri": ""
+          }
+        ],
+        "DeploymentArgs": {
+          "GenericModule.Meta.DisplayName": "Soldat",
+          "GenericModule.Meta.Description": "Soldat Dedicated Server",
+          "GenericModule.Meta.OS": "Windows, Linux",
+          "GenericModule.Meta.AarchSupport": "Unknown",
+          "GenericModule.Meta.Arch": "x86_64",
+          "GenericModule.Meta.URL": "https://www.soldat.pl/en/",
+          "GenericModule.Meta.DisplayImageSource": "steam:638490",
+          "GenericModule.Meta.EndpointURIFormat": " ",
+          "GenericModule.Meta.ConfigManifest": "soldatconfig.json",
+          "GenericModule.Meta.MetaConfigManifest": "soldatmetaconfig.json",
+          "GenericModule.Meta.ConfigRoot": "soldat.kvp",
+          "GenericModule.Meta.MinAMPVersion": "0.0.0.0",
+          "GenericModule.Meta.SpecificDockerImage": "cubecoders/ampbase:debian",
+          "GenericModule.Meta.DockerRequired": "False",
+          "GenericModule.Meta.DockerBaseReadOnly": "False",
+          "GenericModule.Meta.ContainerPolicy": "Supported",
+          "GenericModule.Meta.ContainerPolicyReason": "",
+          "GenericModule.Meta.ExtraSetupStepsURI": "",
+          "GenericModule.Meta.Prerequisites": "[]",
+          "GenericModule.Meta.ExtraContainerPackages": "[]",
+          "GenericModule.Meta.ConfigReleaseState": "NotSpecified",
+          "GenericModule.Meta.NoCommercialUsage": "False",
+          "GenericModule.Meta.ConfigVersion": "1",
+          "GenericModule.Meta.ReleaseNotes": "",
+          "GenericModule.Meta.BreakingReleaseNotes": "",
+          "GenericModule.Meta.AppConfigId": "201ba50c-ad18-42d3-9ae8-891c7b5cb831",
+          "GenericModule.Meta.ImportableExtensions": "[\".ini\"]",
+          "GenericModule.Meta.AppIsMultiIPAware": "True",
+          "GenericModule.App.ApplicationIPBinding": "0.0.0.0",
+          "GenericModule.App.Ports": "[{\"Protocol\":2,\"Port\":23073,\"Offset\":0,\"Range\":1,\"MinListening\":0,\"RangeSeparator\":\"-\",\"Ref\":\"ServerPort\",\"Name\":\"Server Port\",\"Description\":\"Port used for main game and admin traffic\",\"IsDelayedOpen\":false,\"Hidden\":false,\"ChildPorts\":[{\"Protocol\":0,\"Offset\":10,\"Range\":1,\"MinListening\":0,\"RangeSeparator\":\"-\",\"Ref\":\"FilesPort\",\"Name\":\"Files Port\",\"Description\":\"Port used for files traffic\",\"IsDelayedOpen\":false,\"Hidden\":false,\"ChildPorts\":null,\"Required\":false}],\"Required\":false}]",
+          "GenericModule.App.PrimaryApplicationPortRef": "ServerPort",
+          "GenericModule.Meta.OriginalSource": "CubeCoders-AMPTemplates-main",
+          "FileManagerPlugin.SFTP.SFTPIPBinding": "0.0.0.0",
+          "FileManagerPlugin.SFTP.SFTPPortNumber": "2226",
+          "Core.AMP.AdvertisedAddressIncludesPort": "true"
+        },
+        "CustomMountBinds": {},
+        "ExtraContainerPackages": [],
+        "DisplayImageSource": "steam:638490"
+      },
+      {
+        "InstanceID": "e82200b0-ba87-41a1-b74f-228881d8c00a",
+        "TargetID": "08e9e07c-6c73-490c-9c30-45a3f9b4147b",
+        "InstanceName": "UT200401",
+        "FriendlyName": "UT2004",
+        "WelcomeMessage": null,
+        "Description": null,
+        "Module": "GenericModule",
+        "ModuleDisplayName": "Unreal Tournament 2004",
+        "AMPVersion": "0.0.0.0",
+        "IsHTTPS": false,
+        "IP": "0.0.0.0",
+        "ApplicationIP": "0.0.0.0",
+        "IsMultiIPAware": false,
+        "Port": 8084,
+        "Daemon": false,
+        "DaemonAutostart": true,
+        "ExcludeFromFirewall": false,
+        "UseHostModeNetwork": false,
+        "Running": true,
+        "AppState": 0,
+        "Tags": [],
+        "DiskUsageMB": 0,
+        "Group": "",
+        "Order": 0,
+        "ReleaseStream": 10,
+        "ManagementMode": 10,
+        "Suspended": false,
+        "IsContainerInstance": true,
+        "ContainerMemoryMB": 0,
+        "ContainerSwapMB": 0,
+        "ContainerMemoryPolicy": 0,
+        "ContainerCPUs": 0.0,
+        "SpecificDockerImage": "cubecoders/ampbase:debian",
+        "Metrics": {
+          "CPU Usage": {
+            "RawValue": 0,
+            "MaxValue": 100,
+            "Percent": 0,
+            "Units": "%",
+            "Color": "#239B2D",
+            "Color2": "#239B2D",
+            "Color3": "#FFF",
+            "ShortName": null
+          },
+          "Memory Usage": {
+            "RawValue": 0,
+            "MaxValue": 11960,
+            "Percent": 0,
+            "Units": "MB",
+            "Color": "#246BA0",
+            "Color2": null,
+            "Color3": "#FFF",
+            "ShortName": null
+          },
+          "Active Users": {
+            "RawValue": 0,
+            "MaxValue": 16,
+            "Percent": 0,
+            "Units": "",
+            "Color": "#7B249E",
+            "Color2": null,
+            "Color3": "#FFF",
+            "ShortName": null
+          }
+        },
+        "ApplicationEndpoints": [
+          {
+            "DisplayName": "Application Address",
+            "Endpoint": "0.0.0.0:7777",
+            "Uri": ""
+          },
+          {
+            "DisplayName": "SFTP Server",
+            "Endpoint": "0.0.0.0:2227",
+            "Uri": ""
+          },
+          {
+            "DisplayName": "Unknown Endpoint",
+            "Endpoint": "0.0.0.0:7777",
+            "Uri": ""
+          },
+          {
+            "DisplayName": "Unknown Endpoint",
+            "Endpoint": "0.0.0.0:7777",
+            "Uri": ""
+          },
+          {
+            "DisplayName": "Unknown Endpoint",
+            "Endpoint": "0.0.0.0:7777",
+            "Uri": ""
+          },
+          {
+            "DisplayName": "Unknown Endpoint",
+            "Endpoint": "0.0.0.0:7777",
+            "Uri": ""
+          },
+          {
+            "DisplayName": "Unknown Endpoint",
+            "Endpoint": "0.0.0.0:7777",
+            "Uri": ""
+          },
+          {
+            "DisplayName": "SFTP Server",
+            "Endpoint": "0.0.0.0:2227",
+            "Uri": ""
+          },
+          {
+            "DisplayName": "Unknown Endpoint",
+            "Endpoint": "0.0.0.0:7777",
+            "Uri": ""
+          },
+          {
+            "DisplayName": "Unknown Endpoint",
+            "Endpoint": "0.0.0.0:7777",
+            "Uri": ""
+          },
+          {
+            "DisplayName": "Unknown Endpoint",
+            "Endpoint": "0.0.0.0:7777",
+            "Uri": ""
+          },
+          {
+            "DisplayName": "Unknown Endpoint",
+            "Endpoint": "0.0.0.0:7777",
+            "Uri": ""
+          },
+          {
+            "DisplayName": "Unknown Endpoint",
+            "Endpoint": "0.0.0.0:7777",
+            "Uri": ""
+          }
+        ],
+        "DeploymentArgs": {
+          "GenericModule.Meta.DisplayName": "Unreal Tournament 2004",
+          "GenericModule.Meta.Description": "Unreal Tournament 2004 Dedicated Server. Based on v3369.3 and added bonus packs, with OldUnreal Patches",
+          "GenericModule.Meta.OS": "Windows, Linux",
+          "GenericModule.Meta.AarchSupport": "Unknown",
+          "GenericModule.Meta.Arch": "x86_64",
+          "GenericModule.Meta.URL": "https://unreal.fandom.com/wiki/Unreal_Tournament_2004",
+          "GenericModule.Meta.DisplayImageSource": "steam:13230",
+          "GenericModule.Meta.EndpointURIFormat": " ",
+          "GenericModule.Meta.ConfigManifest": "ut2004config.json",
+          "GenericModule.Meta.MetaConfigManifest": "ut2004metaconfig.json",
+          "GenericModule.Meta.ConfigRoot": "ut2004.kvp",
+          "GenericModule.Meta.MinAMPVersion": "0.0.0.0",
+          "GenericModule.Meta.SpecificDockerImage": "cubecoders/ampbase:debian",
+          "GenericModule.Meta.DockerRequired": "False",
+          "GenericModule.Meta.DockerBaseReadOnly": "False",
+          "GenericModule.Meta.ContainerPolicy": "Supported",
+          "GenericModule.Meta.ContainerPolicyReason": "",
+          "GenericModule.Meta.ExtraSetupStepsURI": "",
+          "GenericModule.Meta.Prerequisites": "[]",
+          "GenericModule.Meta.ExtraContainerPackages": "[]",
+          "GenericModule.Meta.ConfigReleaseState": "NotSpecified",
+          "GenericModule.Meta.NoCommercialUsage": "False",
+          "GenericModule.Meta.ConfigVersion": "6",
+          "GenericModule.Meta.ReleaseNotes": "",
+          "GenericModule.Meta.BreakingReleaseNotes": "",
+          "GenericModule.Meta.AppConfigId": "1d67b152-c82c-4271-94a9-ce7ead121d2f",
+          "GenericModule.Meta.ImportableExtensions": "[]",
+          "GenericModule.Meta.AppIsMultiIPAware": "False",
+          "GenericModule.App.ApplicationIPBinding": "0.0.0.0",
+          "GenericModule.App.Ports": "[{\"Protocol\":1,\"Port\":7777,\"Offset\":0,\"Range\":1,\"MinListening\":0,\"RangeSeparator\":\"-\",\"Ref\":\"GamePort\",\"Name\":\"Game Port\",\"Description\":\"Port for game traffic\",\"IsDelayedOpen\":false,\"Hidden\":false,\"ChildPorts\":[{\"Protocol\":1,\"Offset\":1,\"Range\":1,\"MinListening\":0,\"RangeSeparator\":\"-\",\"Ref\":\"QueryPort\",\"Name\":\"Query Port\",\"Description\":\"Port for query traffic\",\"IsDelayedOpen\":false,\"Hidden\":false,\"ChildPorts\":null,\"Required\":false}],\"Required\":false},{\"Protocol\":0,\"Port\":8888,\"Offset\":0,\"Range\":1,\"MinListening\":0,\"RangeSeparator\":\"-\",\"Ref\":\"WebserverPort\",\"Name\":\"Webserver Port\",\"Description\":\"Port for webserver traffic\",\"IsDelayedOpen\":false,\"Hidden\":false,\"ChildPorts\":null,\"Required\":false}]",
+          "GenericModule.App.PrimaryApplicationPortRef": "GamePort",
+          "GenericModule.Meta.OriginalSource": "CubeCoders-AMPTemplates-main",
+          "FileManagerPlugin.SFTP.SFTPIPBinding": "0.0.0.0",
+          "FileManagerPlugin.SFTP.SFTPPortNumber": "2227",
+          "Core.AMP.AdvertisedAddressIncludesPort": "true"
+        },
+        "CustomMountBinds": {},
+        "ExtraContainerPackages": [],
+        "DisplayImageSource": "steam:13230"
+      }
+    ],
+    "AvailableIPs": [
+      "0.0.0.0",
+      "::",
+      "192.168.200.10",
+      "0.0.0.0"
+    ],
+    "Tags": [],
+    "TagsList": "[]",
+    "URL": "http://retro.lanparty.familie-keller.info:8080",
+    "Fitness": null
+  }
+]

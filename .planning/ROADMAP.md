@@ -99,7 +99,7 @@ Plans:
 **Plans:** 4 plans
 Plans:
 - [x] 15-01-zugang-und-bindings-PLAN.md — Env-Zugang, Session-Cache, CA-Verifikation, Migration `0019_game_server_bindings.sql`, Bindungs-Domain, Admin-Pflege (AMP-01, AMP-02).
-- [ ] 15-02-status-und-steuerung-PLAN.md — Statusdienst + SSE, `canManageServers`, Steuer-/Konsolen-Endpunkte mit Audit + Rate-Limit, Kiosk-Status (AMP-03, AMP-04).
+- [x] 15-02-status-und-steuerung-PLAN.md — Statusdienst + SSE, `canManageServers`, Steuer-/Konsolen-Endpunkte mit Audit + Rate-Limit, Kiosk-Status (AMP-03, AMP-04).
 - [ ] 15-03-ui-serverpanel-PLAN.md — ServerPanel/Konsole in der Event-Karte, Verbinden-Links, Event-Formular mit Bindungsauswahl (AMP-03, AMP-04).
 - [ ] 15-04-automatik-und-haertung-PLAN.md — Auto-Start/-Stop, Push, README/Compose, e2e (AMP-05).
 **UI hint**: yes
@@ -125,7 +125,7 @@ Plans:
 | 11. Admin Bulk User Import | 0/2 | Not started | — |
 | 12. Audio and Haptic Notification UX | 0/2 | Not started | — |
 | 13. CI Node 24 Readiness | 0/1 | Not started | — |
-| 15. AMP-Gameserver-Modul | 1/4 | In progress (15-01 complete 2026-10-15) | — |
+| 15. AMP-Gameserver-Modul | 2/4 | In progress (15-01, 15-02 complete 2026-10-15) | — |
 
 ## Out-of-band: Pizza Ordering System
 
