@@ -41,6 +41,7 @@ Progress: [===.......] 29% (4 of 14 plans executed)
 | 11 — Bulk User Import | 2 | — | Not started — PLAN files only |
 | 12 — Audio & Haptic Notifications | 2 | `0012_audio_haptic_prefs.sql` (planned) | Not started — PLAN files only |
 | 13 — CI Node 24 Readiness | 1 | — | Not started — PLAN file only |
+| 15 — AMP-Gameserver-Modul | 4 | `0019_game_server_bindings.sql` (planned) | Not started — CONTEXT + PLAN files (2026-10-15), Branch `feature/amp-integration` rebased |
 
 ### Out-of-band work shipped after Phase 9
 
