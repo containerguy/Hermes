@@ -89,6 +89,25 @@ export type AmpIntegrationInstance = {
   connectionInfo: string;
 };
 
+/** Phase 15: Live-Status einer gebundenen Instanz (GET /api/integrations/amp/status, SSE servers_changed). */
+export type ServerStatus = {
+  bindingId: string;
+  ampInstanceId: string;
+  ampInstanceName: string;
+  /** AMP-Instanz (Prozess/Container) läuft. */
+  instanceRunning: boolean;
+  /** Spielserver ist bereit (AppState Ready). */
+  running: boolean;
+  appState: string;
+  players: number | null;
+  maxPlayers: number | null;
+  host: string;
+  port: number;
+  connectScheme: "steam" | "minecraft" | "copy";
+  updatedAt: string;
+  error: string | null;
+};
+
 /** Phase 15: Bindung Spieltitel -> AMP-Instanz (GET/POST/PUT /api/integrations/amp/bindings). */
 export type GameServerBinding = {
   id: string;

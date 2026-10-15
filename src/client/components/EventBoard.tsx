@@ -1,5 +1,5 @@
-import React, { FormEvent, useEffect, useMemo, useState } from "react";
-import type { AmpIntegrationInstance, GameEvent, User } from "../types/core";
+import React, { FormEvent, useEffect, useState } from "react";
+import type { GameEvent, GameServerBinding, ServerStatus, User } from "../types/core";
 import { requestJson } from "../api/request";
 import { ApiError, getErrorMessage } from "../errors/errors";
 import { useI18n } from "../i18n/I18nContext";
@@ -7,6 +7,10 @@ import { useBrandIconSrc } from "../lib/BrandingContext";
 import { fromDatetimeLocal, toDatetimeLocal } from "../lib/event-format";
 import { useCompactTouchShell } from "../lib/useCompactTouchShell";
 import { EventCard } from "./EventCard";
+import { normalizeGameTitle } from "../../shared/game-title";
+import type { ServerAction } from "../gameservers/ServerPanel";
+import { publishServerStatus } from "../gameservers/server-status-bus";
+import { useServerStatus } from "../gameservers/use-server-status";
 
 export function EventBoard({
   currentUser,
@@ -48,47 +52,44 @@ export function EventBoard({
   const compactTouchShell = useCompactTouchShell();
   const [expandedEventId, setExpandedEventId] = useState<string | null>(null);
   const [createFlowOpen, setCreateFlowOpen] = useState(false);
-  const [ampInstances, setAmpInstances] = useState<AmpIntegrationInstance[]>([]);
-  const [ampLoading, setAmpLoading] = useState(false);
-  const [ampLoadError, setAmpLoadError] = useState("");
-  const [ampSelection, setAmpSelection] = useState("");
+  // Phase 15: Bindungen Spiel -> AMP-Instanz (fürs Formular) und Live-Status (für die Karten)
+  const [bindings, setBindings] = useState<GameServerBinding[]>([]);
+  const [linkServer, setLinkServer] = useState(true);
+  const [serverBusy, setServerBusy] = useState<Record<string, boolean>>({});
+  const { byBinding: serverStatus, refresh: refreshServerStatus } = useServerStatus(
+    ampIntegrationEnabled,
+    currentUser?.id
+  );
+  const canManageServers = currentUser?.role === "admin" || currentUser?.role === "manager";
 
   const canCreate =
     currentUser?.role === "manager" ||
     currentUser?.role === "organizer" ||
     currentUser?.role === "admin";
   const showCreateForm = canCreate && mode === "manager";
-  const ampFormVisible =
-    ampIntegrationEnabled && showCreateForm && (!compactTouchShell || createFlowOpen);
+  const bindingFormVisible = ampIntegrationEnabled && showCreateForm;
 
   useEffect(() => {
-    if (!ampFormVisible || !currentUser) {
+    if (!bindingFormVisible || !currentUser) {
+      setBindings([]);
       return undefined;
     }
     let cancelled = false;
-    setAmpLoading(true);
-    setAmpLoadError("");
-    void requestJson<{ instances: AmpIntegrationInstance[] }>("/api/integrations/amp/instances")
+    void requestJson<{ bindings: GameServerBinding[] }>("/api/integrations/amp/bindings")
       .then((result) => {
-        if (!cancelled) {
-          setAmpInstances(result.instances);
-        }
+        if (!cancelled) setBindings(result.bindings);
       })
-      .catch((caught) => {
-        if (!cancelled) {
-          setAmpInstances([]);
-          setAmpLoadError(getErrorMessage(caught, locale));
-        }
-      })
-      .finally(() => {
-        if (!cancelled) {
-          setAmpLoading(false);
-        }
+      .catch(() => {
+        if (!cancelled) setBindings([]);
       });
     return () => {
       cancelled = true;
     };
-  }, [ampFormVisible, currentUser?.id, locale]);
+  }, [bindingFormVisible, currentUser?.id]);
+
+  const matchedBinding = bindings.find(
+    (binding) => binding.gameTitleNorm === normalizeGameTitle(eventDraft.gameTitle)
+  );
 
   async function loadEvents() {
     if (!currentUser) {
@@ -184,6 +185,17 @@ export function EventBoard({
       source.addEventListener("events_changed", () => {
         loadEvents().catch(() => setLiveState("polling"));
       });
+
+      source.addEventListener("servers_changed", (message) => {
+        try {
+          const data = JSON.parse((message as MessageEvent<string>).data) as { servers?: ServerStatus[] };
+          if (Array.isArray(data.servers)) {
+            publishServerStatus(data.servers);
+          }
+        } catch {
+          /* ungültige Nutzlast ignorieren */
+        }
+      });
     }
 
     const poll = window.setInterval(() => {
@@ -215,7 +227,8 @@ export function EventBoard({
             eventDraft.startMode === "scheduled"
               ? fromDatetimeLocal(eventDraft.startsAt)
               : undefined,
-          details: eventDraft.details.trim() || undefined
+          details: eventDraft.details.trim() || undefined,
+          serverBindingId: matchedBinding ? (linkServer ? matchedBinding.id : null) : undefined
         })
       });
       setEventDraft({
@@ -223,7 +236,7 @@ export function EventBoard({
         gameTitle: "",
         details: ""
       });
-      setAmpSelection("");
+      setLinkServer(true);
       await loadEvents();
       setMessage(t("events.msg.saved"));
       setCreateFlowOpen(false);
@@ -356,6 +369,37 @@ export function EventBoard({
     if (!resolvedCatalog.includes(eventDraft.gameTitle)) {
       setEventDraft((draft) => ({ ...draft, gameTitle: "" }));
     }
+  }
+
+  async function runServerAction(bindingId: string, action: ServerAction) {
+    setServerBusy((prev) => ({ ...prev, [bindingId]: true }));
+    setError("");
+    try {
+      await requestJson<{ ok: boolean }>(
+        `/api/integrations/amp/instances/${encodeURIComponent(bindingId)}/${action}`,
+        { method: "POST" }
+      );
+      await refreshServerStatus(true);
+      setMessage(t("events.server.msg.done"));
+    } catch (caught) {
+      setError(getErrorMessage(caught, locale));
+    } finally {
+      setServerBusy((prev) => ({ ...prev, [bindingId]: false }));
+    }
+  }
+
+  function serverBindingFor(event: GameEvent) {
+    if (!ampIntegrationEnabled || !event.serverBindingId) {
+      return undefined;
+    }
+    const bindingId = event.serverBindingId;
+    return {
+      bindingId,
+      status: serverStatus[bindingId] ?? null,
+      canManage: canManageServers,
+      busy: Boolean(serverBusy[bindingId]),
+      onAction: (action: ServerAction) => void runServerAction(bindingId, action)
+    };
   }
 
   function isJoinDisabled(event: GameEvent) {
@@ -493,50 +537,23 @@ export function EventBoard({
           />
         </label>
       </div>
-      {ampIntegrationEnabled ? (
-        <>
-          <label>
-            {t("events.amp.label")}
-            <select
-              value={ampSelection}
-              onChange={(ev) => {
-                const value = ev.target.value;
-                setAmpSelection(value);
-                if (!value) {
-                  return;
-                }
-                const inst = ampInstances.find((row) => row.id === value);
-                if (inst) {
-                  setEventDraft((draft) => ({
-                    ...draft,
-                    serverHost: inst.serverHost,
-                    connectionInfo: inst.connectionInfo
-                  }));
-                }
-              }}
-              disabled={ampLoading}
-              aria-busy={ampLoading}
-            >
-              <option value="">
-                {ampLoading ? t("events.amp.loading") : t("events.amp.placeholder")}
-              </option>
-              {ampInstances.map((inst) => (
-                <option key={inst.id} value={inst.id}>
-                  {inst.module ? `${inst.friendlyName} · ${inst.module}` : inst.friendlyName}
-                </option>
-              ))}
-            </select>
+      {ampIntegrationEnabled && matchedBinding ? (
+        <div className="event-form-server" role="status">
+          <p className="muted">
+            {t("events.form.serverHint", {
+              title: matchedBinding.displayTitle,
+              endpoint: `${matchedBinding.host}:${matchedBinding.port}`
+            })}
+          </p>
+          <label className="checkbox-label">
+            <input
+              type="checkbox"
+              checked={linkServer}
+              onChange={(ev) => setLinkServer(ev.target.checked)}
+            />
+            {t("events.form.linkServer")}
           </label>
-          <p className="muted">{t("events.amp.hint")}</p>
-          {ampLoadError ? (
-            <p className="error" role="alert">
-              {ampLoadError}
-            </p>
-          ) : null}
-          {!ampLoading && !ampLoadError && ampInstances.length === 0 ? (
-            <p className="muted">{t("events.amp.empty")}</p>
-          ) : null}
-        </>
+        </div>
       ) : null}
       <label>
         {t("events.form.details")}
@@ -633,6 +650,7 @@ export function EventBoard({
                 onArchive={() => changeEventStatus(event.id, "archive")}
                 onCancel={() => changeEventStatus(event.id, "cancel")}
                 onSoftDelete={() => softDeleteEvent(event.id)}
+                server={serverBindingFor(event)}
               />
             ))}
             {events.length === 0 ? (
