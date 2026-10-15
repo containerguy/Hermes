@@ -8,6 +8,7 @@ import { tryWriteAuditLog, writeAuditLog } from "../audit-log";
 import type { DatabaseContext } from "../db/client";
 import { appSettings, gameEvents, participations, users } from "../db/schema";
 import { deriveEventStatus, eventInputSchema, shouldAutoArchive } from "../domain/events";
+import { findBindingForTitle, getBinding } from "../domain/gameservers/bindings";
 import { canCreateEvent, canManageEvent } from "../domain/users";
 import { sendPushToEnabledUsers, sendPushToOperators } from "../push/push-service";
 import { broadcastEventsChanged } from "../realtime/event-bus";
@@ -18,7 +19,8 @@ const updateEventSchema = z.object({
   startsAt: z.string().datetime().optional(),
   minPlayers: z.number().int().min(1).max(256).optional(),
   maxPlayers: z.number().int().min(1).max(256).optional(),
-  details: z.string().trim().max(4000).nullable().optional()
+  details: z.string().trim().max(4000).nullable().optional(),
+  serverBindingId: z.string().min(1).max(64).nullable().optional()
 });
 
 function nowIso() {
@@ -157,6 +159,7 @@ function serializeEvent(
     minPlayers: event.minPlayers,
     maxPlayers: event.maxPlayers,
     details: event.details,
+    serverBindingId: event.serverBindingId ?? null,
     status: event.status,
     createdByUserId: event.createdByUserId,
     createdByUsername: creator?.username ?? "unbekannt",
@@ -220,6 +223,17 @@ export function createEventRouter(context: DatabaseContext) {
       return;
     }
 
+    // Phase 15: Bindung explizit (auch null) oder automatisch über den normalisierten Titel.
+    let serverBindingId: string | null;
+    if (parsed.data.serverBindingId === undefined) {
+      serverBindingId = findBindingForTitle(context, parsed.data.gameTitle)?.id ?? null;
+    } else if (parsed.data.serverBindingId !== null && !getBinding(context, parsed.data.serverBindingId)) {
+      response.status(400).json({ error: "binding_nicht_gefunden" });
+      return;
+    } else {
+      serverBindingId = parsed.data.serverBindingId;
+    }
+
     const timestamp = nowIso();
     const startsAt =
       parsed.data.startMode === "now" ? timestamp : (parsed.data.startsAt as string);
@@ -235,6 +249,7 @@ export function createEventRouter(context: DatabaseContext) {
         minPlayers: parsed.data.minPlayers,
         maxPlayers: parsed.data.maxPlayers,
         details: parsed.data.details?.trim() ? parsed.data.details.trim() : null,
+        serverBindingId,
         status: deriveEventStatus({
           status: "open",
           startsAt: new Date(startsAt),
@@ -322,10 +337,23 @@ export function createEventRouter(context: DatabaseContext) {
       return;
     }
 
+    // Phase 15: explizite Bindung gewinnt; sonst bei geändertem Titel neu zuordnen, sonst behalten.
+    let serverBindingId: string | null = event.serverBindingId ?? null;
+    if (parsed.data.serverBindingId !== undefined) {
+      if (parsed.data.serverBindingId !== null && !getBinding(context, parsed.data.serverBindingId)) {
+        response.status(400).json({ error: "binding_nicht_gefunden" });
+        return;
+      }
+      serverBindingId = parsed.data.serverBindingId;
+    } else if (parsed.data.gameTitle !== undefined && parsed.data.gameTitle !== event.gameTitle) {
+      serverBindingId = findBindingForTitle(context, parsed.data.gameTitle)?.id ?? null;
+    }
+
     context.db
       .update(gameEvents)
       .set({
         gameTitle: parsed.data.gameTitle ?? event.gameTitle,
+        serverBindingId,
         startMode,
         startsAt,
         minPlayers,

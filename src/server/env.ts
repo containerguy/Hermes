@@ -50,3 +50,32 @@ export function readRequiredEnv(name: string) {
 
   return value;
 }
+
+/**
+ * Zugangsdaten für das AMP-Dienstkonto (Phase 15). Bewusst nur aus der Umgebung,
+ * damit sie nie in app_settings, Settings-Exporten oder S3-Snapshots landen.
+ */
+export function getAmpCredentials() {
+  const username = process.env.HERMES_AMP_USERNAME?.trim();
+  const password = process.env.HERMES_AMP_PASSWORD;
+  if (!username || !password) {
+    return null;
+  }
+  const rememberTokenFile = process.env.HERMES_AMP_REMEMBER_TOKEN_FILE?.trim() || undefined;
+  return { username, password, rememberTokenFile };
+}
+
+let warnedMissingCa = false;
+
+/** PEM der CA für den AMP-Controller; leer = System-Trust-Store (nie skipVerify). */
+export function getAmpCaFile() {
+  const file = process.env.HERMES_AMP_CA_FILE?.trim();
+  if (!file) {
+    return undefined;
+  }
+  if (!fs.existsSync(file) && !warnedMissingCa) {
+    warnedMissingCa = true;
+    console.warn(`[Hermes] HERMES_AMP_CA_FILE zeigt auf eine fehlende Datei: ${file}`);
+  }
+  return file;
+}

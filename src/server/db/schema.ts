@@ -144,9 +144,33 @@ export const pushSubscriptions = sqliteTable(
   (table) => [uniqueIndex("push_subscriptions_endpoint_unique").on(table.endpoint)]
 );
 
+/** Phase 15: Bindung Spieltitel (normalisiert) -> AMP-Instanz. */
+export const gameServerBindings = sqliteTable(
+  "game_server_bindings",
+  {
+    id: text("id").primaryKey(),
+    gameTitleNorm: text("game_title_norm").notNull(),
+    displayTitle: text("display_title").notNull(),
+    ampInstanceId: text("amp_instance_id").notNull(),
+    ampInstanceName: text("amp_instance_name").notNull(),
+    host: text("host").notNull(),
+    port: integer("port").notNull(),
+    connectScheme: text("connect_scheme", { enum: ["steam", "minecraft", "copy"] })
+      .notNull()
+      .default("copy"),
+    enabled: integer("enabled", { mode: "boolean" }).notNull().default(true),
+    createdAt: text("created_at").notNull(),
+    updatedAt: text("updated_at").notNull()
+  },
+  (table) => [uniqueIndex("game_server_bindings_title_unique").on(table.gameTitleNorm)]
+);
+
 export const gameEvents = sqliteTable("game_events", {
   id: text("id").primaryKey(),
   gameTitle: text("game_title").notNull(),
+  serverBindingId: text("server_binding_id").references(() => gameServerBindings.id, {
+    onDelete: "set null"
+  }),
   startMode: text("start_mode", { enum: ["now", "scheduled"] }).notNull(),
   startsAt: text("starts_at").notNull(),
   minPlayers: integer("min_players").notNull(),
@@ -427,6 +451,10 @@ export const gameEventRelations = relations(gameEvents, ({ one, many }) => ({
   createdBy: one(users, {
     fields: [gameEvents.createdByUserId],
     references: [users.id]
+  }),
+  serverBinding: one(gameServerBindings, {
+    fields: [gameEvents.serverBindingId],
+    references: [gameServerBindings.id]
   }),
   participations: many(participations)
 }));

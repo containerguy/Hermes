@@ -62,11 +62,15 @@ export const errorMessages: Record<string, string> = {
   api_token_nicht_gefunden: "API-Token nicht gefunden.",
   amp_deaktiviert: "Die AMP-Anbindung ist deaktiviert.",
   amp_nicht_konfiguriert: "AMP ist nicht vollständig konfiguriert (URL oder Zugangsdaten fehlen).",
+  amp_ca_ungueltig: "Die AMP-CA-Datei (HERMES_AMP_CA_FILE) fehlt oder ist unlesbar.",
+  ungueltige_bindung: "Die Server-Bindung ist unvollständig oder ungültig.",
+  binding_titel_existiert: "Für diesen Spieltitel gibt es bereits eine Server-Bindung.",
+  binding_nicht_gefunden: "Server-Bindung nicht gefunden.",
   amp_auth_fehlgeschlagen: "Anmeldung bei AMP fehlgeschlagen. Benutzername, Passwort und URL prüfen.",
   amp_anfrage_fehlgeschlagen: "Die AMP-API hat nicht geantwortet oder einen Fehler gemeldet. Netzwerk und AMP-Logs prüfen.",
   amp_url_erforderlich: "AMP-Basis-URL ist erforderlich, wenn die Anbindung aktiv ist.",
   amp_url_ungueltig: "AMP-Basis-URL ist ungültig.",
-  amp_zugang_erforderlich: "AMP-Benutzername und Passwort sind erforderlich, wenn die Anbindung aktiv ist."
+  amp_zugang_erforderlich: "AMP-Zugangsdaten fehlen in der Server-Umgebung (HERMES_AMP_USERNAME / HERMES_AMP_PASSWORD)."
 };
 
 export const errorMessagesEn: Record<string, string> = {
@@ -129,11 +133,15 @@ export const errorMessagesEn: Record<string, string> = {
   api_token_nicht_gefunden: "API token not found.",
   amp_deaktiviert: "AMP integration is disabled.",
   amp_nicht_konfiguriert: "AMP is not fully configured (URL or credentials missing).",
+  amp_ca_ungueltig: "The AMP CA file (HERMES_AMP_CA_FILE) is missing or unreadable.",
+  ungueltige_bindung: "The server binding is incomplete or invalid.",
+  binding_titel_existiert: "A server binding for this game title already exists.",
+  binding_nicht_gefunden: "Server binding not found.",
   amp_auth_fehlgeschlagen: "AMP sign-in failed. Check username, password, and URL.",
   amp_anfrage_fehlgeschlagen: "The AMP API did not respond or returned an error. Check network and AMP logs.",
   amp_url_erforderlich: "AMP base URL is required when integration is enabled.",
   amp_url_ungueltig: "AMP base URL is invalid.",
-  amp_zugang_erforderlich: "AMP username and password are required when integration is enabled."
+  amp_zugang_erforderlich: "AMP credentials are missing in the server environment (HERMES_AMP_USERNAME / HERMES_AMP_PASSWORD)."
 };
 
 export class ApiError extends Error {

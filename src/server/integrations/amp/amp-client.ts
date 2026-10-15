@@ -1,44 +1,16 @@
-import { Agent, fetch as undiciFetch } from "undici";
 import type { HermesSettings } from "../../settings";
-
-const USER_AGENT = "Hermes-AMP-Integration/1.0";
-const REQUEST_MS = 25_000;
+import { ampCall, unwrapAmpData } from "./amp-session";
 
 export type HermesAmpInstanceRow = {
   id: string;
   friendlyName: string;
+  instanceName: string;
   module: string;
+  targetName: string;
+  running: boolean;
   serverHost: string;
   connectionInfo: string;
 };
-
-function normalizeAmpBaseUrl(raw: string): string {
-  let candidate = raw.trim();
-  if (!candidate) {
-    throw new Error("amp_base_leer");
-  }
-  if (!/^https?:\/\//i.test(candidate)) {
-    candidate = `http://${candidate}`;
-  }
-  const parsed = new URL(candidate);
-  let pathname = parsed.pathname.replace(/\/+$/, "");
-  if (pathname.toLowerCase().endsWith("/api")) {
-    pathname = pathname.slice(0, -4) || "";
-  }
-  const hostBase = `${parsed.protocol}//${parsed.host}`;
-  if (!pathname || pathname === "/") {
-    return `${hostBase}/`;
-  }
-  return `${hostBase}${pathname}/`;
-}
-
-function isAmpApiError(value: unknown): value is { Title?: string; Message?: string } {
-  return (
-    typeof value === "object" &&
-    value !== null &&
-    ("Title" in value || "Message" in value || "StackTrace" in value)
-  );
-}
 
 function asRecordArray(raw: unknown): Record<string, unknown>[] {
   if (Array.isArray(raw)) {
@@ -89,114 +61,59 @@ function formatEndpointLine(ep: Record<string, unknown>): string {
   return desc;
 }
 
-function unwrapAmpData(raw: unknown): unknown {
-  if (raw && typeof raw === "object" && "result" in raw) {
-    return (raw as { result: unknown }).result;
+/**
+ * `ADSModule/GetInstances` liefert auf einem Controller (und auch auf einem Standalone-ADS) eine
+ * Liste von Targets, deren Instanzen unter `AvailableInstances` liegen. Hier wird das flachgezogen;
+ * ADS-Instanzen selbst (Module "ADS") werden ausgelassen.
+ */
+export function flattenAmpInstances(
+  raw: unknown
+): Array<{ row: Record<string, unknown>; targetName: string }> {
+  const out: Array<{ row: Record<string, unknown>; targetName: string }> = [];
+  for (const target of asRecordArray(unwrapAmpData(raw))) {
+    const nested = target.AvailableInstances ?? target.availableInstances;
+    if (nested !== undefined) {
+      const targetName = pickString(target, ["FriendlyName", "friendlyName", "Name"]) || "Local";
+      for (const row of asRecordArray(nested)) {
+        if (pickModule(row) !== "ADS") {
+          out.push({ row, targetName });
+        }
+      }
+    } else if (pickInstanceId(target)) {
+      if (pickModule(target) !== "ADS") {
+        out.push({ row: target, targetName: "" });
+      }
+    }
   }
-  return raw;
-}
-
-async function ampPostJson(
-  baseUrl: string,
-  endpoint: string,
-  body: Record<string, unknown>,
-  sessionId: string,
-  skipTlsVerify: boolean
-): Promise<unknown> {
-  const url = `${baseUrl}API/${endpoint}`;
-  const dispatcher =
-    skipTlsVerify && url.startsWith("https:")
-      ? new Agent({ connect: { rejectUnauthorized: false } })
-      : undefined;
-
-  const response = await undiciFetch(url, {
-    method: "POST",
-    dispatcher,
-    headers: {
-      "Content-Type": "application/json",
-      Accept: "text/javascript",
-      "User-Agent": USER_AGENT
-    },
-    body: JSON.stringify({ ...body, SESSIONID: sessionId }),
-    signal: AbortSignal.timeout(REQUEST_MS)
-  });
-
-  const text = await response.text();
-  let parsed: unknown;
-  try {
-    parsed = text ? JSON.parse(text) : null;
-  } catch {
-    throw new Error("amp_antwort_unlesbar");
-  }
-
-  if (!response.ok) {
-    throw new Error("amp_http_fehler");
-  }
-
-  if (isAmpApiError(parsed)) {
-    const msg = [parsed.Title, parsed.Message].filter(Boolean).join(": ");
-    throw new Error(msg || "amp_api_fehler");
-  }
-
-  return parsed;
+  return out;
 }
 
 export async function fetchAmpInstances(settings: HermesSettings): Promise<HermesAmpInstanceRow[]> {
   if (!settings.ampIntegrationEnabled) {
     throw new Error("amp_deaktiviert");
   }
-  const baseUrl = normalizeAmpBaseUrl(settings.ampBaseUrl);
-  const skipTls = settings.ampTlsSkipVerify;
-  const username = settings.ampUsername.trim();
-  const password = settings.ampPassword;
-  if (!username || !password) {
-    throw new Error("amp_nicht_konfiguriert");
-  }
 
-  const loginRaw = await ampPostJson(
-    baseUrl,
-    "Core/Login",
-    {
-      username,
-      password,
-      token: "",
-      rememberMe: false
-    },
-    "",
-    skipTls
-  );
-
-  const login = loginRaw as { success?: boolean; sessionID?: string };
-  if (!login?.success || !login.sessionID) {
-    throw new Error("amp_auth_fehlgeschlagen");
-  }
-
-  const sessionId = login.sessionID;
-  const instancesRaw = unwrapAmpData(
-    await ampPostJson(baseUrl, "ADSModule/GetInstances", {}, sessionId, skipTls)
-  );
-  const instanceRows = asRecordArray(instancesRaw);
-
+  const instances = flattenAmpInstances(await ampCall(settings, "ADSModule/GetInstances"));
   const rows: HermesAmpInstanceRow[] = [];
 
-  for (const inst of instanceRows) {
+  for (const { row: inst, targetName } of instances) {
     const id = pickInstanceId(inst);
     const friendlyName = pickFriendlyName(inst) || id || "Instance";
+    const instanceName = pickString(inst, ["InstanceName", "instanceName"]) || friendlyName;
     const moduleName = pickModule(inst);
+    const running = inst.Running === true || inst.running === true;
 
     let endpoints: Record<string, unknown>[] = [];
-    if (id) {
+    const inline = inst.ApplicationEndpoints ?? inst.applicationEndpoints;
+    if (inline !== undefined) {
+      endpoints = asRecordArray(inline);
+    } else if (id) {
       try {
-        const epRaw = unwrapAmpData(
-          await ampPostJson(
-            baseUrl,
-            "ADSModule/GetApplicationEndpoints",
-            { instanceId: id },
-            sessionId,
-            skipTls
+        endpoints = asRecordArray(
+          unwrapAmpData(
+            await ampCall(settings, "ADSModule/GetApplicationEndpoints", { instanceId: id })
           )
         );
-        endpoints = asRecordArray(epRaw);
       } catch {
         endpoints = [];
       }
@@ -210,10 +127,7 @@ export async function fetchAmpInstances(settings: HermesSettings): Promise<Herme
         if (host && typeof port === "number" && Number.isFinite(port)) {
           return `${host}:${port}`;
         }
-        if (host) {
-          return host;
-        }
-        return "";
+        return host;
       })
       .filter(Boolean);
 
@@ -224,7 +138,10 @@ export async function fetchAmpInstances(settings: HermesSettings): Promise<Herme
     rows.push({
       id: id || friendlyName,
       friendlyName,
+      instanceName,
       module: moduleName,
+      targetName,
+      running,
       serverHost,
       connectionInfo
     });

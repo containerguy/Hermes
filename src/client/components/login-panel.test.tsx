@@ -81,9 +81,6 @@ const defaultSettings: AppSettings = {
   pizzaCashRecipient: "",
   ampIntegrationEnabled: false,
   ampBaseUrl: "",
-  ampUsername: "",
-  ampPassword: "",
-  ampTlsSkipVerify: false
 };
 
 const redeemedUser: User = {

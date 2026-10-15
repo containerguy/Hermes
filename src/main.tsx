@@ -94,9 +94,6 @@ const defaultSettings: AppSettings = {
   pizzaCashRecipient: "",
   ampIntegrationEnabled: false,
   ampBaseUrl: "",
-  ampUsername: "",
-  ampPassword: "",
-  ampTlsSkipVerify: false
 };
 
 function applyTheme(settings: AppSettings) {

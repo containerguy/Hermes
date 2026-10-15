@@ -69,9 +69,6 @@ export type AppSettings = {
   ampIntegrationEnabled: boolean;
   /** Basis-URL ohne /API, z. B. http://192.168.200.98:8080 */
   ampBaseUrl: string;
-  ampUsername: string;
-  ampPassword: string;
-  ampTlsSkipVerify: boolean;
 };
 
 /** Build-/Release-Infos aus dem Server (package.json + optional Repo-URL). */
@@ -84,9 +81,27 @@ export type AppReleaseInfo = {
 export type AmpIntegrationInstance = {
   id: string;
   friendlyName: string;
+  instanceName: string;
   module: string;
+  targetName: string;
+  running: boolean;
   serverHost: string;
   connectionInfo: string;
+};
+
+/** Phase 15: Bindung Spieltitel -> AMP-Instanz (GET/POST/PUT /api/integrations/amp/bindings). */
+export type GameServerBinding = {
+  id: string;
+  gameTitleNorm: string;
+  displayTitle: string;
+  ampInstanceId: string;
+  ampInstanceName: string;
+  host: string;
+  port: number;
+  connectScheme: "steam" | "minecraft" | "copy";
+  enabled: boolean;
+  createdAt: string;
+  updatedAt: string;
 };
 
 /** Öffentliche App-Einstellungen (ohne Admin-/Betriebsfelder) für Bootstrap ohne Admin-Session. */
@@ -223,6 +238,8 @@ export type GameEvent = {
   minPlayers: number;
   maxPlayers: number;
   details: string | null;
+  /** Phase 15: gebundene AMP-Instanz (null = keine). */
+  serverBindingId: string | null;
   status: "open" | "ready" | "running" | "cancelled" | "archived";
   createdByUserId: string;
   createdByUsername: string;

@@ -77,15 +77,12 @@ const settingsObjectSchema = z.object({
   /** Bargeld-Empfänger Hinweis in Kassenliste. Leer = kein Hinweis. */
   pizzaCashRecipient: z.string().trim().max(120),
   /**
-   * CubeCoders AMP: Integration für dedizierte Server-Instanzen (nur serverseitig, Credentials in DB).
+   * CubeCoders AMP: Gameserver-Modul. Zugangsdaten und CA kommen ausschließlich aus der Umgebung
+   * (HERMES_AMP_USERNAME, HERMES_AMP_PASSWORD, HERMES_AMP_CA_FILE), nie aus app_settings.
    */
   ampIntegrationEnabled: z.boolean(),
   /** Basis-URL der AMP-Installation, z. B. http://192.168.1.10:8080/ (ohne /API) */
   ampBaseUrl: z.string().max(512),
-  ampUsername: z.string().max(120),
-  ampPassword: z.string().max(500),
-  /** Selbstsigniertes HTTPS auf der AMP-URL: TLS-Zertifikat nicht strikt prüfen */
-  ampTlsSkipVerify: z.boolean()
 });
 
 export const settingsSchema = settingsObjectSchema
@@ -125,20 +122,6 @@ export const settingsSchema = settingsObjectSchema
         code: z.ZodIssueCode.custom,
         path: ["ampBaseUrl"],
         message: "amp_url_ungueltig"
-      });
-    }
-    if (!data.ampUsername.trim()) {
-      ctx.addIssue({
-        code: z.ZodIssueCode.custom,
-        path: ["ampUsername"],
-        message: "amp_zugang_erforderlich"
-      });
-    }
-    if (!data.ampPassword) {
-      ctx.addIssue({
-        code: z.ZodIssueCode.custom,
-        path: ["ampPassword"],
-        message: "amp_zugang_erforderlich"
       });
     }
   });
@@ -236,9 +219,6 @@ export const defaultSettings: HermesSettings = {
   pizzaCashRecipient: "",
   ampIntegrationEnabled: false,
   ampBaseUrl: "",
-  ampUsername: "",
-  ampPassword: "",
-  ampTlsSkipVerify: false
 };
 
 function nowIso() {

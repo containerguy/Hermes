@@ -83,6 +83,7 @@ describe("ui correctness structure contracts", () => {
               maxPlayers: 8,
               joinedCount: 1,
               myParticipation: null,
+              serverBindingId: null,
               createdByUserId: "u_manager",
               createdByUsername: "manager",
               details: null
@@ -171,9 +172,6 @@ describe("ui correctness structure contracts", () => {
       pizzaCashRecipient: "",
       ampIntegrationEnabled: false,
       ampBaseUrl: "",
-      ampUsername: "",
-      ampPassword: "",
-      ampTlsSkipVerify: false
     };
 
     requestJsonMock.mockImplementation(async (path: string) => {
