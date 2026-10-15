@@ -6,11 +6,41 @@ export type HermesAmpInstanceRow = {
   friendlyName: string;
   instanceName: string;
   module: string;
+  /** Anzeigename der Vorlage, z. B. "Counter-Strike 1.6" (GenericModule) — leer bei Minecraft. */
+  moduleDisplayName: string;
   targetName: string;
+  /** DNS-Name/IP des Targets aus dessen URL, z. B. cs2.lanparty.familie-keller.info. */
+  targetHost: string;
+  /** Spielport aus dem ersten Nicht-SFTP-Endpunkt, sonst null. */
+  gamePort: number | null;
   running: boolean;
   serverHost: string;
   connectionInfo: string;
 };
+
+function hostFromUrl(raw: string): string {
+  if (!raw) return "";
+  try {
+    return new URL(/^https?:\/\//i.test(raw) ? raw : `http://${raw}`).hostname;
+  } catch {
+    return raw.split(":")[0] ?? "";
+  }
+}
+
+/** Spielport aus `ApplicationEndpoints`: bevorzugt "… Address", nie den SFTP-Server. */
+export function pickGamePort(endpoints: Record<string, unknown>[]): number | null {
+  const candidates = endpoints
+    .filter((ep) => !/sftp/i.test(pickString(ep, ["DisplayName", "Description", "Name"])))
+    .map((ep) => {
+      const endpoint = pickString(ep, ["Endpoint", "endpoint"]);
+      const m = /:(\d{2,5})$/.exec(endpoint);
+      const port = m ? Number(m[1]) : typeof ep.Port === "number" ? ep.Port : NaN;
+      return { port, name: pickString(ep, ["DisplayName", "Description", "Name"]) };
+    })
+    .filter((c) => Number.isInteger(c.port) && c.port > 0 && c.port < 65536);
+  const preferred = candidates.find((c) => /address/i.test(c.name)) ?? candidates[0];
+  return preferred ? preferred.port : null;
+}
 
 function asRecordArray(raw: unknown): Record<string, unknown>[] {
   if (Array.isArray(raw)) {
@@ -68,20 +98,21 @@ function formatEndpointLine(ep: Record<string, unknown>): string {
  */
 export function flattenAmpInstances(
   raw: unknown
-): Array<{ row: Record<string, unknown>; targetName: string }> {
-  const out: Array<{ row: Record<string, unknown>; targetName: string }> = [];
+): Array<{ row: Record<string, unknown>; targetName: string; targetHost: string }> {
+  const out: Array<{ row: Record<string, unknown>; targetName: string; targetHost: string }> = [];
   for (const target of asRecordArray(unwrapAmpData(raw))) {
     const nested = target.AvailableInstances ?? target.availableInstances;
     if (nested !== undefined) {
       const targetName = pickString(target, ["FriendlyName", "friendlyName", "Name"]) || "Local";
+      const targetHost = hostFromUrl(pickString(target, ["URL", "Url", "url"]) || targetName);
       for (const row of asRecordArray(nested)) {
         if (pickModule(row) !== "ADS") {
-          out.push({ row, targetName });
+          out.push({ row, targetName, targetHost });
         }
       }
     } else if (pickInstanceId(target)) {
       if (pickModule(target) !== "ADS") {
-        out.push({ row: target, targetName: "" });
+        out.push({ row: target, targetName: "", targetHost: "" });
       }
     }
   }
@@ -96,11 +127,12 @@ export async function fetchAmpInstances(settings: HermesSettings): Promise<Herme
   const instances = flattenAmpInstances(await ampCall(settings, "ADSModule/GetInstances"));
   const rows: HermesAmpInstanceRow[] = [];
 
-  for (const { row: inst, targetName } of instances) {
+  for (const { row: inst, targetName, targetHost } of instances) {
     const id = pickInstanceId(inst);
     const friendlyName = pickFriendlyName(inst) || id || "Instance";
     const instanceName = pickString(inst, ["InstanceName", "instanceName"]) || friendlyName;
     const moduleName = pickModule(inst);
+    const moduleDisplayName = pickString(inst, ["ModuleDisplayName", "moduleDisplayName"]);
     const running = inst.Running === true || inst.running === true;
 
     let endpoints: Record<string, unknown>[] = [];
@@ -140,7 +172,10 @@ export async function fetchAmpInstances(settings: HermesSettings): Promise<Herme
       friendlyName,
       instanceName,
       module: moduleName,
+      moduleDisplayName,
       targetName,
+      targetHost,
+      gamePort: pickGamePort(endpoints),
       running,
       serverHost,
       connectionInfo

@@ -2,7 +2,7 @@ import { FormEvent, useEffect, useState } from "react";
 import { requestJson } from "../api/request";
 import { getErrorMessage } from "../errors/errors";
 import { useI18n } from "../i18n/I18nContext";
-import type { AmpIntegrationInstance, GameServerBinding } from "../types/core";
+import type { AmpIntegrationInstance, BindingSuggestion, GameServerBinding } from "../types/core";
 
 type Scheme = GameServerBinding["connectScheme"];
 
@@ -30,12 +30,27 @@ interface BindingsAdminProps {
   gameCatalog: string[];
 }
 
-/** Admin-Pflege der Bindungen Spiel -> AMP-Instanz (Phase 15, D-13). */
+function draftFromSuggestion(s: BindingSuggestion, title?: string): Draft {
+  return {
+    displayTitle: title ?? s.suggestedTitle ?? s.moduleDisplayName ?? s.friendlyName,
+    ampInstanceId: s.ampInstanceId,
+    ampInstanceName: s.ampInstanceName,
+    host: s.host,
+    port: s.port ? String(s.port) : "",
+    connectScheme: s.connectScheme,
+    enabled: true
+  };
+}
+
+/** Admin-Pflege der Bindungen Spiel -> AMP-Instanz (Phase 15, D-13), mit Vorschlägen aus AMP. */
 export function BindingsAdmin({ gameCatalog }: BindingsAdminProps) {
   const { t, locale } = useI18n();
   const [bindings, setBindings] = useState<GameServerBinding[]>([]);
   const [instances, setInstances] = useState<AmpIntegrationInstance[]>([]);
-  const [instancesError, setInstancesError] = useState("");
+  const [suggestions, setSuggestions] = useState<BindingSuggestion[]>([]);
+  const [suggestionTitles, setSuggestionTitles] = useState<Record<string, string>>({});
+  const [ampError, setAmpError] = useState("");
+  const [ampLoading, setAmpLoading] = useState(false);
   const [draft, setDraft] = useState<Draft>(EMPTY);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
@@ -53,22 +68,37 @@ export function BindingsAdmin({ gameCatalog }: BindingsAdminProps) {
     }
   }
 
-  async function loadInstances() {
-    setInstancesError("");
+  async function loadFromAmp() {
+    setAmpLoading(true);
+    setAmpError("");
     try {
-      const result = await requestJson<{ instances: AmpIntegrationInstance[] }>(
-        "/api/integrations/amp/instances"
-      );
-      setInstances(result.instances);
+      const [inst, sugg] = await Promise.all([
+        requestJson<{ instances: AmpIntegrationInstance[] }>("/api/integrations/amp/instances"),
+        requestJson<{ suggestions: BindingSuggestion[] }>("/api/integrations/amp/bindings/suggestions")
+      ]);
+      setInstances(inst.instances);
+      setSuggestions(sugg.suggestions);
+      setSuggestionTitles((prev) => {
+        const next = { ...prev };
+        for (const s of sugg.suggestions) {
+          if (!next[s.ampInstanceId]) {
+            next[s.ampInstanceId] = s.suggestedTitle ?? "";
+          }
+        }
+        return next;
+      });
     } catch (caught) {
       setInstances([]);
-      setInstancesError(getErrorMessage(caught, locale));
+      setSuggestions([]);
+      setAmpError(getErrorMessage(caught, locale));
+    } finally {
+      setAmpLoading(false);
     }
   }
 
   useEffect(() => {
     void loadBindings();
-    void loadInstances();
+    void loadFromAmp();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -94,14 +124,85 @@ export function BindingsAdmin({ gameCatalog }: BindingsAdminProps) {
 
   function selectInstance(id: string) {
     const inst = instances.find((x) => x.id === id);
-    const hostFromEndpoint = inst?.serverHost.split(",")[0]?.trim().split(":") ?? [];
     setDraft((prev) => ({
       ...prev,
       ampInstanceId: id,
       ampInstanceName: inst?.instanceName ?? prev.ampInstanceName,
-      host: prev.host || hostFromEndpoint[0] || "",
-      port: prev.port || hostFromEndpoint[1] || ""
+      host: inst?.targetHost || prev.host,
+      port: inst?.gamePort ? String(inst.gamePort) : prev.port
     }));
+  }
+
+  function takeSuggestion(s: BindingSuggestion) {
+    setEditingId(null);
+    setDraft(draftFromSuggestion(s, suggestionTitles[s.ampInstanceId] || undefined));
+    setMessage("");
+    setError("");
+  }
+
+  async function persist(body: Record<string, unknown>, id: string | null) {
+    if (id) {
+      await requestJson(`/api/integrations/amp/bindings/${encodeURIComponent(id)}`, {
+        method: "PUT",
+        body: JSON.stringify(body)
+      });
+    } else {
+      await requestJson("/api/integrations/amp/bindings", { method: "POST", body: JSON.stringify(body) });
+    }
+  }
+
+  function bodyFromDraft(d: Draft) {
+    return {
+      displayTitle: d.displayTitle,
+      ampInstanceId: d.ampInstanceId,
+      ampInstanceName: d.ampInstanceName,
+      host: d.host,
+      port: Number(d.port),
+      connectScheme: d.connectScheme,
+      enabled: d.enabled
+    };
+  }
+
+  async function createFromSuggestion(s: BindingSuggestion) {
+    const title = suggestionTitles[s.ampInstanceId] || s.suggestedTitle;
+    if (!title || !s.host || !s.port) {
+      takeSuggestion(s);
+      return;
+    }
+    setBusy(true);
+    setError("");
+    try {
+      await persist(bodyFromDraft(draftFromSuggestion(s, title)), null);
+      setMessage(t("admin.amp.bindings.saved"));
+      await Promise.all([loadBindings(), loadFromAmp()]);
+    } catch (caught) {
+      setError(getErrorMessage(caught, locale));
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function createAllMatched() {
+    const open = suggestions.filter(
+      (s) => !s.existingBindingId && (suggestionTitles[s.ampInstanceId] || s.suggestedTitle) && s.host && s.port
+    );
+    if (open.length === 0) return;
+    setBusy(true);
+    setError("");
+    let created = 0;
+    try {
+      for (const s of open) {
+        const title = suggestionTitles[s.ampInstanceId] || (s.suggestedTitle as string);
+        await persist(bodyFromDraft(draftFromSuggestion(s, title)), null);
+        created += 1;
+      }
+      setMessage(t("admin.amp.bindings.createdMany", { count: created }));
+    } catch (caught) {
+      setError(getErrorMessage(caught, locale));
+    } finally {
+      setBusy(false);
+      await Promise.all([loadBindings(), loadFromAmp()]);
+    }
   }
 
   async function submit(event: FormEvent<HTMLFormElement>) {
@@ -109,30 +210,11 @@ export function BindingsAdmin({ gameCatalog }: BindingsAdminProps) {
     setBusy(true);
     setMessage("");
     setError("");
-    const body = {
-      displayTitle: draft.displayTitle,
-      ampInstanceId: draft.ampInstanceId,
-      ampInstanceName: draft.ampInstanceName,
-      host: draft.host,
-      port: Number(draft.port),
-      connectScheme: draft.connectScheme,
-      enabled: draft.enabled
-    };
     try {
-      if (editingId) {
-        await requestJson(`/api/integrations/amp/bindings/${encodeURIComponent(editingId)}`, {
-          method: "PUT",
-          body: JSON.stringify(body)
-        });
-      } else {
-        await requestJson("/api/integrations/amp/bindings", {
-          method: "POST",
-          body: JSON.stringify(body)
-        });
-      }
+      await persist(bodyFromDraft(draft), editingId);
       setMessage(t("admin.amp.bindings.saved"));
       cancelEdit();
-      await loadBindings();
+      await Promise.all([loadBindings(), loadFromAmp()]);
     } catch (caught) {
       setError(getErrorMessage(caught, locale));
     } finally {
@@ -154,13 +236,18 @@ export function BindingsAdmin({ gameCatalog }: BindingsAdminProps) {
         cancelEdit();
       }
       setMessage(t("admin.amp.bindings.deleted"));
-      await loadBindings();
+      await Promise.all([loadBindings(), loadFromAmp()]);
     } catch (caught) {
       setError(getErrorMessage(caught, locale));
     } finally {
       setBusy(false);
     }
   }
+
+  const openSuggestions = suggestions.filter((s) => !s.existingBindingId);
+  const readyCount = openSuggestions.filter(
+    (s) => (suggestionTitles[s.ampInstanceId] || s.suggestedTitle) && s.host && s.port
+  ).length;
 
   return (
     <section className="admin-ops" aria-label={t("admin.amp.bindings.title")}>
@@ -170,6 +257,90 @@ export function BindingsAdmin({ gameCatalog }: BindingsAdminProps) {
       </header>
       <p className="muted">{t("admin.amp.bindings.help")}</p>
 
+      <h3>{t("admin.amp.suggestions.title")}</h3>
+      <p className="muted">{t("admin.amp.suggestions.help")}</p>
+      {ampLoading ? <p className="muted">{t("admin.amp.suggestions.loading")}</p> : null}
+      {ampError ? (
+        <p className="error" role="alert">
+          {ampError}
+        </p>
+      ) : null}
+      {!ampLoading && !ampError && openSuggestions.length === 0 ? (
+        <p className="muted">{t("admin.amp.suggestions.none")}</p>
+      ) : null}
+      {openSuggestions.length > 0 ? (
+        <>
+          <table className="admin-table admin-table--suggestions">
+            <thead>
+              <tr>
+                <th>{t("admin.amp.bindings.instance")}</th>
+                <th>{t("admin.amp.bindings.displayTitle")}</th>
+                <th>{t("admin.amp.bindings.endpoint")}</th>
+                <th>{t("admin.amp.bindings.scheme")}</th>
+                <th />
+              </tr>
+            </thead>
+            <tbody>
+              {openSuggestions.map((s) => {
+                const chosen = suggestionTitles[s.ampInstanceId] ?? s.suggestedTitle ?? "";
+                return (
+                  <tr key={s.ampInstanceId}>
+                    <td>
+                      {s.targetName ? `${s.targetName} · ` : ""}
+                      {s.moduleDisplayName || s.friendlyName}
+                      <br />
+                      <small className="muted">{s.ampInstanceName}</small>
+                    </td>
+                    <td>
+                      <select
+                        value={chosen}
+                        aria-label={t("admin.amp.suggestions.pickTitle")}
+                        onChange={(event) =>
+                          setSuggestionTitles((prev) => ({ ...prev, [s.ampInstanceId]: event.target.value }))
+                        }
+                      >
+                        <option value="">{t("admin.amp.suggestions.noMatch")}</option>
+                        {gameCatalog.map((title) => (
+                          <option key={title} value={title}>
+                            {title}
+                            {s.catalogMatches.includes(title) ? " ✓" : ""}
+                          </option>
+                        ))}
+                      </select>
+                    </td>
+                    <td>
+                      {s.host || "?"}:{s.port ?? "?"}
+                    </td>
+                    <td>{s.connectScheme}</td>
+                    <td>
+                      <button
+                        type="button"
+                        disabled={busy || !chosen || !s.host || !s.port}
+                        onClick={() => void createFromSuggestion(s)}
+                      >
+                        {t("admin.amp.suggestions.create")}
+                      </button>{" "}
+                      <button type="button" className="ghost" onClick={() => takeSuggestion(s)}>
+                        {t("admin.amp.suggestions.edit")}
+                      </button>
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+          <div className="action-row">
+            <button type="button" disabled={busy || readyCount === 0} onClick={() => void createAllMatched()}>
+              {t("admin.amp.suggestions.createAll", { count: readyCount })}
+            </button>
+            <button type="button" className="ghost" disabled={ampLoading} onClick={() => void loadFromAmp()}>
+              {t("admin.amp.suggestions.reload")}
+            </button>
+          </div>
+        </>
+      ) : null}
+
+      <h3>{t("admin.amp.bindings.existing")}</h3>
       {bindings.length === 0 ? (
         <p className="muted">{t("admin.amp.bindings.empty")}</p>
       ) : (
@@ -232,13 +403,12 @@ export function BindingsAdmin({ gameCatalog }: BindingsAdminProps) {
             {instances.map((inst) => (
               <option key={inst.id} value={inst.id}>
                 {inst.targetName ? `${inst.targetName} · ` : ""}
-                {inst.friendlyName}
-                {inst.module ? ` (${inst.module})` : ""}
+                {inst.moduleDisplayName || inst.friendlyName}
+                {inst.gamePort ? ` (:${inst.gamePort})` : ""}
               </option>
             ))}
           </select>
         </label>
-        {instancesError ? <p className="muted">{instancesError}</p> : null}
         <label>
           {t("admin.amp.bindings.host")}
           <input
@@ -284,14 +454,18 @@ export function BindingsAdmin({ gameCatalog }: BindingsAdminProps) {
           <button type="submit" disabled={busy}>
             {t("admin.amp.bindings.save")}
           </button>
-          {editingId ? (
+          {editingId || draft.ampInstanceId ? (
             <button type="button" className="ghost" onClick={cancelEdit}>
               {t("admin.amp.bindings.cancel")}
             </button>
           ) : null}
         </div>
         {message ? <p className="muted">{message}</p> : null}
-        {error ? <p className="error-text">{error}</p> : null}
+        {error ? (
+          <p className="error" role="alert">
+            {error}
+          </p>
+        ) : null}
       </form>
     </section>
   );

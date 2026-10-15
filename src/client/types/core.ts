@@ -83,10 +83,28 @@ export type AmpIntegrationInstance = {
   friendlyName: string;
   instanceName: string;
   module: string;
+  moduleDisplayName: string;
   targetName: string;
+  targetHost: string;
+  gamePort: number | null;
   running: boolean;
   serverHost: string;
   connectionInfo: string;
+};
+
+/** Phase 15: Vorschlag aus GET /api/integrations/amp/bindings/suggestions (admin). */
+export type BindingSuggestion = {
+  ampInstanceId: string;
+  ampInstanceName: string;
+  friendlyName: string;
+  moduleDisplayName: string;
+  targetName: string;
+  host: string;
+  port: number | null;
+  connectScheme: "steam" | "minecraft" | "copy";
+  suggestedTitle: string | null;
+  catalogMatches: string[];
+  existingBindingId: string | null;
 };
 
 /** Phase 15: Live-Status einer gebundenen Instanz (GET /api/integrations/amp/status, SSE servers_changed). */

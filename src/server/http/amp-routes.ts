@@ -13,6 +13,7 @@ import {
   listBindings,
   upsertBinding
 } from "../domain/gameservers/bindings";
+import { suggestBindings } from "../domain/gameservers/suggestions";
 import { canAssignRoles, canManageServers } from "../domain/users";
 import { checkRateLimit, recordRateLimitFailure } from "../auth/rate-limits";
 import { fetchAmpInstances } from "../integrations/amp/amp-client";
@@ -188,6 +189,30 @@ export function createAmpIntegrationRouter(context: DatabaseContext) {
       return;
     }
     response.json({ bindings: listBindings(context, { enabledOnly: true }) });
+  });
+
+  // Vorschläge: AMP-Instanzen mit Target-DNS-Name, Spielport und Katalogtreffer (nur admin).
+  router.get("/bindings/suggestions", async (request, response) => {
+    const user = requireUser(context, request);
+    if (!user || !canAssignRoles(user)) {
+      response.status(403).json({ error: "admin_erforderlich" });
+      return;
+    }
+    const settings = readSettings(context);
+    if (!settings.ampIntegrationEnabled) {
+      response.status(404).json({ error: "amp_deaktiviert" });
+      return;
+    }
+    try {
+      const instances = await fetchAmpInstances(settings);
+      response.json({
+        suggestions: suggestBindings(instances, settings.gameCatalog, listBindings(context))
+      });
+    } catch (error) {
+      const msg = error instanceof Error ? error.message : "amp_anfrage_fehlgeschlagen";
+      console.error("[Hermes] AMP suggestions:", msg);
+      response.status(502).json({ error: mapAmpErrorToCode(msg) });
+    }
   });
 
   router.get("/bindings/all", (request, response) => {
