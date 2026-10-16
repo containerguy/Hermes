@@ -17,59 +17,13 @@ import { suggestBindings } from "../domain/gameservers/suggestions";
 import { canAssignRoles, canManageServers } from "../domain/users";
 import { checkRateLimit, recordRateLimitFailure } from "../auth/rate-limits";
 import { fetchAmpInstances } from "../integrations/amp/amp-client";
-import { ampCall, ampInstanceCall, unwrapAmpData } from "../integrations/amp/amp-session";
-import { getAllServerStatus, getServerStatus, pollNow } from "../integrations/amp/amp-status";
+import { ampInstanceCall, unwrapAmpData } from "../integrations/amp/amp-session";
+import { getAllServerStatus, pollNow } from "../integrations/amp/amp-status";
+import { CONTROL_ACTIONS, runControlAction, type ControlAction } from "../integrations/amp/amp-control";
 import { readSettings, type HermesSettings } from "../settings";
 import type { GameServerBinding } from "../domain/gameservers/bindings";
 
 /* ---------- Phase 15-02: Steuerung + Konsole ---------- */
-
-const CONTROL_ACTIONS = ["start", "stop", "restart", "update", "kill"] as const;
-type ControlAction = (typeof CONTROL_ACTIONS)[number];
-
-/** AMP ActionResult: `{ Status: boolean, Reason?: string }`, ggf. in `result` verpackt. */
-function assertActionOk(raw: unknown) {
-  const data = unwrapAmpData(raw);
-  if (data && typeof data === "object" && "Status" in data && (data as { Status?: unknown }).Status === false) {
-    const reason = (data as { Reason?: unknown }).Reason;
-    throw new Error(typeof reason === "string" && reason ? reason : "amp_aktion_fehlgeschlagen");
-  }
-}
-
-async function runControlAction(settings: HermesSettings, binding: GameServerBinding, action: ControlAction) {
-  const status = getServerStatus(binding.id);
-  switch (action) {
-    case "start": {
-      if (!status?.instanceRunning) {
-        assertActionOk(
-          await ampCall(settings, "ADSModule/StartInstance", { InstanceName: binding.ampInstanceName })
-        );
-        // Die Instanz bootet gerade; Core/Start kann noch scheitern — der Poller zeigt den Verlauf.
-        try {
-          assertActionOk(await ampInstanceCall(settings, binding.ampInstanceId, "Core/Start"));
-        } catch {
-          /* Instanz noch nicht erreichbar */
-        }
-        return;
-      }
-      assertActionOk(await ampInstanceCall(settings, binding.ampInstanceId, "Core/Start"));
-      return;
-    }
-    case "stop":
-      assertActionOk(await ampInstanceCall(settings, binding.ampInstanceId, "Core/Stop"));
-      return;
-    case "restart":
-      assertActionOk(await ampInstanceCall(settings, binding.ampInstanceId, "Core/Restart"));
-      return;
-    case "update":
-      // Spiel-Update (SteamCMD o. ä.) — nicht ADSModule/UpgradeInstance, das wäre das AMP-Upgrade.
-      assertActionOk(await ampInstanceCall(settings, binding.ampInstanceId, "Core/UpdateApplication"));
-      return;
-    case "kill":
-      assertActionOk(await ampInstanceCall(settings, binding.ampInstanceId, "Core/Kill"));
-      return;
-  }
-}
 
 type ConsoleLine = { seq: number; ts: string; source: string; text: string };
 const CONSOLE_KEEP = 300;
