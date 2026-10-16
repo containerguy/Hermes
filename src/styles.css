@@ -2495,3 +2495,15 @@ dd {
     flex: 1 1 45%;
   }
 }
+.server-bots {
+  display: grid;
+  gap: 0.4rem;
+}
+.server-bots-fields {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+}
+.server-bots-fields label {
+  flex: 1 1 8rem;
+}

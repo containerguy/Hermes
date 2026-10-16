@@ -18,10 +18,11 @@ import { canAssignRoles, canManageServers } from "../domain/users";
 import { checkRateLimit, recordRateLimitFailure } from "../auth/rate-limits";
 import { fetchAmpInstances } from "../integrations/amp/amp-client";
 import { ampInstanceCall, unwrapAmpData } from "../integrations/amp/amp-session";
-import { getAllServerStatus, pollNow } from "../integrations/amp/amp-status";
+import { getAllServerStatus, getServerStatus, pollNow } from "../integrations/amp/amp-status";
 import { CONTROL_ACTIONS, runControlAction, type ControlAction } from "../integrations/amp/amp-control";
 import { MAX_CONSOLE_PARTS, splitConsoleCommands } from "../integrations/amp/console-split";
 import { readSettings, type HermesSettings } from "../settings";
+import { BotRequestError, botKindForGame, botRequestSchema, buildBotCommands } from "../../shared/bot-commands";
 import type { GameServerBinding } from "../domain/gameservers/bindings";
 
 /* ---------- Phase 15-02: Steuerung + Konsole ---------- */
@@ -71,6 +72,20 @@ const consoleCommandSchema = z.object({
   /** An `;` aufteilen und einzeln senden (Spiele mit Quake-/GoldSrc-/Source-Konsole, s. command-presets). */
   split: z.boolean().optional().default(false)
 });
+
+/** Befehle einzeln und in Reihenfolge senden; bricht beim ersten Fehler ab. */
+async function sendConsoleSequence(settings: HermesSettings, binding: GameServerBinding, commands: string[]) {
+  let sent = 0;
+  for (const message of commands) {
+    try {
+      await ampInstanceCall(settings, binding.ampInstanceId, "Core/SendConsoleMessage", { message });
+      sent += 1;
+    } catch (error) {
+      return { sent, failure: error instanceof Error ? error.message : "amp_anfrage_fehlgeschlagen" };
+    }
+  }
+  return { sent, failure: null };
+}
 
 const KNOWN_AMP_ERRORS = new Set([
   "amp_deaktiviert",
@@ -335,8 +350,8 @@ export function createAmpIntegrationRouter(context: DatabaseContext) {
 
   router.post("/instances/:bindingId/:action", async (request, response, next) => {
     const action = request.params.action as ControlAction;
-    if ((action as string) === "console") {
-      // gehört zur Konsolen-Route weiter unten
+    if ((action as string) === "console" || (action as string) === "bots") {
+      // gehören zur Konsolen- bzw. Bot-Route weiter unten
       next();
       return;
     }
@@ -422,18 +437,7 @@ export function createAmpIntegrationRouter(context: DatabaseContext) {
     recordRateLimitFailure(context, { scope: "amp_control", key: `user:${guard.user.id}` });
 
     // Nacheinander senden, damit die Reihenfolge stimmt (erst yb_quota_mode, dann yb_quota).
-    const settings = readSettings(context);
-    let sent = 0;
-    let failure: string | null = null;
-    for (const message of commands) {
-      try {
-        await ampInstanceCall(settings, guard.binding.ampInstanceId, "Core/SendConsoleMessage", { message });
-        sent += 1;
-      } catch (error) {
-        failure = error instanceof Error ? error.message : "amp_anfrage_fehlgeschlagen";
-        break;
-      }
-    }
+    const { sent, failure } = await sendConsoleSequence(readSettings(context), guard.binding, commands);
 
     if (sent > 0) {
       writeAuditLog(context, {
@@ -454,6 +458,68 @@ export function createAmpIntegrationRouter(context: DatabaseContext) {
       return;
     }
     response.json({ ok: true });
+  });
+
+  /** Bot-Verwaltung (CS 1.6 mit YaPB, CS2): Hermes baut die Befehle, keine freie Eingabe. */
+  router.post("/instances/:bindingId/bots", async (request, response) => {
+    const guard = requireServerManager(request, response);
+    if (!guard) return;
+    if (!requireCsrf(context, request, response)) return;
+
+    const parsed = botRequestSchema.safeParse(request.body);
+    if (!parsed.success) {
+      response.status(400).json({ error: "ungueltige_bot_aktion" });
+      return;
+    }
+    const kind = botKindForGame(getServerStatus(guard.binding.id)?.game);
+    if (!kind) {
+      response.status(400).json({ error: "bots_nicht_unterstuetzt" });
+      return;
+    }
+    let commands: string[];
+    try {
+      commands = buildBotCommands(kind, parsed.data);
+    } catch (error) {
+      if (error instanceof BotRequestError) {
+        response.status(400).json({ error: error.message });
+        return;
+      }
+      throw error;
+    }
+
+    const rateLimit = checkRateLimit(context, {
+      scope: "amp_control",
+      key: `user:${guard.user.id}`,
+      sourceIp: request.ip
+    });
+    if (!rateLimit.ok) {
+      response.status(429).json({ error: rateLimit.error, retryAfterSeconds: rateLimit.retryAfterSeconds });
+      return;
+    }
+    recordRateLimitFailure(context, { scope: "amp_control", key: `user:${guard.user.id}` });
+
+    const { sent, failure } = await sendConsoleSequence(readSettings(context), guard.binding, commands);
+    if (sent > 0) {
+      writeAuditLog(context, {
+        actor: guard.user,
+        action: `amp.bots_${parsed.data.action}`,
+        entityType: "game_server_binding",
+        entityId: guard.binding.id,
+        summary: `${guard.user.username} hat die Bots auf ${guard.binding.ampInstanceName} geändert (${parsed.data.action}).`,
+        metadata: {
+          ampInstanceName: guard.binding.ampInstanceName,
+          kind,
+          ...parsed.data,
+          commands: commands.length,
+          sent
+        }
+      });
+    }
+    if (failure) {
+      response.status(502).json({ error: mapAmpErrorToCode(failure) });
+      return;
+    }
+    response.json({ ok: true, commands: commands.length });
   });
 
   return router;

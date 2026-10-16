@@ -92,6 +92,24 @@ Offene Punkte für den LAN-Test:
 
 ## Hermes
 
+**Bots per Bedienelement:** In der Event-Karte gibt es ab manager unter Server den Knopf „Bots“, für CS 1.6 mit YaPB und für CS2. Dort lassen sich Anzahl, Stufe (leicht/normal/schwer/Experte) und Team (automatisch/T/CT) wählen:
+
+| Aktion | CS 1.6 (YaPB) | CS2 |
+|---|---|---|
+| Hinzufügen | `yb_quota_mode normal`, dann `yb add <1–4> 0 <1\|2\|5>` × N | `bot_quota_mode normal`, `bot_difficulty <0–3>`, `bot_add[_t\|_ct]` × N |
+| Auffüllen auf N | `yb_quota_mode fill`, `yb_difficulty`, `yb_quota N` | `bot_quota_mode fill`, `bot_difficulty`, `bot_quota N` |
+| Stufe für alle ändern | `yb_difficulty <1–4>` | alle kicken und mit der Anzahl neu aufsetzen, weil `bot_difficulty` nur für neue Bots gilt |
+| Alle entfernen | `yb_quota 0`, `yb kickall` | `bot_quota 0`, `bot_kick` |
+
+Den Ablauf macht Hermes serverseitig über `POST /api/integrations/amp/instances/:bindingId/bots`:
+- Die Befehle werden einzeln gesendet.
+- Es gilt das Rate-Limit `amp_control`.
+- Das Audit-Log schreibt `amp.bots_<aktion>`.
+
+„Hinzufügen“ stellt die Quote auf `normal`, weil eine Füll-Quote neue Bots sonst wieder kickt, sobald Menschen drin sind.
+
+**Konsolenvorlagen:**
+
 Die Konsolenvorlage „Bots (YaPB)“ für CS 1.6 steht in `src/client/gameservers/command-presets.ts`. Sie enthält:
 - auffüllen auf 10,
 - einen Bot hinzufügen, gezielt zu T oder CT,

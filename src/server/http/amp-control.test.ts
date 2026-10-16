@@ -264,6 +264,33 @@ describe("AMP control + status (Phase 15-02)", () => {
       .send({ command: "a;b;c;d;e;f;g;h;i", split: true })
       .expect(400);
 
+    // Bots: Hermes baut die Befehle je Spiel (CS2 laut AMP) und sendet sie einzeln
+    ampCalls = [];
+    const bots = (body: unknown) =>
+      manager.agent.post(`/api/integrations/amp/instances/${bindingId}/bots`).set(CSRF_HEADER, manager.csrf).send(body as object);
+    await user.agent
+      .post(`/api/integrations/amp/instances/${bindingId}/bots`)
+      .set(CSRF_HEADER, user.csrf)
+      .send({ action: "removeAll" })
+      .expect(403);
+    await manager.agent.post(`/api/integrations/amp/instances/${bindingId}/bots`).send({ action: "removeAll" }).expect(403);
+    await bots({ action: "add", count: 21, level: "normal" }).expect(400);
+    await bots({ action: "setLevel", level: "hard" }).expect(400); // CS2 braucht eine Anzahl
+    expect(ampCalls.filter((c) => c.endpoint === sendEndpoint)).toEqual([]);
+    await bots({ action: "add", count: 2, level: "hard", team: "ct" }).expect(200);
+    expect(ampCalls.filter((c) => c.endpoint === sendEndpoint).map((c) => c.body.message)).toEqual([
+      "bot_quota_mode normal",
+      "bot_difficulty 2",
+      "bot_add_ct",
+      "bot_add_ct"
+    ]);
+    const botAudit = await admin.get("/api/admin/audit-log").expect(200);
+    expect(
+      (botAudit.body.auditLogs as Array<{ action: string; metadata: Record<string, unknown> }>).find(
+        (e) => e.action === "amp.bots_add"
+      )?.metadata
+    ).toMatchObject({ kind: "cs2", count: 2, level: "hard", team: "ct", commands: 4, sent: 4 });
+
     // Kiosk liefert genau die sechs Serverfelder
     await manager.agent
       .post("/api/events")
