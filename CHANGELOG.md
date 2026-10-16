@@ -4,6 +4,18 @@ Versions are annotated tags `vX.Y.Z` on `main`. Each entry mirrors the
 `chore(release): vX.Y.Z` commit that bumps `package.json`,
 `package-lock.json`, and `src/server/openapi/hermes-api.yaml`.
 
+## v0.13.1 — Clearer server controls (2026-10-16)
+
+### Game servers
+
+- "Start" is disabled while the game runs or is starting, and "Stop" while it
+  is stopped. The server also refuses these actions without calling AMP
+  (`409 amp_laeuft_bereits`, `409 amp_bereits_gestoppt`). Sleeping servers
+  can still be started.
+- If AMP answers but rejects an action (`Status: false`), Hermes now shows
+  "AMP hat die Aktion abgelehnt …" (`409 amp_aktion_abgelehnt`) instead of
+  claiming the AMP API did not respond. AMP's reason goes to the server log.
+
 ## v0.13.0 — Bots for CS 1.6 and CS2 (2026-10-16)
 
 ### Bots

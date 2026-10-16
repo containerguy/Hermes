@@ -20,9 +20,10 @@ import { fetchAmpInstances } from "../integrations/amp/amp-client";
 import { ampInstanceCall, unwrapAmpData } from "../integrations/amp/amp-session";
 import { getAllServerStatus, getServerStatus, pollNow } from "../integrations/amp/amp-status";
 import {
+  AmpActionRejectedError,
   CONTROL_ACTIONS,
+  controlBlockedReason,
   runControlAction,
-  updateBlockedReason,
   type ControlAction
 } from "../integrations/amp/amp-control";
 import { MAX_CONSOLE_PARTS, splitConsoleCommands } from "../integrations/amp/console-split";
@@ -405,7 +406,7 @@ export function createAmpIntegrationRouter(context: DatabaseContext) {
     const guard = requireServerManager(request, response);
     if (!guard) return;
     if (!requireCsrf(context, request, response)) return;
-    const blocked = action === "update" ? updateBlockedReason(getServerStatus(guard.binding.id)) : null;
+    const blocked = controlBlockedReason(action, getServerStatus(guard.binding.id));
     if (blocked) {
       response.status(409).json({ error: blocked });
       return;
@@ -426,6 +427,12 @@ export function createAmpIntegrationRouter(context: DatabaseContext) {
     try {
       await runControlAction(readSettings(context), guard.binding, action);
     } catch (error) {
+      if (error instanceof AmpActionRejectedError) {
+        // AMP hat geantwortet und abgelehnt: kein Netzwerkfehler, Grund steht im Log
+        console.error(`[Hermes] AMP ${action} ${guard.binding.ampInstanceName} abgelehnt:`, error.reason);
+        response.status(409).json({ error: "amp_aktion_abgelehnt" });
+        return;
+      }
       const msg = error instanceof Error ? error.message : "amp_anfrage_fehlgeschlagen";
       console.error(`[Hermes] AMP ${action} ${guard.binding.ampInstanceName}:`, msg);
       response.status(502).json({ error: mapAmpErrorToCode(msg) });

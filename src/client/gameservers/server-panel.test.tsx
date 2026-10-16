@@ -181,6 +181,26 @@ describe("ServerPanel", () => {
     await stopped.rendered.cleanup();
   });
 
+  it("disables Start while the server runs and Stop while it is stopped", async () => {
+    const button = (container: HTMLElement, text: string) =>
+      Array.from(container.querySelectorAll("button")).find((b) => b.textContent?.trim() === text) as HTMLButtonElement;
+    const on = await render(<ServerPanel bindingId="b-cs2" status={running} canManage busy={false} onAction={vi.fn()} />);
+    expect(button(on.container, "Start").disabled).toBe(true);
+    expect(button(on.container, "Stopp").disabled).toBe(false);
+    await on.cleanup();
+    const off = await render(
+      <ServerPanel bindingId="b-cs2" status={{ ...running, running: false, appState: "Stopped" }} canManage busy={false} onAction={vi.fn()} />
+    );
+    expect(button(off.container, "Start").disabled).toBe(false);
+    expect(button(off.container, "Stopp").disabled).toBe(true);
+    await off.cleanup();
+    const sleeping = await render(
+      <ServerPanel bindingId="b-cs2" status={{ ...running, appState: "Sleeping" }} canManage busy={false} onAction={vi.fn()} />
+    );
+    expect(button(sleeping.container, "Start").disabled).toBe(false);
+    await sleeping.cleanup();
+  });
+
   it("offers no bot controls for games without bots", async () => {
     const rendered = await render(
       <ServerPanel bindingId="b-mc" status={{ ...running, game: "Minecraft" }} canManage busy={false} onAction={vi.fn()} />

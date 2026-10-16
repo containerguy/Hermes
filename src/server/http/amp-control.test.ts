@@ -20,6 +20,8 @@ let databasePath: string;
 let ampCalls: AmpCall[] = [];
 /** AppState der CS2-Instanz in GetInstances (20 = Ready, 0 = Stopped). */
 let cs2AppState = 20;
+/** Nächste Instanzaktion lehnt AMP mit diesem Grund ab (Status: false). */
+let rejectNext: string | null = null;
 
 function instancesWithCs2State() {
   return (fixture as Array<{ AvailableInstances: Array<Record<string, unknown>> }>).map((target) => ({
@@ -37,6 +39,7 @@ const CS2_ID = (fixture as Array<{ AvailableInstances: Array<{ InstanceID: strin
 function installAmpMock() {
   ampCalls = [];
   cs2AppState = 20;
+  rejectNext = null;
   const fetchMock = vi.fn(async (url: unknown, init?: { body?: unknown }) => {
     // nicht-gierig: Proxy-Pfade enthalten ein zweites "/API/" (…/Servers/<id>/API/Core/Stop)
     const endpoint = String(url).replace(/^.*?\/API\//, "");
@@ -68,6 +71,9 @@ function installAmpMock() {
             : [])
         ]
       };
+    } else if (rejectNext && /\/API\/Core\/(Start|Stop|Restart|Kill|UpdateApplication)$/.test(endpoint)) {
+      payload = { Status: false, Reason: rejectNext };
+      rejectNext = null;
     } else {
       payload = { Status: true };
     }
@@ -208,6 +214,24 @@ describe("AMP control + status (Phase 15-02)", () => {
       .expect(200);
     expect(ampCalls.some((c) => c.endpoint === `ADSModule/Servers/${CS2_ID}/API/Core/Stop`)).toBe(true);
 
+    // Start bei laufendem Spiel geht gar nicht erst an AMP (AMP würde ablehnen)
+    const startEndpoint = `ADSModule/Servers/${CS2_ID}/API/Core/Start`;
+    const runningStart = await manager.agent
+      .post(`/api/integrations/amp/instances/${bindingId}/start`)
+      .set(CSRF_HEADER, manager.csrf)
+      .expect(409);
+    expect(runningStart.body.error).toBe("amp_laeuft_bereits");
+    expect(ampCalls.some((c) => c.endpoint === startEndpoint)).toBe(false);
+
+    // AMP lehnt ab (Status: false): eigener Code statt "AMP-API hat nicht geantwortet"
+    rejectNext = "Application is busy";
+    const rejected = await manager.agent
+      .post(`/api/integrations/amp/instances/${bindingId}/restart`)
+      .set(CSRF_HEADER, manager.csrf)
+      .expect(409);
+    expect(rejected.body.error).toBe("amp_aktion_abgelehnt");
+    expect(JSON.stringify(rejected.body)).not.toContain("busy");
+
     // Spiel-Update nur bei gestopptem Spiel (sonst verwaist AMP den Spielprozess)
     const updateEndpoint = `ADSModule/Servers/${CS2_ID}/API/Core/UpdateApplication`;
     const runningUpdate = await manager.agent
@@ -223,6 +247,16 @@ describe("AMP control + status (Phase 15-02)", () => {
       .set(CSRF_HEADER, manager.csrf)
       .expect(200);
     expect(ampCalls.some((c) => c.endpoint === updateEndpoint)).toBe(true);
+    const stoppedStop = await manager.agent
+      .post(`/api/integrations/amp/instances/${bindingId}/stop`)
+      .set(CSRF_HEADER, manager.csrf)
+      .expect(409);
+    expect(stoppedStop.body.error).toBe("amp_bereits_gestoppt");
+    await manager.agent
+      .post(`/api/integrations/amp/instances/${bindingId}/start`)
+      .set(CSRF_HEADER, manager.csrf)
+      .expect(200);
+    expect(ampCalls.some((c) => c.endpoint === startEndpoint)).toBe(true);
     cs2AppState = 20;
     await pollNow();
 

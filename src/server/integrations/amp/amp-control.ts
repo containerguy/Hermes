@@ -11,12 +11,19 @@ import { getServerStatus } from "./amp-status";
 export const CONTROL_ACTIONS = ["start", "stop", "restart", "update", "kill"] as const;
 export type ControlAction = (typeof CONTROL_ACTIONS)[number];
 
+/** AMP hat geantwortet, die Aktion aber abgelehnt (`Status: false`); `reason` ist AMPs Text. */
+export class AmpActionRejectedError extends Error {
+  constructor(readonly reason: string) {
+    super("amp_aktion_abgelehnt");
+  }
+}
+
 /** AMP ActionResult: `{ Status: boolean, Reason?: string }`, ggf. in `result` verpackt. */
 export function assertActionOk(raw: unknown) {
   const data = unwrapAmpData(raw);
   if (data && typeof data === "object" && "Status" in data && (data as { Status?: unknown }).Status === false) {
     const reason = (data as { Reason?: unknown }).Reason;
-    throw new Error(typeof reason === "string" && reason ? reason : "amp_aktion_fehlgeschlagen");
+    throw new AmpActionRejectedError(typeof reason === "string" && reason ? reason : "");
   }
 }
 
@@ -28,6 +35,29 @@ const UPDATE_ALLOWED_STATES = new Set(["Stopped", "Failed"]);
 
 export function updateBlockedReason(status: ReturnType<typeof getServerStatus>): string | null {
   return status && UPDATE_ALLOWED_STATES.has(status.appState) ? null : "amp_update_erst_stoppen";
+}
+
+/** Zustände, in denen das Spiel schon läuft oder hochfährt; „Start“ lehnt AMP dort ab. Ruhemodus weckt. */
+export const START_BLOCKED_STATES = new Set([
+  "Ready",
+  "Starting",
+  "PreStart",
+  "Configuring",
+  "Restarting",
+  "Installing",
+  "Updating"
+]);
+
+/**
+ * Aktionen, die im aktuellen Zustand keinen Sinn ergeben, gar nicht erst an AMP schicken.
+ * Ohne bekannten Status (vor dem ersten Poll) wird nur das Update gesperrt.
+ */
+export function controlBlockedReason(action: ControlAction, status: ReturnType<typeof getServerStatus>): string | null {
+  if (action === "update") return updateBlockedReason(status);
+  if (!status) return null;
+  if (action === "start" && START_BLOCKED_STATES.has(status.appState)) return "amp_laeuft_bereits";
+  if (action === "stop" && status.appState === "Stopped") return "amp_bereits_gestoppt";
+  return null;
 }
 
 export async function runControlAction(settings: HermesSettings, binding: GameServerBinding, action: ControlAction) {

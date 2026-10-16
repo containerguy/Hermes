@@ -61,6 +61,9 @@ export function ServerPanel({ bindingId, status, canManage, busy, onAction }: Se
   const botKind = botKindForGame(status?.game);
   // Spiel-Update nur bei angehaltenem Spiel (sonst verwaist AMP den Spielprozess)
   const updateAllowed = status?.appState === "Stopped" || status?.appState === "Failed";
+  // Start/Stopp nur, wenn sie im aktuellen Zustand etwas bewirken (AMP lehnt sonst ab)
+  const startAllowed = !status || (state !== "on" && state !== "starting");
+  const stopAllowed = !status || status.appState !== "Stopped";
 
   async function copy(text: string) {
     const ok = await copyToClipboard(text);
@@ -117,10 +120,10 @@ export function ServerPanel({ bindingId, status, canManage, busy, onAction }: Se
 
       {canManage ? (
         <div className="server-actions">
-          <button type="button" className="secondary" disabled={busy} onClick={() => onAction("start")}>
+          <button type="button" className="secondary" disabled={busy || !startAllowed} onClick={() => onAction("start")}>
             {t("events.server.start")}
           </button>
-          <button type="button" className="secondary" disabled={busy} onClick={() => onAction("stop")}>
+          <button type="button" className="secondary" disabled={busy || !stopAllowed} onClick={() => onAction("stop")}>
             {t("events.server.stop")}
           </button>
           <button type="button" className="secondary" disabled={busy} onClick={() => onAction("restart")}>
