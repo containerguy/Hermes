@@ -33,6 +33,14 @@ export function getSessionById(context: DatabaseContext, sessionId: string) {
 
 function markArchived(context: DatabaseContext, sessionId: string, actor: { id: string } | null) {
   const now = nowIso();
+  // Leere Bestellungen (alle Positionen entfernt) gehören nicht ins Archiv.
+  context.sqlite
+    .prepare(
+      `DELETE FROM pizza_orders
+       WHERE session_id = ?
+         AND NOT EXISTS (SELECT 1 FROM pizza_order_lines l WHERE l.order_id = pizza_orders.id)`
+    )
+    .run(sessionId);
   context.db
     .update(pizzaSessions)
     .set({ archivedAt: now, archivedByUserId: actor?.id ?? null, updatedAt: now })
@@ -141,7 +149,7 @@ export function archiveSession(context: DatabaseContext, sessionId: string, acto
       409
     );
   }
-  markArchived(context, sessionId, actor);
+  context.sqlite.transaction(() => markArchived(context, sessionId, actor))();
   return getSessionById(context, sessionId)!;
 }
 
@@ -172,8 +180,8 @@ export function listArchivedSessions(
 
   const statsStatement = context.sqlite.prepare(
     `SELECT
-       COUNT(DISTINCT o.id) AS orderCount,
-       COUNT(DISTINCT CASE WHEN o.payment_status = 'unpaid' THEN o.id END) AS unpaidCount,
+       COUNT(DISTINCT CASE WHEN l.id IS NOT NULL THEN o.id END) AS orderCount,
+       COUNT(DISTINCT CASE WHEN l.id IS NOT NULL AND o.payment_status = 'unpaid' THEN o.id END) AS unpaidCount,
        COALESCE(SUM(l.qty * l.price_cents_snapshot), 0) AS totalCents
      FROM pizza_orders o
      LEFT JOIN pizza_order_lines l ON l.order_id = o.id

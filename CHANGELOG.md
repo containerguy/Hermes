@@ -64,8 +64,11 @@ AMP (#1, #12) and pizza management (#14).
   only offered when a PayPal handle is set.
 - Fix: a failed round transition (e.g. a second "delivered" click) no
   longer archives the round or creates an empty draft.
-- Fix: order lines of a round archived while still open can no longer be
-  changed or deleted.
+- Archived rounds are frozen: order lines, the guest's payment method and
+  the payment status can no longer be changed (`409 pizza_runde_archiviert`),
+  also not by managers. The archive dialog shows how many orders are still
+  unpaid. Empty orders are removed when a round is archived and not counted
+  in the archive.
 - Cash list PDF: payment status as plain text (`[x] bezahlt (Bar)`,
   `[ ] offen – PayPal gewählt`) instead of check box glyphs the built-in
   font cannot render; "Gedruckt" uses Europe/Berlin time.

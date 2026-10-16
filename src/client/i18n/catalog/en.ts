@@ -644,6 +644,7 @@ export const enMessages: { [K in keyof typeof deMessages]: string } = {
   "pizza.admin.archive": "Archive round",
   "pizza.admin.archiveConfirm": "Archive this order round? It disappears from the current view and stays available in the archive.",
   "pizza.admin.archiveConfirmActive": "This round has not been delivered yet. Archive anyway? Guests will no longer see their order.",
+  "pizza.admin.archiveUnpaid": "Unpaid orders: {count} – they can no longer be changed after archiving.",
   "pizza.admin.pdfPizzeria": "PDF: for the pizzeria",
   "pizza.admin.pdfKasse": "PDF: cash list",
   "pizza.admin.manageMenu": "Manage menu",

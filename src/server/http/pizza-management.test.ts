@@ -283,18 +283,35 @@ describe("Pizza-Verwaltung ab manager", () => {
     expect(actions).toContain("pizza.session.delete");
   });
 
-  it("friert Positionen einer offen archivierten Runde ein", async () => {
+  it("friert eine offen archivierte Runde komplett ein und entfernt leere Bestellungen", async () => {
     await post(manager, "/api/pizza/transitions", { transition: "open" }).expect(200);
     const added = await post(guest, "/api/pizza/lines", { variantId: "v-003-30", qty: 1 }).expect(201);
     const lineId = added.body.lineId as string;
+    const orderId = added.body.orderId as string;
+    // Manager legt an und entfernt wieder → leere Bestellung
+    const managerLine = await post(manager, "/api/pizza/lines", { variantId: "v-003-30", qty: 1 }).expect(201);
+    await manager.agent
+      .delete(`/api/pizza/lines/${managerLine.body.lineId}`)
+      .set(CSRF_HEADER, manager.csrf)
+      .expect(204);
     const sessionId = (await state(guest)).session.id as string;
     await post(manager, `/api/pizza/sessions/${sessionId}/archive`).expect(200);
 
-    await guest.agent.patch(`/api/pizza/lines/${lineId}`).set(CSRF_HEADER, guest.csrf).send({ qty: 3 }).expect(400);
-    await guest.agent.delete(`/api/pizza/lines/${lineId}`).set(CSRF_HEADER, guest.csrf).expect(400);
+    const patched = await guest.agent
+      .patch(`/api/pizza/lines/${lineId}`)
+      .set(CSRF_HEADER, guest.csrf)
+      .send({ qty: 3 })
+      .expect(409);
+    expect(patched.body.error).toBe("pizza_runde_archiviert");
+    await guest.agent.delete(`/api/pizza/lines/${lineId}`).set(CSRF_HEADER, guest.csrf).expect(409);
+    // Zahlungen sind ebenfalls eingefroren, auch für manager
+    const paid = await post(manager, `/api/pizza/orders/${orderId}/payment`, { method: "cash" }).expect(409);
+    expect(paid.body.error).toBe("pizza_runde_archiviert");
 
     const archived = await manager.agent.get("/api/pizza/sessions/archived").expect(200);
-    expect(archived.body.sessions[0]).toMatchObject({ id: sessionId, orderCount: 1, totalCents: 700 });
+    expect(archived.body.sessions[0]).toMatchObject({ id: sessionId, orderCount: 1, unpaidCount: 1, totalCents: 700 });
+    // Lesen bleibt möglich
+    await manager.agent.get(`/api/pizza/print/kassenliste.pdf?sessionId=${sessionId}`).expect(200);
   });
 
   it("archiviert eine gelieferte Runde automatisch beim Öffnen einer neuen", async () => {

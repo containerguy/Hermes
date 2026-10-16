@@ -643,6 +643,7 @@ export const deMessages = {
   "pizza.admin.archive": "Runde archivieren",
   "pizza.admin.archiveConfirm": "Diese Bestellrunde archivieren? Sie verschwindet aus der aktuellen Ansicht und bleibt im Archiv einsehbar.",
   "pizza.admin.archiveConfirmActive": "Diese Runde ist noch nicht geliefert. Trotzdem archivieren? Gäste sehen ihre Bestellung danach nicht mehr.",
+  "pizza.admin.archiveUnpaid": "Offene Zahlungen: {count} – nach dem Archivieren nicht mehr änderbar.",
   "pizza.admin.pdfPizzeria": "PDF: An Pizzeria",
   "pizza.admin.pdfKasse": "PDF: Kassenliste",
   "pizza.admin.manageMenu": "Menü verwalten",

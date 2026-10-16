@@ -221,7 +221,7 @@ describe("PizzaPanel – Manager", () => {
     expect(container.textContent).toContain("Bezahlart: noch nicht gewählt");
 
     await click(buttonByText(container, "Runde archivieren"));
-    expect(window.confirm).toHaveBeenCalled();
+    expect(window.confirm).toHaveBeenCalledWith(expect.stringContaining("Offene Zahlungen: 1"));
     expect(calls).toContainEqual({
       url: "/api/pizza/sessions/s1/archive",
       method: "POST",

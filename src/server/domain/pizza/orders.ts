@@ -24,9 +24,17 @@ export class PizzaOrderError extends AppError {
   }
 }
 
+/** Archivierte Runden sind eingefroren: keine Positionen, keine Bezahlart, kein Zahlstatus (René, PR #14). */
+function assertNotArchived(session: { archivedAt: string | null }) {
+  if (session.archivedAt) {
+    throw new PizzaOrderError("pizza_runde_archiviert", "Bestellrunde ist archiviert", 409);
+  }
+}
+
 /** Offen und nicht archiviert: Eine archivierte Runde bleibt unverändert, auch wenn sie im Zustand `open` archiviert wurde. */
 function assertSessionOpen(session: { state: string; archivedAt: string | null }) {
-  if (!canPlaceOrder(session.state as never) || session.archivedAt) {
+  assertNotArchived(session);
+  if (!canPlaceOrder(session.state as never)) {
     throw new PizzaOrderError("session_not_open", "Bestellung ist nicht offen");
   }
 }
@@ -248,6 +256,7 @@ export function setPaymentMethod(
   if (!order) {
     throw new PizzaOrderError("pizza_bestellung_nicht_gefunden", "Keine eigene Bestellung", 404);
   }
+  assertNotArchived(getSession(context, order.sessionId));
   if (order.paymentStatus !== "unpaid") {
     throw new PizzaOrderError("pizza_bereits_bezahlt", "Bestellung ist bereits bezahlt", 409);
   }
@@ -270,6 +279,7 @@ export function markPayment(
     .get();
   if (!order) throw new PizzaOrderError("order_missing", "Bestellung nicht gefunden", 404);
   const session = getSession(context, order.sessionId);
+  assertNotArchived(session);
   if (!canMarkPayment(session.state as never)) {
     throw new PizzaOrderError(
       "session_not_locked",

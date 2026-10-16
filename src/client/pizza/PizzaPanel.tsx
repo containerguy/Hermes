@@ -204,10 +204,13 @@ function PizzaManagerControls({ state, onTransition, onArchive, onPaymentMode, o
 
   function confirmArchive() {
     if (!session) return;
-    const message =
+    const base =
       sessionState === "delivered" || sessionState === "draft"
         ? t("pizza.admin.archiveConfirm")
         : t("pizza.admin.archiveConfirmActive");
+    // Archivierte Runden sind eingefroren, auch für Zahlungen: offene Beträge vorher abrechnen.
+    const unpaid = state.orders.filter((order) => order.lines.length > 0 && order.paymentStatus === "unpaid").length;
+    const message = unpaid > 0 ? `${base}\n\n${t("pizza.admin.archiveUnpaid", { count: unpaid })}` : base;
     if (!window.confirm(message)) return;
     void onArchive(session.id);
   }
