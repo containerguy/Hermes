@@ -184,6 +184,8 @@ export const gameServerBindings = sqliteTable(
       .notNull()
       .default("copy"),
     enabled: integer("enabled", { mode: "boolean" }).notNull().default(true),
+    /** Leerlauf-Stopp für diese Bindung erlaubt (nur bei verlässlicher Spielerzählung in AMP). */
+    autoStopEnabled: integer("auto_stop_enabled", { mode: "boolean" }).notNull().default(false),
     createdAt: text("created_at").notNull(),
     updatedAt: text("updated_at").notNull()
   },

@@ -40,6 +40,8 @@ type Harness = {
   stop: Mock<(bindingId: string) => Promise<void>>;
   pushRunning: Mock<(eventId: string, gameTitle: string) => Promise<void>>;
   logError: Mock<(message: string, error: unknown) => void>;
+  /** Bindungen mit freigeschaltetem Leerlauf-Stopp (Standard in den Tests: alle). */
+  autoStopIds: string[] | null;
 };
 
 function harness(settings: Partial<AutomationDeps["settings"]> = {}): Harness {
@@ -51,7 +53,8 @@ function harness(settings: Partial<AutomationDeps["settings"]> = {}): Harness {
     start: vi.fn(async (_bindingId: string, _opts?: { followUp?: boolean }) => undefined),
     stop: vi.fn(async (_bindingId: string) => undefined),
     pushRunning: vi.fn(async (_eventId: string, _gameTitle: string) => undefined),
-    logError: vi.fn((_message: string, _error: unknown) => undefined)
+    logError: vi.fn((_message: string, _error: unknown) => undefined),
+    autoStopIds: null
   } as Harness;
   // Deps lesen immer den aktuellen Stand von `h` (Tests ersetzen `h.events`).
   h.deps = {
@@ -59,6 +62,7 @@ function harness(settings: Partial<AutomationDeps["settings"]> = {}): Harness {
     listActiveEvents: () => h.events,
     getStatus: (id) => h.statuses.get(id) ?? null,
     listStatuses: () => [...h.statuses.values()],
+    autoStopBindingIds: () => h.autoStopIds ?? [...h.statuses.keys()],
     start: h.start,
     stop: h.stop,
     pushRunning: h.pushRunning,
@@ -383,4 +387,28 @@ describe("AMP automation tick", () => {
       expect(state.pendingGameStart).toEqual({});
     });
   });
+
+  it("never idle-stops a binding without auto-stop opt-in (AMP may not count players)", async () => {
+    const h = harness({ ampAutoStartOnReady: false, ampAutoStopIdleMinutes: 1 });
+    h.autoStopIds = ["b-cs"];
+    let state = await initialized(h);
+    // UT2004: UserJoinRegex leer -> AMP meldet immer 0 Spieler, auch mitten im Spiel
+    h.statuses.set(
+      "b-ut",
+      serverStatus({ bindingId: "b-ut", ampInstanceName: "UT200401", running: true, appState: "Ready", players: 0 })
+    );
+    h.statuses.set(
+      "b-cs",
+      serverStatus({ bindingId: "b-cs", ampInstanceName: "Counter-Strike201", running: true, appState: "Ready", players: 0 })
+    );
+    for (let i = 0; i < 3; i += 1) {
+      h.clock.now += 60_000;
+      state = await ticks(h, state, 1);
+    }
+    // CS2 (mit Freischaltung) nach 1 min gestoppt, UT2004 nie
+    expect(h.stop).toHaveBeenCalledTimes(1);
+    expect(h.stop).toHaveBeenCalledWith("b-cs");
+    expect(state.idleSince["b-ut"]).toBeUndefined();
+  });
 });
+

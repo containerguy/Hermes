@@ -264,7 +264,7 @@ describe("AMP automation (Phase 15-04)", () => {
     expect(ampCalls.filter((c) => c === `ADSModule/Servers/${minecraft().InstanceID}/API/Core/Start`)).toHaveLength(1);
   });
 
-  it("auto-stops an idle server without active events and audits it", async () => {
+  it("auto-stops an idle server without active events only for bindings with opt-in, and audits it", async () => {
     const admin = request.agent(started!.app);
     await login(admin, "hauptadmin");
     const adminCsrf = await fetchCsrf(admin);
@@ -280,20 +280,40 @@ describe("AMP automation (Phase 15-04)", () => {
       })
       .expect(200);
     const cs2 = instances.flatMap((t) => t.AvailableInstances).find((i) => i.InstanceName === "Counter-Strike201")!;
-    await admin
+    const cs2Binding = {
+      displayTitle: "Counter-Strike 2",
+      ampInstanceId: cs2.InstanceID,
+      ampInstanceName: "Counter-Strike201",
+      host: "cs2.lanparty.example",
+      port: 27015,
+      connectScheme: "steam",
+      enabled: true
+    };
+    const created = await admin
       .post("/api/integrations/amp/bindings")
       .set(CSRF_HEADER, adminCsrf)
-      .send({
-        displayTitle: "Counter-Strike 2",
-        ampInstanceId: cs2.InstanceID,
-        ampInstanceName: "Counter-Strike201",
-        host: "cs2.lanparty.example",
-        port: 27015,
-        connectScheme: "steam",
-        enabled: true
-      })
+      .send(cs2Binding)
       .expect(201);
+    // Standard: Leerlauf-Stopp für die Bindung aus
+    expect(created.body.binding.autoStopEnabled).toBe(false);
     await admin.get("/api/integrations/amp/status?refresh=1").expect(200);
+
+    vi.useFakeTimers({ toFake: ["Date"] });
+    try {
+      await runAutomationNow();
+      vi.setSystemTime(Date.now() + 5 * 60_000);
+      await runAutomationNow();
+      expect(ampCalls).not.toContain(`ADSModule/Servers/${cs2.InstanceID}/API/Core/Stop`);
+    } finally {
+      vi.useRealTimers();
+    }
+
+    const updated = await admin
+      .put(`/api/integrations/amp/bindings/${created.body.binding.id}`)
+      .set(CSRF_HEADER, adminCsrf)
+      .send({ ...cs2Binding, autoStopEnabled: true })
+      .expect(200);
+    expect(updated.body.binding.autoStopEnabled).toBe(true);
 
     vi.useFakeTimers({ toFake: ["Date"] });
     try {

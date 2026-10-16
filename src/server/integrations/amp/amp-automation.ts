@@ -2,7 +2,7 @@ import { and, inArray, isNull } from "drizzle-orm";
 import { writeAuditLog } from "../../audit-log";
 import type { DatabaseContext } from "../../db/client";
 import { gameEvents } from "../../db/schema";
-import { getBinding } from "../../domain/gameservers/bindings";
+import { getBinding, listBindings } from "../../domain/gameservers/bindings";
 import { sendPushToEventParticipants } from "../../push/push-service";
 import { readSettings } from "../../settings";
 import { runControlAction } from "./amp-control";
@@ -26,6 +26,11 @@ export type AutomationDeps = {
   listActiveEvents(): AutomationEvent[];
   getStatus(bindingId: string): ServerStatus | null;
   listStatuses(): ServerStatus[];
+  /**
+   * Bindungen, für die der Leerlauf-Stopp freigeschaltet ist. Ohne Freischaltung wird nie gestoppt:
+   * Bei manchen Spielen zählt AMP keine Spieler (leeres Console.UserJoinRegex, "Active Users" bleibt 0).
+   */
+  autoStopBindingIds(): string[];
   /**
    * Startet den Server. `followUp`: zweiter, einmaliger `Core/Start` nach `StartInstance`, sobald die
    * Instanz erreichbar ist (siehe `pendingGameStart`).
@@ -210,6 +215,7 @@ export async function runAutomationTick(deps: AutomationDeps, previous: Automati
 
   // Auto-Stop (D-15): kein aktives Event auf der Bindung und die ganze Leerlaufzeit über 0 Spieler.
   const idleMinutes = deps.settings.ampAutoStopIdleMinutes;
+  const autoStopAllowed = new Set(idleMinutes > 0 ? deps.autoStopBindingIds() : []);
   const statuses = deps.listStatuses();
   const knownBindings = new Set(statuses.map((status) => status.bindingId));
   for (const id of Object.keys(state.idleSince)) {
@@ -220,6 +226,7 @@ export async function runAutomationTick(deps: AutomationDeps, previous: Automati
     const bindingId = status.bindingId;
     const idle =
       idleMinutes > 0 &&
+      autoStopAllowed.has(bindingId) &&
       !eventsByBinding.has(bindingId) &&
       !startedBindings.has(bindingId) &&
       !status.error &&
@@ -302,6 +309,12 @@ export function buildAutomationDeps(context: DatabaseContext): AutomationDeps {
     listActiveEvents: () => (settings.ampIntegrationEnabled ? listActiveEvents(context) : []),
     getStatus: getServerStatus,
     listStatuses: () => (settings.ampIntegrationEnabled ? getAllServerStatus() : []),
+    autoStopBindingIds: () =>
+      settings.ampIntegrationEnabled
+        ? listBindings(context, { enabledOnly: true })
+            .filter((binding) => binding.autoStopEnabled)
+            .map((binding) => binding.id)
+        : [],
     start: (bindingId, opts) => runAutomaticAction(context, bindingId, "start", opts?.followUp === true),
     stop: (bindingId) => runAutomaticAction(context, bindingId, "stop"),
     pushRunning: (eventId, gameTitle) =>

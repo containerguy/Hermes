@@ -31,6 +31,7 @@ function binding(id: string, instanceName: string, ampInstanceId: string): GameS
     port: 27015,
     connectScheme: "steam",
     enabled: true,
+    autoStopEnabled: false,
     createdAt: now,
     updatedAt: now
   };

@@ -19,7 +19,12 @@ export const bindingInputSchema = z.object({
     .regex(/^[a-zA-Z0-9.-]+$/, "ungueltiger_host"),
   port: z.number().int().min(1).max(65535),
   connectScheme: connectSchemeSchema,
-  enabled: z.boolean().optional().default(true)
+  enabled: z.boolean().optional().default(true),
+  /**
+   * Leerlauf-Stopp erlaubt. Standard aus: AMP zählt Spieler bei manchen Spielen nicht
+   * (leeres Console.UserJoinRegex), dann wäre "0 Spieler" auch mitten im Spiel wahr.
+   */
+  autoStopEnabled: z.boolean().optional().default(false)
 });
 
 export type BindingInput = z.infer<typeof bindingInputSchema>;
@@ -34,6 +39,7 @@ export type GameServerBinding = {
   port: number;
   connectScheme: z.infer<typeof connectSchemeSchema>;
   enabled: boolean;
+  autoStopEnabled: boolean;
   createdAt: string;
   updatedAt: string;
 };
@@ -55,6 +61,7 @@ function toBinding(row: typeof gameServerBindings.$inferSelect): GameServerBindi
     port: row.port,
     connectScheme: row.connectScheme,
     enabled: row.enabled,
+    autoStopEnabled: row.autoStopEnabled,
     createdAt: row.createdAt,
     updatedAt: row.updatedAt
   };
@@ -123,6 +130,7 @@ export function upsertBinding(
     port: input.port,
     connectScheme: input.connectScheme,
     enabled: input.enabled,
+    autoStopEnabled: input.autoStopEnabled,
     updatedAt: timestamp
   };
 

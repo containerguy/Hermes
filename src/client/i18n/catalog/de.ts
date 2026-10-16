@@ -463,7 +463,7 @@ export const deMessages = {
   "admin.features.pizza.cashRecipient": "Bargeld-Empfänger Hinweis",
   "admin.amp.title": "CubeCoders AMP",
   "admin.amp.help":
-    "Wenn aktiviert, können Manager und Organisatoren beim Anlegen einer Runde Instanzen von deinem AMP-Controller laden und Server-/Verbindungsfelder ausfüllen. Basis-URL ohne „/API“ (z. B. http://192.168.200.98:8080). Zugangsdaten werden nur serverseitig gespeichert.",
+    "Wenn aktiviert, zeigt Hermes zu Events mit gebundenem Spiel Serverstatus, Spielerzahl und Verbinden; ab Rolle Manager lassen sich die Server steuern. Basis-URL des AMP-Controllers ohne „/API“ (z. B. https://amp-ctl.lanparty.example). Zugangsdaten liegen nur in der Server-Umgebung.",
   "admin.amp.enabled": "AMP-Anbindung aktivieren",
   "admin.amp.baseUrl": "AMP-Basis-URL",
   "admin.amp.envHint": "Zugangsdaten und CA werden auf dem Server per Umgebung gesetzt (HERMES_AMP_USERNAME, HERMES_AMP_PASSWORD, HERMES_AMP_CA_FILE).",
@@ -471,7 +471,7 @@ export const deMessages = {
   "admin.amp.autoStart": "Server automatisch starten, wenn ein Event bereit ist",
   "admin.amp.autoStopIdle": "Leerlauf-Stopp nach Minuten (0 = aus)",
   "admin.amp.automationHelp":
-    "Auto-Start greift höchstens einmal pro Event. Gestoppt wird nur ein Server ohne aktives Event, der die ganze Zeit 0 Spieler hatte.",
+    "Auto-Start greift höchstens einmal pro Event. Gestoppt werden nur Server, deren Bindung den Leerlauf-Stopp erlaubt, ohne aktives Event und mit 0 Spielern über die ganze Zeit.",
   "admin.amp.bindings.title": "Server-Bindungen",
   "admin.amp.bindings.help": "Verknüpft Spieltitel aus dem Katalog mit AMP-Instanzen. Events mit passendem Titel bekommen die Bindung automatisch.",
   "admin.amp.bindings.empty": "Noch keine Bindungen angelegt.",
@@ -488,6 +488,9 @@ export const deMessages = {
   "admin.amp.bindings.scheme.minecraft": "Minecraft (Adresse kopieren)",
   "admin.amp.bindings.scheme.copy": "Adresse kopieren",
   "admin.amp.bindings.enabled": "Aktiv",
+  "admin.amp.bindings.autoStop": "Leerlauf-Stopp erlauben",
+  "admin.amp.bindings.autoStopColumn": "Leerlauf-Stopp",
+  "admin.amp.bindings.autoStopHint": "Nur einschalten, wenn AMP für dieses Spiel Spieler zählt (in AMP ist „Console.UserJoinRegex“ gesetzt). Bei Soldat, UT2004 und Call of Duty 4 ist das Muster in den Vorlagen leer: AMP meldet dort immer 0 Spieler, und der Leerlauf-Stopp würde mitten im Spiel stoppen.",
   "admin.amp.bindings.save": "Speichern",
   "admin.amp.bindings.cancel": "Abbrechen",
   "admin.amp.bindings.edit": "Bearbeiten",

@@ -90,6 +90,7 @@ describe("binding suggestions", () => {
         port: 27015,
         connectScheme: "steam",
         enabled: true,
+        autoStopEnabled: false,
         createdAt: "",
         updatedAt: ""
       }
