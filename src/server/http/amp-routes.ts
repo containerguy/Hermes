@@ -20,6 +20,7 @@ import { fetchAmpInstances } from "../integrations/amp/amp-client";
 import { ampInstanceCall, unwrapAmpData } from "../integrations/amp/amp-session";
 import { getAllServerStatus, pollNow } from "../integrations/amp/amp-status";
 import { CONTROL_ACTIONS, runControlAction, type ControlAction } from "../integrations/amp/amp-control";
+import { MAX_CONSOLE_PARTS, splitConsoleCommands } from "../integrations/amp/console-split";
 import { readSettings, type HermesSettings } from "../settings";
 import type { GameServerBinding } from "../domain/gameservers/bindings";
 
@@ -65,7 +66,11 @@ async function fetchConsole(settings: HermesSettings, binding: GameServerBinding
   return { lines: buffer.lines.filter((line) => line.seq > since), cursor: buffer.seq };
 }
 
-const consoleCommandSchema = z.object({ command: z.string().trim().min(1).max(200) });
+const consoleCommandSchema = z.object({
+  command: z.string().trim().min(1).max(200),
+  /** An `;` aufteilen und einzeln senden (Spiele mit Quake-/GoldSrc-/Source-Konsole, s. command-presets). */
+  split: z.boolean().optional().default(false)
+});
 
 const KNOWN_AMP_ERRORS = new Set([
   "amp_deaktiviert",
@@ -208,7 +213,12 @@ export function createAmpIntegrationRouter(context: DatabaseContext) {
         entityType: "game_server_binding",
         entityId: binding.id,
         summary: `${actor.username} hat die Server-Bindung ${binding.displayTitle} angelegt.`,
-        metadata: { ampInstanceName: binding.ampInstanceName, host: binding.host, port: binding.port }
+        metadata: {
+          ampInstanceName: binding.ampInstanceName,
+          host: binding.host,
+          port: binding.port,
+          autoStopEnabled: binding.autoStopEnabled
+        }
       });
       response.status(201).json({ binding });
     } catch (error) {
@@ -247,7 +257,8 @@ export function createAmpIntegrationRouter(context: DatabaseContext) {
           ampInstanceName: binding.ampInstanceName,
           host: binding.host,
           port: binding.port,
-          enabled: binding.enabled
+          enabled: binding.enabled,
+          autoStopEnabled: binding.autoStopEnabled
         }
       });
       response.json({ binding });
@@ -393,6 +404,11 @@ export function createAmpIntegrationRouter(context: DatabaseContext) {
       response.status(400).json({ error: "ungueltiger_befehl" });
       return;
     }
+    const commands = parsed.data.split ? splitConsoleCommands(parsed.data.command) : [parsed.data.command];
+    if (commands.length === 0 || commands.length > MAX_CONSOLE_PARTS) {
+      response.status(400).json({ error: "ungueltiger_befehl" });
+      return;
+    }
     const rateLimit = checkRateLimit(context, {
       scope: "amp_control",
       key: `user:${guard.user.id}`,
@@ -405,24 +421,38 @@ export function createAmpIntegrationRouter(context: DatabaseContext) {
     // Jede Aktion zählt als Versuch (checkRateLimit prüft nur eine bestehende Sperre).
     recordRateLimitFailure(context, { scope: "amp_control", key: `user:${guard.user.id}` });
 
-    try {
-      await ampInstanceCall(readSettings(context), guard.binding.ampInstanceId, "Core/SendConsoleMessage", {
-        message: parsed.data.command
-      });
-    } catch (error) {
-      const msg = error instanceof Error ? error.message : "amp_anfrage_fehlgeschlagen";
-      response.status(502).json({ error: mapAmpErrorToCode(msg) });
-      return;
+    // Nacheinander senden, damit die Reihenfolge stimmt (erst yb_quota_mode, dann yb_quota).
+    const settings = readSettings(context);
+    let sent = 0;
+    let failure: string | null = null;
+    for (const message of commands) {
+      try {
+        await ampInstanceCall(settings, guard.binding.ampInstanceId, "Core/SendConsoleMessage", { message });
+        sent += 1;
+      } catch (error) {
+        failure = error instanceof Error ? error.message : "amp_anfrage_fehlgeschlagen";
+        break;
+      }
     }
 
-    writeAuditLog(context, {
-      actor: guard.user,
-      action: "amp.console_command",
-      entityType: "game_server_binding",
-      entityId: guard.binding.id,
-      summary: `${guard.user.username} hat einen Konsolenbefehl an ${guard.binding.ampInstanceName} gesendet.`,
-      metadata: { ampInstanceName: guard.binding.ampInstanceName, command: maskConsoleSecrets(parsed.data.command) }
-    });
+    if (sent > 0) {
+      writeAuditLog(context, {
+        actor: guard.user,
+        action: "amp.console_command",
+        entityType: "game_server_binding",
+        entityId: guard.binding.id,
+        summary: `${guard.user.username} hat einen Konsolenbefehl an ${guard.binding.ampInstanceName} gesendet.`,
+        metadata: {
+          ampInstanceName: guard.binding.ampInstanceName,
+          command: maskConsoleSecrets(parsed.data.command),
+          ...(commands.length > 1 ? { parts: commands.length, sent } : {})
+        }
+      });
+    }
+    if (failure) {
+      response.status(502).json({ error: mapAmpErrorToCode(failure) });
+      return;
+    }
     response.json({ ok: true });
   });
 

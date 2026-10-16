@@ -3,6 +3,8 @@
 #
 #   install.sh <cstrike-verzeichnis> [--dry-run]      installieren (idempotent)
 #   install.sh <cstrike-verzeichnis> --check          nur Zustand anzeigen
+#   install.sh <cstrike-verzeichnis> --relink         nur liblist.gam/plugins.ini wieder auf YaPB
+#                                                     (nach einem AMP-Update; ohne Download)
 #   install.sh <cstrike-verzeichnis> --uninstall      Bots entfernen, Originale zurück
 #
 # Vorher die Instanz in AMP stoppen. Läuft als Besitzer der Instanzdateien (z. B. `amp`) oder als
@@ -17,9 +19,10 @@ YAPB_SHA256="8c095ac89b9b2ccc70a66a71d608e1a570b5268c57c6083ced8c06161533a4b1"
 YAPB_URL="https://github.com/yapb/yapb/releases/download/${YAPB_VERSION}/yapb-${YAPB_VERSION}-linux.tar.xz"
 YAPB_SO="addons/yapb/bin/yapb.so"
 BACKUP_SUFFIX=".hermes-yapb-bak"
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
 usage() {
-  sed -n '2,11p' "$0" | sed 's/^# \{0,1\}//'
+  sed -n '2,13p' "$0" | sed 's/^# \{0,1\}//'
   exit 2
 }
 
@@ -31,6 +34,7 @@ case "$MODE" in
   install) ;;
   --dry-run) MODE="install"; DRY_RUN=1 ;;
   --check) MODE="check" ;;
+  --relink) MODE="relink" ;;
   --uninstall) MODE="uninstall" ;;
   *) usage ;;
 esac
@@ -154,6 +158,21 @@ install() {
     fi
   fi
 
+  # Familientaugliche Bot-Namen (yb_language de); eine vorhandene Liste bleibt unangetastet.
+  if [[ -f "$CSTRIKE/addons/yapb/conf/lang/de_names.cfg" ]]; then
+    log "conf/lang/de_names.cfg existiert schon – bleibt unverändert"
+  else
+    run cp "$SCRIPT_DIR/de_names.cfg" "$CSTRIKE/addons/yapb/conf/lang/de_names.cfg"
+    log "Bot-Namen: conf/lang/de_names.cfg angelegt"
+  fi
+
+  link
+  fix_permissions
+  log "Fertig. Instanz in AMP starten, dann in der Konsole: yb version"
+}
+
+# YaPB in den Ladeweg eintragen (idempotent). Ein AMP-Update (SteamCMD validate) setzt liblist.gam zurück.
+link() {
   if [[ "$LOADER" == "metamod" ]]; then
     [[ -f "$PLUGINS" ]] || { log "Fehler: Metamod erkannt, aber $PLUGINS fehlt"; exit 1; }
     if grep -qE "^[[:space:]]*linux[[:space:]]+$YAPB_SO" "$PLUGINS"; then
@@ -176,9 +195,18 @@ install() {
       log "liblist.gam: gamedll_linux -> $YAPB_SO (Original in liblist.gam$BACKUP_SUFFIX)"
     fi
   fi
+}
 
+fix_permissions() {
   run chown -R "$OWNER" "$CSTRIKE/addons/yapb"
-  log "Fertig. Instanz in AMP starten, dann in der Konsole: yb version"
+  # Das Paket bringt data/{logs,pwf,train} ohne x-Bit mit; YaPB kann dort sonst nicht schreiben (LAN-Test CS1601).
+  run chmod -R u+rwX,go+rX "$CSTRIKE/addons/yapb"
+}
+
+relink() {
+  [[ -f "$CSTRIKE/$YAPB_SO" ]] || { log "Fehler: $YAPB_SO fehlt – erst installieren"; exit 1; }
+  link
+  fix_permissions
 }
 
 uninstall() {
@@ -199,5 +227,6 @@ uninstall() {
 case "$MODE" in
   check) status ;;
   install) install; status ;;
+  relink) relink; status ;;
   uninstall) uninstall; status ;;
 esac

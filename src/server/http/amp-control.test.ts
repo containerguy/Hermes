@@ -233,6 +233,37 @@ describe("AMP control + status (Phase 15-02)", () => {
       ampCalls.some((c) => c.endpoint === `ADSModule/Servers/${CS2_ID}/API/Core/SendConsoleMessage` && c.body.message === "status")
     ).toBe(true);
 
+    // split: an ; aufteilen und einzeln in Reihenfolge senden (GoldSrc-RCON über AMP trennt nicht selbst)
+    const sendEndpoint = `ADSModule/Servers/${CS2_ID}/API/Core/SendConsoleMessage`;
+    ampCalls = [];
+    await manager.agent
+      .post(`/api/integrations/amp/instances/${bindingId}/console`)
+      .set(CSRF_HEADER, manager.csrf)
+      .send({ command: "yb_quota_mode fill; yb_quota 10", split: true })
+      .expect(200);
+    expect(ampCalls.filter((c) => c.endpoint === sendEndpoint).map((c) => c.body.message)).toEqual([
+      "yb_quota_mode fill",
+      "yb_quota 10"
+    ]);
+    // ohne split bleibt die Zeile ganz (Minecraft, Factorio: ; gehört zum Befehl)
+    ampCalls = [];
+    await manager.agent
+      .post(`/api/integrations/amp/instances/${bindingId}/console`)
+      .set(CSRF_HEADER, manager.csrf)
+      .send({ command: "a; b" })
+      .expect(200);
+    expect(ampCalls.filter((c) => c.endpoint === sendEndpoint).map((c) => c.body.message)).toEqual(["a; b"]);
+    await manager.agent
+      .post(`/api/integrations/amp/instances/${bindingId}/console`)
+      .set(CSRF_HEADER, manager.csrf)
+      .send({ command: " ; ", split: true })
+      .expect(400);
+    await manager.agent
+      .post(`/api/integrations/amp/instances/${bindingId}/console`)
+      .set(CSRF_HEADER, manager.csrf)
+      .send({ command: "a;b;c;d;e;f;g;h;i", split: true })
+      .expect(400);
+
     // Kiosk liefert genau die sechs Serverfelder
     await manager.agent
       .post("/api/events")

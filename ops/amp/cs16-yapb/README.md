@@ -18,6 +18,7 @@ Paket: `yapb-4.4.957-linux.tar.xz`, SHA-256 `8c095ac89b9b2ccc70a66a71d608e1a570b
 ./install.sh <cstrike-verzeichnis> --check       # nur Zustand anzeigen
 ./install.sh <cstrike-verzeichnis> --dry-run     # zeigen, was passieren würde
 ./install.sh <cstrike-verzeichnis>               # installieren (idempotent)
+./install.sh <cstrike-verzeichnis> --relink      # nach einem AMP-Update: nur wieder einhängen, ohne Download
 ./install.sh <cstrike-verzeichnis> --uninstall   # entfernen, Originale zurück
 ```
 
@@ -26,6 +27,8 @@ Paket: `yapb-4.4.957-linux.tar.xz`, SHA-256 `8c095ac89b9b2ccc70a66a71d608e1a570b
   - Ohne Metamod (**Standalone**): setzt `gamedll_linux` in `liblist.gam` auf YaPB. YaPB lädt die originale `dlls/cs.so` dann selbst.
 - Sichert `liblist.gam` und `plugins.ini` als `*.hermes-yapb-bak`. `--uninstall` stellt sie wieder her.
 - Binary und Wegpunkte werden bei jedem Lauf aktualisiert. `conf/` wird nur beim ersten Mal angelegt, eigene Anpassungen bleiben also erhalten.
+- Setzt die Rechte unter `addons/yapb` auf `u+rwX,go+rX`. Das Paket bringt `data/{logs,pwf,train}` ohne x-Bit mit, dann kann YaPB dort nicht schreiben.
+- Legt `conf/lang/de_names.cfg` aus diesem Verzeichnis an, falls sie fehlt: familientaugliche Bot-Namen statt der Liste aus `en_names.cfg`. YaPB nimmt sie bei `yb_language de`.
 - LAN-Voreinstellungen in `addons/yapb/conf/yapb.cfg`:
 
   | Einstellung | Wirkung |
@@ -53,6 +56,40 @@ Paket: `yapb-4.4.957-linux.tar.xz`, SHA-256 `8c095ac89b9b2ccc70a66a71d608e1a570b
 
 > **Achtung beim 64-Bit-Server:** Seit dem Update zum 25-jährigen Jubiläum liegen auch `dlls/cs_amd64.so` und `linux64/` bei. YaPB gibt es nur als 32-Bit-Binary. Wird die Instanz auf den 64-Bit-Server umgestellt, lädt `liblist.gam` eine unpassende Bibliothek, und der Server startet nicht. In diesem Fall vorher `install.sh … --uninstall` ausführen.
 
+## Nach einem AMP-Update
+
+Ein Update in AMP (SteamCMD mit `validate`) setzt `liblist.gam` auf das Original zurück. YaPB bleibt zwar unter `addons/yapb` liegen, wird aber nicht mehr geladen. In der Hermes-Konsole antwortet `yb version` dann mit „Unknown command“.
+
+**Sofort:** Instanz stoppen, `./install.sh <pfad> --relink`, Instanz starten. Das dauert eine Sekunde und braucht kein Internet.
+
+**Dauerhaft (Vorschlag, im LAN zu prüfen):** eine zusätzliche Update-Stufe in AMP, die nach SteamCMD `--relink` ausführt.
+
+1. Skript und Namensliste in die Instanz legen, damit sie im AMP-Container erreichbar sind:
+   - Host: `/home/amp/.ampdata/instances/CS1601/hermes-yapb/`
+   - Container: `/AMP/hermes-yapb/`
+2. In der Update-Liste der Instanz eine Stufe nach dem SteamCMD-Eintrag anhängen. Die Liste steht in `GenericModule.kvp` unter `App.UpdateSources` oder in der dort per `@IncludeJson[…]` eingebundenen `…updates.json`:
+
+   ```json
+   {
+     "UpdateStageName": "YaPB wieder einhängen (Hermes)",
+     "UpdateSourcePlatform": "Linux",
+     "UpdateSource": "Executable",
+     "UpdateSourceData": "/bin/bash",
+     "UpdateSourceArgs": "/AMP/hermes-yapb/install.sh /AMP/counter-strike/90/cstrike --relink",
+     "SkipOnFailure": false
+   }
+   ```
+
+3. Prüfen:
+   - In AMP „Update“ auslösen.
+   - `--check` zeigt danach wieder „zeigt auf YaPB“.
+   - `yb version` antwortet.
+
+Offene Punkte für den LAN-Test:
+- Feldnamen und Pfadvariablen gegen die echte Datei der Instanz abgleichen.
+- Prüfen, ob AMP die Datei beim Aktualisieren der Vorlagen („Fetch latest configs“) überschreibt.
+- Falls ja, bleibt `--relink` nach Updates ein Handgriff. Der Konsolenhinweis in Hermes nennt ihn.
+
 ## Hermes
 
 Die Konsolenvorlage „Bots (YaPB)“ für CS 1.6 steht in `src/client/gameservers/command-presets.ts`. Sie enthält:
@@ -64,6 +101,15 @@ Die Konsolenvorlage „Bots (YaPB)“ für CS 1.6 steht in `src/client/gameserve
 - `yb list` und `yb version`.
 
 Die Befehle gehen wie die übrigen CS-1.6-Befehle per RCON an den Server.
+
+GoldSrc-RCON über AMP trennt `;` nicht selbst. Ohne Aufteilung setzte `yb_quota_mode fill; yb_quota 10` nur `yb_quota_mode` auf `fill;`.
+
+Deshalb teilt Hermes Eingaben für CS 1.6, CS 2 und CoD4 an `;` auf und sendet die Teile einzeln nacheinander:
+- `;` in Anführungszeichen bleibt stehen.
+- Höchstens 8 Teile pro Eingabe.
+- Ein Eintrag im Audit-Log pro Eingabe.
+
+Für Minecraft und Factorio bleibt die Zeile ganz, weil `;` dort zum Befehl gehört.
 
 ## Aufgabenteilung
 

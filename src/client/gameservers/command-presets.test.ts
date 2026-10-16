@@ -43,6 +43,15 @@ describe("commandSetForGame", () => {
     // ohne yb_quota 0 würde die Quote die eben gekickten Bots sofort wieder auffüllen
     expect(commands).toContain("yb_quota 0; yb kickall");
     expect(set?.hint?.de).toContain("YaPB");
+    // GoldSrc-RCON über AMP trennt ; nicht selbst → Hermes teilt auf
+    expect(set?.splitCommands).toBe(true);
+  });
+
+  it("teilt nur bei Konsolen auf, in denen ; Befehle trennt", () => {
+    expect(commandSetForGame("Counter-Strike 2")?.splitCommands).toBe(true);
+    expect(commandSetForGame("Call of Duty 4")?.splitCommands).toBe(true);
+    expect(commandSetForGame("Minecraft")?.splitCommands).toBeFalsy();
+    expect(commandSetForGame("Factorio")?.splitCommands).toBeFalsy();
   });
 
   it("UT2004 verweist aufs WebAdmin statt auf Konsolenbefehle", () => {
