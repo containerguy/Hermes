@@ -212,9 +212,12 @@ describe("Pizza-Verwaltung ab manager", () => {
     await post(guest, "/api/pizza/lines", { variantId: "v-003-30", qty: 1 }).expect(201);
     await post(manager, "/api/pizza/transitions", { transition: "lock" }).expect(200);
     await post(manager, "/api/pizza/transitions", { transition: "deliver" }).expect(200);
+    // Doppelklick: zweites „deliver“ scheitert, ohne die Runde zu archivieren oder einen Entwurf anzulegen
+    await post(manager, "/api/pizza/transitions", { transition: "deliver" }).expect(409);
 
     let current = await state(guest);
     const firstSessionId = current.session.id as string;
+    expect(current.session.state).toBe("delivered");
     expect(current.orders).toHaveLength(1);
 
     await post(guest, `/api/pizza/sessions/${firstSessionId}/archive`).expect(403);

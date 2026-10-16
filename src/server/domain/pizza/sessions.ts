@@ -73,12 +73,24 @@ export function transitionSession(
   actor: { id: string },
   label?: string | null
 ) {
-  const session = getOrCreateDraftSession(context, actor);
+  // Transaktion: scheitert der Übergang, bleiben Archivierung und neue Entwurfsrunde aus.
+  return context.sqlite.transaction(() => applyTransition(context, transition, actor, label))();
+}
 
-  if (transition === "open") {
-    if (countActiveItems(context) === 0) {
-      throw new PizzaLifecycleError("menu_empty", "Mindestens ein aktiver Menüeintrag erforderlich");
-    }
+function applyTransition(
+  context: DatabaseContext,
+  transition: PizzaSessionTransition,
+  actor: { id: string },
+  label?: string | null
+) {
+  if (transition === "open" && countActiveItems(context) === 0) {
+    throw new PizzaLifecycleError("menu_empty", "Mindestens ein aktiver Menüeintrag erforderlich");
+  }
+  // Nur „open“ beginnt eine neue Runde. Ein zweites „deliver“ (Doppelklick) auf eine gelieferte
+  // Runde darf sie nicht archivieren und keinen leeren Entwurf anlegen.
+  const session = transition === "open" ? getOrCreateDraftSession(context, actor) : getActiveSession(context);
+  if (!session) {
+    throw new PizzaLifecycleError("invalid_transition", `Übergang ${transition} ohne aktive Runde nicht erlaubt`);
   }
 
   const target = nextState(session.state, transition);
