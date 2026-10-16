@@ -69,8 +69,12 @@ export type AppSettings = {
   pizzaPaymentMethods: "cash_and_paypal" | "cash_only" | "paypal_only";
   /** CubeCoders AMP: Instanzen beim Event-Anlegen auswählbar (serverseitig konfiguriert). */
   ampIntegrationEnabled: boolean;
-  /** Basis-URL ohne /API, z. B. http://192.168.200.98:8080 */
+  /** Basis-URL des AMP-Controllers ohne /API, z. B. https://amp-ctl.lanparty.example */
   ampBaseUrl: string;
+  /** Gebundene Instanz automatisch starten, sobald ein Event bereit ist (nur Admin-Ansicht). */
+  ampAutoStartOnReady: boolean;
+  /** Leerlauf-Stopp nach Minuten ohne aktives Event und ohne Spieler (0 = aus). */
+  ampAutoStopIdleMinutes: number;
 };
 
 /** Build-/Release-Infos aus dem Server (package.json + optional Repo-URL). */
@@ -143,6 +147,8 @@ export type GameServerBinding = {
   port: number;
   connectScheme: "steam" | "minecraft" | "copy";
   enabled: boolean;
+  /** Leerlauf-Stopp für diese Bindung erlaubt (Standard aus). */
+  autoStopEnabled: boolean;
   createdAt: string;
   updatedAt: string;
 };

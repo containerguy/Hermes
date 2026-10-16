@@ -95,6 +95,8 @@ const defaultSettings: AppSettings = {
   pizzaPaymentMethods: "cash_and_paypal",
   ampIntegrationEnabled: false,
   ampBaseUrl: "",
+  ampAutoStartOnReady: false,
+  ampAutoStopIdleMinutes: 0,
 };
 
 function applyTheme(settings: AppSettings) {

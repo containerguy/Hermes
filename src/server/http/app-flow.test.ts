@@ -1177,6 +1177,8 @@ describe("app flow", () => {
       pizzaPaymentMethods: "cash_and_paypal" as const,
       ampIntegrationEnabled: false,
       ampBaseUrl: "",
+      ampAutoStartOnReady: true,
+      ampAutoStopIdleMinutes: 15,
     };
 
     await adminAgent
@@ -1211,7 +1213,15 @@ describe("app flow", () => {
       .expect(200)
       .expect((response) => {
         expect(response.body.settings).toEqual(pickPublicSettings(updatedSettings));
+        expect(response.body.settings).not.toHaveProperty("ampAutoStartOnReady");
+        expect(response.body.settings).not.toHaveProperty("ampAutoStopIdleMinutes");
       });
+
+    await adminAgent
+      .put("/api/admin/settings")
+      .send({ ...updatedSettings, ampAutoStopIdleMinutes: 1441 })
+      .set(CSRF_HEADER, csrf)
+      .expect(400);
   });
 
   it("supports profile display name updates and confirmed email change", async () => {

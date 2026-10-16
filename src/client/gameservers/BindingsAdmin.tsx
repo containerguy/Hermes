@@ -14,6 +14,7 @@ type Draft = {
   port: string;
   connectScheme: Scheme;
   enabled: boolean;
+  autoStopEnabled: boolean;
 };
 
 const EMPTY: Draft = {
@@ -23,7 +24,8 @@ const EMPTY: Draft = {
   host: "",
   port: "",
   connectScheme: "copy",
-  enabled: true
+  enabled: true,
+  autoStopEnabled: false
 };
 
 interface BindingsAdminProps {
@@ -38,7 +40,8 @@ function draftFromSuggestion(s: BindingSuggestion, title?: string): Draft {
     host: s.host,
     port: s.port ? String(s.port) : "",
     connectScheme: s.connectScheme,
-    enabled: true
+    enabled: true,
+    autoStopEnabled: false
   };
 }
 
@@ -111,7 +114,8 @@ export function BindingsAdmin({ gameCatalog }: BindingsAdminProps) {
       host: binding.host,
       port: String(binding.port),
       connectScheme: binding.connectScheme,
-      enabled: binding.enabled
+      enabled: binding.enabled,
+      autoStopEnabled: binding.autoStopEnabled
     });
     setMessage("");
     setError("");
@@ -159,7 +163,8 @@ export function BindingsAdmin({ gameCatalog }: BindingsAdminProps) {
       host: d.host,
       port: Number(d.port),
       connectScheme: d.connectScheme,
-      enabled: d.enabled
+      enabled: d.enabled,
+      autoStopEnabled: d.autoStopEnabled
     };
   }
 
@@ -261,9 +266,16 @@ export function BindingsAdmin({ gameCatalog }: BindingsAdminProps) {
       <p className="muted">{t("admin.amp.suggestions.help")}</p>
       {ampLoading ? <p className="muted">{t("admin.amp.suggestions.loading")}</p> : null}
       {ampError ? (
-        <p className="error" role="alert">
-          {ampError}
-        </p>
+        <>
+          <p className="error" role="alert">
+            {ampError}
+          </p>
+          <div className="action-row">
+            <button type="button" className="ghost" onClick={() => void loadFromAmp()}>
+              {t("admin.amp.suggestions.reload")}
+            </button>
+          </div>
+        </>
       ) : null}
       {!ampLoading && !ampError && openSuggestions.length === 0 ? (
         <p className="muted">{t("admin.amp.suggestions.none")}</p>
@@ -352,6 +364,7 @@ export function BindingsAdmin({ gameCatalog }: BindingsAdminProps) {
               <th>{t("admin.amp.bindings.endpoint")}</th>
               <th>{t("admin.amp.bindings.scheme")}</th>
               <th>{t("admin.amp.bindings.enabled")}</th>
+              <th>{t("admin.amp.bindings.autoStopColumn")}</th>
               <th />
             </tr>
           </thead>
@@ -365,6 +378,7 @@ export function BindingsAdmin({ gameCatalog }: BindingsAdminProps) {
                 </td>
                 <td>{binding.connectScheme}</td>
                 <td>{binding.enabled ? "✓" : "–"}</td>
+                <td>{binding.autoStopEnabled ? "✓" : "–"}</td>
                 <td>
                   <button type="button" className="ghost" onClick={() => startEdit(binding)}>
                     {t("admin.amp.bindings.edit")}
@@ -450,6 +464,18 @@ export function BindingsAdmin({ gameCatalog }: BindingsAdminProps) {
           />
           {t("admin.amp.bindings.enabled")}
         </label>
+        <label className="checkbox-label">
+          <input
+            type="checkbox"
+            checked={draft.autoStopEnabled}
+            aria-describedby="amp-binding-autostop-hint"
+            onChange={(event) => setDraft({ ...draft, autoStopEnabled: event.target.checked })}
+          />
+          {t("admin.amp.bindings.autoStop")}
+        </label>
+        <p className="muted field-hint" id="amp-binding-autostop-hint">
+          {t("admin.amp.bindings.autoStopHint")}
+        </p>
         <div className="action-row">
           <button type="submit" disabled={busy}>
             {t("admin.amp.bindings.save")}

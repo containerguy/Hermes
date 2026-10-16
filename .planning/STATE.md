@@ -4,8 +4,8 @@ milestone: v1.2
 milestone_name: Post-LAN Quality of Life
 status: paused-after-phase-9
 stopped_at: Completed 09-04-client-pairing-ux-PLAN.md; pizza ordering shipped out-of-band
-last_updated: "2026-05-18"
-last_activity: 2026-05-16
+last_updated: "2026-10-16"
+last_activity: 2026-10-16
 progress:
   total_phases: 5
   completed_phases: 1
@@ -28,7 +28,7 @@ See: .planning/PROJECT.md (updated 2026-04-15)
 Phase: 09 (device-recognition-and-pairing) — COMPLETE
 Plan: 4 of 4
 Status: Phase complete; v1.2 paused after Phase 9. Pizza ordering shipped out-of-band (see phases/14-pizza-ordering/).
-Last activity: 2026-05-16 (pizza session globalization refactor)
+Last activity: 2026-10-16 (Phase 15-04 AMP-Automatik, Draft-PR; davor Pizza-Refactor 2026-05-16)
 
 Progress: [===.......] 29% (4 of 14 plans executed)
 
@@ -41,7 +41,7 @@ Progress: [===.......] 29% (4 of 14 plans executed)
 | 11 — Bulk User Import | 2 | — | Not started — PLAN files only |
 | 12 — Audio & Haptic Notifications | 2 | `0012_audio_haptic_prefs.sql` (planned) | Not started — PLAN files only |
 | 13 — CI Node 24 Readiness | 1 | — | Not started — PLAN file only |
-| 15 — AMP-Gameserver-Modul | 4 | `0020_game_server_bindings.sql` (planned) | In progress — 15-01…15-03 complete (2026-10-16), Branch `feature/amp-integration` |
+| 15 — AMP-Gameserver-Modul | 4 | `0020_game_server_bindings.sql` | Code complete — 15-01…15-04 (2026-10-16), Branch `feature/amp-integration`, Draft-PR; Abnahme gegen echte AMP-Server ausstehend (siehe 15-04-SUMMARY „Offen") |
 
 ### Out-of-band work shipped after Phase 9
 

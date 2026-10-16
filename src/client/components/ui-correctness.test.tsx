@@ -173,6 +173,8 @@ describe("ui correctness structure contracts", () => {
       pizzaPaymentMethods: "cash_and_paypal",
       ampIntegrationEnabled: false,
       ampBaseUrl: "",
+      ampAutoStartOnReady: false,
+      ampAutoStopIdleMinutes: 0,
     };
 
     requestJsonMock.mockImplementation(async (path: string) => {

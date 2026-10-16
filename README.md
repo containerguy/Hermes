@@ -92,6 +92,66 @@ ACCESS_KEY
 SECRET_KEY
 ```
 
+## Gameserver (CubeCoders AMP)
+
+Optionales Modul: Hermes zeigt zu jedem Event den Status des passenden Gameservers, einen Verbinden-Knopf und – ab Rolle `manager` – Start, Stopp, Neustart, Update und Konsole. Ausgeführt wird alles in [CubeCoders AMP](https://cubecoders.com/AMP); Hermes spricht direkt mit dem AMP-Controller.
+
+### Voraussetzungen
+
+- Ein **AMP-Dienstkonto** (z. B. `hermes`) mit eigener, **minimaler Rolle**: Instanzen sehen, Start/Stop/Restart/Update und Konsole lesen/schreiben auf den Spiele-Instanzen. Nicht die Rolle `*` (Super Admin) verwenden. Ohne 2FA, weil Hermes sich unbeaufsichtigt anmeldet.
+- Die **CA-Datei** (PEM), die das Zertifikat des AMP-Controllers ausgestellt hat, falls dieser kein öffentlich vertrauenswürdiges Zertifikat nutzt. TLS wird immer geprüft; es gibt keinen „Zertifikat ignorieren"-Schalter.
+- Jedes Spiel muss in AMP **mindestens einmal erfolgreich aktualisiert** worden sein. Ohne erfolgreiches erstes Update (`App.HasSuccessfullyUpdatedAtLeastOnce`) startet AMP das Spiel nicht – und meldet dabei keinen Fehler. Erstes Update daher im AMP-Panel oder über „Mehr … → Update" in Hermes auslösen.
+
+### Umgebung
+
+Zugangsdaten liegen **nur** in der Umgebung, nie in `app_settings` oder Backups:
+
+```env
+HERMES_AMP_USERNAME=hermes
+HERMES_AMP_PASSWORD=...
+# Optional: Datei für das rotierende rememberMe-Token (spart den Passwort-Login nach Neustarts)
+HERMES_AMP_REMEMBER_TOKEN_FILE=/data/amp-remember.token
+# Optional: CA des AMP-Controllers (leer = System-Trust-Store)
+HERMES_AMP_CA_FILE=/run/secrets/amp-ca.pem
+```
+
+Unter Docker wird die CA wie `s3.creds` readonly gemountet (siehe `docker-compose.yml`):
+
+```yaml
+    environment:
+      HERMES_AMP_CA_FILE: /run/secrets/amp-ca.pem
+    volumes:
+      - ./amp-ca.pem:/run/secrets/amp-ca.pem:ro
+```
+
+Danach in Hermes unter **Admin → Betrieb → CubeCoders AMP** das Modul aktivieren, die Basis-URL des Controllers eintragen (z. B. `https://amp-ctl.lanparty.example`) und unter „Server-Bindungen" Spieltitel aus dem Katalog mit AMP-Instanzen verknüpfen (Host, Port, Verbinden-Art). Events mit passendem Spieltitel bekommen die Bindung automatisch.
+
+Passwörter, RCON-Passwörter und Spielserver-Konfiguration bleiben in AMP. Hermes speichert pro Bindung nur Instanz-ID/-Name, Host, Port und Verbinden-Art; Konsolenausgaben mit Passwörtern werden maskiert.
+
+### Rollen
+
+| Aktion | user | organizer | manager | admin |
+|---|---|---|---|---|
+| Status sehen, Verbinden | ja | ja | ja | ja |
+| Start, Stopp, Neustart, Update | – | – | ja | ja |
+| Konsole lesen und Befehle senden | – | – | ja | ja |
+| Abschießen (Kill), nur nach Bestätigung | – | – | ja | ja |
+| Bindungen und AMP-Einstellungen pflegen | – | – | – | ja |
+
+Die Rechte werden serverseitig geprüft; jede Steueraktion landet im Audit-Log und unterliegt einem Rate-Limit.
+
+### Automatik
+
+Beide Schalter sind standardmäßig aus (Admin → Betrieb → CubeCoders AMP):
+
+- **Server automatisch starten, wenn ein Event bereit ist:** Wird ein Event mit gebundenem Server `bereit` (oder läuft es schon) und der Server ist aus, startet Hermes ihn – **höchstens einmal pro Event**. Stoppt ein Manager den Server danach bewusst, bleibt er aus. Läuft der Server schon (auch im AMP-Ruhemodus „Sleeping") oder ist AMP gerade beim Starten/Updaten, passiert nichts. War die AMP-Instanz selbst aus, startet Hermes zuerst die Instanz und – sobald sie erreichbar ist und das Spiel noch steht – das Spiel genau ein zweites Mal (Nachstart, höchstens 10 Minuten nach dem Instanzstart; Audit `amp.auto_start` mit `followUp`).
+- **Leerlauf-Stopp nach Minuten (0 = aus):** Hermes stoppt einen Server, wenn kein aktives Event (offen, bereit, läuft) mehr an ihm hängt und er die ganze Zeit über **0 Spieler** hatte. Fehlt die Spielerzahl in AMP, zählt das nicht als leer. Zusätzlich muss der Leerlauf-Stopp **in der Bindung freigeschaltet** sein („Leerlauf-Stopp erlauben", Standard aus).
+
+> **Spielerzählung prüfen, bevor du den Leerlauf-Stopp für eine Bindung erlaubst.** AMP zählt Spieler über das Konsolenmuster `Console.UserJoinRegex` der Instanz. In den CubeCoders-Vorlagen ist es bei **Soldat, UT2004 und Call of Duty 4** leer – dort meldet AMP immer 0 Spieler, auch mitten im Spiel, und ein Leerlauf-Stopp würde laufende Partien beenden. Bei CS2, CS 1.6 und Factorio ist ein Muster gesetzt, Minecraft zählt über das eigene AMP-Modul (Stand LAN-Abnahme 2026-10-16).
+- **Push „Server für <Spiel> läuft":** Sobald der Server eines aktiven Events beitretbar ist (Ready oder Ruhemodus), bekommen alle, die bei diesem Event **dabei** sind und Benachrichtigungen aktiviert haben, genau einen Push. Der Push enthält nur den Spieltitel und den Link zur Übersicht, keine Serveradresse.
+
+Nach einem Neustart von Hermes übernimmt der erste Durchlauf nur den aktuellen Stand: Es gehen keine Pushes raus, und Server bereits bereiter Events werden nicht automatisch gestartet. Die Automatik prüft alle 30 Sekunden; Auto-Start und Auto-Stopp stehen im Audit-Log als `amp.auto_start` bzw. `amp.auto_stop` (ohne Benutzer).
+
 ## Lokal Starten
 
 ```bash
@@ -315,3 +375,4 @@ Falls Chromium wegen fehlender Systembibliotheken nicht startet, müssen die Pla
 - **Single-Writer**: genau eine schreibende Hermes-Instanz
 - Backup-Status im Admin UI geprüft (letztes Success/Failure + Location)
 - Restore/Rollback verstanden: Recovery-Key wird bei Restore ausgegeben, Rollback via Recovery-Snapshot möglich
+- Falls das Gameserver-Modul genutzt wird: AMP-Dienstkonto mit minimaler Rolle, `HERMES_AMP_USERNAME`/`HERMES_AMP_PASSWORD` gesetzt, CA gemountet (`HERMES_AMP_CA_FILE`), jedes Spiel in AMP einmal erfolgreich aktualisiert

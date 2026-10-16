@@ -103,7 +103,9 @@ export function flattenAmpInstances(
   for (const target of asRecordArray(unwrapAmpData(raw))) {
     const nested = target.AvailableInstances ?? target.availableInstances;
     if (nested !== undefined) {
-      const targetName = pickString(target, ["FriendlyName", "friendlyName", "Name"]) || "Local";
+      // FriendlyName enthält bei manchen Targets den Panel-Port ("retro.lan:8080") — nur der Name zählt.
+      const targetName =
+        pickString(target, ["FriendlyName", "friendlyName", "Name"]).replace(/:\d+$/, "") || "Local";
       const targetHost = hostFromUrl(pickString(target, ["URL", "Url", "url"]) || targetName);
       for (const row of asRecordArray(nested)) {
         if (pickModule(row) !== "ADS") {
