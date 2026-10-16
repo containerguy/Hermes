@@ -5,6 +5,7 @@ import { createRoot, type Root } from "react-dom/client";
 import { act } from "react-dom/test-utils";
 import { I18nProvider } from "../i18n/I18nContext";
 import type { ServerStatus } from "../types/core";
+import { requestJson } from "../api/request";
 import { ServerPanel } from "./ServerPanel";
 
 vi.mock("../api/request", () => ({ requestJson: vi.fn(async () => ({ lines: [], cursor: 0 })) }));
@@ -120,6 +121,72 @@ describe("ServerPanel", () => {
     });
     const input = rendered.container.querySelector(".server-console-input input") as HTMLInputElement;
     expect(input.value).toBe("kick <name>");
+    await rendered.cleanup();
+  });
+
+  it("manages CS 1.6 bots with controls instead of console commands", async () => {
+    const rendered = await render(
+      <ServerPanel
+        bindingId="b-cs16"
+        status={{ ...running, bindingId: "b-cs16", game: "Counter-Strike 1.6" }}
+        canManage
+        busy={false}
+        onAction={vi.fn()}
+      />
+    );
+    const button = (text: string) =>
+      Array.from(rendered.container.querySelectorAll("button")).find((b) => b.textContent?.trim() === text)!;
+    await act(async () => {
+      button("Bots").dispatchEvent(new MouseEvent("click", { bubbles: true }));
+      await flush();
+    });
+    const [levelSelect, teamSelect] = Array.from(rendered.container.querySelectorAll<HTMLSelectElement>(".server-bots select"));
+    await act(async () => {
+      levelSelect.value = "hard";
+      levelSelect.dispatchEvent(new Event("change", { bubbles: true }));
+      teamSelect.value = "t";
+      teamSelect.dispatchEvent(new Event("change", { bubbles: true }));
+      await flush();
+    });
+    await act(async () => {
+      button("Hinzufügen").dispatchEvent(new MouseEvent("click", { bubbles: true }));
+      await flush();
+    });
+    expect(vi.mocked(requestJson)).toHaveBeenCalledWith("/api/integrations/amp/instances/b-cs16/bots", {
+      method: "POST",
+      body: JSON.stringify({ action: "add", count: 5, level: "hard", team: "t" })
+    });
+    expect(rendered.container.textContent).toContain("Stufe für alle ändern");
+    await rendered.cleanup();
+  });
+
+  it("allows the game update only while the game is stopped", async () => {
+    const onAction = vi.fn();
+    const open = async (status: ServerStatus) => {
+      const rendered = await render(<ServerPanel bindingId="b-cs2" status={status} canManage busy={false} onAction={onAction} />);
+      const more = Array.from(rendered.container.querySelectorAll("button")).find((b) => b.textContent?.trim() === "Mehr …")!;
+      await act(async () => {
+        more.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+        await flush();
+      });
+      const update = Array.from(rendered.container.querySelectorAll("button")).find((b) => b.textContent?.trim() === "Update")!;
+      return { rendered, update };
+    };
+    const running1 = await open(running);
+    expect(running1.update.disabled).toBe(true);
+    expect(running1.rendered.container.textContent).toContain("Update erst nach „Stopp“ möglich.");
+    await running1.rendered.cleanup();
+    const stopped = await open({ ...running, running: false, appState: "Stopped" });
+    expect(stopped.update.disabled).toBe(false);
+    await stopped.rendered.cleanup();
+  });
+
+  it("offers no bot controls for games without bots", async () => {
+    const rendered = await render(
+      <ServerPanel bindingId="b-mc" status={{ ...running, game: "Minecraft" }} canManage busy={false} onAction={vi.fn()} />
+    );
+    const labels = Array.from(rendered.container.querySelectorAll("button")).map((b) => b.textContent?.trim());
+    expect(labels).not.toContain("Bots");
     await rendered.cleanup();
   });
 

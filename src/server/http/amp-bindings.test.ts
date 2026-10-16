@@ -164,8 +164,14 @@ describe("AMP server bindings (Phase 15-01)", () => {
     await admin
       .put(`/api/integrations/amp/bindings/${bindingId}`)
       .set(CSRF_HEADER, adminCsrf)
-      .send({ ...minecraftBinding, enabled: false })
+      .send({ ...minecraftBinding, enabled: false, autoStopEnabled: true })
       .expect(200);
+    // Audit hält fest, wer den Leerlauf-Stopp freigeschaltet hat
+    const audit = await admin.get("/api/admin/audit-log").expect(200);
+    const upserts = (audit.body.auditLogs as Array<{ action: string; metadata: Record<string, unknown> | null }>).filter(
+      (entry) => entry.action === "gameserver.binding_upsert"
+    );
+    expect(upserts.map((entry) => entry.metadata?.autoStopEnabled).sort()).toEqual([false, true]);
     const afterDisable = await manager
       .post("/api/events")
       .set(CSRF_HEADER, managerCsrf)

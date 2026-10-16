@@ -9,8 +9,8 @@ import { CSRF_HEADER } from "../auth/csrf";
 import { bootstrapAdmin } from "../db/bootstrap-admin";
 import { createHermesApp } from "../app";
 import { setAmpFetchForTests } from "../integrations/amp/amp-session";
-import { resetAmpStatusForTests } from "../integrations/amp/amp-status";
-import { maskConsoleSecrets } from "./amp-routes";
+import { pollNow, resetAmpStatusForTests } from "../integrations/amp/amp-status";
+import { maskConsoleSecrets, setBotCountPollForTests } from "./amp-routes";
 
 type StartedApp = Awaited<ReturnType<typeof createHermesApp>>;
 type AmpCall = { endpoint: string; body: Record<string, unknown> };
@@ -18,6 +18,17 @@ type AmpCall = { endpoint: string; body: Record<string, unknown> };
 let started: StartedApp | undefined;
 let databasePath: string;
 let ampCalls: AmpCall[] = [];
+/** AppState der CS2-Instanz in GetInstances (20 = Ready, 0 = Stopped). */
+let cs2AppState = 20;
+
+function instancesWithCs2State() {
+  return (fixture as Array<{ AvailableInstances: Array<Record<string, unknown>> }>).map((target) => ({
+    ...target,
+    AvailableInstances: target.AvailableInstances.map((instance) =>
+      instance.InstanceName === "Counter-Strike201" ? { ...instance, AppState: cs2AppState } : instance
+    )
+  }));
+}
 
 const CS2_ID = (fixture as Array<{ AvailableInstances: Array<{ InstanceID: string; InstanceName: string }> }>)
   .flatMap((t) => t.AvailableInstances)
@@ -25,6 +36,7 @@ const CS2_ID = (fixture as Array<{ AvailableInstances: Array<{ InstanceID: strin
 
 function installAmpMock() {
   ampCalls = [];
+  cs2AppState = 20;
   const fetchMock = vi.fn(async (url: unknown, init?: { body?: unknown }) => {
     // nicht-gierig: Proxy-Pfade enthalten ein zweites "/API/" (…/Servers/<id>/API/Core/Stop)
     const endpoint = String(url).replace(/^.*?\/API\//, "");
@@ -43,12 +55,17 @@ function installAmpMock() {
         Message: "You do not have permission to use this method at this time. This method requires the Session.Exists permission."
       };
     } else if (endpoint === "ADSModule/GetInstances") {
-      payload = fixture;
+      payload = instancesWithCs2State();
     } else if (endpoint.endsWith("/API/Core/GetUpdates")) {
+      const lastSent = [...ampCalls].reverse().find((c) => c.endpoint.endsWith("/API/Core/SendConsoleMessage"));
       payload = {
         ConsoleEntries: [
           { Timestamp: "2026-10-15T20:00:00Z", Source: "Console", Contents: "Server started" },
-          { Timestamp: "2026-10-15T20:00:01Z", Source: "Console", Contents: 'rcon_password "SuperGeheim123"' }
+          { Timestamp: "2026-10-15T20:00:01Z", Source: "Console", Contents: 'rcon_password "SuperGeheim123"' },
+          // Antwort auf `status` (CS2): Hermes liest daraus die Botzahl
+          ...(lastSent?.body.message === "status"
+            ? [{ Timestamp: "2026-10-15T20:00:02Z", Source: "Console", Contents: "players  : 0 humans, 3 bots (32 max)" }]
+            : [])
         ]
       };
     } else {
@@ -191,11 +208,23 @@ describe("AMP control + status (Phase 15-02)", () => {
       .expect(200);
     expect(ampCalls.some((c) => c.endpoint === `ADSModule/Servers/${CS2_ID}/API/Core/Stop`)).toBe(true);
 
+    // Spiel-Update nur bei gestopptem Spiel (sonst verwaist AMP den Spielprozess)
+    const updateEndpoint = `ADSModule/Servers/${CS2_ID}/API/Core/UpdateApplication`;
+    const runningUpdate = await manager.agent
+      .post(`/api/integrations/amp/instances/${bindingId}/update`)
+      .set(CSRF_HEADER, manager.csrf)
+      .expect(409);
+    expect(runningUpdate.body.error).toBe("amp_update_erst_stoppen");
+    expect(ampCalls.some((c) => c.endpoint === updateEndpoint)).toBe(false);
+    cs2AppState = 0;
+    await pollNow();
     await manager.agent
       .post(`/api/integrations/amp/instances/${bindingId}/update`)
       .set(CSRF_HEADER, manager.csrf)
       .expect(200);
-    expect(ampCalls.some((c) => c.endpoint === `ADSModule/Servers/${CS2_ID}/API/Core/UpdateApplication`)).toBe(true);
+    expect(ampCalls.some((c) => c.endpoint === updateEndpoint)).toBe(true);
+    cs2AppState = 20;
+    await pollNow();
 
     // Unbekannte Aktion / unbekannte Bindung
     await manager.agent
@@ -232,6 +261,73 @@ describe("AMP control + status (Phase 15-02)", () => {
     expect(
       ampCalls.some((c) => c.endpoint === `ADSModule/Servers/${CS2_ID}/API/Core/SendConsoleMessage` && c.body.message === "status")
     ).toBe(true);
+
+    // split: an ; aufteilen und einzeln in Reihenfolge senden (GoldSrc-RCON über AMP trennt nicht selbst)
+    const sendEndpoint = `ADSModule/Servers/${CS2_ID}/API/Core/SendConsoleMessage`;
+    ampCalls = [];
+    await manager.agent
+      .post(`/api/integrations/amp/instances/${bindingId}/console`)
+      .set(CSRF_HEADER, manager.csrf)
+      .send({ command: "yb_quota_mode fill; yb_quota 10", split: true })
+      .expect(200);
+    expect(ampCalls.filter((c) => c.endpoint === sendEndpoint).map((c) => c.body.message)).toEqual([
+      "yb_quota_mode fill",
+      "yb_quota 10"
+    ]);
+    // ohne split bleibt die Zeile ganz (Minecraft, Factorio: ; gehört zum Befehl)
+    ampCalls = [];
+    await manager.agent
+      .post(`/api/integrations/amp/instances/${bindingId}/console`)
+      .set(CSRF_HEADER, manager.csrf)
+      .send({ command: "a; b" })
+      .expect(200);
+    expect(ampCalls.filter((c) => c.endpoint === sendEndpoint).map((c) => c.body.message)).toEqual(["a; b"]);
+    await manager.agent
+      .post(`/api/integrations/amp/instances/${bindingId}/console`)
+      .set(CSRF_HEADER, manager.csrf)
+      .send({ command: " ; ", split: true })
+      .expect(400);
+    await manager.agent
+      .post(`/api/integrations/amp/instances/${bindingId}/console`)
+      .set(CSRF_HEADER, manager.csrf)
+      .send({ command: "a;b;c;d;e;f;g;h;i", split: true })
+      .expect(400);
+
+    // Bots: Hermes baut die Befehle je Spiel (CS2 laut AMP) und sendet sie einzeln
+    ampCalls = [];
+    const bots = (body: unknown) =>
+      manager.agent.post(`/api/integrations/amp/instances/${bindingId}/bots`).set(CSRF_HEADER, manager.csrf).send(body as object);
+    await user.agent
+      .post(`/api/integrations/amp/instances/${bindingId}/bots`)
+      .set(CSRF_HEADER, user.csrf)
+      .send({ action: "removeAll" })
+      .expect(403);
+    await manager.agent.post(`/api/integrations/amp/instances/${bindingId}/bots`).send({ action: "removeAll" }).expect(403);
+    await bots({ action: "add", count: 21, level: "normal" }).expect(400);
+    expect(ampCalls.filter((c) => c.endpoint === sendEndpoint)).toEqual([]);
+    setBotCountPollForTests({ attempts: 3, intervalMs: 1 });
+    const added = await bots({ action: "add", count: 2, level: "hard", team: "ct" }).expect(200);
+    expect(added.body).toMatchObject({ ok: true, botsBefore: 3 });
+    expect(ampCalls.filter((c) => c.endpoint === sendEndpoint).map((c) => c.body.message)).toEqual([
+      "status",
+      "mp_limitteams 0",
+      "mp_autoteambalance 0",
+      "bot_quota_mode fill",
+      "bot_quota 3",
+      "bot_difficulty 2",
+      "bot_add_ct",
+      "bot_add_ct"
+    ]);
+    const counted = await manager.agent.get(`/api/integrations/amp/instances/${bindingId}/bots`).expect(200);
+    expect(counted.body).toEqual({ kind: "cs2", bots: 3, humans: 0 });
+    await user.agent.get(`/api/integrations/amp/instances/${bindingId}/bots`).expect(403);
+    setBotCountPollForTests(null);
+    const botAudit = await admin.get("/api/admin/audit-log").expect(200);
+    expect(
+      (botAudit.body.auditLogs as Array<{ action: string; metadata: Record<string, unknown> }>).find(
+        (e) => e.action === "amp.bots_add"
+      )?.metadata
+    ).toMatchObject({ kind: "cs2", count: 2, level: "hard", team: "ct", commands: 7, sent: 7, botsBefore: 3 });
 
     // Kiosk liefert genau die sechs Serverfelder
     await manager.agent

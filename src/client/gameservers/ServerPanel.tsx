@@ -3,6 +3,8 @@ import { copyToClipboard } from "../cod4/clipboard";
 import { useI18n } from "../i18n/I18nContext";
 import type { ServerStatus } from "../types/core";
 import { buildConnectAction } from "./connect-link";
+import { botKindForGame } from "../../shared/bot-commands";
+import { ServerBots } from "./ServerBots";
 import { ServerConsole } from "./ServerConsole";
 
 export type ServerAction = "start" | "stop" | "restart" | "update" | "kill";
@@ -34,6 +36,7 @@ export function ServerPanel({ bindingId, status, canManage, busy, onAction }: Se
   const [copyStatus, setCopyStatus] = useState<"idle" | "ok" | "error">("idle");
   const [moreOpen, setMoreOpen] = useState(false);
   const [consoleOpen, setConsoleOpen] = useState(false);
+  const [botsOpen, setBotsOpen] = useState(false);
   const copyTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
@@ -55,6 +58,9 @@ export function ServerPanel({ bindingId, status, canManage, busy, onAction }: Se
           ? t("events.server.status.error")
           : t("events.server.status.off");
   const connect = status ? buildConnectAction(status) : null;
+  const botKind = botKindForGame(status?.game);
+  // Spiel-Update nur bei angehaltenem Spiel (sonst verwaist AMP den Spielprozess)
+  const updateAllowed = status?.appState === "Stopped" || status?.appState === "Failed";
 
   async function copy(text: string) {
     const ok = await copyToClipboard(text);
@@ -130,7 +136,14 @@ export function ServerPanel({ bindingId, status, canManage, busy, onAction }: Se
           </button>
           {moreOpen ? (
             <>
-              <button type="button" className="secondary" disabled={busy} onClick={() => onAction("update")}>
+              {!updateAllowed ? <span className="muted server-console-hint">{t("events.server.updateNeedsStop")}</span> : null}
+              <button
+                type="button"
+                className="secondary"
+                disabled={busy || !updateAllowed}
+                title={updateAllowed ? undefined : t("events.server.updateNeedsStop")}
+                onClick={() => onAction("update")}
+              >
                 {t("events.server.update")}
               </button>
               <button type="button" className="secondary danger" disabled={busy} onClick={confirmKill}>
@@ -146,9 +159,20 @@ export function ServerPanel({ bindingId, status, canManage, busy, onAction }: Se
           >
             {consoleOpen ? t("events.server.consoleHide") : t("events.server.console")}
           </button>
+          {botKind ? (
+            <button
+              type="button"
+              className="secondary"
+              aria-expanded={botsOpen}
+              onClick={() => setBotsOpen((open) => !open)}
+            >
+              {botsOpen ? t("events.server.bots.hide") : t("events.server.bots.title")}
+            </button>
+          ) : null}
         </div>
       ) : null}
 
+      {canManage && botsOpen && botKind ? <ServerBots bindingId={bindingId} kind={botKind} /> : null}
       {canManage && consoleOpen ? <ServerConsole bindingId={bindingId} game={status?.game ?? null} host={status?.host ?? ""} /> : null}
     </section>
   );

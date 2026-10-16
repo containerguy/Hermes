@@ -20,6 +20,11 @@ export type GameCommandSet = {
   /** ok = Konsole antwortet; untested = Befehle gehen raus, Rückmeldung nicht geprüft; none = Konsole nimmt nichts an */
   console: "ok" | "untested" | "none";
   hint?: Text;
+  /**
+   * Eingaben an `;` aufteilen und einzeln senden. Für Quake-/GoldSrc-/Source-Konsolen, in denen `;`
+   * Befehle trennt: AMP reicht die Zeile bei GoldSrc-RCON sonst als einen Befehl durch (LAN-Test CS1601).
+   */
+  splitCommands?: boolean;
   /** Port der Web-Administration, falls die Konsole nicht reicht. */
   webAdminPort?: number;
   groups: CommandGroup[];
@@ -34,6 +39,7 @@ const cs2: GameCommandSet = {
   key: "cs2",
   name: "Counter-Strike 2",
   console: "ok",
+  splitCommands: true,
   groups: [
     {
       label: t("Info"),
@@ -100,12 +106,33 @@ const cs16: GameCommandSet = {
   key: "cs16",
   name: "Counter-Strike 1.6",
   console: "ok",
+  splitCommands: true,
   hint: t(
-    "CS 1.6 hat ohne Zusatz-Mod (z. B. PodBot) keine Bots.",
-    "CS 1.6 has no bots without an add-on (e.g. PodBot)."
+    "Bots kommen über den Mod YaPB (ops/amp/cs16-yapb). Antworten die yb-Befehle mit „Unknown command“, fehlt der Mod oder ein AMP-Update hat ihn ausgehängt: dann install.sh --relink.",
+    "Bots come from the YaPB mod (ops/amp/cs16-yapb). If yb commands answer “Unknown command”, the mod is missing or an AMP update unhooked it: run install.sh --relink."
   ),
   groups: [
     { label: t("Info"), presets: [p(t("Status & Spielerliste", "Status & player list"), "status")] },
+    {
+      label: t("Bots (YaPB)"),
+      presets: [
+        p(
+          t("Mit Bots auffüllen auf 10 Spieler", "Fill up to 10 players with bots"),
+          "yb_quota_mode fill; yb_quota 10",
+          t("Bots gehen, sobald Menschen joinen.", "Bots leave as soon as humans join.")
+        ),
+        p(t("Einen Bot hinzufügen", "Add one bot"), "yb add"),
+        p(t("Bot zu den Terroristen", "Bot to Terrorists"), "yb add 2 0 1"),
+        p(t("Bot zu den Counter-Terroristen", "Bot to Counter-Terrorists"), "yb add 2 0 2"),
+        p(t("Einen Bot entfernen", "Remove one bot"), "yb kick"),
+        p(t("Alle Bots entfernen", "Remove all bots"), "yb_quota 0; yb kickall"),
+        p(t("Bots leicht", "Bots easy"), "yb_difficulty 1"),
+        p(t("Bots normal", "Bots normal"), "yb_difficulty 2"),
+        p(t("Bots schwer", "Bots hard"), "yb_difficulty 3"),
+        p(t("Welche Bots sind drin?", "Which bots are in?"), "yb list"),
+        p(t("YaPB-Version prüfen", "Check YaPB version"), "yb version")
+      ]
+    },
     {
       label: t("Map wechseln", "Change map"),
       presets: maps((m) => `changelevel ${m}`, [
@@ -147,6 +174,7 @@ const cod4: GameCommandSet = {
   key: "cod4",
   name: "Call of Duty 4",
   console: "ok",
+  splitCommands: true,
   hint: t(
     "Befehle gehen per RCON an den Server. Vanilla-CoD4 hat keine Bots.",
     "Commands are sent via RCON. Vanilla CoD4 has no bots."

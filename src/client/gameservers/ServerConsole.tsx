@@ -99,7 +99,7 @@ export function ServerConsole({
     try {
       await requestJson(`/api/integrations/amp/instances/${encodeURIComponent(bindingId)}/console`, {
         method: "POST",
-        body: JSON.stringify({ command: trimmed })
+        body: JSON.stringify({ command: trimmed, split: commandSet?.splitCommands === true })
       });
       setCommand("");
       setPresetNote("");

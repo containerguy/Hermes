@@ -34,6 +34,26 @@ describe("commandSetForGame", () => {
     }
   });
 
+  it("CS 1.6 bietet YaPB-Botbefehle; alle Bots entfernen setzt vorher die Quote auf 0", () => {
+    const set = commandSetForGame("Counter-Strike 1.6");
+    const bots = set?.groups.find((group) => group.label.de === "Bots (YaPB)");
+    const commands = bots?.presets.map((preset) => preset.command) ?? [];
+    expect(commands).toContain("yb add");
+    expect(commands).toContain("yb_quota_mode fill; yb_quota 10");
+    // ohne yb_quota 0 würde die Quote die eben gekickten Bots sofort wieder auffüllen
+    expect(commands).toContain("yb_quota 0; yb kickall");
+    expect(set?.hint?.de).toContain("YaPB");
+    // GoldSrc-RCON über AMP trennt ; nicht selbst → Hermes teilt auf
+    expect(set?.splitCommands).toBe(true);
+  });
+
+  it("teilt nur bei Konsolen auf, in denen ; Befehle trennt", () => {
+    expect(commandSetForGame("Counter-Strike 2")?.splitCommands).toBe(true);
+    expect(commandSetForGame("Call of Duty 4")?.splitCommands).toBe(true);
+    expect(commandSetForGame("Minecraft")?.splitCommands).toBeFalsy();
+    expect(commandSetForGame("Factorio")?.splitCommands).toBeFalsy();
+  });
+
   it("UT2004 verweist aufs WebAdmin statt auf Konsolenbefehle", () => {
     const set = commandSetForGame("Unreal Tournament 2004");
     expect(set?.console).toBe("none");
