@@ -283,6 +283,20 @@ describe("Pizza-Verwaltung ab manager", () => {
     expect(actions).toContain("pizza.session.delete");
   });
 
+  it("friert Positionen einer offen archivierten Runde ein", async () => {
+    await post(manager, "/api/pizza/transitions", { transition: "open" }).expect(200);
+    const added = await post(guest, "/api/pizza/lines", { variantId: "v-003-30", qty: 1 }).expect(201);
+    const lineId = added.body.lineId as string;
+    const sessionId = (await state(guest)).session.id as string;
+    await post(manager, `/api/pizza/sessions/${sessionId}/archive`).expect(200);
+
+    await guest.agent.patch(`/api/pizza/lines/${lineId}`).set(CSRF_HEADER, guest.csrf).send({ qty: 3 }).expect(400);
+    await guest.agent.delete(`/api/pizza/lines/${lineId}`).set(CSRF_HEADER, guest.csrf).expect(400);
+
+    const archived = await manager.agent.get("/api/pizza/sessions/archived").expect(200);
+    expect(archived.body.sessions[0]).toMatchObject({ id: sessionId, orderCount: 1, totalCents: 700 });
+  });
+
   it("archiviert eine gelieferte Runde automatisch beim Öffnen einer neuen", async () => {
     await post(manager, "/api/pizza/transitions", { transition: "open" }).expect(200);
     await post(guest, "/api/pizza/lines", { variantId: "v-003-30", qty: 1 }).expect(201);

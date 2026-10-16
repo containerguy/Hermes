@@ -64,6 +64,11 @@ AMP (#1, #12) and pizza management (#14).
   only offered when a PayPal handle is set.
 - Fix: a failed round transition (e.g. a second "delivered" click) no
   longer archives the round or creates an empty draft.
+- Fix: order lines of a round archived while still open can no longer be
+  changed or deleted.
+- Cash list PDF: payment status as plain text (`[x] bezahlt (Bar)`,
+  `[ ] offen – PayPal gewählt`) instead of check box glyphs the built-in
+  font cannot render; "Gedruckt" uses Europe/Berlin time.
 - All pizza write routes require the CSRF header; new error codes are
   translated (de/en).
 - Pizza tables (`pizza_menu_items`, `pizza_menu_variants`,

@@ -24,8 +24,9 @@ export class PizzaOrderError extends AppError {
   }
 }
 
-function assertSessionOpen(state: string) {
-  if (!canPlaceOrder(state as never)) {
+/** Offen und nicht archiviert: Eine archivierte Runde bleibt unverändert, auch wenn sie im Zustand `open` archiviert wurde. */
+function assertSessionOpen(session: { state: string; archivedAt: string | null }) {
+  if (!canPlaceOrder(session.state as never) || session.archivedAt) {
     throw new PizzaOrderError("session_not_open", "Bestellung ist nicht offen");
   }
 }
@@ -91,7 +92,7 @@ export interface AddLineInput {
 
 export function addLine(context: DatabaseContext, input: AddLineInput) {
   const session = getSession(context, input.sessionId);
-  assertSessionOpen(session.state);
+  assertSessionOpen(session);
   assertValidQty(input.qty);
   const note = normalizeNote(input.customNote);
   assertValidNote(note);
@@ -157,7 +158,7 @@ export function updateLine(context: DatabaseContext, input: UpdateLineInput) {
     throw new PizzaOrderError("forbidden", "Position gehört einem anderen User", 403);
   }
   const session = getSession(context, found.order.sessionId);
-  assertSessionOpen(session.state);
+  assertSessionOpen(session);
 
   const update: Partial<typeof pizzaOrderLines.$inferInsert> = {};
   if (typeof input.qty === "number") {
@@ -180,7 +181,7 @@ export function deleteLine(context: DatabaseContext, lineId: string, userId: str
     throw new PizzaOrderError("forbidden", "Position gehört einem anderen User", 403);
   }
   const session = getSession(context, found.order.sessionId);
-  assertSessionOpen(session.state);
+  assertSessionOpen(session);
   context.db.delete(pizzaOrderLines).where(eq(pizzaOrderLines.id, lineId)).run();
 }
 
