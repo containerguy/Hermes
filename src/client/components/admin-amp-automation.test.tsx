@@ -4,6 +4,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { createRoot, type Root } from "react-dom/client";
 import { act } from "react-dom/test-utils";
 import { AdminPanelBetrieb } from "./AdminPanelBetrieb";
+import { requestJson } from "../api/request";
 import { I18nProvider } from "../i18n/I18nContext";
 import type { AppSettings } from "../types/core";
 
@@ -55,7 +56,11 @@ afterEach(async () => {
   container = null;
 });
 
-async function render(onSettingsChange: (next: AppSettings) => void, overrides: Partial<AppSettings> = {}) {
+async function render(
+  onSettingsChange: (next: AppSettings) => void,
+  overrides: Partial<AppSettings> = {},
+  savedOverrides: Partial<AppSettings> = overrides
+) {
   container = document.createElement("div");
   document.body.appendChild(container);
   root = createRoot(container);
@@ -64,6 +69,7 @@ async function render(onSettingsChange: (next: AppSettings) => void, overrides: 
       <I18nProvider locale="de">
         <AdminPanelBetrieb
           settings={{ ...settings, ...overrides }}
+          savedSettings={{ ...settings, ...savedOverrides }}
           gameCatalogDraft=""
           storage={null}
           restoreDiagnostics={null}
@@ -117,5 +123,58 @@ describe("AdminPanelBetrieb AMP automation", () => {
     const view = await render(vi.fn(), { ampIntegrationEnabled: false });
     expect(findLabel(view, "Server automatisch starten")).toBeUndefined();
     expect(findLabel(view, "Leerlauf-Stopp")).toBeUndefined();
+  });
+
+  it("shows the binding admin only once AMP is enabled in the saved settings", async () => {
+    const requestMock = requestJson as unknown as ReturnType<typeof vi.fn>;
+    requestMock.mockClear();
+
+    // Entwurf: angekreuzt, aber noch nicht gespeichert -> keine AMP-Anfragen, Hinweis statt Fehler
+    const draftView = await render(vi.fn(), { ampIntegrationEnabled: true }, { ampIntegrationEnabled: false });
+    expect(draftView.textContent).toContain("Einstellungen speichern, um danach Server-Bindungen anzulegen.");
+    expect(draftView.querySelector('[aria-label="Server-Bindungen"]')).toBeNull();
+    expect(requestMock).not.toHaveBeenCalled();
+    await act(async () => {
+      root?.unmount();
+    });
+    container?.remove();
+
+    // Gespeichert -> Bindungsverwaltung lädt Instanzen
+    const savedView = await render(vi.fn());
+    await act(async () => {
+      await Promise.resolve();
+    });
+    expect(savedView.querySelector('[aria-label="Server-Bindungen"]')).not.toBeNull();
+    expect(savedView.textContent).not.toContain("Einstellungen speichern, um danach Server-Bindungen anzulegen.");
+    const urls = requestMock.mock.calls.map((call) => String(call[0]));
+    expect(urls).toContain("/api/integrations/amp/instances");
+  });
+
+  it("offers a retry when loading instances from AMP fails", async () => {
+    const requestMock = requestJson as unknown as ReturnType<typeof vi.fn>;
+    requestMock.mockClear();
+    requestMock.mockImplementation(async (url: string) => {
+      if (url === "/api/integrations/amp/instances") {
+        throw new Error("amp_http_fehler");
+      }
+      return { bindings: [], suggestions: [], instances: [] };
+    });
+    const view = await render(vi.fn());
+    for (let i = 0; i < 5; i += 1) {
+      await act(async () => {
+        await Promise.resolve();
+      });
+    }
+    const retry = Array.from(view.querySelectorAll("button")).find((b) => b.textContent === "Neu aus AMP laden");
+    expect(retry).toBeDefined();
+
+    requestMock.mockImplementation(async () => ({ bindings: [], suggestions: [], instances: [] }));
+    await act(async () => {
+      retry!.click();
+    });
+    const instanceCalls = requestMock.mock.calls.filter((call) => call[0] === "/api/integrations/amp/instances");
+    expect(instanceCalls).toHaveLength(2);
+    requestMock.mockReset();
+    requestMock.mockResolvedValue({ bindings: [], suggestions: [], instances: [] });
   });
 });

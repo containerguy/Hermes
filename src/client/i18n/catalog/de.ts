@@ -467,6 +467,7 @@ export const deMessages = {
   "admin.amp.enabled": "AMP-Anbindung aktivieren",
   "admin.amp.baseUrl": "AMP-Basis-URL",
   "admin.amp.envHint": "Zugangsdaten und CA werden auf dem Server per Umgebung gesetzt (HERMES_AMP_USERNAME, HERMES_AMP_PASSWORD, HERMES_AMP_CA_FILE).",
+  "admin.amp.saveFirst": "Einstellungen speichern, um danach Server-Bindungen anzulegen.",
   "admin.amp.autoStart": "Server automatisch starten, wenn ein Event bereit ist",
   "admin.amp.autoStopIdle": "Leerlauf-Stopp nach Minuten (0 = aus)",
   "admin.amp.automationHelp":

@@ -261,9 +261,16 @@ export function BindingsAdmin({ gameCatalog }: BindingsAdminProps) {
       <p className="muted">{t("admin.amp.suggestions.help")}</p>
       {ampLoading ? <p className="muted">{t("admin.amp.suggestions.loading")}</p> : null}
       {ampError ? (
-        <p className="error" role="alert">
-          {ampError}
-        </p>
+        <>
+          <p className="error" role="alert">
+            {ampError}
+          </p>
+          <div className="action-row">
+            <button type="button" className="ghost" onClick={() => void loadFromAmp()}>
+              {t("admin.amp.suggestions.reload")}
+            </button>
+          </div>
+        </>
       ) : null}
       {!ampLoading && !ampError && openSuggestions.length === 0 ? (
         <p className="muted">{t("admin.amp.suggestions.none")}</p>

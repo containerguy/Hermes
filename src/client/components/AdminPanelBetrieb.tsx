@@ -17,6 +17,11 @@ function generateKioskStreamSecret(): string {
 
 interface AdminPanelBetriebProps {
   settings: AppSettings;
+  /**
+   * Gespeicherter Stand. Die Bindungsverwaltung spricht mit AMP über den Server und funktioniert
+   * erst, wenn Modul und Basis-URL gespeichert sind — nicht schon beim Ankreuzen im Entwurf.
+   */
+  savedSettings: AppSettings;
   gameCatalogDraft: string;
   storage: StorageInfo | null;
   restoreDiagnostics: RestoreDiagnostics | null;
@@ -37,6 +42,7 @@ interface AdminPanelBetriebProps {
 
 export function AdminPanelBetrieb({
   settings,
+  savedSettings,
   gameCatalogDraft,
   storage,
   restoreDiagnostics,
@@ -417,6 +423,9 @@ export function AdminPanelBetrieb({
                 />
               </label>
               <p className="muted">{t("admin.amp.envHint")}</p>
+              {!savedSettings.ampIntegrationEnabled ? (
+                <p className="notice">{t("admin.amp.saveFirst")}</p>
+              ) : null}
               <label className="checkbox-label">
                 <input
                   type="checkbox"
@@ -576,7 +585,10 @@ export function AdminPanelBetrieb({
         ) : null}
       </section>
       {settings.featuresPizzaEnabled ? <PizzaMenuJsonAdmin /> : null}
-      {settings.ampIntegrationEnabled ? <BindingsAdmin gameCatalog={settings.gameCatalog} /> : null}
+      {savedSettings.ampIntegrationEnabled ? (
+        // Neu laden, sobald eine andere Basis-URL gespeichert wurde.
+        <BindingsAdmin key={savedSettings.ampBaseUrl} gameCatalog={savedSettings.gameCatalog} />
+      ) : null}
     </>
   );
 }

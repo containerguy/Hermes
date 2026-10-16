@@ -186,6 +186,8 @@ test("gameserver: admin binds Minecraft, manager's event shows the server panel,
   const ops = page.locator("form#admin-betrieb");
   await ops.getByLabel("AMP-Anbindung aktivieren").check();
   await ops.getByLabel("AMP-Basis-URL").fill("https://amp-ctl.lanparty.example");
+  await expect(ops.getByText("Einstellungen speichern, um danach Server-Bindungen anzulegen.")).toBeVisible();
+  await expect(page.getByRole("region", { name: "Server-Bindungen" })).toHaveCount(0);
   await expect(ops.getByLabel("Server automatisch starten, wenn ein Event bereit ist")).not.toBeChecked();
   await expect(ops.getByLabel("Leerlauf-Stopp nach Minuten (0 = aus)")).toHaveValue("0");
   const saved = page.waitForResponse(
@@ -193,8 +195,7 @@ test("gameserver: admin binds Minecraft, manager's event shows the server panel,
   );
   await ops.getByRole("button", { name: "Einstellungen speichern" }).click();
   expect((await saved).status()).toBe(200);
-  // Die Bindungsverwaltung lädt die AMP-Instanzen beim Einblenden; nach dem Speichern neu laden.
-  await page.reload();
+  // Vor dem Speichern bleibt die Bindungsverwaltung aus; danach lädt sie die Instanzen ohne Reload.
 
   // Bindung Minecraft anlegen
   const bindings = page.getByRole("region", { name: "Server-Bindungen" });

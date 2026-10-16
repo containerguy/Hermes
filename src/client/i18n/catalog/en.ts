@@ -469,6 +469,7 @@ export const enMessages: { [K in keyof typeof deMessages]: string } = {
   "admin.amp.enabled": "Enable AMP integration",
   "admin.amp.baseUrl": "AMP base URL",
   "admin.amp.envHint": "Credentials and CA are configured on the server via environment (HERMES_AMP_USERNAME, HERMES_AMP_PASSWORD, HERMES_AMP_CA_FILE).",
+  "admin.amp.saveFirst": "Save the settings to create server bindings afterwards.",
   "admin.amp.autoStart": "Start the server automatically when an event is ready",
   "admin.amp.autoStopIdle": "Idle stop after minutes (0 = off)",
   "admin.amp.automationHelp":

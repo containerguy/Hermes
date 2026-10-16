@@ -136,7 +136,21 @@ Bewusste Folgen, die René kennen sollte:
    `StartInstance` und direkt danach `Core/Start`; schlägt `Core/Start` fehl, weil die Instanz noch
    bootet, wird das (wie bei der manuellen Aktion) verschluckt und **nicht** wiederholt. Im LAN prüfen,
    ob AMP das Spiel nach `StartInstance` selbst startet; sonst braucht es einen zweiten Versuch.
-4. Bestehendes UI-Verhalten aus 15-01: Die Bindungsverwaltung lädt AMP-Instanzen schon beim Ankreuzen
-   von „AMP-Anbindung aktivieren" (vor dem Speichern) und bekommt dann einen Fehler; erst ein Reload
-   nach dem Speichern zeigt die Instanzen. Nicht geändert, nur im e2e umgangen.
+4. ~~UI-Verhalten aus 15-01: Bindungsverwaltung lud AMP-Instanzen schon beim Ankreuzen.~~ Behoben
+   (Nachtrag 2026-10-16, siehe unten).
 5. Der Push-Text ist nur deutsch (wie die übrigen Event-Pushes).
+
+## Nachtrag: Bindungsverwaltung ohne Neuladen
+
+- `AdminPanel` hält zusätzlich `savedSettings` (letzter vom Server bestätigter Stand: Laden, Speichern,
+  Import). `AdminPanelBetrieb` rendert `BindingsAdmin` nur bei **gespeichertem**
+  `ampIntegrationEnabled`, mit `key={savedSettings.ampBaseUrl}` — nach dem Speichern einer anderen
+  Basis-URL lädt die Verwaltung Instanzen und Vorschläge neu.
+- Solange das Modul nur im Entwurf angekreuzt ist, steht im AMP-Abschnitt „Einstellungen speichern,
+  um danach Server-Bindungen anzulegen." (`admin.amp.saveFirst`, de/en); es gehen keine AMP-Anfragen raus.
+- `BindingsAdmin`: bei einem Ladefehler gibt es jetzt „Neu aus AMP laden" direkt unter der Meldung
+  (vorher nur sichtbar, wenn Vorschläge existierten — nach einem Fehler war die Seite eine Sackgasse).
+- Tests: `admin-amp-automation.test.tsx` +2 (Entwurf → kein Request + Hinweis; gespeichert → lädt;
+  Fehler → Retry lädt erneut). e2e „gameserver" ohne `page.reload()`, prüft Hinweis und dass die
+  Bindungsverwaltung vor dem Speichern fehlt.
+
