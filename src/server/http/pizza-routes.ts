@@ -200,7 +200,7 @@ function loadSerializedState(context: DatabaseContext, currentUserId: string) {
 function requirePizzaManager(context: DatabaseContext, request: Request, response: Response) {
   const actor = requireUser(context, request)!;
   if (!canManagePizza(actor)) {
-    response.status(403).json({ error: "manager_erforderlich" });
+    response.status(403).json({ error: "pizza_manager_erforderlich" });
     return null;
   }
   return actor;

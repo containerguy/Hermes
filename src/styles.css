@@ -2387,6 +2387,147 @@ dd {
   gap: 6px;
 }
 
+/* Pizza: Bezahlart, Archiv, Menüpflege */
+.pizza-panel__pdf-link {
+  display: inline-flex;
+  align-items: center;
+  min-height: 44px;
+  padding: 0 14px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  font-weight: 800;
+}
+.pizza-payment-picker {
+  border: 1px solid rgba(0, 0, 0, 0.08);
+  border-radius: 8px;
+  padding: 6px 12px 10px;
+  margin: 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 18px;
+}
+.pizza-payment-picker legend {
+  font-weight: 800;
+  padding: 0 4px;
+}
+.pizza-payment-picker__option {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 44px;
+  cursor: pointer;
+}
+.pizza-payment-picker__option input {
+  width: 20px;
+  min-height: 20px;
+  margin: 0;
+}
+.pizza-payment-picker__only {
+  margin: 0;
+}
+.pizza-overview__method {
+  font-size: 0.8rem;
+  color: #4b5563;
+}
+.pizza-overview__pay-controls {
+  flex-wrap: wrap;
+}
+.pizza-archive,
+.pizza-menu-editor {
+  border-top: 1px solid rgba(0, 0, 0, 0.08);
+  padding-top: 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.pizza-archive h4,
+.pizza-menu-editor h4,
+.pizza-menu-editor h5 {
+  margin: 0;
+}
+.pizza-archive__list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.pizza-archive__row {
+  border: 1px solid rgba(0, 0, 0, 0.06);
+  border-radius: 8px;
+  padding: 8px 10px;
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  align-items: center;
+  gap: 8px;
+}
+.pizza-archive__info {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+.pizza-archive__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.pizza-menu-editor__toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: end;
+}
+.pizza-menu-editor__search {
+  flex: 1 1 220px;
+}
+.pizza-menu-editor__count {
+  margin: 0;
+  font-size: 0.85rem;
+}
+.pizza-menu-editor .pizza-admin__list {
+  margin-top: 0;
+  max-height: 70vh;
+  overflow-y: auto;
+}
+.pizza-menu-editor__head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 6px 10px;
+}
+.pizza-menu-editor__prices {
+  font-size: 0.85rem;
+}
+.pizza-menu-editor .pizza-admin__row-actions {
+  flex-wrap: wrap;
+}
+.pizza-menu-editor__details {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.pizza-menu-editor__form {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+  gap: 8px 12px;
+}
+.pizza-menu-editor__wide {
+  grid-column: 1 / -1;
+}
+.pizza-menu-editor .pizza-admin__variants li {
+  border: 1px solid rgba(0, 0, 0, 0.06);
+  border-radius: 8px;
+  padding: 6px 8px;
+  align-items: end;
+}
+.pizza-menu-editor .pizza-admin__variants label,
+.pizza-menu-editor .pizza-admin__new-variant label {
+  flex: 1 1 120px;
+}
+
 /* Phase 15: Gameserver-Bereich in der Event-Karte */
 .server-panel {
   margin-top: 0.75rem;

@@ -71,7 +71,22 @@ export const errorMessages: Record<string, string> = {
   amp_anfrage_fehlgeschlagen: "Die AMP-API hat nicht geantwortet oder einen Fehler gemeldet. Netzwerk und AMP-Logs prüfen.",
   amp_url_erforderlich: "AMP-Basis-URL ist erforderlich, wenn die Anbindung aktiv ist.",
   amp_url_ungueltig: "AMP-Basis-URL ist ungültig.",
-  amp_zugang_erforderlich: "AMP-Zugangsdaten fehlen in der Server-Umgebung (HERMES_AMP_USERNAME / HERMES_AMP_PASSWORD)."
+  amp_zugang_erforderlich: "AMP-Zugangsdaten fehlen in der Server-Umgebung (HERMES_AMP_USERNAME / HERMES_AMP_PASSWORD).",
+  pizza_manager_erforderlich: "Für die Pizza-Verwaltung sind Manager- oder Adminrechte nötig.",
+  pizza_runde_nicht_gefunden: "Diese Pizzarunde gibt es nicht mehr.",
+  pizza_runde_bereits_archiviert: "Diese Pizzarunde ist bereits archiviert.",
+  pizza_runde_nicht_archiviert: "Nur archivierte Pizzarunden können endgültig gelöscht werden.",
+  pizza_artikel_nicht_gefunden: "Dieser Menüeintrag existiert nicht mehr.",
+  pizza_variante_nicht_gefunden: "Diese Variante existiert nicht mehr.",
+  pizza_bezahlart_nicht_verfuegbar: "Diese Bezahlart wird gerade nicht angeboten.",
+  pizza_bereits_bezahlt: "Deine Bestellung ist bereits als bezahlt markiert.",
+  pizza_bestellung_nicht_gefunden: "Du hast in dieser Runde noch nichts bestellt.",
+  menu_empty: "Das Menü hat keine bestellbaren Einträge.",
+  invalid_transition: "Dieser Schritt ist im aktuellen Zustand nicht möglich. Bitte neu laden.",
+  session_not_open: "Die Pizzabestellung ist nicht offen.",
+  session_nicht_offen: "Die Pizzabestellung ist nicht offen.",
+  max_lines_exceeded: "Maximal 3 Positionen pro Bestellung.",
+  variant_missing: "Dieser Artikel ist nicht mehr bestellbar."
 };
 
 export const errorMessagesEn: Record<string, string> = {
@@ -143,7 +158,22 @@ export const errorMessagesEn: Record<string, string> = {
   amp_anfrage_fehlgeschlagen: "The AMP API did not respond or returned an error. Check network and AMP logs.",
   amp_url_erforderlich: "AMP base URL is required when integration is enabled.",
   amp_url_ungueltig: "AMP base URL is invalid.",
-  amp_zugang_erforderlich: "AMP credentials are missing in the server environment (HERMES_AMP_USERNAME / HERMES_AMP_PASSWORD)."
+  amp_zugang_erforderlich: "AMP credentials are missing in the server environment (HERMES_AMP_USERNAME / HERMES_AMP_PASSWORD).",
+  pizza_manager_erforderlich: "Managing pizza orders requires manager or admin permissions.",
+  pizza_runde_nicht_gefunden: "This pizza round no longer exists.",
+  pizza_runde_bereits_archiviert: "This pizza round is already archived.",
+  pizza_runde_nicht_archiviert: "Only archived pizza rounds can be deleted permanently.",
+  pizza_artikel_nicht_gefunden: "This menu item no longer exists.",
+  pizza_variante_nicht_gefunden: "This variant no longer exists.",
+  pizza_bezahlart_nicht_verfuegbar: "This payment method is not offered right now.",
+  pizza_bereits_bezahlt: "Your order is already marked as paid.",
+  pizza_bestellung_nicht_gefunden: "You have not ordered anything in this round yet.",
+  menu_empty: "The menu has no orderable items.",
+  invalid_transition: "This step is not possible in the current state. Please reload.",
+  session_not_open: "Pizza ordering is not open.",
+  session_nicht_offen: "Pizza ordering is not open.",
+  max_lines_exceeded: "At most 3 items per order.",
+  variant_missing: "This item can no longer be ordered."
 };
 
 export class ApiError extends Error {
