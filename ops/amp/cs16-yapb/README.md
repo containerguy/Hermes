@@ -45,6 +45,14 @@ Paket: `yapb-4.4.957-linux.tar.xz`, SHA-256 `8c095ac89b9b2ccc70a66a71d608e1a570b
 
   **Nicht** getestet wurde gegen einen echten HLDS.
 
+## Stand auf CS1601 (Bestandsaufnahme 2026-10-16)
+
+- Pfad auf `retro` (Host): `/home/amp/.ampdata/instances/CS1601/counter-strike/90/cstrike`, im AMP-Container `/AMP/counter-strike/90/cstrike`.
+- Kein `addons/`-Verzeichnis, also weder Metamod noch AMX Mod X noch ReHLDS. Daher **Standalone**: `liblist.gam` zeigt nach der Installation auf YaPB.
+- AMP startet `hlds_linux` als **32-Bit**-Prozess (`-game cstrike … +maxplayers 24`). Internet über das Host-Netz ist vorhanden, `YAPB_TARBALL` ist also nicht nötig.
+
+> **Achtung beim 64-Bit-Server:** Seit dem Update zum 25-jährigen Jubiläum liegen auch `dlls/cs_amd64.so` und `linux64/` bei. YaPB gibt es nur als 32-Bit-Binary. Wird die Instanz auf den 64-Bit-Server umgestellt, lädt `liblist.gam` eine unpassende Bibliothek, und der Server startet nicht. In diesem Fall vorher `install.sh … --uninstall` ausführen.
+
 ## Hermes
 
 Die Konsolenvorlage „Bots (YaPB)“ für CS 1.6 steht in `src/client/gameservers/command-presets.ts`. Sie enthält:
