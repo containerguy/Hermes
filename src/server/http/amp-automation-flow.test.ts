@@ -24,12 +24,14 @@ import { runAutomationNow } from "../integrations/amp/amp-automation";
 
 type StartedApp = Awaited<ReturnType<typeof createHermesApp>>;
 type Agent = ReturnType<typeof request.agent>;
-type FixtureInstance = { InstanceID: string; InstanceName: string; AppState: number };
+type FixtureInstance = { InstanceID: string; InstanceName: string; AppState: number; Running: boolean };
 
 let started: StartedApp | undefined;
 let databasePath: string;
 let ampCalls: string[] = [];
 let instances: Array<{ AvailableInstances: FixtureInstance[] }> = [];
+/** Antworten für die nächsten Instanz-`Core/Start`-Aufrufe (danach `{ Status: true }`). */
+let coreStartReplies: unknown[] = [];
 
 function minecraft() {
   return instances.flatMap((t) => t.AvailableInstances).find((i) => i.InstanceName === "Minecraft01")!;
@@ -37,6 +39,7 @@ function minecraft() {
 
 function installAmpMock() {
   ampCalls = [];
+  coreStartReplies = [];
   instances = JSON.parse(JSON.stringify(fixture));
   const fetchMock = vi.fn(async (url: unknown, init?: { body?: unknown }) => {
     const endpoint = String(url).replace(/^.*?\/API\//, "");
@@ -51,6 +54,12 @@ function installAmpMock() {
       payload = { Title: "Unauthorized Access", Message: "requires the Session.Exists permission." };
     } else if (endpoint === "ADSModule/GetInstances") {
       payload = instances;
+    } else if (endpoint === "ADSModule/StartInstance") {
+      const target = instances.flatMap((t) => t.AvailableInstances).find((i) => i.InstanceName === body.InstanceName);
+      if (target) target.Running = true;
+      payload = { Status: true };
+    } else if (endpoint.endsWith("/API/Core/Start") && coreStartReplies.length > 0) {
+      payload = coreStartReplies.shift();
     } else {
       payload = { Status: true };
     }
@@ -302,6 +311,77 @@ describe("AMP automation (Phase 15-04)", () => {
     const autoStops = auditActions("amp.auto_stop");
     expect(autoStops).toHaveLength(1);
     expect(autoStops[0].actor_user_id).toBeNull();
+  });
+
+  it("starts the game once more after StartInstance when the first Core/Start hit a booting instance", async () => {
+    const admin = request.agent(started!.app);
+    await login(admin, "hauptadmin");
+    const adminCsrf = await fetchCsrf(admin);
+    const current = await admin.get("/api/admin/settings").expect(200);
+    await admin
+      .put("/api/admin/settings")
+      .set(CSRF_HEADER, adminCsrf)
+      .send({
+        ...current.body.settings,
+        ampIntegrationEnabled: true,
+        ampBaseUrl: "https://amp-ctl.example.test",
+        ampAutoStartOnReady: true
+      })
+      .expect(200);
+    await admin
+      .post("/api/integrations/amp/bindings")
+      .set(CSRF_HEADER, adminCsrf)
+      .send({
+        displayTitle: "Minecraft",
+        ampInstanceId: minecraft().InstanceID,
+        ampInstanceName: "Minecraft01",
+        host: "minecraft.lanparty.example",
+        port: 25565,
+        connectScheme: "minecraft",
+        enabled: true
+      })
+      .expect(201);
+    const manager = await createUser(admin, adminCsrf, "mgr", "manager");
+
+    // AMP-Prozess der Instanz ist aus; das erste Core/Start trifft die noch bootende Instanz
+    minecraft().Running = false;
+    coreStartReplies = [{ Status: false, Reason: "Instance is still starting" }];
+    await admin.get("/api/integrations/amp/status?refresh=1").expect(200);
+    await runAutomationNow();
+
+    await manager.agent
+      .post("/api/events")
+      .set(CSRF_HEADER, manager.csrf)
+      .send({ gameTitle: "Minecraft", startMode: "now", minPlayers: 1, maxPlayers: 10 })
+      .expect(201)
+      .then((response) =>
+        manager.agent
+          .post(`/api/events/${response.body.event.id}/participation`)
+          .set(CSRF_HEADER, manager.csrf)
+          .send({ status: "joined" })
+          .expect(200)
+      );
+
+    await runAutomationNow();
+    const coreStart = `ADSModule/Servers/${minecraft().InstanceID}/API/Core/Start`;
+    expect(ampCalls.filter((c) => c === "ADSModule/StartInstance")).toHaveLength(1);
+    expect(ampCalls.filter((c) => c === coreStart)).toHaveLength(1);
+
+    // Poll: Instanz läuft jetzt, Spiel steht noch -> genau ein Nachstart
+    await admin.get("/api/integrations/amp/status?refresh=1").expect(200);
+    await runAutomationNow();
+    await runAutomationNow();
+    expect(ampCalls.filter((c) => c === "ADSModule/StartInstance")).toHaveLength(1);
+    expect(ampCalls.filter((c) => c === coreStart)).toHaveLength(2);
+
+    const sqlite = new Database(databasePath);
+    const audits = sqlite
+      .prepare("SELECT summary, metadata FROM audit_logs WHERE action = 'amp.auto_start' ORDER BY created_at")
+      .all() as Array<{ summary: string; metadata: string }>;
+    sqlite.close();
+    expect(audits).toHaveLength(2);
+    expect(audits[1].summary).toContain("nachgestartet");
+    expect(JSON.parse(audits[1].metadata)).toMatchObject({ followUp: true });
   });
 
   it("does nothing while the AMP module is disabled", async () => {

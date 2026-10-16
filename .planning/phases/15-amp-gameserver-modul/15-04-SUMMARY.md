@@ -132,10 +132,9 @@ Bewusste Folgen, die René kennen sollte:
    Event archivieren, `ampAutoStopIdleMinutes` (z. B. 10) abwarten → Instanz stoppt, Audit `amp.auto_stop`.
 2. Prüfen, dass `Active Users` bei den echten Spielen eine Zahl liefert. Spiele ohne diese Metrik
    (`players === null`) werden vom Leerlauf-Stopp **nie** gestoppt (gewollt, aber gut zu wissen).
-3. Verhalten bei Instanzen, deren AMP-Prozess aus ist (`Running: false`): Auto-Start ruft
-   `StartInstance` und direkt danach `Core/Start`; schlägt `Core/Start` fehl, weil die Instanz noch
-   bootet, wird das (wie bei der manuellen Aktion) verschluckt und **nicht** wiederholt. Im LAN prüfen,
-   ob AMP das Spiel nach `StartInstance` selbst startet; sonst braucht es einen zweiten Versuch.
+3. ~~Auto-Start bei Instanzen mit AMP-Prozess aus: gescheitertes `Core/Start` nach `StartInstance` wurde
+   nicht wiederholt.~~ Behoben (Nachtrag „Nachstart", unten). Im LAN noch prüfen: Wie lange bootet eine
+   Instanz nach `StartInstance` (Nachstart gibt nach 10 min auf), und startet AMP das Spiel ggf. selbst.
 4. ~~UI-Verhalten aus 15-01: Bindungsverwaltung lud AMP-Instanzen schon beim Ankreuzen.~~ Behoben
    (Nachtrag 2026-10-16, siehe unten).
 5. Der Push-Text ist nur deutsch (wie die übrigen Event-Pushes).
@@ -153,4 +152,25 @@ Bewusste Folgen, die René kennen sollte:
 - Tests: `admin-amp-automation.test.tsx` +2 (Entwurf → kein Request + Hinweis; gespeichert → lädt;
   Fehler → Retry lädt erneut). e2e „gameserver" ohne `page.reload()`, prüft Hinweis und dass die
   Bindungsverwaltung vor dem Speichern fehlt.
+
+## Nachtrag: Nachstart nach `StartInstance`
+
+- Problem: Lief der AMP-Prozess einer Instanz nicht (`instanceRunning === false`), rief der Auto-Start
+  `ADSModule/StartInstance` und direkt danach `Core/Start`. Das zweite scheitert meist, weil die Instanz noch
+  bootet; der Fehler wurde verschluckt und das Event galt als bedient → Spiel blieb aus.
+- Lösung im reinen Tick: `AutomationState.pendingGameStart[bindingId]` merkt sich den Startzeitpunkt, wenn
+  der Auto-Start eine nicht laufende Instanz trifft. In den folgenden Ticks gilt:
+  - Server beitretbar (AMP hat das Spiel selbst gestartet) → erledigt, kein Nachstart.
+  - Instanz läuft (`instanceRunning`), Status bekannt, kein Zwischenzustand, Spiel steht → **genau ein**
+    `deps.start(bindingId, { followUp: true })` (der dann nur noch `Core/Start` aufruft).
+  - Instanz bootet noch oder Zwischenzustand → warten.
+  - Kein aktives Event mehr auf der Bindung, Auto-Start abgeschaltet oder mehr als 10 min
+    (`GAME_START_FOLLOW_UP_TIMEOUT_MS`) vergangen → aufgeben (Timeout wird geloggt).
+- Audit: der Nachstart schreibt ebenfalls `amp.auto_start`, Summary „… nachgestartet", Metadata `followUp: true`.
+- Die manuelle Start-Aktion (`POST …/start`) bleibt unverändert: Wer selbst klickt, sieht den Status und kann
+  erneut drücken.
+- Tests: `amp-automation.test.ts` +4 (Nachstart genau einmal nach Boot/Zwischenzustand; AMP startet selbst →
+  kein Nachstart; Timeout/Event weg/Setting aus → kein Nachstart; Instanz lief schon → kein Pending),
+  `amp-automation-flow.test.ts` +1 (gemocktes AMP: `StartInstance` 1×, erstes `Core/Start` mit
+  `Status: false`, Nachstart → `Core/Start` 2×, zweites Audit mit `followUp`). Gesamt 279 Tests grün.
 

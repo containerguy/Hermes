@@ -144,7 +144,7 @@ Die Rechte werden serverseitig geprüft; jede Steueraktion landet im Audit-Log u
 
 Beide Schalter sind standardmäßig aus (Admin → Betrieb → CubeCoders AMP):
 
-- **Server automatisch starten, wenn ein Event bereit ist:** Wird ein Event mit gebundenem Server `bereit` (oder läuft es schon) und der Server ist aus, startet Hermes ihn – **höchstens einmal pro Event**. Stoppt ein Manager den Server danach bewusst, bleibt er aus. Läuft der Server schon (auch im AMP-Ruhemodus „Sleeping") oder ist AMP gerade beim Starten/Updaten, passiert nichts.
+- **Server automatisch starten, wenn ein Event bereit ist:** Wird ein Event mit gebundenem Server `bereit` (oder läuft es schon) und der Server ist aus, startet Hermes ihn – **höchstens einmal pro Event**. Stoppt ein Manager den Server danach bewusst, bleibt er aus. Läuft der Server schon (auch im AMP-Ruhemodus „Sleeping") oder ist AMP gerade beim Starten/Updaten, passiert nichts. War die AMP-Instanz selbst aus, startet Hermes zuerst die Instanz und – sobald sie erreichbar ist und das Spiel noch steht – das Spiel genau ein zweites Mal (Nachstart, höchstens 10 Minuten nach dem Instanzstart; Audit `amp.auto_start` mit `followUp`).
 - **Leerlauf-Stopp nach Minuten (0 = aus):** Hermes stoppt einen Server, wenn kein aktives Event (offen, bereit, läuft) mehr an ihm hängt und er die ganze Zeit über **0 Spieler** hatte. Fehlt die Spielerzahl in AMP, zählt das nicht als leer.
 - **Push „Server für <Spiel> läuft":** Sobald der Server eines aktiven Events beitretbar ist (Ready oder Ruhemodus), bekommen alle, die bei diesem Event **dabei** sind und Benachrichtigungen aktiviert haben, genau einen Push. Der Push enthält nur den Spieltitel und den Link zur Übersicht, keine Serveradresse.
 

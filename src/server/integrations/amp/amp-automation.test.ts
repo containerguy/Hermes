@@ -1,5 +1,6 @@
 import { describe, expect, it, vi, type Mock } from "vitest";
 import {
+  GAME_START_FOLLOW_UP_TIMEOUT_MS,
   createAutomationState,
   runAutomationTick,
   type AutomationDeps,
@@ -35,7 +36,7 @@ type Harness = {
   statuses: Map<string, ServerStatus>;
   settings: AutomationDeps["settings"];
   clock: { now: number };
-  start: Mock<(bindingId: string) => Promise<void>>;
+  start: Mock<(bindingId: string, opts?: { followUp?: boolean }) => Promise<void>>;
   stop: Mock<(bindingId: string) => Promise<void>>;
   pushRunning: Mock<(eventId: string, gameTitle: string) => Promise<void>>;
   logError: Mock<(message: string, error: unknown) => void>;
@@ -47,7 +48,7 @@ function harness(settings: Partial<AutomationDeps["settings"]> = {}): Harness {
     statuses: new Map<string, ServerStatus>(),
     settings: { ampAutoStartOnReady: true, ampAutoStopIdleMinutes: 0, ...settings },
     clock: { now: Date.parse("2026-10-16T10:00:00.000Z") },
-    start: vi.fn(async (_bindingId: string) => undefined),
+    start: vi.fn(async (_bindingId: string, _opts?: { followUp?: boolean }) => undefined),
     stop: vi.fn(async (_bindingId: string) => undefined),
     pushRunning: vi.fn(async (_eventId: string, _gameTitle: string) => undefined),
     logError: vi.fn((_message: string, _error: unknown) => undefined)
@@ -289,5 +290,97 @@ describe("AMP automation tick", () => {
     // einmal pro Event: kein zweiter Startversuch nach dem Fehler
     await ticks(h, state, 2);
     expect(h.start).toHaveBeenCalledTimes(1);
+  });
+
+  describe("follow-up start after StartInstance", () => {
+    const booting = () => serverStatus({ instanceRunning: false, appState: "Stopped" });
+
+    it("starts the game once more as soon as the booted instance is reachable", async () => {
+      const h = harness();
+      let state = await initialized(h);
+      h.events = [event()];
+      h.statuses.set("b-mc", booting());
+      state = await ticks(h, state, 1);
+      expect(h.start).toHaveBeenCalledTimes(1);
+      expect(h.start).toHaveBeenLastCalledWith("b-mc");
+
+      // Instanz bootet noch bzw. AMP meldet Zwischenzustand -> warten
+      h.clock.now += 30_000;
+      state = await ticks(h, state, 1);
+      h.statuses.set("b-mc", serverStatus({ instanceRunning: true, appState: "PreStart" }));
+      h.clock.now += 30_000;
+      state = await ticks(h, state, 1);
+      expect(h.start).toHaveBeenCalledTimes(1);
+
+      // Instanz läuft, Spiel steht -> genau ein Nachstart
+      h.statuses.set("b-mc", serverStatus({ instanceRunning: true, appState: "Stopped" }));
+      h.clock.now += 30_000;
+      state = await ticks(h, state, 3);
+      expect(h.start).toHaveBeenCalledTimes(2);
+      expect(h.start).toHaveBeenLastCalledWith("b-mc", { followUp: true });
+      expect(state.pendingGameStart).toEqual({});
+    });
+
+    it("skips the follow-up when AMP starts the game by itself", async () => {
+      const h = harness();
+      let state = await initialized(h);
+      h.events = [event()];
+      h.statuses.set("b-mc", booting());
+      state = await ticks(h, state, 1);
+      h.statuses.set("b-mc", serverStatus({ instanceRunning: true, running: true, appState: "Ready" }));
+      state = await ticks(h, state, 1);
+      h.statuses.set("b-mc", serverStatus({ instanceRunning: true, appState: "Stopped" }));
+      await ticks(h, state, 2);
+      expect(h.start).toHaveBeenCalledTimes(1);
+    });
+
+    it("gives up after the timeout, without an active event, or when auto-start is switched off", async () => {
+      // Timeout
+      const h = harness();
+      let state = await initialized(h);
+      h.events = [event()];
+      h.statuses.set("b-mc", booting());
+      state = await ticks(h, state, 1);
+      h.clock.now += GAME_START_FOLLOW_UP_TIMEOUT_MS + 1;
+      state = await ticks(h, state, 1);
+      expect(h.logError).toHaveBeenCalledWith(expect.stringContaining("nicht gestartet"), expect.any(Error));
+      h.statuses.set("b-mc", serverStatus({ instanceRunning: true, appState: "Stopped" }));
+      await ticks(h, state, 2);
+      expect(h.start).toHaveBeenCalledTimes(1);
+
+      // Event archiviert, bevor die Instanz oben ist
+      const h2 = harness();
+      let state2 = await initialized(h2);
+      h2.events = [event()];
+      h2.statuses.set("b-mc", booting());
+      state2 = await ticks(h2, state2, 1);
+      h2.events = [];
+      state2 = await ticks(h2, state2, 1);
+      h2.statuses.set("b-mc", serverStatus({ instanceRunning: true, appState: "Stopped" }));
+      h2.events = [event({ id: "e-later", status: "open" })];
+      await ticks(h2, state2, 2);
+      expect(h2.start).toHaveBeenCalledTimes(1);
+
+      // Admin schaltet Auto-Start ab
+      const h3 = harness();
+      let state3 = await initialized(h3);
+      h3.events = [event()];
+      h3.statuses.set("b-mc", booting());
+      state3 = await ticks(h3, state3, 1);
+      h3.settings.ampAutoStartOnReady = false;
+      h3.statuses.set("b-mc", serverStatus({ instanceRunning: true, appState: "Stopped" }));
+      await ticks(h3, state3, 2);
+      expect(h3.start).toHaveBeenCalledTimes(1);
+    });
+
+    it("does not schedule a follow-up when the instance was already running", async () => {
+      const h = harness();
+      let state = await initialized(h);
+      h.events = [event()];
+      h.statuses.set("b-mc", serverStatus({ instanceRunning: true, appState: "Stopped" }));
+      state = await ticks(h, state, 3);
+      expect(h.start).toHaveBeenCalledTimes(1);
+      expect(state.pendingGameStart).toEqual({});
+    });
   });
 });

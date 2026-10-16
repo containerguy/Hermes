@@ -26,7 +26,11 @@ export type AutomationDeps = {
   listActiveEvents(): AutomationEvent[];
   getStatus(bindingId: string): ServerStatus | null;
   listStatuses(): ServerStatus[];
-  start(bindingId: string): Promise<void>;
+  /**
+   * Startet den Server. `followUp`: zweiter, einmaliger `Core/Start` nach `StartInstance`, sobald die
+   * Instanz erreichbar ist (siehe `pendingGameStart`).
+   */
+  start(bindingId: string, opts?: { followUp?: boolean }): Promise<void>;
   stop(bindingId: string): Promise<void>;
   pushRunning(eventId: string, gameTitle: string): Promise<void>;
   settings: { ampAutoStartOnReady: boolean; ampAutoStopIdleMinutes: number };
@@ -47,10 +51,23 @@ export type AutomationState = {
   pushBaseline: Record<string, true>;
   /** Beginn der Leerlaufphase je Bindung (ms seit Epoch). */
   idleSince: Record<string, number>;
+  /**
+   * Bindungen, deren AMP-Instanz beim Auto-Start nicht lief (ms seit Epoch des Starts). Direkt nach
+   * `ADSModule/StartInstance` bootet die Instanz noch, das folgende `Core/Start` scheitert oft.
+   * Sobald die Instanz läuft und das Spiel noch aus ist, folgt genau ein zweiter Start.
+   */
+  pendingGameStart: Record<string, number>;
 };
 
 export function createAutomationState(): AutomationState {
-  return { initialized: false, startHandled: {}, pushHandled: {}, pushBaseline: {}, idleSince: {} };
+  return {
+    initialized: false,
+    startHandled: {},
+    pushHandled: {},
+    pushBaseline: {},
+    idleSince: {},
+    pendingGameStart: {}
+  };
 }
 
 /** Zwischenzustände: kein Auto-Start, solange AMP gerade etwas tut. */
@@ -67,6 +84,9 @@ const TRANSITIONAL_STATES = new Set([
   "Maintenance"
 ]);
 
+/** So lange wartet der Nachstart auf die bootende Instanz, danach wird aufgegeben. */
+export const GAME_START_FOLLOW_UP_TIMEOUT_MS = 10 * 60_000;
+
 function isKnown(status: ServerStatus | null): status is ServerStatus {
   return Boolean(status) && !status!.error;
 }
@@ -77,9 +97,11 @@ export async function runAutomationTick(deps: AutomationDeps, previous: Automati
     startHandled: { ...previous.startHandled },
     pushHandled: { ...previous.pushHandled },
     pushBaseline: { ...previous.pushBaseline },
-    idleSince: { ...previous.idleSince }
+    idleSince: { ...previous.idleSince },
+    pendingGameStart: { ...(previous.pendingGameStart ?? {}) }
   };
   const logError = deps.logError ?? ((message, error) => console.error(message, error));
+  const nowMs = deps.now().getTime();
   const events = deps.listActiveEvents();
   const activeIds = new Set(events.map((event) => event.id));
 
@@ -147,6 +169,9 @@ export async function runAutomationTick(deps: AutomationDeps, previous: Automati
     }
     if (startedBindings.has(bindingId)) continue;
     startedBindings.add(bindingId);
+    if (!status.instanceRunning) {
+      state.pendingGameStart[bindingId] = nowMs;
+    }
     try {
       await deps.start(bindingId);
     } catch (error) {
@@ -154,9 +179,37 @@ export async function runAutomationTick(deps: AutomationDeps, previous: Automati
     }
   }
 
+  // Nachstart nach StartInstance: einmal Core/Start, sobald die Instanz erreichbar ist und das Spiel
+  // noch steht. Startet AMP das Spiel selbst, entfällt er; ohne aktives Event oder nach dem Timeout auch.
+  for (const [bindingId, since] of Object.entries(state.pendingGameStart)) {
+    if (startedBindings.has(bindingId)) continue;
+    const status = deps.getStatus(bindingId);
+    if (!deps.settings.ampAutoStartOnReady || !eventsByBinding.has(bindingId) || (status && status.running)) {
+      delete state.pendingGameStart[bindingId];
+      continue;
+    }
+    if (nowMs - since > GAME_START_FOLLOW_UP_TIMEOUT_MS) {
+      delete state.pendingGameStart[bindingId];
+      logError(
+        `[Hermes] AMP-Automatik: ${status?.ampInstanceName ?? bindingId} ist nach StartInstance nicht gestartet`,
+        new Error("amp_nachstart_timeout")
+      );
+      continue;
+    }
+    if (!isKnown(status) || !status.instanceRunning || TRANSITIONAL_STATES.has(status.appState)) {
+      continue;
+    }
+    delete state.pendingGameStart[bindingId];
+    startedBindings.add(bindingId);
+    try {
+      await deps.start(bindingId, { followUp: true });
+    } catch (error) {
+      logError(`[Hermes] AMP-Automatik: Nachstart von ${status.ampInstanceName} fehlgeschlagen`, error);
+    }
+  }
+
   // Auto-Stop (D-15): kein aktives Event auf der Bindung und die ganze Leerlaufzeit über 0 Spieler.
   const idleMinutes = deps.settings.ampAutoStopIdleMinutes;
-  const nowMs = deps.now().getTime();
   const statuses = deps.listStatuses();
   const knownBindings = new Set(statuses.map((status) => status.bindingId));
   for (const id of Object.keys(state.idleSince)) {
@@ -214,7 +267,12 @@ function listActiveEvents(context: DatabaseContext): AutomationEvent[] {
     .all() as AutomationEvent[];
 }
 
-async function runAutomaticAction(context: DatabaseContext, bindingId: string, action: "start" | "stop") {
+async function runAutomaticAction(
+  context: DatabaseContext,
+  bindingId: string,
+  action: "start" | "stop",
+  followUp = false
+) {
   const settings = readSettings(context);
   const binding = getBinding(context, bindingId);
   if (!settings.ampIntegrationEnabled || !binding || !binding.enabled) {
@@ -227,10 +285,12 @@ async function runAutomaticAction(context: DatabaseContext, bindingId: string, a
     entityType: "game_server_binding",
     entityId: binding.id,
     summary:
-      action === "start"
-        ? `Automatik: ${binding.ampInstanceName} (${binding.displayTitle}) gestartet, Event ist bereit.`
-        : `Automatik: ${binding.ampInstanceName} (${binding.displayTitle}) nach Leerlauf gestoppt.`,
-    metadata: { ampInstanceName: binding.ampInstanceName, action }
+      action === "stop"
+        ? `Automatik: ${binding.ampInstanceName} (${binding.displayTitle}) nach Leerlauf gestoppt.`
+        : followUp
+          ? `Automatik: Spiel auf ${binding.ampInstanceName} (${binding.displayTitle}) nach dem Instanzstart nachgestartet.`
+          : `Automatik: ${binding.ampInstanceName} (${binding.displayTitle}) gestartet, Event ist bereit.`,
+    metadata: { ampInstanceName: binding.ampInstanceName, action, ...(followUp ? { followUp: true } : {}) }
   });
   void pollNow(context);
 }
@@ -242,7 +302,7 @@ export function buildAutomationDeps(context: DatabaseContext): AutomationDeps {
     listActiveEvents: () => (settings.ampIntegrationEnabled ? listActiveEvents(context) : []),
     getStatus: getServerStatus,
     listStatuses: () => (settings.ampIntegrationEnabled ? getAllServerStatus() : []),
-    start: (bindingId) => runAutomaticAction(context, bindingId, "start"),
+    start: (bindingId, opts) => runAutomaticAction(context, bindingId, "start", opts?.followUp === true),
     stop: (bindingId) => runAutomaticAction(context, bindingId, "stop"),
     pushRunning: (eventId, gameTitle) =>
       // Keine Serverdaten im Payload; Adresse und Verbinden-Knopf holt der Client nach dem Login.
