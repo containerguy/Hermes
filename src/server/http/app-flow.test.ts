@@ -1174,6 +1174,7 @@ describe("app flow", () => {
       pizzaPaypalHandle: "",
       pizzaPaypalName: "",
       pizzaCashRecipient: "",
+      pizzaPaymentMethods: "cash_and_paypal" as const,
       ampIntegrationEnabled: false,
       ampBaseUrl: "",
       ampAutoStartOnReady: true,

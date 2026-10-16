@@ -1,19 +1,24 @@
 import { eq } from "drizzle-orm";
-import { Router } from "express";
+import { Router, type Request, type Response } from "express";
 import { z } from "zod";
 import { tryWriteAuditLog } from "../audit-log";
+import { requireCsrf } from "../auth/csrf";
 import { requireUser } from "../auth/current-user";
 import { enforceApiTokenWriteAccess } from "../auth/hermes-auth";
 import type { DatabaseContext } from "../db/client";
 import { pizzaMenuItems, pizzaMenuVariants, users } from "../db/schema";
 import {
-  deleteVariant,
+  getItemById,
   getVariantById,
   listActiveMenu,
   listAllMenu,
+  removeItem,
+  removeVariant,
   setItemActive,
+  setVariantActive,
   upsertItem,
-  upsertVariant
+  upsertVariant,
+  type PizzaMenuItemRow
 } from "../domain/pizza/menu";
 import {
   addLine,
@@ -21,19 +26,30 @@ import {
   getOrderForUser,
   listOrdersForSession,
   markPayment,
+  resetUnofferedPaymentMethods,
+  setPaymentMethod,
   updateLine
 } from "../domain/pizza/orders";
+import { defaultPaymentMethod, offeredPaymentMethods } from "../domain/pizza/payment";
 import {
+  archiveSession,
+  deleteArchivedSession,
   getActiveSession,
-  getOrCreateDraftSession,
+  getSessionById,
+  listArchivedSessions,
   transitionSession
 } from "../domain/pizza/sessions";
 import { guestTotals } from "../domain/pizza/totals";
+import { canManagePizza } from "../domain/users";
 import { buildKassenlistePdf, buildPizzeriaPdf } from "../pdf/pizza-print";
 import { sendPushToEnabledUsers } from "../push/push-service";
 import { broadcastEventsChanged } from "../realtime/event-bus";
-import { readSettings } from "../settings";
+import { readSettings, writeSettings } from "../settings";
 import { handleDomainError } from "./errors";
+
+const paymentModeSchema = z.object({
+  pizzaPaymentMethods: z.enum(["cash_and_paypal", "cash_only", "paypal_only"])
+});
 
 const transitionSchema = z.object({
   transition: z.enum(["open", "lock", "deliver", "reopen"]),
@@ -55,6 +71,10 @@ const paymentSchema = z.object({
   method: z.enum(["paypal", "cash", "unpaid"])
 });
 
+const paymentMethodSchema = z.object({
+  method: z.enum(["paypal", "cash"])
+});
+
 const itemUpsertSchema = z.object({
   id: z.string().optional(),
   number: z.string().trim().max(16).nullable().optional(),
@@ -71,8 +91,11 @@ const variantUpsertSchema = z.object({
   itemId: z.string().min(1),
   sizeLabel: z.string().trim().max(32).nullable(),
   priceCents: z.number().int().min(0).max(100_000),
-  sortOrder: z.number().int().optional()
+  sortOrder: z.number().int().optional(),
+  active: z.boolean().optional()
 });
+
+const activeSchema = z.object({ active: z.boolean() });
 
 const menuImportSchema = z.object({
   items: z
@@ -92,7 +115,8 @@ const menuImportSchema = z.object({
               id: z.string().optional(),
               sizeLabel: z.string().trim().max(32).nullable(),
               priceCents: z.number().int().min(0).max(100_000),
-              sortOrder: z.number().int().optional()
+              sortOrder: z.number().int().optional(),
+              active: z.boolean().optional()
             })
           )
           .max(8)
@@ -101,30 +125,72 @@ const menuImportSchema = z.object({
     .max(500)
 });
 
-function loadSerializedState(context: DatabaseContext, currentUserId: string) {
-  const session = getActiveSession(context);
-  const menu = listActiveMenu(context);
-  const myOrder = session ? getOrderForUser(context, session.id, currentUserId) : null;
-  const allOrders = session ? listOrdersForSession(context, session.id) : [];
+type LineLabel = { itemNumber: string | null; itemName: string; sizeLabel: string | null };
 
-  const usernamesById = new Map<string, { username: string; displayName: string | null }>();
-  for (const order of allOrders) {
-    const found = context.db.select().from(users).where(eq(users.id, order.userId)).get();
-    if (found) {
-      usernamesById.set(order.userId, {
-        username: found.username,
-        displayName: found.displayName
+/**
+ * Bezeichnungen aller Varianten (auch deaktivierter), damit vergangene Bestellzeilen ihren
+ * Namen behalten, selbst wenn der Artikel nicht mehr im bestellbaren Menü steht.
+ */
+function buildLineLabels(menu: PizzaMenuItemRow[]) {
+  const labels = new Map<string, LineLabel>();
+  for (const item of menu) {
+    for (const variant of item.variants) {
+      labels.set(variant.id, {
+        itemNumber: item.number,
+        itemName: item.name,
+        sizeLabel: variant.sizeLabel
       });
     }
   }
+  return labels;
+}
+
+function labelFor(labels: Map<string, LineLabel>, variantId: string): LineLabel {
+  return labels.get(variantId) ?? { itemNumber: null, itemName: "[entfernt]", sizeLabel: null };
+}
+
+type OrderWithLines = ReturnType<typeof listOrdersForSession>[number];
+
+function decorateOrder(order: OrderWithLines, labels: Map<string, LineLabel>) {
+  return {
+    ...order,
+    lines: order.lines.map((line) => ({ ...line, ...labelFor(labels, line.variantId) }))
+  };
+}
+
+function loadUsers(context: DatabaseContext, userIds: string[]) {
+  const byId = new Map<string, { username: string; displayName: string | null }>();
+  for (const userId of new Set(userIds)) {
+    const found = context.db.select().from(users).where(eq(users.id, userId)).get();
+    if (found) {
+      byId.set(userId, { username: found.username, displayName: found.displayName });
+    }
+  }
+  return byId;
+}
+
+function loadSerializedState(context: DatabaseContext, currentUserId: string) {
+  const settings = readSettings(context);
+  const session = getActiveSession(context);
+  const menu = listActiveMenu(context);
+  const labels = buildLineLabels(listAllMenu(context));
+  const myOrder = session ? getOrderForUser(context, session.id, currentUserId) : null;
+  const allOrders = session ? listOrdersForSession(context, session.id) : [];
+  const usersById = loadUsers(
+    context,
+    allOrders.map((order) => order.userId)
+  );
 
   return {
     session: session ?? null,
     menu,
-    myOrder,
+    paymentMethods: offeredPaymentMethods(settings),
+    /** Einstellung hinter `paymentMethods`; ab manager im Pizza-Panel änderbar. */
+    paymentMode: settings.pizzaPaymentMethods,
+    myOrder: myOrder ? decorateOrder(myOrder, labels) : null,
     orders: allOrders.map((order) => ({
-      ...order,
-      user: usernamesById.get(order.userId) ?? { username: "unbekannt", displayName: null }
+      ...decorateOrder(order, labels),
+      user: usersById.get(order.userId) ?? { username: "unbekannt", displayName: null }
     })),
     guestTotals: guestTotals(
       allOrders.map((order) => ({
@@ -138,8 +204,26 @@ function loadSerializedState(context: DatabaseContext, currentUserId: string) {
   };
 }
 
-function isManager(role: string): boolean {
-  return role === "admin" || role === "manager";
+function requirePizzaManager(context: DatabaseContext, request: Request, response: Response) {
+  const actor = requireUser(context, request)!;
+  if (!canManagePizza(actor)) {
+    response.status(403).json({ error: "pizza_manager_erforderlich" });
+    return null;
+  }
+  return actor;
+}
+
+function respondDomainError(error: unknown, response: Response, logLabel: string) {
+  if (!handleDomainError(error, response)) {
+    console.error(`[Hermes] ${logLabel}`, error);
+    response.status(500).json({ error: "interner_fehler" });
+  }
+}
+
+/** Druck-Routen: Standard ist die aktuelle Runde, `?sessionId=` erlaubt archivierte Runden. */
+function resolvePrintSession(context: DatabaseContext, request: Request) {
+  const requested = typeof request.query.sessionId === "string" ? request.query.sessionId : "";
+  return requested ? getSessionById(context, requested) : getActiveSession(context);
 }
 
 export function createPizzaRouter(context: DatabaseContext) {
@@ -164,6 +248,7 @@ export function createPizzaRouter(context: DatabaseContext) {
   router.use((request, response, next) => {
     if (["POST", "PATCH", "PUT", "DELETE"].includes(request.method)) {
       if (!enforceApiTokenWriteAccess(request, response)) return;
+      if (!requireCsrf(context, request, response)) return;
     }
     next();
   });
@@ -174,11 +259,8 @@ export function createPizzaRouter(context: DatabaseContext) {
   });
 
   router.post("/transitions", (request, response) => {
-    const actor = requireUser(context, request)!;
-    if (!isManager(actor.role)) {
-      response.status(403).json({ error: "manager_erforderlich" });
-      return;
-    }
+    const actor = requirePizzaManager(context, request, response);
+    if (!actor) return;
     const parsed = transitionSchema.safeParse(request.body);
     if (!parsed.success) {
       response.status(400).json({ error: "ungueltiger_uebergang" });
@@ -205,10 +287,82 @@ export function createPizzaRouter(context: DatabaseContext) {
 
       response.json({ session });
     } catch (error) {
-      if (!handleDomainError(error, response)) {
-        console.error("[Hermes] pizza transition failed", error);
-        response.status(500).json({ error: "interner_fehler" });
-      }
+      respondDomainError(error, response, "pizza transition failed");
+    }
+  });
+
+  /** Bezahlarten ab manager (René, PR #14). Andere Einstellungen bleiben admin vorbehalten. */
+  router.put("/payment-mode", (request, response) => {
+    const actor = requirePizzaManager(context, request, response);
+    if (!actor) return;
+    const parsed = paymentModeSchema.safeParse(request.body);
+    if (!parsed.success) {
+      response.status(400).json({ error: "ungueltige_settings" });
+      return;
+    }
+    const current = readSettings(context);
+    // Nur diesen einen Schlüssel schreiben; die übrigen Einstellungen bleiben unberührt.
+    writeSettings(context, { pizzaPaymentMethods: parsed.data.pizzaPaymentMethods }, actor.id);
+    // Offene Bestellungen der aktuellen Runde mit einer nicht mehr angebotenen Bezahlart neu setzen
+    // (eine verbleibende Bezahlart wird vorausgewählt, sonst wählt der Gast neu).
+    const offered = offeredPaymentMethods(readSettings(context));
+    const active = getActiveSession(context);
+    if (active) {
+      resetUnofferedPaymentMethods(context, active.id, offered, defaultPaymentMethod(offered));
+    }
+    tryWriteAuditLog(context, {
+      actor,
+      action: "pizza.payment_mode",
+      entityType: "settings",
+      entityId: "app",
+      summary: `Pizza-Bezahlarten: ${parsed.data.pizzaPaymentMethods}`,
+      metadata: { from: current.pizzaPaymentMethods, to: parsed.data.pizzaPaymentMethods }
+    });
+    broadcastEventsChanged("pizza_payment_mode");
+    response.json({ paymentMode: parsed.data.pizzaPaymentMethods, paymentMethods: offered });
+  });
+
+  router.get("/sessions/archived", (request, response) => {
+    if (!requirePizzaManager(context, request, response)) return;
+    response.json({ sessions: listArchivedSessions(context) });
+  });
+
+  router.post("/sessions/:id/archive", (request, response) => {
+    const actor = requirePizzaManager(context, request, response);
+    if (!actor) return;
+    try {
+      const session = archiveSession(context, request.params.id, actor);
+      tryWriteAuditLog(context, {
+        actor,
+        action: "pizza.session.archive",
+        entityType: "pizza_session",
+        entityId: session.id,
+        summary: `Pizzarunde archiviert${session.label ? `: ${session.label}` : ""}`,
+        metadata: { state: session.state }
+      });
+      broadcastEventsChanged("pizza_session_archived");
+      response.json({ session });
+    } catch (error) {
+      respondDomainError(error, response, "pizza archive failed");
+    }
+  });
+
+  router.delete("/sessions/:id", (request, response) => {
+    const actor = requirePizzaManager(context, request, response);
+    if (!actor) return;
+    try {
+      const { session, orderCount } = deleteArchivedSession(context, request.params.id);
+      tryWriteAuditLog(context, {
+        actor,
+        action: "pizza.session.delete",
+        entityType: "pizza_session",
+        entityId: session.id,
+        summary: `Archivierte Pizzarunde gelöscht${session.label ? `: ${session.label}` : ""}`,
+        metadata: { orderCount, state: session.state }
+      });
+      response.status(204).end();
+    } catch (error) {
+      respondDomainError(error, response, "pizza session delete failed");
     }
   });
 
@@ -230,15 +384,13 @@ export function createPizzaRouter(context: DatabaseContext) {
         userId: actor.id,
         variantId: parsed.data.variantId,
         qty: parsed.data.qty,
-        customNote: parsed.data.customNote ?? null
+        customNote: parsed.data.customNote ?? null,
+        defaultPaymentMethod: defaultPaymentMethod(offeredPaymentMethods(readSettings(context)))
       });
       broadcastEventsChanged("pizza_line_added");
       response.status(201).json({ lineId, orderId });
     } catch (error) {
-      if (!handleDomainError(error, response)) {
-        console.error("[Hermes] pizza addLine failed", error);
-        response.status(500).json({ error: "interner_fehler" });
-      }
+      respondDomainError(error, response, "pizza addLine failed");
     }
   });
 
@@ -259,9 +411,7 @@ export function createPizzaRouter(context: DatabaseContext) {
       broadcastEventsChanged("pizza_line_updated");
       response.status(204).end();
     } catch (error) {
-      if (!handleDomainError(error, response)) {
-        response.status(500).json({ error: "interner_fehler" });
-      }
+      respondDomainError(error, response, "pizza updateLine failed");
     }
   });
 
@@ -272,23 +422,44 @@ export function createPizzaRouter(context: DatabaseContext) {
       broadcastEventsChanged("pizza_line_deleted");
       response.status(204).end();
     } catch (error) {
-      if (!handleDomainError(error, response)) {
-        response.status(500).json({ error: "interner_fehler" });
-      }
+      respondDomainError(error, response, "pizza deleteLine failed");
+    }
+  });
+
+  router.post("/orders/mine/payment-method", (request, response) => {
+    const actor = requireUser(context, request)!;
+    const parsed = paymentMethodSchema.safeParse(request.body);
+    if (!parsed.success) {
+      response.status(400).json({ error: "ungueltige_methode" });
+      return;
+    }
+    const session = getActiveSession(context);
+    if (!session) {
+      response.status(404).json({ error: "keine_session" });
+      return;
+    }
+    try {
+      setPaymentMethod(context, {
+        sessionId: session.id,
+        userId: actor.id,
+        method: parsed.data.method,
+        offered: offeredPaymentMethods(readSettings(context))
+      });
+      broadcastEventsChanged("pizza_payment_method");
+      response.status(204).end();
+    } catch (error) {
+      respondDomainError(error, response, "pizza payment method failed");
     }
   });
 
   router.post("/orders/:orderId/payment", (request, response) => {
-    const actor = requireUser(context, request)!;
     const parsed = paymentSchema.safeParse(request.body);
     if (!parsed.success) {
       response.status(400).json({ error: "ungueltige_methode" });
       return;
     }
-    if (!isManager(actor.role)) {
-      response.status(403).json({ error: "manager_erforderlich" });
-      return;
-    }
+    const actor = requirePizzaManager(context, request, response);
+    if (!actor) return;
     try {
       markPayment(context, {
         orderId: request.params.orderId,
@@ -305,77 +476,168 @@ export function createPizzaRouter(context: DatabaseContext) {
       broadcastEventsChanged("pizza_payment_marked");
       response.status(204).end();
     } catch (error) {
-      if (!handleDomainError(error, response)) {
-        response.status(500).json({ error: "interner_fehler" });
-      }
+      respondDomainError(error, response, "pizza payment failed");
     }
   });
 
-  router.get("/admin/menu", (_request, response) => {
+  // --- Menüpflege (ab manager) ---------------------------------------------------------------
+
+  router.get("/admin/menu", (request, response) => {
+    if (!requirePizzaManager(context, request, response)) return;
     response.json({ items: listAllMenu(context) });
   });
 
   router.post("/admin/items", (request, response) => {
-    const actor = requireUser(context, request)!;
-    if (actor.role !== "admin") {
-      response.status(403).json({ error: "admin_erforderlich" });
-      return;
-    }
+    const actor = requirePizzaManager(context, request, response);
+    if (!actor) return;
     const parsed = itemUpsertSchema.safeParse(request.body);
     if (!parsed.success) {
       response.status(400).json({ error: "ungueltige_eingabe" });
       return;
     }
+    const existed = parsed.data.id ? Boolean(getItemById(context, parsed.data.id)) : false;
     const id = upsertItem(context, parsed.data);
+    tryWriteAuditLog(context, {
+      actor,
+      action: existed ? "pizza.menu.item.update" : "pizza.menu.item.create",
+      entityType: "pizza_menu_item",
+      entityId: id,
+      summary: `Pizza-Menüeintrag ${existed ? "geändert" : "angelegt"}: ${parsed.data.name}`
+    });
+    broadcastEventsChanged("pizza_menu_changed");
     response.json({ id });
   });
 
   router.post("/admin/items/:id/active", (request, response) => {
-    const actor = requireUser(context, request)!;
-    if (actor.role !== "admin") {
-      response.status(403).json({ error: "admin_erforderlich" });
-      return;
-    }
-    const active = z.object({ active: z.boolean() }).safeParse(request.body);
-    if (!active.success) {
+    const actor = requirePizzaManager(context, request, response);
+    if (!actor) return;
+    const parsed = activeSchema.safeParse(request.body);
+    if (!parsed.success) {
       response.status(400).json({ error: "ungueltige_eingabe" });
       return;
     }
-    setItemActive(context, request.params.id, active.data.active);
+    const item = getItemById(context, request.params.id);
+    if (!item) {
+      response.status(404).json({ error: "pizza_artikel_nicht_gefunden" });
+      return;
+    }
+    setItemActive(context, item.id, parsed.data.active);
+    tryWriteAuditLog(context, {
+      actor,
+      action: parsed.data.active ? "pizza.menu.item.activate" : "pizza.menu.item.deactivate",
+      entityType: "pizza_menu_item",
+      entityId: item.id,
+      summary: `Pizza-Menüeintrag ${parsed.data.active ? "aktiviert" : "deaktiviert"}: ${item.name}`
+    });
+    broadcastEventsChanged("pizza_menu_changed");
     response.status(204).end();
   });
 
-  router.post("/admin/variants", (request, response) => {
-    const actor = requireUser(context, request)!;
-    if (actor.role !== "admin") {
-      response.status(403).json({ error: "admin_erforderlich" });
+  router.delete("/admin/items/:id", (request, response) => {
+    const actor = requirePizzaManager(context, request, response);
+    if (!actor) return;
+    const item = getItemById(context, request.params.id);
+    const result = removeItem(context, request.params.id);
+    if (!item || !result) {
+      response.status(404).json({ error: "pizza_artikel_nicht_gefunden" });
       return;
     }
+    tryWriteAuditLog(context, {
+      actor,
+      action: result === "deleted" ? "pizza.menu.item.delete" : "pizza.menu.item.deactivate",
+      entityType: "pizza_menu_item",
+      entityId: item.id,
+      summary:
+        result === "deleted"
+          ? `Pizza-Menüeintrag gelöscht: ${item.name}`
+          : `Pizza-Menüeintrag deaktiviert (in Bestellungen verwendet): ${item.name}`
+    });
+    broadcastEventsChanged("pizza_menu_changed");
+    response.json({ result });
+  });
+
+  router.post("/admin/variants", (request, response) => {
+    const actor = requirePizzaManager(context, request, response);
+    if (!actor) return;
     const parsed = variantUpsertSchema.safeParse(request.body);
     if (!parsed.success) {
       response.status(400).json({ error: "ungueltige_eingabe" });
       return;
     }
-    const id = upsertVariant(context, parsed.data);
-    response.json({ id });
+    const previous = parsed.data.id ? getVariantById(context, parsed.data.id) : undefined;
+    try {
+      const id = upsertVariant(context, parsed.data);
+      tryWriteAuditLog(context, {
+        actor,
+        action: previous ? "pizza.menu.variant.update" : "pizza.menu.variant.create",
+        entityType: "pizza_menu_variant",
+        entityId: id,
+        summary: `Pizza-Variante ${previous ? "geändert" : "angelegt"}: ${parsed.data.sizeLabel ?? "Standard"}`,
+        metadata: {
+          itemId: previous?.itemId ?? parsed.data.itemId,
+          priceCents: parsed.data.priceCents,
+          previousPriceCents: previous?.priceCents ?? null
+        }
+      });
+      broadcastEventsChanged("pizza_menu_changed");
+      response.json({ id });
+    } catch (error) {
+      respondDomainError(error, response, "pizza variant upsert failed");
+    }
   });
 
-  router.delete("/admin/variants/:id", (request, response) => {
-    const actor = requireUser(context, request)!;
-    if (actor.role !== "admin") {
-      response.status(403).json({ error: "admin_erforderlich" });
+  router.post("/admin/variants/:id/active", (request, response) => {
+    const actor = requirePizzaManager(context, request, response);
+    if (!actor) return;
+    const parsed = activeSchema.safeParse(request.body);
+    if (!parsed.success) {
+      response.status(400).json({ error: "ungueltige_eingabe" });
       return;
     }
-    deleteVariant(context, request.params.id);
+    const variant = getVariantById(context, request.params.id);
+    if (!variant) {
+      response.status(404).json({ error: "pizza_variante_nicht_gefunden" });
+      return;
+    }
+    setVariantActive(context, variant.id, parsed.data.active);
+    tryWriteAuditLog(context, {
+      actor,
+      action: parsed.data.active ? "pizza.menu.variant.activate" : "pizza.menu.variant.deactivate",
+      entityType: "pizza_menu_variant",
+      entityId: variant.id,
+      summary: `Pizza-Variante ${parsed.data.active ? "aktiviert" : "deaktiviert"}: ${variant.sizeLabel ?? "Standard"}`,
+      metadata: { itemId: variant.itemId }
+    });
+    broadcastEventsChanged("pizza_menu_changed");
     response.status(204).end();
   });
 
-  router.get("/admin/menu/export", (request, response) => {
-    const actor = requireUser(context, request)!;
-    if (actor.role !== "admin") {
-      response.status(403).json({ error: "admin_erforderlich" });
+  router.delete("/admin/variants/:id", (request, response) => {
+    const actor = requirePizzaManager(context, request, response);
+    if (!actor) return;
+    const variant = getVariantById(context, request.params.id);
+    const result = removeVariant(context, request.params.id);
+    if (!variant || !result) {
+      response.status(404).json({ error: "pizza_variante_nicht_gefunden" });
       return;
     }
+    tryWriteAuditLog(context, {
+      actor,
+      action: result === "deleted" ? "pizza.menu.variant.delete" : "pizza.menu.variant.deactivate",
+      entityType: "pizza_menu_variant",
+      entityId: variant.id,
+      summary:
+        result === "deleted"
+          ? `Pizza-Variante gelöscht: ${variant.sizeLabel ?? "Standard"}`
+          : `Pizza-Variante deaktiviert (in Bestellungen verwendet): ${variant.sizeLabel ?? "Standard"}`,
+      metadata: { itemId: variant.itemId }
+    });
+    broadcastEventsChanged("pizza_menu_changed");
+    response.json({ result });
+  });
+
+  router.get("/admin/menu/export", (request, response) => {
+    if (!requirePizzaManager(context, request, response)) return;
     const items = listAllMenu(context).map((item) => ({
       id: item.id,
       number: item.number,
@@ -389,18 +651,16 @@ export function createPizzaRouter(context: DatabaseContext) {
         id: variant.id,
         sizeLabel: variant.sizeLabel,
         priceCents: variant.priceCents,
-        sortOrder: variant.sortOrder
+        sortOrder: variant.sortOrder,
+        active: variant.active
       }))
     }));
     response.json({ items });
   });
 
   router.put("/admin/menu/import", (request, response) => {
-    const actor = requireUser(context, request)!;
-    if (actor.role !== "admin") {
-      response.status(403).json({ error: "admin_erforderlich" });
-      return;
-    }
+    const actor = requirePizzaManager(context, request, response);
+    if (!actor) return;
     const parsed = menuImportSchema.safeParse(request.body);
     if (!parsed.success) {
       response.status(400).json({
@@ -436,7 +696,8 @@ export function createPizzaRouter(context: DatabaseContext) {
               itemId,
               sizeLabel: variantInput.sizeLabel,
               priceCents: variantInput.priceCents,
-              sortOrder: variantInput.sortOrder ?? 0
+              sortOrder: variantInput.sortOrder ?? 0,
+              active: variantInput.active ?? true
             });
             seenVariantIds.add(variantId);
           }
@@ -452,17 +713,16 @@ export function createPizzaRouter(context: DatabaseContext) {
         }
         const allDbVariants = context.db.select().from(pizzaMenuVariants).all();
         let variantsRemoved = 0;
+        let variantsDeactivated = 0;
         for (const dbVariant of allDbVariants) {
           if (seenVariantIds.has(dbVariant.id)) continue;
-          try {
-            deleteVariant(context, dbVariant.id);
-            variantsRemoved += 1;
-          } catch {
-            // referenced by existing order line — leave in place
-          }
+          // Referenzierte Varianten (Bestellhistorie) werden deaktiviert statt gelöscht.
+          const result = removeVariant(context, dbVariant.id);
+          if (result === "deleted") variantsRemoved += 1;
+          if (result === "deactivated" && dbVariant.active) variantsDeactivated += 1;
         }
 
-        return { deactivated, variantsRemoved };
+        return { deactivated, variantsRemoved, variantsDeactivated };
       });
 
       const stats = tx();
@@ -474,15 +734,18 @@ export function createPizzaRouter(context: DatabaseContext) {
         metadata: {
           itemCount: parsed.data.items.length,
           deactivated: stats.deactivated,
-          variantsRemoved: stats.variantsRemoved
+          variantsRemoved: stats.variantsRemoved,
+          variantsDeactivated: stats.variantsDeactivated
         }
       });
+      broadcastEventsChanged("pizza_menu_changed");
 
       response.json({
         ok: true,
         itemCount: parsed.data.items.length,
         deactivated: stats.deactivated,
-        variantsRemoved: stats.variantsRemoved
+        variantsRemoved: stats.variantsRemoved,
+        variantsDeactivated: stats.variantsDeactivated
       });
     } catch (error) {
       console.error("[Hermes] pizza menu import failed", error);
@@ -490,19 +753,19 @@ export function createPizzaRouter(context: DatabaseContext) {
     }
   });
 
+  // --- Druck (ab manager) --------------------------------------------------------------------
+
   router.get("/print/pizzeria.pdf", async (request, response) => {
-    const actor = requireUser(context, request)!;
-    if (!isManager(actor.role)) {
-      response.status(403).json({ error: "manager_erforderlich" });
-      return;
-    }
-    const session = getActiveSession(context);
+    if (!requirePizzaManager(context, request, response)) return;
+    const session = resolvePrintSession(context, request);
     if (!session) {
       response.status(404).json({ error: "keine_session" });
       return;
     }
     const orders = listOrdersForSession(context, session.id);
     const settings = readSettings(context);
+    const menu = listAllMenu(context);
+    const itemsById = new Map(menu.map((item) => [item.id, item]));
 
     type Aggregate = {
       number: string | null;
@@ -518,11 +781,7 @@ export function createPizzaRouter(context: DatabaseContext) {
       for (const line of order.lines) {
         const variant = getVariantById(context, line.variantId);
         if (!variant) continue;
-        const item = context.db
-          .select()
-          .from(pizzaMenuItems)
-          .where(eq(pizzaMenuItems.id, variant.itemId))
-          .get();
+        const item = itemsById.get(variant.itemId);
         if (!item) continue;
         const key = `${item.id}:${variant.id}`;
         const existing = aggregateMap.get(key);
@@ -572,22 +831,24 @@ export function createPizzaRouter(context: DatabaseContext) {
   });
 
   router.get("/print/kassenliste.pdf", async (request, response) => {
-    const actor = requireUser(context, request)!;
-    if (!isManager(actor.role)) {
-      response.status(403).json({ error: "manager_erforderlich" });
-      return;
-    }
-    const session = getActiveSession(context);
+    if (!requirePizzaManager(context, request, response)) return;
+    const session = resolvePrintSession(context, request);
     if (!session) {
       response.status(404).json({ error: "keine_session" });
       return;
     }
     const orders = listOrdersForSession(context, session.id);
     const settings = readSettings(context);
+    const labels = buildLineLabels(listAllMenu(context));
+    const usersById = loadUsers(
+      context,
+      orders.map((order) => order.userId)
+    );
+    const offered = offeredPaymentMethods(settings);
 
     const guests = orders
       .map((order) => {
-        const user = context.db.select().from(users).where(eq(users.id, order.userId)).get();
+        const user = usersById.get(order.userId);
         const totalCents = order.lines.reduce(
           (sum, line) => sum + line.qty * line.priceCentsSnapshot,
           0
@@ -597,19 +858,13 @@ export function createPizzaRouter(context: DatabaseContext) {
           displayName: user?.displayName ?? null,
           totalCents,
           paymentStatus: order.paymentStatus,
+          paymentMethod: order.paymentMethod,
           lines: order.lines.map((line) => {
-            const variant = getVariantById(context, line.variantId);
-            const item = variant
-              ? context.db
-                  .select()
-                  .from(pizzaMenuItems)
-                  .where(eq(pizzaMenuItems.id, variant.itemId))
-                  .get()
-              : null;
+            const label = labelFor(labels, line.variantId);
             return {
-              number: item?.number ?? null,
-              name: item?.name ?? "[entfernt]",
-              sizeLabel: variant?.sizeLabel ?? null,
+              number: label.itemNumber,
+              name: label.itemName,
+              sizeLabel: label.sizeLabel,
               qty: line.qty,
               priceCentsSnapshot: line.priceCentsSnapshot,
               customNote: line.customNote
@@ -623,9 +878,9 @@ export function createPizzaRouter(context: DatabaseContext) {
       const buffer = await buildKassenlistePdf({
         eventTitle: session.label ?? settings.appName ?? "Pizzabestellung",
         printedAt: new Date(),
-        paypalName: settings.pizzaPaypalName || null,
-        paypalHandle: settings.pizzaPaypalHandle || null,
-        cashRecipient: settings.pizzaCashRecipient || null,
+        paypalName: offered.includes("paypal") ? settings.pizzaPaypalName || null : null,
+        paypalHandle: offered.includes("paypal") ? settings.pizzaPaypalHandle || null : null,
+        cashRecipient: offered.includes("cash") ? settings.pizzaCashRecipient || null : null,
         guests
       });
       response.setHeader("Content-Type", "application/pdf");
@@ -642,5 +897,3 @@ export function createPizzaRouter(context: DatabaseContext) {
 
   return router;
 }
-
-export { getOrCreateDraftSession };

@@ -19,4 +19,31 @@ describe("restorable tables", () => {
     sqlite.close();
     expect(missingParents).toEqual([]);
   });
+
+  it("decide for every table whether a restore brings it back (new tables must be added to one of the lists)", () => {
+    // Bewusst nicht wiederhergestellt: kurzlebige Anmelde-/Sperrdaten und der Zustand des Backups selbst.
+    // user_api_tokens und rate_limit_allowlist fehlen schon länger im Restore (Stand PR #14).
+    const notRestored = [
+      "email_change_challenges",
+      "pairing_tokens",
+      "rate_limit_allowlist",
+      "rate_limit_entries",
+      "storage_backup_status",
+      "storage_restore_recoveries",
+      "user_api_tokens"
+    ];
+    const sqlite = new Database(":memory:");
+    runMigrations(sqlite);
+    const tables = (
+      sqlite.prepare("SELECT name FROM sqlite_master WHERE type = 'table' AND name NOT LIKE 'sqlite_%'").all() as Array<{
+        name: string;
+      }>
+    ).map((row) => row.name);
+    sqlite.close();
+    const decided = new Set([...restorableTables, ...notRestored]);
+    expect(tables.filter((table) => !decided.has(table))).toEqual([]);
+    expect(restorableTables).toEqual(
+      expect.arrayContaining(["pizza_menu_items", "pizza_menu_variants", "pizza_sessions", "pizza_orders", "pizza_order_lines"])
+    );
+  });
 });

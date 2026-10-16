@@ -20,6 +20,8 @@ export interface KassenlisteGuestRow {
   displayName: string | null;
   totalCents: number;
   paymentStatus: "unpaid" | "paid_paypal" | "paid_cash";
+  /** Vom Gast gewählte Bezahlart; null/undefined = noch nicht gewählt. */
+  paymentMethod?: "cash" | "paypal" | null;
   lines: Array<{
     number: string | null;
     name: string;
@@ -42,7 +44,9 @@ export interface KassenlistePrintInput {
 function formatDateDe(date: Date): string {
   return new Intl.DateTimeFormat("de-DE", {
     dateStyle: "medium",
-    timeStyle: "short"
+    timeStyle: "short",
+    // Der Container läuft in UTC; gedruckt wird für die LAN in Deutschland.
+    timeZone: "Europe/Berlin"
   }).format(date);
 }
 
@@ -108,12 +112,17 @@ export async function buildKassenlistePdf(input: KassenlistePrintInput): Promise
   for (const guest of input.guests) {
     const heading = `${guest.displayName ?? guest.username} — ${formatEuro(guest.totalCents)}`;
     doc.fontSize(13).text(heading);
+    // Nur WinAnsi-Zeichen: Helvetica kann ☑/☐ nicht darstellen.
     const status =
       guest.paymentStatus === "paid_paypal"
-        ? "☑ PayPal"
+        ? "[x] bezahlt (PayPal)"
         : guest.paymentStatus === "paid_cash"
-          ? "☑ Bar"
-          : "☐ PayPal   ☐ Bar";
+          ? "[x] bezahlt (Bar)"
+          : guest.paymentMethod === "cash"
+            ? "[ ] offen – Bar gewählt"
+            : guest.paymentMethod === "paypal"
+              ? "[ ] offen – PayPal gewählt"
+              : "[ ] offen – PayPal oder Bar";
     doc.fontSize(10).fillColor("#555").text(`Status: ${status}`);
     doc.fillColor("black");
     for (const line of guest.lines) {

@@ -77,6 +77,11 @@ const settingsObjectSchema = z.object({
   /** Bargeld-Empfänger Hinweis in Kassenliste. Leer = kein Hinweis. */
   pizzaCashRecipient: z.string().trim().max(120),
   /**
+   * Angebotene Bezahlarten für die Pizzabestellung. PayPal wird nur angeboten, wenn zusätzlich
+   * ein PayPal-Handle gesetzt ist; bleibt nichts übrig, gilt Bargeld.
+   */
+  pizzaPaymentMethods: z.enum(["cash_and_paypal", "cash_only", "paypal_only"]),
+  /**
    * CubeCoders AMP: Gameserver-Modul. Zugangsdaten und CA kommen ausschließlich aus der Umgebung
    * (HERMES_AMP_USERNAME, HERMES_AMP_PASSWORD, HERMES_AMP_CA_FILE), nie aus app_settings.
    */
@@ -161,6 +166,7 @@ export type PublicHermesSettings = Pick<
   | "pizzaPaypalHandle"
   | "pizzaPaypalName"
   | "pizzaCashRecipient"
+  | "pizzaPaymentMethods"
   | "ampIntegrationEnabled"
 >;
 
@@ -189,6 +195,7 @@ export function pickPublicSettings(full: HermesSettings): PublicHermesSettings {
     pizzaPaypalHandle: full.pizzaPaypalHandle,
     pizzaPaypalName: full.pizzaPaypalName,
     pizzaCashRecipient: full.pizzaCashRecipient,
+    pizzaPaymentMethods: full.pizzaPaymentMethods,
     ampIntegrationEnabled: full.ampIntegrationEnabled
   };
 }
@@ -221,6 +228,7 @@ export const defaultSettings: HermesSettings = {
   pizzaPaypalHandle: "",
   pizzaPaypalName: "",
   pizzaCashRecipient: "",
+  pizzaPaymentMethods: "cash_and_paypal",
   ampIntegrationEnabled: false,
   ampBaseUrl: "",
   ampAutoStartOnReady: false,
@@ -247,7 +255,7 @@ export function readSettings(context: DatabaseContext) {
 
 export function writeSettings(
   context: DatabaseContext,
-  settings: HermesSettings,
+  settings: Partial<HermesSettings>,
   updatedByUserId: string
 ) {
   const timestamp = nowIso();

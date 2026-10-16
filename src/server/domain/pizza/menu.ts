@@ -2,6 +2,7 @@ import { and, asc, eq } from "drizzle-orm";
 import { randomUUID } from "node:crypto";
 import type { DatabaseContext } from "../../db/client";
 import { pizzaMenuItems, pizzaMenuVariants } from "../../db/schema";
+import { AppError } from "../../http/errors";
 
 export interface PizzaMenuVariantRow {
   id: string;
@@ -9,6 +10,7 @@ export interface PizzaMenuVariantRow {
   sizeLabel: string | null;
   priceCents: number;
   sortOrder: number;
+  active: boolean;
 }
 
 export interface PizzaMenuItemRow {
@@ -26,6 +28,14 @@ export interface PizzaMenuItemRow {
 function nowIso() {
   return new Date().toISOString();
 }
+
+export class PizzaMenuError extends AppError {
+  constructor(code: string, message: string, status: number) {
+    super(code, message, status);
+  }
+}
+
+export type PizzaMenuRemovalResult = "deleted" | "deactivated";
 
 export function listActiveMenu(context: DatabaseContext): PizzaMenuItemRow[] {
   const items = context.db
@@ -50,10 +60,13 @@ export function listActiveMenu(context: DatabaseContext): PizzaMenuItemRow[] {
     variantsByItem.set(variant.itemId, list);
   }
 
-  return items.map((item) => ({
-    ...item,
-    variants: variantsByItem.get(item.id) ?? []
-  }));
+  // Bestellbar ist nur, was aktiv ist und mindestens eine aktive Variante hat.
+  return items
+    .map((item) => ({
+      ...item,
+      variants: (variantsByItem.get(item.id) ?? []).filter((variant) => variant.active)
+    }))
+    .filter((item) => item.variants.length > 0);
 }
 
 export function listAllMenu(context: DatabaseContext): PizzaMenuItemRow[] {
@@ -98,16 +111,17 @@ export function getVariantWithItem(context: DatabaseContext, variantId: string) 
     .from(pizzaMenuItems)
     .where(eq(pizzaMenuItems.id, variant.itemId))
     .get();
-  if (!item || !item.active) return null;
+  if (!item || !item.active || !variant.active) return null;
   return { variant, item };
 }
 
+/** Anzahl bestellbarer Artikel (aktiv und mit mindestens einer aktiven Variante). */
 export function countActiveItems(context: DatabaseContext): number {
-  return context.db
-    .select()
-    .from(pizzaMenuItems)
-    .where(eq(pizzaMenuItems.active, true))
-    .all().length;
+  return listActiveMenu(context).length;
+}
+
+export function getItemById(context: DatabaseContext, itemId: string) {
+  return context.db.select().from(pizzaMenuItems).where(eq(pizzaMenuItems.id, itemId)).get();
 }
 
 export interface UpsertItemInput {
@@ -170,6 +184,7 @@ export interface UpsertVariantInput {
   sizeLabel: string | null;
   priceCents: number;
   sortOrder?: number;
+  active?: boolean;
 }
 
 export function upsertVariant(context: DatabaseContext, input: UpsertVariantInput) {
@@ -181,16 +196,22 @@ export function upsertVariant(context: DatabaseContext, input: UpsertVariantInpu
     .get();
 
   if (existing) {
+    // Preisänderungen wirken nur auf neue Bestellzeilen; bestehende Zeilen behalten ihren
+    // priceCentsSnapshot.
     context.db
       .update(pizzaMenuVariants)
       .set({
         sizeLabel: input.sizeLabel,
         priceCents: input.priceCents,
-        sortOrder: input.sortOrder ?? existing.sortOrder
+        sortOrder: input.sortOrder ?? existing.sortOrder,
+        active: input.active ?? existing.active
       })
       .where(eq(pizzaMenuVariants.id, id))
       .run();
   } else {
+    if (!getItemById(context, input.itemId)) {
+      throw new PizzaMenuError("pizza_artikel_nicht_gefunden", "Menüeintrag nicht gefunden", 404);
+    }
     context.db
       .insert(pizzaMenuVariants)
       .values({
@@ -198,15 +219,63 @@ export function upsertVariant(context: DatabaseContext, input: UpsertVariantInpu
         itemId: input.itemId,
         sizeLabel: input.sizeLabel,
         priceCents: input.priceCents,
-        sortOrder: input.sortOrder ?? 0
+        sortOrder: input.sortOrder ?? 0,
+        active: input.active ?? true
       })
       .run();
   }
   return id;
 }
 
-export function deleteVariant(context: DatabaseContext, variantId: string) {
+function countLinesForVariants(context: DatabaseContext, variantIds: string[]) {
+  if (variantIds.length === 0) return 0;
+  const placeholders = variantIds.map(() => "?").join(", ");
+  const row = context.sqlite
+    .prepare(`SELECT COUNT(*) AS count FROM pizza_order_lines WHERE variant_id IN (${placeholders})`)
+    .get(...variantIds) as { count: number };
+  return row.count;
+}
+
+/**
+ * Entfernt eine Variante. Ist sie in einer (auch archivierten) Bestellung referenziert, wird
+ * sie nur deaktiviert, damit vergangene Bestellungen vollständig bleiben (FK RESTRICT).
+ */
+export function removeVariant(
+  context: DatabaseContext,
+  variantId: string
+): PizzaMenuRemovalResult | null {
+  const variant = getVariantById(context, variantId);
+  if (!variant) return null;
+  if (countLinesForVariants(context, [variantId]) > 0) {
+    setVariantActive(context, variantId, false);
+    return "deactivated";
+  }
   context.db.delete(pizzaMenuVariants).where(eq(pizzaMenuVariants.id, variantId)).run();
+  return "deleted";
+}
+
+/**
+ * Entfernt einen Menüeintrag samt Varianten. Hat eine seiner Varianten Bestellhistorie, wird
+ * der Eintrag nur deaktiviert.
+ */
+export function removeItem(context: DatabaseContext, itemId: string): PizzaMenuRemovalResult | null {
+  const item = getItemById(context, itemId);
+  if (!item) return null;
+  const variantIds = listVariantsForItem(context, itemId).map((variant) => variant.id);
+  if (countLinesForVariants(context, variantIds) > 0) {
+    setItemActive(context, itemId, false);
+    return "deactivated";
+  }
+  context.db.delete(pizzaMenuItems).where(eq(pizzaMenuItems.id, itemId)).run();
+  return "deleted";
+}
+
+export function setVariantActive(context: DatabaseContext, variantId: string, active: boolean) {
+  context.db
+    .update(pizzaMenuVariants)
+    .set({ active })
+    .where(eq(pizzaMenuVariants.id, variantId))
+    .run();
 }
 
 export function setItemActive(context: DatabaseContext, itemId: string, active: boolean) {

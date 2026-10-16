@@ -361,6 +361,27 @@ export function AdminPanelBetrieb({
             <>
               <p className="muted">{t("admin.features.pizza.paymentHelp")}</p>
               <label>
+                {t("admin.features.pizza.paymentMethods")}
+                <select
+                  value={settings.pizzaPaymentMethods}
+                  onChange={(event) =>
+                    onSettingsChange({
+                      ...settings,
+                      pizzaPaymentMethods: event.target.value as AppSettings["pizzaPaymentMethods"]
+                    })
+                  }
+                >
+                  <option value="cash_and_paypal">
+                    {t("admin.features.pizza.paymentMethods.cash_and_paypal")}
+                  </option>
+                  <option value="cash_only">{t("admin.features.pizza.paymentMethods.cash_only")}</option>
+                  <option value="paypal_only">
+                    {t("admin.features.pizza.paymentMethods.paypal_only")}
+                  </option>
+                </select>
+              </label>
+              <p className="muted">{t("admin.features.pizza.paymentMethodsHelp")}</p>
+              <label>
                 {t("admin.features.pizza.paypalHandle")}
                 <input
                   value={settings.pizzaPaypalHandle}

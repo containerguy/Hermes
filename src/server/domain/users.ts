@@ -94,3 +94,8 @@ export function canAssignRoles(actor: { role: UserRole }) {
 export function canManageServers(actor: { role: UserRole }) {
   return actor.role === "admin" || actor.role === "manager";
 }
+
+/** Pizzabestellung verwalten (Runden, Menü, Archiv, Zahlungen) — ab manager. */
+export function canManagePizza(actor: { role: UserRole }) {
+  return actor.role === "admin" || actor.role === "manager";
+}
