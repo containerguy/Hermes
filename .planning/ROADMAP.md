@@ -101,7 +101,7 @@ Plans:
 - [x] 15-01-zugang-und-bindings-PLAN.md — Env-Zugang, Session-Cache, CA-Verifikation, Migration `0020_game_server_bindings.sql`, Bindungs-Domain, Admin-Pflege (AMP-01, AMP-02).
 - [x] 15-02-status-und-steuerung-PLAN.md — Statusdienst + SSE, `canManageServers`, Steuer-/Konsolen-Endpunkte mit Audit + Rate-Limit, Kiosk-Status (AMP-03, AMP-04).
 - [x] 15-03-ui-serverpanel-PLAN.md — ServerPanel/Konsole in der Event-Karte, Verbinden-Links, Event-Formular mit Bindungsauswahl (AMP-03, AMP-04).
-- [ ] 15-04-automatik-und-haertung-PLAN.md — Auto-Start/-Stop, Push, README/Compose, e2e (AMP-05).
+- [x] 15-04-automatik-und-haertung-PLAN.md — Auto-Start/-Stop, Push, README/Compose, e2e (AMP-05). Code fertig 2026-10-16; Abnahme gegen echte AMP-Server ausstehend.
 **UI hint**: yes
 
 ### Phase 13: CI Node 24 Readiness
@@ -125,7 +125,7 @@ Plans:
 | 11. Admin Bulk User Import | 0/2 | Not started | — |
 | 12. Audio and Haptic Notification UX | 0/2 | Not started | — |
 | 13. CI Node 24 Readiness | 0/1 | Not started | — |
-| 15. AMP-Gameserver-Modul | 3/4 | In progress (15-01…15-03 complete 2026-10-16) | — |
+| 15. AMP-Gameserver-Modul | 4/4 | Code complete 2026-10-16 (Draft-PR, LAN-Abnahme offen) | — |
 
 ## Out-of-band: Pizza Ordering System
 
@@ -135,5 +135,5 @@ Shipped between 2026-05-01 and 2026-05-16 without a v1.2 phase track (4 commits)
 
 Next up:
 
-- Phase 15 (AMP-Gameserver-Modul) ist geplant und nimmt Migration `0019`; Theme/Audio rücken auf `0020`+.
-- v1.2 is paused after Phase 9. Resuming would mean Phase 10 (Theme System) per the original sequence. Renumber the theme/audio migrations before starting (next free number is `0019`).
+- Phase 15 (AMP-Gameserver-Modul): 15-01…15-04 umgesetzt (Migration `0020_game_server_bindings.sql`; `0019` ging an `0019_devices.sql` der persistenten Sitzungen). Offen: Abnahme gegen die echten AMP-Server im LAN, danach Merge nach `main`. Theme/Audio rücken auf `0021`+.
+- v1.2 is paused after Phase 9. Resuming would mean Phase 10 (Theme System) per the original sequence. Renumber the theme/audio migrations before starting (next free number is `0021`).

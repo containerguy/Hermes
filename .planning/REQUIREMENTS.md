@@ -30,7 +30,7 @@ These requirements promote captured backlog todos into formal phases. Scope cove
 - [x] **AMP-02**: Admins binden Spiele aus dem Katalog an AMP-Instanzen (Instanz, Host, Port, Verbinden-Schema). Events erhalten ihre Bindung automatisch über die normalisierte Titelgleichheit und können sie abwählen.
 - [x] **AMP-03**: Jeder angemeldete Nutzer sieht pro gebundenem Event Live-Status (aus/startet/läuft), Spielerzahl und einen Verbinden-Knopf (`steam://connect/…` oder Adresse kopieren); der Kiosk zeigt den Status ohne Geheimnisse.
 - [x] **AMP-04**: Nutzer ab Rolle `manager` verwalten gebundene Instanzen in Hermes: Start, Stop, Neustart, Update, Kill, Konsole lesen und Befehle senden. Rechte werden serverseitig erzwungen, jede Aktion wird auditiert und rate-limitiert; Konsolenausgaben maskieren Passwörter.
-- [ ] **AMP-05**: Optional (standardmäßig aus) startet Hermes die Instanz, wenn ein Event `ready` wird, stoppt sie nach konfigurierbarem Leerlauf ohne aktives Event und sendet den Teilnehmern einmalig einen Push, wenn der Server läuft.
+- [x] **AMP-05**: Optional (standardmäßig aus) startet Hermes die Instanz, wenn ein Event `ready` wird, stoppt sie nach konfigurierbarem Leerlauf ohne aktives Event und sendet den Teilnehmern einmalig einen Push, wenn der Server läuft.
 
 ### CI/Tooling
 
