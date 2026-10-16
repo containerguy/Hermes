@@ -322,6 +322,8 @@ export const deMessages = {
   "events.server.consoleEmpty": "Noch keine Ausgabe.",
   "events.server.consolePlaceholder": "Befehl an den Server …",
   "events.server.consoleSend": "Senden",
+  "events.server.consolePresets": "Befehlsvorlage für {game} einfügen …",
+  "events.server.webAdmin": "WebAdmin öffnen",
   "events.server.msg.done": "Serverbefehl ausgeführt – Status folgt in Kürze.",
   "events.form.serverHint": "Server für „{title}“: {endpoint}",
   "events.form.linkServer": "Server mit diesem Event verknüpfen",

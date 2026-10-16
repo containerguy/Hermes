@@ -41,6 +41,7 @@ const running: ServerStatus = {
   instanceRunning: true,
   running: true,
   appState: "Ready",
+  game: "Counter-Strike 2",
   players: 3,
   maxPlayers: 32,
   host: "cs2.lanparty.example",
@@ -93,6 +94,55 @@ describe("ServerPanel", () => {
       await flush();
     });
     expect(rendered.container.textContent).toContain("Abschießen");
+    await rendered.cleanup();
+  });
+
+  it("fills the console input from a game command template", async () => {
+    const rendered = await render(
+      <ServerPanel bindingId="b-cs2" status={running} canManage busy={false} onAction={vi.fn()} />
+    );
+    const consoleButton = Array.from(rendered.container.querySelectorAll(".server-actions button")).find(
+      (b) => b.textContent?.trim() === "Konsole"
+    )!;
+    await act(async () => {
+      consoleButton.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+      await flush();
+    });
+
+    const select = rendered.container.querySelector(".server-console-presets") as HTMLSelectElement;
+    expect(select.textContent).toContain("changelevel de_mirage");
+    expect(select.textContent).toContain("bot_add_ct");
+    const kick = Array.from(select.options).find((o) => o.textContent?.includes("kick <name>"))!;
+    await act(async () => {
+      select.value = kick.value;
+      select.dispatchEvent(new Event("change", { bubbles: true }));
+      await flush();
+    });
+    const input = rendered.container.querySelector(".server-console-input input") as HTMLInputElement;
+    expect(input.value).toBe("kick <name>");
+    await rendered.cleanup();
+  });
+
+  it("points UT2004 to WebAdmin instead of console templates", async () => {
+    const rendered = await render(
+      <ServerPanel
+        bindingId="b-ut"
+        status={{ ...running, game: "Unreal Tournament 2004", host: "ut2004.example" }}
+        canManage
+        busy={false}
+        onAction={vi.fn()}
+      />
+    );
+    const consoleButton = Array.from(rendered.container.querySelectorAll(".server-actions button")).find(
+      (b) => b.textContent?.trim() === "Konsole"
+    )!;
+    await act(async () => {
+      consoleButton.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+      await flush();
+    });
+    expect(rendered.container.querySelector(".server-console-presets")).toBeNull();
+    const link = Array.from(rendered.container.querySelectorAll("a")).find((a) => a.textContent === "WebAdmin öffnen");
+    expect(link?.getAttribute("href")).toBe("http://ut2004.example:8888");
     await rendered.cleanup();
   });
 

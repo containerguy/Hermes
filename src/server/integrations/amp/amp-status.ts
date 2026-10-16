@@ -22,6 +22,8 @@ export type ServerStatus = {
   /** Spieler können sich verbinden (AppState Ready oder Ruhemodus/Sleeping). */
   running: boolean;
   appState: string;
+  /** Spiel laut AMP (ModuleDisplayName, sonst Modulname) — wählt in der UI die Befehlsvorlagen. */
+  game: string | null;
   players: number | null;
   maxPlayers: number | null;
   host: string;
@@ -131,12 +133,21 @@ function readPlayers(row: Record<string, unknown>): { players: number | null; ma
   };
 }
 
+function readGame(row: Record<string, unknown>): string | null {
+  for (const key of ["ModuleDisplayName", "Module"]) {
+    const value = row[key];
+    if (typeof value === "string" && value.trim()) return value.trim();
+  }
+  return null;
+}
+
 function statusEquals(a: ServerStatus | undefined, b: ServerStatus): boolean {
   if (!a) return false;
   return (
     a.instanceRunning === b.instanceRunning &&
     a.running === b.running &&
     a.appState === b.appState &&
+    a.game === b.game &&
     a.players === b.players &&
     a.maxPlayers === b.maxPlayers &&
     a.error === b.error &&
@@ -149,7 +160,7 @@ function statusEquals(a: ServerStatus | undefined, b: ServerStatus): boolean {
 function baseStatus(
   binding: GameServerBinding,
   ips: Map<string, string | null>
-): Omit<ServerStatus, "instanceRunning" | "running" | "appState" | "players" | "maxPlayers" | "updatedAt" | "error"> {
+): Omit<ServerStatus, "instanceRunning" | "running" | "appState" | "game" | "players" | "maxPlayers" | "updatedAt" | "error"> {
   return {
     bindingId: binding.id,
     ampInstanceId: binding.ampInstanceId,
@@ -194,6 +205,7 @@ export function applyInstancesSnapshot(
         instanceRunning: previous?.instanceRunning ?? false,
         running: previous?.running ?? false,
         appState: previous?.appState ?? "Undefined",
+        game: previous?.game ?? null,
         players: previous?.players ?? null,
         maxPlayers: previous?.maxPlayers ?? null,
         updatedAt: previous?.updatedAt ?? timestamp,
@@ -207,6 +219,7 @@ export function applyInstancesSnapshot(
           instanceRunning: false,
           running: false,
           appState: "Undefined",
+          game: null,
           players: null,
           maxPlayers: null,
           updatedAt: timestamp,
@@ -220,6 +233,7 @@ export function applyInstancesSnapshot(
           // Ruhemodus (Universal Sleep): Server wacht beim ersten Verbindungsversuch auf -> beitretbar
           running: JOINABLE_STATES.has(appState),
           appState,
+          game: readGame(row),
           ...readPlayers(row),
           updatedAt: timestamp,
           error: null

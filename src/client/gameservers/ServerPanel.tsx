@@ -149,7 +149,7 @@ export function ServerPanel({ bindingId, status, canManage, busy, onAction }: Se
         </div>
       ) : null}
 
-      {canManage && consoleOpen ? <ServerConsole bindingId={bindingId} /> : null}
+      {canManage && consoleOpen ? <ServerConsole bindingId={bindingId} game={status?.game ?? null} host={status?.host ?? ""} /> : null}
     </section>
   );
 }

@@ -323,6 +323,8 @@ export const enMessages: { [K in keyof typeof deMessages]: string } = {
   "events.server.consoleEmpty": "No output yet.",
   "events.server.consolePlaceholder": "Command for the server …",
   "events.server.consoleSend": "Send",
+  "events.server.consolePresets": "Insert a {game} command template …",
+  "events.server.webAdmin": "Open WebAdmin",
   "events.server.msg.done": "Server command executed – status will follow shortly.",
   "events.form.serverHint": "Server for “{title}”: {endpoint}",
   "events.form.linkServer": "Link the server to this event",

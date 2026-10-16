@@ -2447,6 +2447,13 @@ dd {
 .server-console-input input {
   flex: 1;
 }
+.server-console-presets {
+  margin-top: 0.4rem;
+}
+.server-console-hint {
+  margin: 0.3rem 0 0;
+  font-size: 0.85rem;
+}
 .event-form-server {
   display: grid;
   gap: 0.3rem;

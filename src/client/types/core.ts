@@ -114,9 +114,11 @@ export type ServerStatus = {
   ampInstanceName: string;
   /** AMP-Instanz (Prozess/Container) läuft. */
   instanceRunning: boolean;
-  /** Spielserver ist bereit (AppState Ready). */
+  /** Spieler können sich verbinden (Ready oder Ruhemodus). */
   running: boolean;
   appState: string;
+  /** Spiel laut AMP (ModuleDisplayName, sonst Modulname). */
+  game: string | null;
   players: number | null;
   maxPlayers: number | null;
   host: string;
