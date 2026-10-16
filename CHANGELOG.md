@@ -4,6 +4,45 @@ Versions are annotated tags `vX.Y.Z` on `main`. Each entry mirrors the
 `chore(release): vX.Y.Z` commit that bumps `package.json`,
 `package-lock.json`, and `src/server/openapi/hermes-api.yaml`.
 
+## v0.13.0 — Bots for CS 1.6 and CS2 (2026-10-16)
+
+### Bots
+
+- CS 1.6 gets bots via the YaPB mod 4.4.957 (`ops/amp/cs16-yapb/`):
+  - `install.sh` installs it with a pinned checksum (`--check`,
+    `--dry-run`, `--relink`, `--uninstall`).
+  - LAN defaults: no bots until requested, bots make room for humans,
+    German menu, chat and family-friendly bot names, no waypoint
+    upload/download.
+  - An AMP update stage re-hooks YaPB after each game update. It was
+    tested in the LAN; the README has the exact `GenericModule.kvp` entry.
+- New bot controls in the event card (manager and up) for CS 1.6 (YaPB)
+  and CS2: count, level (easy to expert) and team, with **Add**,
+  **Fill up to N**, **Change level for all** and **Remove all**.
+  - Endpoint: `POST /api/integrations/amp/instances/:bindingId/bots`.
+  - Hermes builds the game-specific commands itself and sends them one
+    by one, with CSRF, the `amp_control` rate limit and audit entries
+    `amp.bots_<action>`.
+  - CS2 re-adds bots on "Change level", because `bot_difficulty` only
+    applies to new bots.
+- Console templates "Bots (YaPB)" for CS 1.6.
+
+### Game servers
+
+- Console input for CS 1.6, CS2 and CoD4 is split at `;` (outside quotes)
+  and sent as separate commands, because AMP passes GoldSrc RCON lines
+  through unsplit. Minecraft and Factorio keep the line as is.
+- Game update only while the game is stopped (`409
+  amp_update_erst_stoppen`, button disabled otherwise). An AMP update on a
+  running game left `hlds_linux` orphaned on its port, so the next start
+  failed.
+- Binding audit entries include `autoStopEnabled`.
+
+### Pizza
+
+- Cash list PDF prints the PayPal/cash recipient whenever an order chose
+  that method, even if it is no longer offered.
+
 ## v0.12.0 — Game servers (AMP), persistent sessions, pizza management (2026-10-16)
 
 Covers everything merged to `main` since v0.11.0: persistent sessions and
