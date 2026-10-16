@@ -38,6 +38,7 @@ const settings: AppSettings = {
   pizzaPaypalHandle: "",
   pizzaPaypalName: "",
   pizzaCashRecipient: "",
+  pizzaPaymentMethods: "cash_and_paypal",
   ampIntegrationEnabled: true,
   ampBaseUrl: "https://amp-ctl.example.test",
   ampAutoStartOnReady: false,
