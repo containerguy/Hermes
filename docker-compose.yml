@@ -16,11 +16,18 @@ services:
       HERMES_S3_CREDS_FILE: /run/secrets/s3.creds
       HERMES_S3_DB_KEY: hermes.sqlite
       HERMES_S3_RESTORE_MODE: if-missing
+      # Gameserver-Modul (CubeCoders AMP): HERMES_AMP_USERNAME/HERMES_AMP_PASSWORD kommen aus .env.
+      # Das rotierende rememberMe-Token liegt im Daten-Volume und überlebt Neustarts.
+      HERMES_AMP_REMEMBER_TOKEN_FILE: /data/amp-remember.token
+      # CA des AMP-Controllers (eigene CA): Zeile einkommentieren und unten den Mount aktivieren.
+      # HERMES_AMP_CA_FILE: /run/secrets/amp-ca.pem
     ports:
       - "3000:3000"
     volumes:
       - hermes-data:/data
       - ./s3.creds:/run/secrets/s3.creds:ro
+      # Nur aktivieren, wenn ./amp-ca.pem existiert (sonst legt Docker ein leeres Verzeichnis an).
+      # - ./amp-ca.pem:/run/secrets/amp-ca.pem:ro
     restart: unless-stopped
 
 volumes:

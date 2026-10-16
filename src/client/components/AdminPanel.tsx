@@ -74,6 +74,8 @@ const defaultSettings: AppSettings = {
   pizzaCashRecipient: "",
   ampIntegrationEnabled: false,
   ampBaseUrl: "",
+  ampAutoStartOnReady: false,
+  ampAutoStopIdleMinutes: 0,
 };
 
 export function AdminPanel({
@@ -95,6 +97,8 @@ export function AdminPanel({
     Record<string, { label: string; maxUses: string; expiresAt: string }>
   >({});
   const [settings, setSettings] = useState<AppSettings>(defaultSettings);
+  /** Zuletzt vom Server bestätigter Stand (Entwurf in `settings` kann davon abweichen). */
+  const [savedSettings, setSavedSettings] = useState<AppSettings>(defaultSettings);
   const [gameCatalogDraft, setGameCatalogDraft] = useState("");
   const [storage, setStorage] = useState<StorageInfo | null>(null);
   const [restoreDiagnostics, setRestoreDiagnostics] = useState<RestoreDiagnostics | null>(null);
@@ -190,6 +194,7 @@ export function AdminPanel({
         body: JSON.stringify({ settings: settingsPayload })
       });
       setSettings(result.settings);
+      setSavedSettings(result.settings);
       setGameCatalogDraft(result.settings.gameCatalog.join("\n"));
       onSettingsChanged(result.settings);
       setMessage(t("login.msg.settingsImported"));
@@ -257,6 +262,7 @@ export function AdminPanel({
     ]);
     setUsers(userResult.users);
     setSettings(settingsResult.settings);
+    setSavedSettings(settingsResult.settings);
     setGameCatalogDraft(settingsResult.settings.gameCatalog.join("\n"));
     setStorage(settingsResult.storage ?? null);
     setAuditLogs(auditResult.auditLogs);
@@ -611,6 +617,7 @@ export function AdminPanel({
         body: JSON.stringify(payload)
       });
       setSettings(result.settings);
+      setSavedSettings(result.settings);
       setGameCatalogDraft(result.settings.gameCatalog.join("\n"));
       onSettingsChanged(result.settings);
       setMessage("Einstellungen gespeichert.");
@@ -734,6 +741,7 @@ export function AdminPanel({
       {adminSection === "betrieb" ? (
         <AdminPanelBetrieb
           settings={settings}
+          savedSettings={savedSettings}
           gameCatalogDraft={gameCatalogDraft}
           storage={storage}
           restoreDiagnostics={restoreDiagnostics}

@@ -83,6 +83,10 @@ const settingsObjectSchema = z.object({
   ampIntegrationEnabled: z.boolean(),
   /** Basis-URL der AMP-Installation, z. B. http://192.168.1.10:8080/ (ohne /API) */
   ampBaseUrl: z.string().max(512),
+  /** Phase 15-04 (D-15): gebundene Instanz automatisch starten, sobald ein Event bereit ist. */
+  ampAutoStartOnReady: z.boolean(),
+  /** Phase 15-04 (D-15): Instanz nach N Minuten Leerlauf ohne aktives Event stoppen (0 = aus). */
+  ampAutoStopIdleMinutes: z.number().int().min(0).max(1440),
 });
 
 export const settingsSchema = settingsObjectSchema
@@ -219,6 +223,8 @@ export const defaultSettings: HermesSettings = {
   pizzaCashRecipient: "",
   ampIntegrationEnabled: false,
   ampBaseUrl: "",
+  ampAutoStartOnReady: false,
+  ampAutoStopIdleMinutes: 0,
 };
 
 function nowIso() {

@@ -62,12 +62,14 @@ export class RestoreValidationError extends Error {
 
 let snapshotTimer: NodeJS.Timeout | undefined;
 
-const restorableTables = [
+export const restorableTables = [
   "users",
   "login_challenges",
   "devices",
   "sessions",
   "push_subscriptions",
+  // vor game_events: game_events.server_binding_id verweist auf die Bindung
+  "game_server_bindings",
   "game_events",
   "participations",
   "app_settings",

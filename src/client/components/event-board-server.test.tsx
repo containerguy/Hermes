@@ -51,6 +51,7 @@ const minecraft: GameServerBinding = {
   port: 25565,
   connectScheme: "minecraft",
   enabled: true,
+  autoStopEnabled: false,
   createdAt: "",
   updatedAt: ""
 };

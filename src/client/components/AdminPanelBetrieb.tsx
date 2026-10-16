@@ -17,6 +17,11 @@ function generateKioskStreamSecret(): string {
 
 interface AdminPanelBetriebProps {
   settings: AppSettings;
+  /**
+   * Gespeicherter Stand. Die Bindungsverwaltung spricht mit AMP über den Server und funktioniert
+   * erst, wenn Modul und Basis-URL gespeichert sind — nicht schon beim Ankreuzen im Entwurf.
+   */
+  savedSettings: AppSettings;
   gameCatalogDraft: string;
   storage: StorageInfo | null;
   restoreDiagnostics: RestoreDiagnostics | null;
@@ -37,6 +42,7 @@ interface AdminPanelBetriebProps {
 
 export function AdminPanelBetrieb({
   settings,
+  savedSettings,
   gameCatalogDraft,
   storage,
   restoreDiagnostics,
@@ -417,6 +423,38 @@ export function AdminPanelBetrieb({
                 />
               </label>
               <p className="muted">{t("admin.amp.envHint")}</p>
+              {!savedSettings.ampIntegrationEnabled ? (
+                <p className="notice">{t("admin.amp.saveFirst")}</p>
+              ) : null}
+              <label className="checkbox-label">
+                <input
+                  type="checkbox"
+                  checked={settings.ampAutoStartOnReady}
+                  onChange={(event) =>
+                    onSettingsChange({ ...settings, ampAutoStartOnReady: event.target.checked })
+                  }
+                />
+                {t("admin.amp.autoStart")}
+              </label>
+              <label>
+                {t("admin.amp.autoStopIdle")}
+                <input
+                  type="number"
+                  inputMode="numeric"
+                  min={0}
+                  max={1440}
+                  step={1}
+                  value={settings.ampAutoStopIdleMinutes}
+                  onChange={(event) => {
+                    const parsed = Number.parseInt(event.target.value, 10);
+                    onSettingsChange({
+                      ...settings,
+                      ampAutoStopIdleMinutes: Number.isFinite(parsed) ? Math.min(1440, Math.max(0, parsed)) : 0
+                    });
+                  }}
+                />
+              </label>
+              <p className="muted">{t("admin.amp.automationHelp")}</p>
             </>
           ) : null}
         </fieldset>
@@ -547,7 +585,10 @@ export function AdminPanelBetrieb({
         ) : null}
       </section>
       {settings.featuresPizzaEnabled ? <PizzaMenuJsonAdmin /> : null}
-      {settings.ampIntegrationEnabled ? <BindingsAdmin gameCatalog={settings.gameCatalog} /> : null}
+      {savedSettings.ampIntegrationEnabled ? (
+        // Neu laden, sobald eine andere Basis-URL gespeichert wurde.
+        <BindingsAdmin key={savedSettings.ampBaseUrl} gameCatalog={savedSettings.gameCatalog} />
+      ) : null}
     </>
   );
 }

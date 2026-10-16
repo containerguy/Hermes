@@ -1,9 +1,9 @@
 import { and, eq, inArray, isNull } from "drizzle-orm";
 import webpush from "web-push";
 import type { DatabaseContext } from "../db/client";
-import { pushSubscriptions, users } from "../db/schema";
+import { participations, pushSubscriptions, users } from "../db/schema";
 
-type PushPayload = {
+export type PushPayload = {
   title: string;
   body: string;
   url?: string;
@@ -144,6 +144,29 @@ export async function sendPushToOperators(context: DatabaseContext, payload: Pus
       and(
         eq(users.notificationsEnabled, true),
         inArray(users.role, ["admin", "manager", "organizer"])
+      )
+    )
+    .all();
+
+  await Promise.all(targets.map((target) => sendPushToUser(context, target.id, payload)));
+}
+
+/** Nur Teilnehmer mit Status `joined` („dabei") eines Events, die Benachrichtigungen aktiviert haben. */
+export async function sendPushToEventParticipants(
+  context: DatabaseContext,
+  eventId: string,
+  payload: PushPayload
+) {
+  const targets = context.db
+    .select({ id: users.id })
+    .from(participations)
+    .innerJoin(users, eq(participations.userId, users.id))
+    .where(
+      and(
+        eq(participations.eventId, eventId),
+        eq(participations.status, "joined"),
+        eq(users.notificationsEnabled, true),
+        isNull(users.deletedAt)
       )
     )
     .all();

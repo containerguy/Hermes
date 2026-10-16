@@ -172,6 +172,8 @@ describe("ui correctness structure contracts", () => {
       pizzaCashRecipient: "",
       ampIntegrationEnabled: false,
       ampBaseUrl: "",
+      ampAutoStartOnReady: false,
+      ampAutoStopIdleMinutes: 0,
     };
 
     requestJsonMock.mockImplementation(async (path: string) => {
