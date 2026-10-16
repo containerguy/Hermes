@@ -63,6 +63,9 @@ function matchScore(a: string, b: string): number {
 export function suggestScheme(row: Pick<HermesAmpInstanceRow, "module" | "moduleDisplayName" | "friendlyName">) {
   if (row.module === "Minecraft") return "minecraft" as const;
   const text = `${row.moduleDisplayName} ${row.friendlyName}`.toLowerCase();
+  // v0.14.0: eigene Links für UT2004 (ut2004://) und die Steam-Version von Factorio (steam://run)
+  if (/unreal tournament 2004|ut ?2004/.test(text)) return "ut2004" as const;
+  if (/factorio/.test(text)) return "factorio" as const;
   if (/counter-?strike|cs2|cs16|cs:?s|team fortress|left 4 dead|garry|half-?life|day of defeat/.test(text)) {
     return "steam" as const;
   }

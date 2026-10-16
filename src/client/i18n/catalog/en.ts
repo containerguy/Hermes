@@ -323,6 +323,12 @@ export const enMessages: { [K in keyof typeof deMessages]: string } = {
   "events.server.copy": "Copy address",
   "events.server.copied": "Copied ✓",
   "events.server.copyFailed": "Copy failed – select the address manually",
+  "events.server.ut2004Setup":
+    "Button does nothing? One-time setup: download the file, double-click it, confirm the admin prompt. The path is the default GOG installation; if UT2004 lives elsewhere, adjust the file in a text editor.",
+  "events.server.ut2004Setup.download": "UT2004 link handler (.reg)",
+  "events.server.ut2004Setup.remove": "remove again",
+  "events.server.factorioSteam":
+    "Launches the Steam version of Factorio. Steam may ask once whether the launch options are OK. Factorio without Steam: “Copy address”, then in the game Multiplayer → Connect to address.",
   "events.server.start": "Start",
   "events.server.stop": "Stop",
   "events.server.restart": "Restart",
@@ -512,6 +518,8 @@ export const enMessages: { [K in keyof typeof deMessages]: string } = {
   "admin.amp.bindings.port": "Port",
   "admin.amp.bindings.scheme": "Connect via",
   "admin.amp.bindings.scheme.steam": "Steam link (steam://connect)",
+  "admin.amp.bindings.scheme.ut2004": "UT2004 link (ut2004://)",
+  "admin.amp.bindings.scheme.factorio": "Factorio via Steam (steam://run)",
   "admin.amp.bindings.scheme.minecraft": "Minecraft (copy address)",
   "admin.amp.bindings.scheme.copy": "Copy address",
   "admin.amp.bindings.enabled": "Enabled",

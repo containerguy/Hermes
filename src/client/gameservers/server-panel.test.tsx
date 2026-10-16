@@ -70,6 +70,7 @@ describe("ServerPanel", () => {
     expect(link?.getAttribute("href")).toBe("steam://connect/192.168.200.8:27015");
     expect(rendered.container.querySelector(".server-actions")).toBeNull();
     expect(rendered.container.querySelector(".server-dot--on")).toBeTruthy();
+    expect(rendered.container.querySelector(".server-connect-hint")).toBeNull();
     await rendered.cleanup();
   });
 
@@ -247,6 +248,51 @@ describe("ServerPanel", () => {
     expect(rendered.container.textContent).not.toContain("Sleeping");
     expect(rendered.container.querySelector(".server-dot--sleep")).toBeTruthy();
     expect(rendered.container.querySelector("a.button-link")).toBeTruthy();
+    await rendered.cleanup();
+  });
+
+  it("links ut2004:// next to the copy button and offers the one-time .reg setup", async () => {
+    const rendered = await render(
+      <ServerPanel
+        bindingId="b-ut"
+        status={{ ...running, bindingId: "b-ut", connectScheme: "ut2004", port: 7777, host: "retro.example", connectIp: "192.168.200.9" }}
+        canManage={false}
+        busy={false}
+        onAction={vi.fn()}
+      />
+    );
+    const link = rendered.container.querySelector("a.button-link") as HTMLAnchorElement | null;
+    expect(link?.getAttribute("href")).toBe("ut2004://192.168.200.9:7777");
+    expect(rendered.container.querySelector(".server-connect button")?.textContent).toBe("Adresse kopieren");
+    const hint = rendered.container.querySelector(".server-connect-hint");
+    expect(hint?.textContent).toContain("Klappt der Knopf nicht? Einmalig einrichten");
+    expect(hint?.textContent).toContain("GOG-Standardinstallation");
+    const downloads = [...(hint?.querySelectorAll("a") ?? [])];
+    expect(downloads.map((a) => a.getAttribute("href"))).toEqual([
+      "/downloads/ut2004-protocol.reg",
+      "/downloads/ut2004-protocol-remove.reg"
+    ]);
+    expect(downloads.every((a) => a.hasAttribute("download"))).toBe(true);
+    await rendered.cleanup();
+  });
+
+  it("starts Factorio via steam://run and explains the Steam prompt and the non-Steam way", async () => {
+    const rendered = await render(
+      <ServerPanel
+        bindingId="b-fa"
+        status={{ ...running, bindingId: "b-fa", connectScheme: "factorio", port: 34197, host: "factorio.example", connectIp: "192.168.200.10" }}
+        canManage={false}
+        busy={false}
+        onAction={vi.fn()}
+      />
+    );
+    const link = rendered.container.querySelector("a.button-link") as HTMLAnchorElement | null;
+    expect(link?.getAttribute("href")).toBe("steam://run/427520//--mp-connect%20192.168.200.10:34197/");
+    expect(rendered.container.querySelector(".server-endpoint")?.textContent).toBe("factorio.example:34197");
+    const hint = rendered.container.querySelector(".server-connect-hint");
+    expect(hint?.textContent).toContain("Startparameter");
+    expect(hint?.textContent).toContain("Direkt verbinden");
+    expect(hint?.querySelector("a")).toBeNull();
     await rendered.cleanup();
   });
 

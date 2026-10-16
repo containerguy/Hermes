@@ -191,6 +191,70 @@ describe("AMP server bindings (Phase 15-01)", () => {
     expect(linkedLater?.serverBindingId).toBeNull();
   });
 
+  it("accepts the ut2004 and factorio connect schemes and rejects unknown ones", async () => {
+    const admin = request.agent(started!.app);
+    await login(admin, "hauptadmin");
+    const csrf = await fetchCsrf(admin);
+    await enableAmp(admin, csrf);
+
+    const ut = await admin
+      .post("/api/integrations/amp/bindings")
+      .set(CSRF_HEADER, csrf)
+      .send({
+        ...minecraftBinding,
+        displayTitle: "UT2004",
+        ampInstanceId: "22222222-2222-3333-4444-555555555555",
+        ampInstanceName: "UT200401",
+        host: "retro.lanparty.example",
+        port: 7777,
+        connectScheme: "ut2004"
+      })
+      .expect(201);
+    expect(ut.body.binding.connectScheme).toBe("ut2004");
+
+    const factorio = await admin
+      .post("/api/integrations/amp/bindings")
+      .set(CSRF_HEADER, csrf)
+      .send({
+        ...minecraftBinding,
+        displayTitle: "Factorio",
+        ampInstanceId: "33333333-2222-3333-4444-555555555555",
+        ampInstanceName: "Factorio01",
+        host: "factorio.lanparty.example",
+        port: 34197,
+        connectScheme: "factorio"
+      })
+      .expect(201);
+    expect(factorio.body.binding.connectScheme).toBe("factorio");
+
+    // Auch der Wechsel einer bestehenden Bindung auf ein neues Schema landet in der Datenbank
+    await admin
+      .put(`/api/integrations/amp/bindings/${ut.body.binding.id}`)
+      .set(CSRF_HEADER, csrf)
+      .send({
+        ...minecraftBinding,
+        displayTitle: "UT2004",
+        ampInstanceId: "22222222-2222-3333-4444-555555555555",
+        ampInstanceName: "UT200401",
+        host: "retro.lanparty.example",
+        port: 7777,
+        connectScheme: "factorio"
+      })
+      .expect(200);
+
+    const listed = await admin.get("/api/integrations/amp/bindings").expect(200);
+    const schemes = (listed.body.bindings as Array<{ displayTitle: string; connectScheme: string }>)
+      .map((b) => `${b.displayTitle}=${b.connectScheme}`)
+      .sort();
+    expect(schemes).toEqual(["Factorio=factorio", "UT2004=factorio"]);
+
+    await admin
+      .post("/api/integrations/amp/bindings")
+      .set(CSRF_HEADER, csrf)
+      .send({ ...minecraftBinding, connectScheme: "ut99" })
+      .expect(400);
+  });
+
   it("returns an empty binding list and 404 on writes while the module is disabled", async () => {
     const admin = request.agent(started!.app);
     await login(admin, "hauptadmin");

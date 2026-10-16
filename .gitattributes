@@ -1,0 +1,2 @@
+# Windows-Registry-Dateien: UTF-16LE mit BOM und CRLF, Git darf sie nicht anfassen
+*.reg binary
