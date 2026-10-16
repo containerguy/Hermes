@@ -24,7 +24,7 @@ requirements: [AMP-01, AMP-02]
 - **Instanzliste**: `fetchAmpInstances()` zieht `AvailableInstances` der Targets flach
   (`flattenAmpInstances()`), lässt ADS-Instanzen aus und liefert zusätzlich `instanceName`, `targetName`,
   `running`. Die alte Implementierung hätte auf dem Controller die Targets selbst als Instanzen gelistet.
-- **Datenmodell** (D-05/D-06): `0019_game_server_bindings.sql` — Tabelle `game_server_bindings`
+- **Datenmodell** (D-05/D-06): `0020_game_server_bindings.sql` — Tabelle `game_server_bindings`
   (UNIQUE `game_title_norm`, CHECK auf `connect_scheme`), `game_events.server_binding_id`
   (`ON DELETE SET NULL`), Index. Drizzle: `gameServerBindings`, `gameEvents.serverBindingId`, Relation.
 - **Domain**: `src/server/domain/gameservers/normalize-title.ts` (`normalizeGameTitle`, identisch zu

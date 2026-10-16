@@ -98,7 +98,7 @@ Plans:
   4. Optional aktivierbar: Auto-Start bei `ready`, Auto-Stop nach Leerlauf, Push bei laufendem Server — alles standardmäßig aus.
 **Plans:** 4 plans
 Plans:
-- [x] 15-01-zugang-und-bindings-PLAN.md — Env-Zugang, Session-Cache, CA-Verifikation, Migration `0019_game_server_bindings.sql`, Bindungs-Domain, Admin-Pflege (AMP-01, AMP-02).
+- [x] 15-01-zugang-und-bindings-PLAN.md — Env-Zugang, Session-Cache, CA-Verifikation, Migration `0020_game_server_bindings.sql`, Bindungs-Domain, Admin-Pflege (AMP-01, AMP-02).
 - [x] 15-02-status-und-steuerung-PLAN.md — Statusdienst + SSE, `canManageServers`, Steuer-/Konsolen-Endpunkte mit Audit + Rate-Limit, Kiosk-Status (AMP-03, AMP-04).
 - [x] 15-03-ui-serverpanel-PLAN.md — ServerPanel/Konsole in der Event-Karte, Verbinden-Links, Event-Formular mit Bindungsauswahl (AMP-03, AMP-04).
 - [ ] 15-04-automatik-und-haertung-PLAN.md — Auto-Start/-Stop, Push, README/Compose, e2e (AMP-05).

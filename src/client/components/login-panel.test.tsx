@@ -28,6 +28,12 @@ async function flushMicrotasks() {
   }
 }
 
+function setInputValue(input: HTMLInputElement, value: string) {
+  const setter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value")?.set;
+  setter?.call(input, value);
+  input.dispatchEvent(new Event("input", { bubbles: true }));
+}
+
 async function renderIntoDocument(element: React.ReactElement) {
   const container = document.createElement("div");
   document.body.appendChild(container);
@@ -302,6 +308,132 @@ describe("LoginPanel pairing redemption", () => {
     );
 
     expect(window.location.hash).not.toContain("pair=");
+
+    await rendered.cleanup();
+  });
+});
+
+describe("LoginPanel device persistence", () => {
+  it("hides the device-name field when this browser is already known for the user", async () => {
+    const { requestJson } = await import("../api/request");
+    const requestJsonMock = requestJson as unknown as ReturnType<typeof vi.fn>;
+    requestJsonMock.mockResolvedValue({});
+    window.localStorage.setItem(
+      "hermes_known_device_v1",
+      JSON.stringify({ username: "u", name: "Gaming-PC" })
+    );
+
+    const rendered = await renderIntoDocument(
+      <LoginPanel
+        currentUser={null}
+        settings={defaultSettings}
+        onLoggedIn={vi.fn()}
+        onLoggedOut={vi.fn()}
+        onUserUpdated={vi.fn()}
+      />
+    );
+
+    const form = rendered.container.querySelector("form")!;
+    await act(async () => {
+      setInputValue(form.querySelector("input")!, "u");
+      await flushMicrotasks();
+    });
+    await act(async () => {
+      form.dispatchEvent(new Event("submit", { bubbles: true, cancelable: true }));
+      await flushMicrotasks();
+    });
+
+    expect(rendered.container.textContent).toContain("Dieses Gerät ist als „Gaming-PC“ bekannt.");
+    const labels = Array.from(rendered.container.querySelectorAll("label")).map((label) => label.textContent ?? "");
+    expect(labels.some((text) => text.startsWith("Gerätename"))).toBe(false);
+
+    const changeButton = Array.from(rendered.container.querySelectorAll("button")).find(
+      (button) => button.textContent === "Anderen Namen vergeben"
+    )!;
+    await act(async () => {
+      changeButton.click();
+      await flushMicrotasks();
+    });
+    const labelsAfter = Array.from(rendered.container.querySelectorAll("label")).map((label) => label.textContent ?? "");
+    expect(labelsAfter.some((text) => text.startsWith("Gerätename"))).toBe(true);
+
+    await rendered.cleanup();
+  });
+
+  it("redeems a pasted pairing link without a mail code", async () => {
+    const { requestJson } = await import("../api/request");
+    const requestJsonMock = requestJson as unknown as ReturnType<typeof vi.fn>;
+    requestJsonMock.mockImplementation(async (url: string) => {
+      if (url === "/api/auth/pair-redeem") {
+        return { user: redeemedUser, device: { name: "iPhone · Safari", recognized: false } };
+      }
+      return {};
+    });
+    const onLoggedIn = vi.fn();
+
+    const rendered = await renderIntoDocument(
+      <LoginPanel
+        currentUser={null}
+        settings={defaultSettings}
+        onLoggedIn={onLoggedIn}
+        onLoggedOut={vi.fn()}
+        onUserUpdated={vi.fn()}
+      />
+    );
+
+    const pairForm = rendered.container.querySelector(".pair-link-login form")!;
+    await act(async () => {
+      setInputValue(
+        pairForm.querySelector("input")!,
+        "https://hermes.lan/#login?pair=PAIR_TOKEN_TEST_VALUE_BBBBBBBBBBBB"
+      );
+      await flushMicrotasks();
+    });
+    await act(async () => {
+      pairForm.dispatchEvent(new Event("submit", { bubbles: true, cancelable: true }));
+      await flushMicrotasks();
+    });
+
+    const redeemCalls = requestJsonMock.mock.calls.filter((call) => call[0] === "/api/auth/pair-redeem");
+    expect(redeemCalls).toHaveLength(1);
+    const body = JSON.parse((redeemCalls[0][1] as RequestInit).body as string) as { token: string };
+    expect(body.token).toBe("PAIR_TOKEN_TEST_VALUE_BBBBBBBBBBBB");
+    expect(onLoggedIn).toHaveBeenCalledWith(redeemedUser);
+    expect(JSON.parse(window.localStorage.getItem("hermes_known_device_v1") ?? "{}")).toEqual({
+      username: "u",
+      name: "iPhone · Safari"
+    });
+
+    await rendered.cleanup();
+  });
+
+  it("rejects a pasted value without a pairing token", async () => {
+    const { requestJson } = await import("../api/request");
+    const requestJsonMock = requestJson as unknown as ReturnType<typeof vi.fn>;
+    requestJsonMock.mockResolvedValue({});
+
+    const rendered = await renderIntoDocument(
+      <LoginPanel
+        currentUser={null}
+        settings={defaultSettings}
+        onLoggedIn={vi.fn()}
+        onLoggedOut={vi.fn()}
+        onUserUpdated={vi.fn()}
+      />
+    );
+
+    const pairForm = rendered.container.querySelector(".pair-link-login form")!;
+    await act(async () => {
+      setInputValue(pairForm.querySelector("input")!, "https://example.test/#login");
+      await flushMicrotasks();
+    });
+    await act(async () => {
+      pairForm.dispatchEvent(new Event("submit", { bubbles: true, cancelable: true }));
+      await flushMicrotasks();
+    });
+
+    expect(requestJsonMock.mock.calls.some((call) => call[0] === "/api/auth/pair-redeem")).toBe(false);
+    expect(rendered.container.textContent).toContain("Das sieht nicht nach einem gültigen Pairing-Link aus.");
 
     await rendered.cleanup();
   });

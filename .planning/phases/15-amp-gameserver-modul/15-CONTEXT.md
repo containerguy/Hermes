@@ -29,7 +29,7 @@ Out of scope: AMP-Konten für Spieler, SSO/OIDC zwischen Hermes und AMP, Bearbei
 
 ### Datenmodell (locked)
 
-- D-05: Neue Tabelle `game_server_bindings` (Migration `0019_game_server_bindings.sql`): `id`, `game_title_norm` (UNIQUE, Normalisierung wie `isCod4Game`: lowercase, nur `[a-z0-9]`), `display_title`, `amp_instance_id` (AMP-GUID), `amp_instance_name`, `host`, `port`, `connect_scheme` ∈ `steam` | `minecraft` | `copy`, `enabled`, `created_at`, `updated_at`.
+- D-05: Neue Tabelle `game_server_bindings` (Migration `0020_game_server_bindings.sql`): `id`, `game_title_norm` (UNIQUE, Normalisierung wie `isCod4Game`: lowercase, nur `[a-z0-9]`), `display_title`, `amp_instance_id` (AMP-GUID), `amp_instance_name`, `host`, `port`, `connect_scheme` ∈ `steam` | `minecraft` | `copy`, `enabled`, `created_at`, `updated_at`.
 - D-06: `game_events` bekommt `server_binding_id TEXT NULL REFERENCES game_server_bindings(id) ON DELETE SET NULL`. Beim Anlegen/Bearbeiten eines Events wird die Bindung automatisch aus `gameTitle` ermittelt (Normalisierung), kann aber vom Ersteller abgewählt werden.
 - D-07: `details` bleibt Freitext für Menschen. Verbindungsdaten kommen **nur** aus der Bindung, nie aus `details`. Passwörter/RCON stehen nirgends in Hermes.
 

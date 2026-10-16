@@ -1,8 +1,16 @@
 import { and, eq, isNull } from "drizzle-orm";
-import type { Request } from "express";
+import type { Request, Response } from "express";
 import type { DatabaseContext } from "../db/client";
 import { sessions, userApiTokens, users } from "../db/schema";
-import { hashSessionToken, SESSION_COOKIE } from "./sessions";
+import {
+  hashSessionToken,
+  isSessionIdleExpired,
+  readDeviceCookie,
+  SESSION_COOKIE,
+  SESSION_RENEW_INTERVAL_MS,
+  setDeviceCookie,
+  setSessionCookie
+} from "./sessions";
 
 export type HermesRequestAuth =
   | {
@@ -93,6 +101,10 @@ function resolveSessionCookie(context: DatabaseContext, request: Request) {
     return;
   }
 
+  if (isSessionIdleExpired(result.session.lastSeenAt)) {
+    return;
+  }
+
   context.db
     .update(sessions)
     .set({ lastSeenAt: nowIso() })
@@ -124,9 +136,42 @@ export function resolveHermesAuth(context: DatabaseContext, request: Request) {
   resolveSessionCookie(context, request);
 }
 
+/**
+ * Sliding expiration: re-issue the session cookie (and the device cookie) at most once
+ * per renew interval, so an actively used session never runs into the cookie max-age.
+ */
+function renewSessionCookieIfDue(context: DatabaseContext, request: Request, response: Response) {
+  const auth = request.hermesAuth;
+  if (auth?.kind !== "session") {
+    return;
+  }
+  const token = request.cookies?.[SESSION_COOKIE] as string | undefined;
+  if (!token) {
+    return;
+  }
+
+  const lastRenewal = Date.parse(auth.session.renewedAt ?? auth.session.createdAt);
+  if (!Number.isNaN(lastRenewal) && Date.now() - lastRenewal < SESSION_RENEW_INTERVAL_MS) {
+    return;
+  }
+
+  context.db
+    .update(sessions)
+    .set({ renewedAt: nowIso() })
+    .where(eq(sessions.id, auth.session.id))
+    .run();
+  setSessionCookie(response, token);
+
+  const deviceKey = readDeviceCookie(request);
+  if (deviceKey && auth.session.deviceId) {
+    setDeviceCookie(response, deviceKey);
+  }
+}
+
 export function hermesAuthMiddleware(context: DatabaseContext) {
-  return (request: Request, _response: unknown, next: () => void) => {
+  return (request: Request, response: Response, next: () => void) => {
     resolveHermesAuth(context, request);
+    renewSessionCookieIfDue(context, request, response);
     next();
   };
 }

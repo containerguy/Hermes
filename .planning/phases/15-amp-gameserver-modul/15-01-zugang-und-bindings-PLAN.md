@@ -9,7 +9,7 @@ files_modified:
   - src/server/settings.ts
   - src/server/integrations/amp/amp-client.ts
   - src/server/integrations/amp/amp-session.ts
-  - src/server/db/migrations/0019_game_server_bindings.sql
+  - src/server/db/migrations/0020_game_server_bindings.sql
   - src/server/db/schema.ts
   - src/server/domain/gameservers/bindings.ts
   - src/server/domain/gameservers/normalize-title.ts
@@ -30,7 +30,7 @@ must_haves:
     - "Es gibt eine Tabelle game_server_bindings und game_events.server_binding_id; Bindungen werden über die Titel-Normalisierung automatisch zugeordnet."
     - "Admins pflegen Bindungen über /api/integrations/amp/bindings; andere Rollen bekommen 403."
   artifacts:
-    - path: "src/server/db/migrations/0019_game_server_bindings.sql"
+    - path: "src/server/db/migrations/0020_game_server_bindings.sql"
       provides: "Tabelle game_server_bindings, Spalte game_events.server_binding_id, Bereinigung der alten Settings-Keys"
       contains: "CREATE TABLE IF NOT EXISTS game_server_bindings"
     - path: "src/server/integrations/amp/amp-session.ts"
@@ -169,14 +169,14 @@ Settings nach dieser Phase (`src/server/settings.ts`): `ampIntegrationEnabled: b
 
 <task type="auto">
   <name>Task 3: Migration 0019 und Drizzle-Schema für Bindungen</name>
-  <files>src/server/db/migrations/0019_game_server_bindings.sql, src/server/db/schema.ts, src/server/http/app-flow.test.ts</files>
+  <files>src/server/db/migrations/0020_game_server_bindings.sql, src/server/db/schema.ts, src/server/http/app-flow.test.ts</files>
   <read_first>
     - src/server/db/migrations/0018_pizza_session_global.sql (jüngste Migration, Stil)
     - src/server/db/schema.ts (`gameEvents`, Index-Stil, relations)
     - 15-CONTEXT.md (D-05, D-06)
   </read_first>
   <action>
-    Migration `0019_game_server_bindings.sql`:
+    Migration `0020_game_server_bindings.sql`:
     1. Header `-- Phase 15: AMP-Gameserver-Modul (AMP-01, AMP-02)`.
     2. `CREATE TABLE IF NOT EXISTS game_server_bindings (id TEXT PRIMARY KEY, game_title_norm TEXT NOT NULL, display_title TEXT NOT NULL, amp_instance_id TEXT NOT NULL, amp_instance_name TEXT NOT NULL, host TEXT NOT NULL, port INTEGER NOT NULL, connect_scheme TEXT NOT NULL DEFAULT 'copy', enabled INTEGER NOT NULL DEFAULT 1, created_at TEXT NOT NULL, updated_at TEXT NOT NULL);`
     3. `CREATE UNIQUE INDEX IF NOT EXISTS game_server_bindings_title_unique ON game_server_bindings(game_title_norm);`
@@ -189,7 +189,7 @@ Settings nach dieser Phase (`src/server/settings.ts`): `ampIntegrationEnabled: b
     <automated>npx vitest run src/server/http/app-flow.test.ts -t "migrations"</automated>
   </verify>
   <acceptance_criteria>
-    - `ls src/server/db/migrations | sort | tail -1` → `0019_game_server_bindings.sql`.
+    - `ls src/server/db/migrations | sort | tail -1` → `0020_game_server_bindings.sql`.
     - Schema exportiert `gameServerBindings`; `gameEvents` hat `serverBindingId`.
     - Migrationstest prüft `game_server_bindings_title_unique` und `server_binding_id`.
   </acceptance_criteria>

@@ -82,7 +82,7 @@ describe("app flow", () => {
     expect(gameEventsColumns).toContain("details");
     expect(gameEventsColumns).not.toContain("server_host");
     expect(gameEventsColumns).not.toContain("connection_info");
-    // Phase 15: Bindung an eine AMP-Instanz (0019_game_server_bindings.sql)
+    // Phase 15: Bindung an eine AMP-Instanz (0020_game_server_bindings.sql)
     expect(gameEventsColumns).toContain("server_binding_id");
     const bindingColumns = sqlite
       .prepare("SELECT name FROM pragma_table_info('game_server_bindings') ORDER BY cid")
