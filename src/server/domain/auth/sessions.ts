@@ -1,9 +1,11 @@
-import { and, desc, eq, isNull } from "drizzle-orm";
+import { and, desc, eq, gte, isNull } from "drizzle-orm";
 import { z } from "zod";
 import { tryWriteAuditLog } from "../../audit-log";
 import { validateDeviceName } from "../../auth/device-names";
+import { sessionIdleCutoffIso } from "../../auth/sessions";
 import type { DatabaseContext } from "../../db/client";
-import { sessions, users } from "../../db/schema";
+import { devices, sessions, users } from "../../db/schema";
+import { syncSessionDeviceNames } from "./devices";
 
 export type SessionRow = typeof sessions.$inferSelect;
 export type UserRow = typeof users.$inferSelect;
@@ -42,7 +44,13 @@ export function listUserSessions(
   const rows = context.db
     .select()
     .from(sessions)
-    .where(and(eq(sessions.userId, current.user.id), isNull(sessions.revokedAt)))
+    .where(
+      and(
+        eq(sessions.userId, current.user.id),
+        isNull(sessions.revokedAt),
+        gte(sessions.lastSeenAt, sessionIdleCutoffIso())
+      )
+    )
     .orderBy(desc(sessions.lastSeenAt))
     .all();
   return rows.map((row) => serialize(row, current.session.id));
@@ -79,11 +87,21 @@ export function renameUserSession(
     return { ok: false, status: 404, error: "session_nicht_gefunden" };
   }
 
-  context.db
-    .update(sessions)
-    .set({ deviceName: validated.name })
-    .where(eq(sessions.id, target.id))
-    .run();
+  context.sqlite.transaction(() => {
+    context.db
+      .update(sessions)
+      .set({ deviceName: validated.name })
+      .where(eq(sessions.id, target.id))
+      .run();
+    if (target.deviceId) {
+      context.db
+        .update(devices)
+        .set({ name: validated.name })
+        .where(and(eq(devices.id, target.deviceId), eq(devices.userId, current.user.id)))
+        .run();
+      syncSessionDeviceNames(context, target.deviceId, validated.name);
+    }
+  })();
 
   const updated = context.db.select().from(sessions).where(eq(sessions.id, target.id)).get();
 

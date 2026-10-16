@@ -65,6 +65,7 @@ let snapshotTimer: NodeJS.Timeout | undefined;
 const restorableTables = [
   "users",
   "login_challenges",
+  "devices",
   "sessions",
   "push_subscriptions",
   "game_events",

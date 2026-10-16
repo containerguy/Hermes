@@ -102,10 +102,14 @@ npm run build
 npm start
 ```
 
-Für produktive Deployments sollte zusätzlich ein eigenes CSRF-Secret gesetzt werden (in `.env`):
+Für produktive Deployments sollten zusätzlich eigene Secrets gesetzt werden (in `.env`):
 
 ```env
 HERMES_CSRF_SECRET=change-me
+# Einmal festlegen und danach stabil halten, sonst werden bekannte Geräte nicht mehr erkannt.
+HERMES_DEVICE_KEY_SECRET=change-me
+# Optional: Session-Idle-Timeout in Tagen (1-400, Standard 180)
+# HERMES_SESSION_TTL_DAYS=180
 ```
 
 Die App läuft danach auf:
@@ -185,7 +189,9 @@ Die JSON-API liegt unter **`/api/*`** (siehe OpenAPI). Typische Ressourcen: Even
 
 ### Authentifizierung
 
-- **Browser / Web-UI:** Session-Cookie `hermes_session` nach erfolgreichem Login (wie bisher).
+- **Browser / Web-UI:** Session-Cookie `hermes_session` nach erfolgreichem Login. Die Session läuft nach `HERMES_SESSION_TTL_DAYS` Tagen **ohne Nutzung** ab (Standard 180); jede Nutzung verlängert sie (Cookie wird höchstens einmal täglich neu gesetzt).
+- **Geräte:** Ein separates, langlebiges `httpOnly`-Cookie `hermes_device` (plus ein Schlüssel im `localStorage` als Fallback) erkennt den Browser beim nächsten Login wieder. Der Gerätename bleibt dadurch auch nach Logout erhalten. Das Cookie authentifiziert **nicht** – ein Mailcode oder Pairing-Link ist immer nötig. „Dieses Gerät vergessen“ verwirft Gerät und Namen.
+- **iPhone/iPad Home-Bildschirm-App:** hat einen eigenen Speicher und übernimmt die Safari-Anmeldung nicht. Im Profil einen Pairing-Link erzeugen, kopieren und in der App unter „Mit Pairing-Link anmelden“ einfügen.
 - **Skripte & Integrationen:** persönliches **API-Token** mit Header  
   `Authorization: Bearer <token>`  
   Tokens werden unter **`/#login`** (Profil) erzeugt und widerrufen. Der Klartext wird **nur einmal** beim Anlegen angezeigt und danach nur noch als Hash gespeichert.
@@ -301,6 +307,7 @@ Falls Chromium wegen fehlender Systembibliotheken nicht startet, müssen die Pla
 - HTTP-API verstanden: bei Bedarf **`/api/docs`** für Operatoren/Integratoren bereitstellen; Tokens nur über vertrauenswürdige Kanäle verteilen
 - Reverse Proxy / TLS ist **operator-owned** (Hermes liefert kein TLS, nur HTTP)
 - `HERMES_COOKIE_SECURE=true` sobald Hermes hinter HTTPS läuft
+- `HERMES_CSRF_SECRET` und `HERMES_DEVICE_KEY_SECRET` gesetzt (Device-Secret danach nicht mehr ändern)
 - SMTP konfiguriert (und `HERMES_MAIL_MODE=smtp`), `HERMES_MAIL_FROM` gesetzt
 - VAPID Keys generiert und gesetzt (`HERMES_VAPID_*`)
 - S3 Snapshot-Storage konfiguriert (`HERMES_STORAGE_BACKEND=s3`, Bucket/Endpoint/Region/Key)

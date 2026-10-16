@@ -3,7 +3,7 @@ import { randomUUID } from "node:crypto";
 import { z } from "zod";
 import { tryWriteAuditLog } from "../../audit-log";
 import type { DatabaseContext } from "../../db/client";
-import { participations, pushSubscriptions, sessions, users } from "../../db/schema";
+import { devices, participations, pushSubscriptions, sessions, users } from "../../db/schema";
 import { ensureActiveIdentityAvailable, userRoleSchema } from "../users";
 import { readSettings } from "../../settings";
 import { fallbackPhoneNumber } from "./bulk-import";
@@ -202,6 +202,8 @@ export function softDeleteUser(
       .set({ revokedAt: timestamp })
       .where(eq(sessions.userId, existing.id))
       .run();
+    // Device names are personal data; drop them with the account (sessions keep a NULL device_id).
+    context.db.delete(devices).where(eq(devices.userId, existing.id)).run();
     context.db
       .update(users)
       .set({

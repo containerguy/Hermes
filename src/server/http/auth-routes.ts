@@ -4,16 +4,13 @@ import { randomBytes, randomUUID } from "node:crypto";
 import { z } from "zod";
 import { createCsrfToken, CSRF_HEADER, requireCsrf } from "../auth/csrf";
 import { getCurrentSession, publicUser, requireUser } from "../auth/current-user";
-import { deviceSignalsFingerprint, hashDeviceKey, normalizeDeviceSignals } from "../auth/device-key";
-import { resolveDeviceName, validateDeviceName } from "../auth/device-names";
 import { maskInviteCode, tryWriteAuditLog } from "../audit-log";
 import { createPairingToken, hashPairingToken, PAIR_TOKEN_TTL_MS } from "../auth/pairing-tokens";
 import { checkRateLimit, recordRateLimitFailure } from "../auth/rate-limits";
 import {
-  createSessionId,
-  createSessionToken,
+  clearDeviceCookie,
   clearSessionCookie,
-  hashSessionToken,
+  setDeviceCookie,
   setSessionCookie
 } from "../auth/sessions";
 import { generateOtp, hashOtp, verifyOtp } from "../auth/otp";
@@ -45,6 +42,7 @@ import {
   renameUserSession,
   revokeUserSession
 } from "../domain/auth/sessions";
+import { forgetCurrentDevice, issueLoginSession } from "../domain/auth/devices";
 import {
   emailChangeSchema,
   emailChangeVerifySchema,
@@ -588,114 +586,48 @@ export function createAuthRouter(context: DatabaseContext) {
       return;
     }
 
-    const sessionId = createSessionId();
-    const sessionToken = createSessionToken();
-    const sessionTokenHash = hashSessionToken(sessionToken);
-    const resolvedDeviceName = resolveDeviceName(
-      parsed.data.deviceName,
-      request.get("user-agent") ?? undefined
-    );
-
-    const deviceKeyHash = parsed.data.deviceKey ? hashDeviceKey(parsed.data.deviceKey) : null;
-    const normalizedSignals = normalizeDeviceSignals({
-      userAgent: request.get("user-agent") ?? undefined,
-      pwa: parsed.data.pwa
-    });
-    const deviceSignals = deviceSignalsFingerprint(normalizedSignals);
-
-    let recognizedSession: typeof sessions.$inferSelect | undefined;
-    if (deviceKeyHash) {
-      recognizedSession = context.db
-        .select()
-        .from(sessions)
-        .where(
-          and(
-            eq(sessions.userId, user.id),
-            eq(sessions.deviceKeyHash, deviceKeyHash),
-            isNull(sessions.revokedAt)
-          )
-        )
-        .get();
-    }
-    if (!recognizedSession) {
-      const candidates = context.db
-        .select()
-        .from(sessions)
-        .where(
-          and(
-            eq(sessions.userId, user.id),
-            eq(sessions.deviceSignals, deviceSignals),
-            isNull(sessions.revokedAt),
-            isNull(sessions.deviceKeyHash)
-          )
-        )
-        .all();
-      // D-02 fallback: only reuse an existing session by signals when exactly one
-      // non-key-bound candidate matches; ambiguity falls through to a fresh insert.
-      if (candidates.length === 1) {
-        recognizedSession = candidates[0];
-      }
-    }
-
-    context.sqlite.transaction(() => {
+    const issued = context.sqlite.transaction(() => {
       context.db
         .update(loginChallenges)
         .set({ consumedAt: timestamp })
         .where(eq(loginChallenges.id, challenge.id))
         .run();
 
-      if (recognizedSession) {
-        context.db
-          .update(sessions)
-          .set({
-            tokenHash: sessionTokenHash,
-            lastSeenAt: timestamp,
-            userAgent: request.get("user-agent") ?? null,
-            deviceName: resolvedDeviceName,
-            deviceKeyHash: deviceKeyHash ?? recognizedSession.deviceKeyHash ?? null,
-            deviceSignals
-          })
-          .where(eq(sessions.id, recognizedSession.id))
-          .run();
-      } else {
-        context.db
-          .insert(sessions)
-          .values({
-            id: sessionId,
-            userId: user.id,
-            deviceName: resolvedDeviceName,
-            userAgent: request.get("user-agent") ?? null,
-            lastSeenAt: timestamp,
-            createdAt: timestamp,
-            tokenHash: sessionTokenHash,
-            revokedAt: null,
-            deviceKeyHash,
-            deviceSignals
-          })
-          .run();
-      }
+      return issueLoginSession(context, {
+        user,
+        request,
+        submittedDeviceKey: parsed.data.deviceKey,
+        submittedDeviceName: parsed.data.deviceName,
+        pwa: parsed.data.pwa,
+        timestamp
+      });
     })();
 
     tryWriteAuditLog(context, {
       actor: user,
-      action: recognizedSession ? "auth.login_recognized" : "auth.login",
+      action: issued.recognized ? "auth.login_recognized" : "auth.login",
       entityType: "session",
-      entityId: recognizedSession?.id ?? sessionId,
-      summary: recognizedSession
+      entityId: issued.sessionId,
+      summary: issued.recognized
         ? `${user.username} hat sich von einem bekannten Gerät erneut angemeldet.`
         : `${user.username} hat sich angemeldet.`,
       metadata: {
-        deviceName: resolvedDeviceName,
-        deviceClass: normalizedSignals.deviceClass,
-        platform: normalizedSignals.platform,
-        browser: normalizedSignals.browser,
-        pwa: normalizedSignals.pwa,
-        recognized: Boolean(recognizedSession)
+        deviceId: issued.deviceId,
+        deviceName: issued.deviceName,
+        deviceClass: issued.signals.deviceClass,
+        platform: issued.signals.platform,
+        browser: issued.signals.browser,
+        pwa: issued.signals.pwa,
+        recognized: issued.recognized
       }
     });
     response.setHeader("Cache-Control", "no-store");
-    setSessionCookie(response, sessionToken);
-    response.json({ user: publicUser(user) });
+    setSessionCookie(response, issued.sessionToken);
+    setDeviceCookie(response, issued.deviceKey);
+    response.json({
+      user: publicUser(user),
+      device: { name: issued.deviceName, recognized: issued.recognized }
+    });
   });
 
   router.get("/me", (request, response) => {
@@ -805,6 +737,18 @@ export function createAuthRouter(context: DatabaseContext) {
       clearSessionCookie(response);
     }
     response.json({ revokedCurrent: result.revokedCurrent });
+  });
+
+  router.post("/device/forget", (request, response) => {
+    const current = getCurrentSession(context, request);
+    if (!current) {
+      response.status(401).json({ error: "nicht_angemeldet" });
+      return;
+    }
+    const result = forgetCurrentDevice(context, current);
+    clearSessionCookie(response);
+    clearDeviceCookie(response);
+    response.json({ forgotten: Boolean(result.forgottenDeviceId) });
   });
 
   router.post("/pair-token", (request, response) => {
@@ -932,20 +876,6 @@ export function createAuthRouter(context: DatabaseContext) {
       return;
     }
 
-    const newSessionId = createSessionId();
-    const newSessionToken = createSessionToken();
-    const newSessionTokenHash = hashSessionToken(newSessionToken);
-    const resolvedDeviceName = resolveDeviceName(
-      parsed.data.deviceName,
-      request.get("user-agent") ?? undefined
-    );
-    const deviceKeyHash = parsed.data.deviceKey ? hashDeviceKey(parsed.data.deviceKey) : null;
-    const normalizedSignals = normalizeDeviceSignals({
-      userAgent: request.get("user-agent") ?? undefined,
-      pwa: parsed.data.pwa
-    });
-    const deviceSignals = deviceSignalsFingerprint(normalizedSignals);
-
     const consumed = context.sqlite.transaction(() => {
       const claim = context.db
         .update(pairingTokens)
@@ -953,29 +883,22 @@ export function createAuthRouter(context: DatabaseContext) {
         .where(and(eq(pairingTokens.id, tokenRow.id), isNull(pairingTokens.consumedAt)))
         .run();
       if (claim.changes === 0) {
-        return false;
+        return undefined;
       }
-      context.db
-        .insert(sessions)
-        .values({
-          id: newSessionId,
-          userId: user.id,
-          deviceName: resolvedDeviceName,
-          userAgent: request.get("user-agent") ?? null,
-          lastSeenAt: timestamp,
-          createdAt: timestamp,
-          tokenHash: newSessionTokenHash,
-          revokedAt: null,
-          deviceKeyHash,
-          deviceSignals
-        })
-        .run();
+      const issuedSession = issueLoginSession(context, {
+        user,
+        request,
+        submittedDeviceKey: parsed.data.deviceKey,
+        submittedDeviceName: parsed.data.deviceName,
+        pwa: parsed.data.pwa,
+        timestamp
+      });
       context.db
         .update(pairingTokens)
-        .set({ consumedSessionId: newSessionId })
+        .set({ consumedSessionId: issuedSession.sessionId })
         .where(eq(pairingTokens.id, tokenRow.id))
         .run();
-      return true;
+      return issuedSession;
     })();
 
     if (!consumed) {
@@ -987,22 +910,28 @@ export function createAuthRouter(context: DatabaseContext) {
       actor: user,
       action: "device_pair_redeemed",
       entityType: "session",
-      entityId: newSessionId,
+      entityId: consumed.sessionId,
       summary: `${user.username} hat ein neues Gerät über Pairing verbunden.`,
       metadata: {
         originSessionId: tokenRow.originSessionId,
-        newSessionId,
-        deviceName: resolvedDeviceName,
-        deviceClass: normalizedSignals.deviceClass,
-        platform: normalizedSignals.platform,
-        browser: normalizedSignals.browser,
-        pwa: normalizedSignals.pwa
+        newSessionId: consumed.sessionId,
+        deviceId: consumed.deviceId,
+        deviceName: consumed.deviceName,
+        deviceClass: consumed.signals.deviceClass,
+        platform: consumed.signals.platform,
+        browser: consumed.signals.browser,
+        pwa: consumed.signals.pwa,
+        recognized: consumed.recognized
       }
     });
 
     response.setHeader("Cache-Control", "no-store");
-    setSessionCookie(response, newSessionToken);
-    response.status(201).json({ user: publicUser(user) });
+    setSessionCookie(response, consumed.sessionToken);
+    setDeviceCookie(response, consumed.deviceKey);
+    response.status(201).json({
+      user: publicUser(user),
+      device: { name: consumed.deviceName, recognized: consumed.recognized }
+    });
   });
 
   router.post("/logout", (request, response) => {

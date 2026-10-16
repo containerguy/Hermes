@@ -2,7 +2,14 @@ import React, { FormEvent, useEffect, useState } from "react";
 import type { ApiToken, AppSettings, User, UserSession } from "../types/core";
 import { requestJson } from "../api/request";
 import { clearCsrfToken, primeCsrfToken } from "../api/csrf";
-import { forgetDeviceKey, getDeviceContext } from "../api/device-key";
+import {
+  forgetDeviceKey,
+  getDeviceContext,
+  getKnownDeviceName,
+  isIos,
+  isPwa,
+  rememberKnownDevice
+} from "../api/device-key";
 import { getErrorMessage } from "../errors/errors";
 import { useI18n } from "../i18n/I18nContext";
 import type { MessageKey } from "../i18n/catalog/index";
@@ -15,6 +22,20 @@ import { PushNotificationsSection } from "./PushNotificationsSection";
 import { RegisterStep } from "./RegisterStep";
 import { SessionsSection } from "./SessionsSection";
 import { getPushSupport, urlBase64ToUint8Array } from "../lib/push-support";
+
+type LoginDevice = { name: string; recognized: boolean };
+
+const PAIR_TOKEN_PATTERN = /^[A-Za-z0-9_-]{32,128}$/;
+
+/** Accepts a full pairing link (…#login?pair=TOKEN) or the bare token. */
+function extractPairToken(input: string): string | null {
+  const trimmed = input.trim();
+  if (PAIR_TOKEN_PATTERN.test(trimmed)) {
+    return trimmed;
+  }
+  const match = trimmed.match(/[?&#]pair=([A-Za-z0-9_-]{32,128})(?:$|[&#\s])/);
+  return match?.[1] ?? null;
+}
 
 type BeforeInstallPromptChrome = Event & {
   prompt: () => Promise<void>;
@@ -35,6 +56,8 @@ export function LoginPanel({
   onUserUpdated: (user: User) => void;
 }) {
   const { t, locale } = useI18n();
+  const [iosPwa] = useState(() => isIos() && isPwa());
+  const [iosBrowser] = useState(() => isIos() && !isPwa());
   const [username, setUsername] = useState("");
   const [registration, setRegistration] = useState({ inviteCode: "", username: "", email: "" });
   const [code, setCode] = useState("");
@@ -55,6 +78,7 @@ export function LoginPanel({
   const [redeemStatus, setRedeemStatus] = useState<
     "idle" | "redeeming" | "done" | "error"
   >("idle");
+  const [pairLinkDraft, setPairLinkDraft] = useState("");
   const [deferredInstall, setDeferredInstall] = useState<BeforeInstallPromptChrome | null>(null);
   const [apiTokens, setApiTokens] = useState<ApiToken[]>([]);
   const [apiTokenLabel, setApiTokenLabel] = useState("");
@@ -82,6 +106,10 @@ export function LoginPanel({
 
     const result = await requestJson<{ sessions: UserSession[] }>("/api/auth/sessions");
     setSessions(result.sessions);
+    const currentSession = result.sessions.find((session) => session.current);
+    if (currentSession?.deviceName) {
+      rememberKnownDevice(currentUser.username, currentSession.deviceName);
+    }
     setSessionNames(
       Object.fromEntries(
         result.sessions.map((session) => [session.id, session.deviceName || t("loginProfile.unnamedDevice")])
@@ -144,41 +172,63 @@ export function LoginPanel({
       return;
     }
 
+    void redeemPairingToken(pair).finally(() => {
+      params.delete("pair");
+      const baseHash = hash.slice(0, queryStart);
+      const remaining = params.toString();
+      const nextHash = remaining ? `${baseHash}?${remaining}` : baseHash || "#login";
+      window.history.replaceState(
+        null,
+        "",
+        `${window.location.pathname}${window.location.search}${nextHash}`
+      );
+    });
+  }, []);
+
+  async function redeemPairingToken(token: string) {
     setRedeemStatus("redeeming");
+    setError("");
+    setMessage("");
     const deviceContext = getDeviceContext();
 
-    requestJson<{ user: User }>("/api/auth/pair-redeem", {
-      method: "POST",
-      body: JSON.stringify({
-        token: pair,
-        deviceKey: deviceContext.deviceKey,
-        pwa: deviceContext.pwa
-      })
-    })
-      .then((result) => {
-        onLoggedIn(result.user);
-        primeCsrfToken();
-        setRedeemStatus("done");
-        setMessage(t("login.msg.pairDone"));
-      })
-      .catch((caught) => {
-        setRedeemStatus("error");
-        setError(getErrorMessage(caught, locale));
-      })
-      .finally(() => {
-        params.delete("pair");
-        const baseHash = hash.slice(0, queryStart);
-        const remaining = params.toString();
-        const nextHash = remaining
-          ? `${baseHash}?${remaining}`
-          : baseHash || "#login";
-        window.history.replaceState(
-          null,
-          "",
-          `${window.location.pathname}${window.location.search}${nextHash}`
-        );
+    try {
+      const result = await requestJson<{ user: User; device?: LoginDevice }>("/api/auth/pair-redeem", {
+        method: "POST",
+        body: JSON.stringify({
+          token,
+          deviceKey: deviceContext.deviceKey,
+          pwa: deviceContext.pwa
+        })
       });
-  }, []);
+      if (result.device?.name) {
+        rememberKnownDevice(result.user.username, result.device.name);
+      }
+      onLoggedIn(result.user);
+      primeCsrfToken();
+      setRedeemStatus("done");
+      setMessage(t("login.msg.pairDone"));
+    } catch (caught) {
+      setRedeemStatus("error");
+      setError(getErrorMessage(caught, locale));
+    }
+  }
+
+  async function submitPairLink(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    const token = extractPairToken(pairLinkDraft);
+    if (!token) {
+      setMessage("");
+      setError(t("login.pairLink.invalid"));
+      return;
+    }
+    setBusy(true);
+    try {
+      await redeemPairingToken(token);
+      setPairLinkDraft("");
+    } finally {
+      setBusy(false);
+    }
+  }
 
   async function mintPairingToken() {
     setBusy(true);
@@ -210,13 +260,7 @@ export function LoginPanel({
     setBusy(true);
     setError("");
     try {
-      const currentSession = sessions.find((session) => session.current);
-      if (currentSession) {
-        await requestJson<{ revokedCurrent: boolean }>(
-          `/api/auth/sessions/${currentSession.id}`,
-          { method: "DELETE" }
-        );
-      }
+      await requestJson<{ forgotten: boolean }>("/api/auth/device/forget", { method: "POST" });
       forgetDeviceKey();
       clearCsrfToken();
       onLoggedOut();
@@ -257,7 +301,7 @@ export function LoginPanel({
 
     try {
       const deviceContext = getDeviceContext();
-      const result = await requestJson<{ user: User }>("/api/auth/verify-code", {
+      const result = await requestJson<{ user: User; device?: LoginDevice }>("/api/auth/verify-code", {
         method: "POST",
         body: JSON.stringify({
           username,
@@ -267,9 +311,13 @@ export function LoginPanel({
           pwa: deviceContext.pwa
         })
       });
+      if (result.device?.name) {
+        rememberKnownDevice(result.user.username, result.device.name);
+      }
       onLoggedIn(result.user);
       primeCsrfToken();
       setCode("");
+      setDeviceName("");
       setMessage(t("login.msg.loggedIn"));
     } catch (caught) {
       setError(getErrorMessage(caught, locale));
@@ -593,6 +641,7 @@ export function LoginPanel({
           pairingExpiresAt={pairingExpiresAt}
           redeemStatus={redeemStatus}
           busy={busy}
+          showIosHomeScreenHint={iosBrowser}
           onMint={() => void mintPairingToken()}
           onClear={clearPairingToken}
         />
@@ -658,6 +707,7 @@ export function LoginPanel({
           username={username}
           code={code}
           deviceName={deviceName}
+          knownDeviceName={step === "verify" ? getKnownDeviceName(username) : null}
           message={message}
           error={error}
           busy={busy}
@@ -671,6 +721,30 @@ export function LoginPanel({
           onVerify={verifyCode}
         />
       )}
+      {mode === "login" ? (
+        <details className="pair-link-login" open={iosPwa}>
+          <summary>{t("login.pairLink.summary")}</summary>
+          <p className="muted">{iosPwa ? t("login.pairLink.helpIosPwa") : t("login.pairLink.help")}</p>
+          <form onSubmit={submitPairLink}>
+            <label>
+              {t("login.pairLink.field")}
+              <input
+                value={pairLinkDraft}
+                onChange={(event) => setPairLinkDraft(event.target.value)}
+                autoComplete="off"
+                autoCapitalize="off"
+                spellCheck={false}
+                required
+              />
+            </label>
+            <div className="action-row">
+              <button type="submit" className="secondary" disabled={busy || redeemStatus === "redeeming"}>
+                {t("login.pairLink.submit")}
+              </button>
+            </div>
+          </form>
+        </details>
+      ) : null}
     </section>
   );
 }
