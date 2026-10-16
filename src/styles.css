@@ -1149,6 +1149,34 @@ dd {
   border-top: 8px solid var(--rose);
 }
 
+.field-hint {
+  margin: -4px 0 0;
+  font-size: 0.9rem;
+}
+
+.known-device-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 12px;
+}
+
+.known-device-row p {
+  margin: 0;
+}
+
+.pair-link-login {
+  margin-top: 18px;
+  padding-top: 14px;
+  border-top: 1px solid var(--line);
+}
+
+.pair-link-login summary {
+  cursor: pointer;
+  font-weight: 600;
+  padding: 10px 0;
+}
+
 .runtime-callout {
   border-radius: var(--radius-sm);
   padding: 14px 16px;

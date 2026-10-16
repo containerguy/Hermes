@@ -4,6 +4,52 @@ Versions are annotated tags `vX.Y.Z` on `main`. Each entry mirrors the
 `chore(release): vX.Y.Z` commit that bumps `package.json`,
 `package-lock.json`, and `src/server/openapi/hermes-api.yaml`.
 
+## Unreleased — Persistent sessions and devices
+
+### Behavior change
+
+- Sessions no longer hard-expire 30 days after login. They now expire after
+  `HERMES_SESSION_TTL_DAYS` (default 180, max 400) days **without use**; every
+  use extends them. The session cookie is re-issued at most once per day.
+  Idle-expired sessions are also rejected server-side.
+- Device names belong to the device, not to a single session. Logging out,
+  an admin role/email change or a remote "Abmelden" keeps the device and its
+  name; the next login on the same browser reuses it.
+
+### Server
+
+- Migration `0019_devices.sql`: new `devices` table (per user, HMAC-hashed
+  device key, name, `forgotten_at`), `sessions.device_id` and
+  `sessions.renewed_at`. Existing key-bound sessions are backfilled into
+  devices.
+- New long-lived `httpOnly` cookie `hermes_device` (400 days). Login looks
+  up the device by cookie first, then by the client's `localStorage` key;
+  the server generates a key when the client sends none. The cookie never
+  authenticates on its own.
+- Fix: a recognized login without a typed name no longer overwrites a
+  custom device name with the auto-derived one.
+- New `POST /api/auth/device/forget` (CSRF-protected): marks the device as
+  forgotten, revokes its sessions and clears both cookies.
+- `verify-code` and `pair-redeem` responses include
+  `device: { name, recognized }`.
+- Renaming a session renames its device. Soft-deleting a user removes their
+  devices. `devices` is part of S3 snapshot restore.
+
+### Client
+
+- The login form hides the device-name field when this browser is already
+  known for the entered user ("Dieses Gerät ist als „…" bekannt.").
+- New "Mit Pairing-Link anmelden" field on the login page (paste link or
+  code); expanded by default in an iOS home-screen app.
+- Pairing section: "Link kopieren" button and an iOS hint explaining that
+  the home-screen app needs pairing.
+- "Dieses Gerät vergessen" uses the new endpoint.
+
+### Configuration
+
+- `HERMES_DEVICE_KEY_SECRET` (documented now; set once and keep stable).
+- `HERMES_SESSION_TTL_DAYS` (optional).
+
 ## v0.11.0 — Pizza ordering as opt-in feature (2026-05-20)
 
 ### Behavior change (admin action required on upgrade)

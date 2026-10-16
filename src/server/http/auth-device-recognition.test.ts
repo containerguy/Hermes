@@ -194,8 +194,9 @@ describe("auth device recognition", () => {
     expect(row.device_signals).toBe("windows|chrome|desktop|web");
   });
 
-  it("fresh device path: a different deviceKey creates a new session row", async () => {
+  it("fresh device path: a different browser (deviceKey, no shared cookie) creates a new session row", async () => {
     const agent = request.agent(started!.app);
+    const otherBrowser = request.agent(started!.app);
 
     await requestCode(agent, "hauptadmin");
     await agent
@@ -212,8 +213,8 @@ describe("auth device recognition", () => {
     const baseline = countActiveSessionsForAdmin();
     expect(baseline).toBe(1);
 
-    await requestCode(agent, "hauptadmin");
-    await agent
+    await requestCode(otherBrowser, "hauptadmin");
+    await otherBrowser
       .post("/api/auth/verify-code")
       .set("User-Agent", CHROME_WINDOWS_UA)
       .send({

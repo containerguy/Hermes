@@ -1,4 +1,4 @@
-import { relations } from "drizzle-orm";
+import { relations, sql } from "drizzle-orm";
 import { index, integer, sqliteTable, text, uniqueIndex } from "drizzle-orm/sqlite-core";
 
 export const users = sqliteTable(
@@ -47,6 +47,28 @@ export const loginChallenges = sqliteTable("login_challenges", {
   index("login_challenges_expires_at_idx").on(table.expiresAt)
 ]);
 
+export const devices = sqliteTable(
+  "devices",
+  {
+    id: text("id").primaryKey(),
+    userId: text("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    deviceKeyHash: text("device_key_hash").notNull(),
+    name: text("name").notNull(),
+    deviceSignals: text("device_signals"),
+    createdAt: text("created_at").notNull(),
+    lastSeenAt: text("last_seen_at").notNull(),
+    forgottenAt: text("forgotten_at")
+  },
+  (table) => [
+    uniqueIndex("devices_user_key_active_unique")
+      .on(table.userId, table.deviceKeyHash)
+      .where(sql`${table.forgottenAt} IS NULL`),
+    index("devices_user_idx").on(table.userId)
+  ]
+);
+
 export const sessions = sqliteTable("sessions", {
   id: text("id").primaryKey(),
   userId: text("user_id")
@@ -59,9 +81,12 @@ export const sessions = sqliteTable("sessions", {
   tokenHash: text("token_hash"),
   revokedAt: text("revoked_at"),
   deviceKeyHash: text("device_key_hash"),
-  deviceSignals: text("device_signals")
+  deviceSignals: text("device_signals"),
+  deviceId: text("device_id").references(() => devices.id, { onDelete: "set null" }),
+  renewedAt: text("renewed_at")
 }, (table) => [
   uniqueIndex("sessions_token_hash_unique").on(table.tokenHash),
+  index("sessions_device_idx").on(table.deviceId),
   index("sessions_user_device_key_idx").on(table.userId, table.deviceKeyHash),
   index("sessions_user_device_signals_idx").on(table.userId, table.deviceSignals)
 ]);
@@ -416,6 +441,7 @@ export const pizzaOrderLines = sqliteTable(
 
 export const userRelations = relations(users, ({ many }) => ({
   sessions: many(sessions),
+  devices: many(devices),
   pushSubscriptions: many(pushSubscriptions),
   participations: many(participations),
   createdEvents: many(gameEvents),

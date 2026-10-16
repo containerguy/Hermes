@@ -1,4 +1,4 @@
-import React, { FormEvent } from "react";
+import React, { FormEvent, useEffect, useState } from "react";
 import { useI18n } from "../i18n/I18nContext";
 
 interface LoginStepProps {
@@ -6,6 +6,8 @@ interface LoginStepProps {
   username: string;
   code: string;
   deviceName: string;
+  /** Name under which this browser is already known for the entered user (display only). */
+  knownDeviceName: string | null;
   message: string;
   error: string;
   busy: boolean;
@@ -24,6 +26,7 @@ export function LoginStep({
   username,
   code,
   deviceName,
+  knownDeviceName,
   message,
   error,
   busy,
@@ -37,6 +40,13 @@ export function LoginStep({
   onVerify
 }: LoginStepProps) {
   const { t } = useI18n();
+  const [editDeviceName, setEditDeviceName] = useState(false);
+
+  useEffect(() => {
+    setEditDeviceName(false);
+  }, [knownDeviceName]);
+
+  const showDeviceNameField = !knownDeviceName || editDeviceName;
 
   return (
     <form onSubmit={step === "request" ? onRequest : onVerify}>
@@ -63,14 +73,30 @@ export function LoginStep({
               required
             />
           </label>
-          <label>
-            {t("login.field.deviceName")}
-            <input
-              placeholder={t("login.deviceName.placeholder")}
-              value={deviceName}
-              onChange={(event) => onDeviceNameChange(event.target.value)}
-            />
-          </label>
+          {showDeviceNameField ? (
+            <>
+              <label>
+                {t("login.field.deviceName")}
+                <input
+                  placeholder={knownDeviceName ?? t("login.deviceName.placeholder")}
+                  value={deviceName}
+                  maxLength={120}
+                  aria-describedby="login-device-name-hint"
+                  onChange={(event) => onDeviceNameChange(event.target.value)}
+                />
+              </label>
+              <p className="muted field-hint" id="login-device-name-hint">
+                {t("login.deviceName.optionalHint")}
+              </p>
+            </>
+          ) : (
+            <div className="known-device-row">
+              <p className="muted">{t("login.deviceName.known", { name: knownDeviceName ?? "" })}</p>
+              <button type="button" className="secondary" onClick={() => setEditDeviceName(true)}>
+                {t("login.deviceName.change")}
+              </button>
+            </div>
+          )}
         </>
       ) : null}
       {message ? <p className="notice">{message}</p> : null}

@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useEffect, useState } from "react";
 import { useI18n } from "../i18n/I18nContext";
 import { QrCanvas } from "./QrCanvas";
 
@@ -7,6 +7,8 @@ interface DevicePairingSectionProps {
   pairingExpiresAt: string | null;
   redeemStatus: "idle" | "redeeming" | "done" | "error";
   busy: boolean;
+  /** iPhone/iPad Safari: the home-screen app has its own storage and needs pairing. */
+  showIosHomeScreenHint?: boolean;
   onMint: () => void;
   onClear: () => void;
 }
@@ -16,10 +18,25 @@ export function DevicePairingSection({
   pairingExpiresAt,
   redeemStatus,
   busy,
+  showIosHomeScreenHint = false,
   onMint,
   onClear
 }: DevicePairingSectionProps) {
   const { t, locale } = useI18n();
+  const [copied, setCopied] = useState(false);
+
+  useEffect(() => {
+    setCopied(false);
+  }, [pairingToken]);
+
+  async function copyPairLink(url: string) {
+    try {
+      await navigator.clipboard.writeText(url);
+      setCopied(true);
+    } catch {
+      setCopied(false);
+    }
+  }
   const dateLocale = locale === "en" ? "en-US" : "de-DE";
 
   return (
@@ -29,6 +46,9 @@ export function DevicePairingSection({
           <p className="eyebrow">{t("loginProfile.pairEyebrow")}</p>
           <h2>{t("loginProfile.pair.titleConnect")}</h2>
           <p className="muted">{t("loginProfile.pair.helpConnect")}</p>
+          {showIosHomeScreenHint ? (
+            <p className="notice">{t("loginProfile.pair.iosHomeScreenHint")}</p>
+          ) : null}
         </div>
         {pairingToken ? (
           <button type="button" className="secondary" onClick={onClear} disabled={busy}>
@@ -57,6 +77,9 @@ export function DevicePairingSection({
                 </time>
               ) : null}
               <div className="action-row">
+                <button type="button" className="secondary" onClick={() => void copyPairLink(pairUrl)}>
+                  {copied ? t("loginProfile.pair.copied") : t("loginProfile.pair.copy")}
+                </button>
                 <button type="button" onClick={onMint} disabled={busy}>
                   {t("loginProfile.pairNewCode")}
                 </button>

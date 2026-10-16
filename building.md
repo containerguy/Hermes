@@ -24,7 +24,10 @@ Hermes nutzt CSRF Tokens für mutierende, cookie-authentifizierte Requests. Für
 
 ```env
 HERMES_CSRF_SECRET=change-me
+HERMES_DEVICE_KEY_SECRET=change-me
 ```
+
+`HERMES_DEVICE_KEY_SECRET` dient als HMAC-Secret für gespeicherte Geräteschlüssel. Einmal setzen und stabil halten – eine Änderung macht alle bekannten Geräte unbekannt. `HERMES_SESSION_TTL_DAYS` (Standard 180, max. 400) legt fest, nach wie vielen Tagen ohne Nutzung eine Session abläuft.
 
 S3/Wasabi ist in `.env.example` bereits auf diese Werte vorbereitet:
 
@@ -206,7 +209,10 @@ Admin-Aktionen:
 Profil-Aktionen:
 
 - `GET /api/auth/sessions` listet aktive Geräte des eingeloggten Users.
-- `DELETE /api/auth/sessions/:id` meldet ein Gerät ab.
+- `PATCH /api/auth/sessions/:id` benennt ein Gerät um (der Name bleibt am Gerät, auch über Logout hinweg).
+- `DELETE /api/auth/sessions/:id` meldet ein Gerät ab (das Gerät bleibt bekannt).
+- `POST /api/auth/device/forget` vergisst das aktuelle Gerät: Sessions des Geräts werden widerrufen, Session- und Geräte-Cookie gelöscht.
+- `POST /api/auth/verify-code` und `POST /api/auth/pair-redeem` liefern zusätzlich `device: { name, recognized }` und setzen das Geräte-Cookie `hermes_device`.
 - `POST /api/auth/register` registriert neue User mit aktivem Invite-Code, sofern öffentliche Registrierung in den Settings aktiviert ist.
 
 Wichtig: S3 ist Snapshot-Storage, kein Locking-Backend für mehrere gleichzeitig schreibende Hermes-Instanzen.
