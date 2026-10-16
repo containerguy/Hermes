@@ -98,6 +98,9 @@ export type AmpIntegrationInstance = {
   connectionInfo: string;
 };
 
+/** Wie der Verbinden-Knopf eines Gameservers verlinkt (Bindung, Phase 15; ut2004/factorio seit v0.14.0). */
+export type ConnectScheme = "steam" | "ut2004" | "factorio" | "minecraft" | "copy";
+
 /** Phase 15: Vorschlag aus GET /api/integrations/amp/bindings/suggestions (admin). */
 export type BindingSuggestion = {
   ampInstanceId: string;
@@ -107,7 +110,7 @@ export type BindingSuggestion = {
   targetName: string;
   host: string;
   port: number | null;
-  connectScheme: "steam" | "minecraft" | "copy";
+  connectScheme: ConnectScheme;
   suggestedTitle: string | null;
   catalogMatches: string[];
   existingBindingId: string | null;
@@ -131,7 +134,7 @@ export type ServerStatus = {
   /** IPv4 des Hosts (serverseitig aufgelöst) — für steam://connect, das keine DNS-Namen annimmt. */
   connectIp: string | null;
   port: number;
-  connectScheme: "steam" | "minecraft" | "copy";
+  connectScheme: ConnectScheme;
   updatedAt: string;
   error: string | null;
 };
@@ -145,7 +148,7 @@ export type GameServerBinding = {
   ampInstanceName: string;
   host: string;
   port: number;
-  connectScheme: "steam" | "minecraft" | "copy";
+  connectScheme: ConnectScheme;
   enabled: boolean;
   /** Leerlauf-Stopp für diese Bindung erlaubt (Standard aus). */
   autoStopEnabled: boolean;

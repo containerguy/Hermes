@@ -4,6 +4,27 @@ Versions are annotated tags `vX.Y.Z` on `main`. Each entry mirrors the
 `chore(release): vX.Y.Z` commit that bumps `package.json`,
 `package-lock.json`, and `src/server/openapi/hermes-api.yaml`.
 
+## v0.14.0 — Connect button for UT2004 and Factorio (2026-10-17)
+
+### Game servers
+
+- New connect schemes for bindings, also suggested automatically from AMP:
+  - `ut2004` opens `ut2004://<ip>:<port>` and joins UT2004 directly.
+  - `factorio` starts the Steam version via
+    `steam://run/427520//--mp-connect%20<ip>:<port>/`. Steam may ask once
+    to confirm the launch options. Without Steam: "Copy address", then
+    Multiplayer → Connect to address in the game.
+  - Both prefer the server-side resolved IPv4 and fall back to the host name.
+- "Copy address" stays next to every connect button.
+- One-time UT2004 setup: the event card links
+  `/downloads/ut2004-protocol.reg` (registers `ut2004://` under
+  `HKEY_LOCAL_MACHINE` for the default GOG path; per-user registrations
+  are ignored by Windows 11 Explorer and browsers) and
+  `/downloads/ut2004-protocol-remove.reg`. The files are UTF-16LE with BOM
+  and CRLF and marked `binary` in `.gitattributes`.
+- Migration `0023` rebuilds `game_server_bindings` to widen the
+  `connect_scheme` check; existing bindings and event links are kept.
+
 ## v0.13.1 — Clearer server controls (2026-10-16)
 
 ### Game servers

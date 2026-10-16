@@ -452,6 +452,8 @@ export function BindingsAdmin({ gameCatalog }: BindingsAdminProps) {
             onChange={(event) => setDraft({ ...draft, connectScheme: event.target.value as Scheme })}
           >
             <option value="steam">{t("admin.amp.bindings.scheme.steam")}</option>
+            <option value="ut2004">{t("admin.amp.bindings.scheme.ut2004")}</option>
+            <option value="factorio">{t("admin.amp.bindings.scheme.factorio")}</option>
             <option value="minecraft">{t("admin.amp.bindings.scheme.minecraft")}</option>
             <option value="copy">{t("admin.amp.bindings.scheme.copy")}</option>
           </select>

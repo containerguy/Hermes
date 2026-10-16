@@ -322,6 +322,12 @@ export const deMessages = {
   "events.server.copy": "Adresse kopieren",
   "events.server.copied": "Kopiert ✓",
   "events.server.copyFailed": "Kopieren nicht möglich – Adresse markieren",
+  "events.server.ut2004Setup":
+    "Klappt der Knopf nicht? Einmalig einrichten: Datei herunterladen, Doppelklick, Admin-Abfrage bestätigen. Pfad ist die GOG-Standardinstallation; bei anderem Ort die Datei im Editor anpassen.",
+  "events.server.ut2004Setup.download": "UT2004-Verknüpfung (.reg)",
+  "events.server.ut2004Setup.remove": "wieder entfernen",
+  "events.server.factorioSteam":
+    "Startet die Steam-Version von Factorio. Steam fragt beim ersten Mal ggf. nach, ob die Startparameter in Ordnung sind. Factorio ohne Steam: „Adresse kopieren“ und im Spiel Mehrspieler → Direkt verbinden.",
   "events.server.start": "Start",
   "events.server.stop": "Stopp",
   "events.server.restart": "Neustart",
@@ -510,6 +516,8 @@ export const deMessages = {
   "admin.amp.bindings.port": "Port",
   "admin.amp.bindings.scheme": "Verbinden über",
   "admin.amp.bindings.scheme.steam": "Steam-Link (steam://connect)",
+  "admin.amp.bindings.scheme.ut2004": "UT2004-Link (ut2004://)",
+  "admin.amp.bindings.scheme.factorio": "Factorio über Steam (steam://run)",
   "admin.amp.bindings.scheme.minecraft": "Minecraft (Adresse kopieren)",
   "admin.amp.bindings.scheme.copy": "Adresse kopieren",
   "admin.amp.bindings.enabled": "Aktiv",

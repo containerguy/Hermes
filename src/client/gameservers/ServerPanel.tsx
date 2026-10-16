@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { copyToClipboard } from "../cod4/clipboard";
 import { useI18n } from "../i18n/I18nContext";
 import type { ServerStatus } from "../types/core";
-import { buildConnectAction } from "./connect-link";
+import { buildConnectAction, UT2004_PROTOCOL_REG, UT2004_PROTOCOL_REMOVE_REG } from "./connect-link";
 import { botKindForGame } from "../../shared/bot-commands";
 import { ServerBots } from "./ServerBots";
 import { ServerConsole } from "./ServerConsole";
@@ -114,6 +114,22 @@ export function ServerPanel({ bindingId, status, canManage, busy, onAction }: Se
                 : t("events.server.copy")}
           </button>
         </div>
+      ) : null}
+
+      {connect?.kind === "link" && connect.hint === "ut2004Setup" ? (
+        <p className="muted server-connect-hint">
+          {t("events.server.ut2004Setup")}{" "}
+          <a href={UT2004_PROTOCOL_REG} download>
+            {t("events.server.ut2004Setup.download")}
+          </a>
+          {" · "}
+          <a href={UT2004_PROTOCOL_REMOVE_REG} download>
+            {t("events.server.ut2004Setup.remove")}
+          </a>
+        </p>
+      ) : null}
+      {connect?.kind === "link" && connect.hint === "factorioSteam" ? (
+        <p className="muted server-connect-hint">{t("events.server.factorioSteam")}</p>
       ) : null}
 
       {status?.error ? <p className="muted">{t("events.server.statusHint")}</p> : null}

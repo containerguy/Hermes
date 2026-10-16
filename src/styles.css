@@ -2577,6 +2577,10 @@ dd {
   gap: 0.5rem;
   flex-wrap: wrap;
 }
+.server-connect-hint {
+  margin: 0;
+  font-size: 0.85rem;
+}
 .server-endpoint {
   user-select: all;
   padding: 0.2rem 0.4rem;

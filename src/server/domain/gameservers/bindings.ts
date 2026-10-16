@@ -5,7 +5,7 @@ import type { DatabaseContext } from "../../db/client";
 import { gameServerBindings } from "../../db/schema";
 import { normalizeGameTitle } from "./normalize-title";
 
-export const connectSchemeSchema = z.enum(["steam", "minecraft", "copy"]);
+export const connectSchemeSchema = z.enum(["steam", "ut2004", "factorio", "minecraft", "copy"]);
 
 export const bindingInputSchema = z.object({
   displayTitle: z.string().trim().min(1).max(160),

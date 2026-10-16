@@ -180,7 +180,7 @@ export const gameServerBindings = sqliteTable(
     ampInstanceName: text("amp_instance_name").notNull(),
     host: text("host").notNull(),
     port: integer("port").notNull(),
-    connectScheme: text("connect_scheme", { enum: ["steam", "minecraft", "copy"] })
+    connectScheme: text("connect_scheme", { enum: ["steam", "ut2004", "factorio", "minecraft", "copy"] })
       .notNull()
       .default("copy"),
     enabled: integer("enabled", { mode: "boolean" }).notNull().default(true),

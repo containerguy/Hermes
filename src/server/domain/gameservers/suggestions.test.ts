@@ -70,9 +70,9 @@ describe("binding suggestions", () => {
     });
     expect(byName.CS1601).toMatchObject({ suggestedTitle: "Counter Strike 1.6", connectScheme: "steam" });
     expect(byName.CoD401).toMatchObject({ suggestedTitle: "Call of Duty 4", connectScheme: "copy" });
-    expect(byName.UT200401).toMatchObject({ suggestedTitle: "UT2004", port: 7777 });
+    expect(byName.UT200401).toMatchObject({ suggestedTitle: "UT2004", connectScheme: "ut2004", port: 7777 });
     expect(byName.Soldat01).toMatchObject({ suggestedTitle: "Soldat", port: 23073 });
-    expect(byName.Factorio01).toMatchObject({ suggestedTitle: "Factorio", port: 34197 });
+    expect(byName.Factorio01).toMatchObject({ suggestedTitle: "Factorio", connectScheme: "factorio", port: 34197 });
     expect(byName.Minecraft01).toMatchObject({ suggestedTitle: "Minecraft", connectScheme: "minecraft", port: 25565 });
   });
 
@@ -99,8 +99,21 @@ describe("binding suggestions", () => {
     expect(suggestions.filter((s) => s.existingBindingId === null)).toHaveLength(rows.length - 1);
   });
 
+  it("suggests ut2004:// for Unreal Tournament 2004 and steam://run for Factorio", () => {
+    expect(
+      suggestScheme({ module: "GenericModule", moduleDisplayName: "Unreal Tournament 2004", friendlyName: "Retro" })
+    ).toBe("ut2004");
+    expect(suggestScheme({ module: "GenericModule", moduleDisplayName: "", friendlyName: "UT2004" })).toBe("ut2004");
+    expect(suggestScheme({ module: "GenericModule", moduleDisplayName: "Factorio", friendlyName: "Factorio" })).toBe(
+      "factorio"
+    );
+  });
+
   it("falls back to copy scheme for unknown games", () => {
-    expect(suggestScheme({ module: "GenericModule", moduleDisplayName: "Factorio", friendlyName: "Factorio" })).toBe("copy");
+    expect(suggestScheme({ module: "GenericModule", moduleDisplayName: "Soldat", friendlyName: "Soldat" })).toBe("copy");
+    expect(
+      suggestScheme({ module: "GenericModule", moduleDisplayName: "Unreal Tournament 99", friendlyName: "UT99" })
+    ).toBe("copy");
     expect(suggestScheme({ module: "GenericModule", moduleDisplayName: "Counter-Strike: Source", friendlyName: "CSS" })).toBe("steam");
   });
 });
