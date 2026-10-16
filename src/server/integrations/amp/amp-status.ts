@@ -1,3 +1,5 @@
+import { promises as dns } from "node:dns";
+import { isIP } from "node:net";
 import type { DatabaseContext } from "../../db/client";
 import { listBindings, type GameServerBinding } from "../../domain/gameservers/bindings";
 import { broadcastServersChanged } from "../../realtime/event-bus";
@@ -23,11 +25,47 @@ export type ServerStatus = {
   players: number | null;
   maxPlayers: number | null;
   host: string;
+  /**
+   * IPv4 des Hosts, serverseitig aufgelöst. `steam://connect/` akzeptiert nur IP-Adressen
+   * (mit DNS-Namen verwirft Steam den Link ohne Meldung) — getestet 2026-10-16.
+   */
+  connectIp: string | null;
   port: number;
   connectScheme: GameServerBinding["connectScheme"];
   updatedAt: string;
   error: string | null;
 };
+
+const DNS_TTL_MS = 5 * 60 * 1000;
+const dnsCache = new Map<string, { ip: string | null; at: number }>();
+
+/** Löst die Hosts der Bindungen zu IPv4 auf (5 min Cache, IP-Literale direkt, Fehler = null). */
+export async function resolveBindingHosts(bindings: GameServerBinding[]): Promise<Map<string, string | null>> {
+  const out = new Map<string, string | null>();
+  const now = Date.now();
+  await Promise.all(
+    [...new Set(bindings.map((b) => b.host))].map(async (host) => {
+      if (isIP(host) === 4) {
+        out.set(host, host);
+        return;
+      }
+      const cached = dnsCache.get(host);
+      if (cached && now - cached.at < DNS_TTL_MS) {
+        out.set(host, cached.ip);
+        return;
+      }
+      let ip: string | null = null;
+      try {
+        ip = (await dns.lookup(host, { family: 4 })).address;
+      } catch {
+        ip = null;
+      }
+      dnsCache.set(host, { ip, at: now });
+      out.set(host, ip);
+    })
+  );
+  return out;
+}
 
 /** AMP ApplicationState (numerisch in GetInstances) -> Name. */
 const APP_STATE_NAMES: Record<number, string> = {
@@ -100,16 +138,21 @@ function statusEquals(a: ServerStatus | undefined, b: ServerStatus): boolean {
     a.maxPlayers === b.maxPlayers &&
     a.error === b.error &&
     a.host === b.host &&
+    a.connectIp === b.connectIp &&
     a.port === b.port
   );
 }
 
-function baseStatus(binding: GameServerBinding): Omit<ServerStatus, "instanceRunning" | "running" | "appState" | "players" | "maxPlayers" | "updatedAt" | "error"> {
+function baseStatus(
+  binding: GameServerBinding,
+  ips: Map<string, string | null>
+): Omit<ServerStatus, "instanceRunning" | "running" | "appState" | "players" | "maxPlayers" | "updatedAt" | "error"> {
   return {
     bindingId: binding.id,
     ampInstanceId: binding.ampInstanceId,
     ampInstanceName: binding.ampInstanceName,
     host: binding.host,
+    connectIp: ips.get(binding.host) ?? (isIP(binding.host) === 4 ? binding.host : null),
     port: binding.port,
     connectScheme: binding.connectScheme
   };
@@ -122,7 +165,8 @@ function baseStatus(binding: GameServerBinding): Omit<ServerStatus, "instanceRun
 export function applyInstancesSnapshot(
   raw: unknown,
   bindings: GameServerBinding[],
-  error: string | null = null
+  error: string | null = null,
+  ips: Map<string, string | null> = new Map()
 ): boolean {
   const byId = new Map<string, Record<string, unknown>>();
   if (!error) {
@@ -143,7 +187,7 @@ export function applyInstancesSnapshot(
 
     if (error) {
       next = {
-        ...baseStatus(binding),
+        ...baseStatus(binding, ips),
         instanceRunning: previous?.instanceRunning ?? false,
         running: previous?.running ?? false,
         appState: previous?.appState ?? "Undefined",
@@ -156,7 +200,7 @@ export function applyInstancesSnapshot(
       const row = byId.get(binding.ampInstanceId);
       if (!row) {
         next = {
-          ...baseStatus(binding),
+          ...baseStatus(binding, ips),
           instanceRunning: false,
           running: false,
           appState: "Undefined",
@@ -168,7 +212,7 @@ export function applyInstancesSnapshot(
       } else {
         const appState = appStateName(row.AppState ?? row.appState);
         next = {
-          ...baseStatus(binding),
+          ...baseStatus(binding, ips),
           instanceRunning: row.Running === true || row.running === true,
           running: appState === "Ready",
           appState,
@@ -210,10 +254,11 @@ async function pollOnce(context: DatabaseContext): Promise<void> {
     return;
   }
 
+  const ips = await resolveBindingHosts(bindings);
   let changed: boolean;
   try {
     const raw = await ampCall(settings, "ADSModule/GetInstances");
-    changed = applyInstancesSnapshot(raw, bindings);
+    changed = applyInstancesSnapshot(raw, bindings, null, ips);
     if (lastErrorLogged) {
       console.info("[Hermes] AMP-Status wieder erreichbar");
       lastErrorLogged = null;
@@ -224,7 +269,7 @@ async function pollOnce(context: DatabaseContext): Promise<void> {
       console.warn("[Hermes] AMP-Status-Poll fehlgeschlagen:", code);
       lastErrorLogged = code;
     }
-    changed = applyInstancesSnapshot(null, bindings, code);
+    changed = applyInstancesSnapshot(null, bindings, code, ips);
   }
 
   if (changed) {
@@ -269,6 +314,7 @@ export function stopAmpStatusService() {
 export function resetAmpStatusForTests() {
   stopAmpStatusService();
   cache.clear();
+  dnsCache.clear();
   polling = null;
   lastErrorLogged = null;
 }

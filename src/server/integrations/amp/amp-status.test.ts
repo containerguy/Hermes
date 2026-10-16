@@ -79,6 +79,7 @@ describe("amp-status", () => {
         "ampInstanceName",
         "appState",
         "bindingId",
+        "connectIp",
         "connectScheme",
         "error",
         "host",
@@ -90,6 +91,18 @@ describe("amp-status", () => {
         "updatedAt"
       ].sort()
     );
+  });
+
+  it("carries the resolved IP and treats an IP change as a status change", () => {
+    const cs2 = findInstance("Counter-Strike201");
+    const bindings = [binding("b-cs2", "Counter-Strike201", cs2.InstanceID)];
+    const host = bindings[0]!.host;
+    applyInstancesSnapshot(fixture, bindings, null, new Map([[host, "192.168.200.8"]]));
+    expect(getServerStatus("b-cs2")?.connectIp).toBe("192.168.200.8");
+    expect(applyInstancesSnapshot(fixture, bindings, null, new Map([[host, "192.168.200.8"]]))).toBe(false);
+    expect(applyInstancesSnapshot(fixture, bindings, null, new Map([[host, "192.168.200.99"]]))).toBe(true);
+    expect(applyInstancesSnapshot(fixture, bindings, null, new Map())).toBe(true);
+    expect(getServerStatus("b-cs2")?.connectIp).toBeNull();
   });
 
   it("does not report a change for an identical second snapshot", () => {

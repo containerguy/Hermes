@@ -44,6 +44,7 @@ const running: ServerStatus = {
   players: 3,
   maxPlayers: 32,
   host: "cs2.lanparty.example",
+  connectIp: "192.168.200.8",
   port: 27015,
   connectScheme: "steam",
   updatedAt: new Date().toISOString(),
@@ -64,7 +65,7 @@ describe("ServerPanel", () => {
     expect(rendered.container.textContent).toContain("Server läuft");
     expect(rendered.container.textContent).toContain("3 / 32");
     const link = rendered.container.querySelector("a.button-link") as HTMLAnchorElement | null;
-    expect(link?.getAttribute("href")).toBe("steam://connect/cs2.lanparty.example:27015");
+    expect(link?.getAttribute("href")).toBe("steam://connect/192.168.200.8:27015");
     expect(rendered.container.querySelector(".server-actions")).toBeNull();
     expect(rendered.container.querySelector(".server-dot--on")).toBeTruthy();
     await rendered.cleanup();

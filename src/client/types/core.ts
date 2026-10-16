@@ -120,6 +120,8 @@ export type ServerStatus = {
   players: number | null;
   maxPlayers: number | null;
   host: string;
+  /** IPv4 des Hosts (serverseitig aufgelöst) — für steam://connect, das keine DNS-Namen annimmt. */
+  connectIp: string | null;
   port: number;
   connectScheme: "steam" | "minecraft" | "copy";
   updatedAt: string;
