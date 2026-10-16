@@ -327,6 +327,7 @@ export const deMessages = {
   "events.server.restart": "Neustart",
   "events.server.more": "Mehr …",
   "events.server.update": "Update",
+  "events.server.updateNeedsStop": "Update erst nach „Stopp“ möglich.",
   "events.server.kill": "Abschießen",
   "events.server.confirmKill": "Serverprozess hart beenden? Nicht gespeicherte Spielstände gehen verloren.",
   "events.server.console": "Konsole",

@@ -59,6 +59,8 @@ export function ServerPanel({ bindingId, status, canManage, busy, onAction }: Se
           : t("events.server.status.off");
   const connect = status ? buildConnectAction(status) : null;
   const botKind = botKindForGame(status?.game);
+  // Spiel-Update nur bei angehaltenem Spiel (sonst verwaist AMP den Spielprozess)
+  const updateAllowed = status?.appState === "Stopped" || status?.appState === "Failed";
 
   async function copy(text: string) {
     const ok = await copyToClipboard(text);
@@ -134,7 +136,14 @@ export function ServerPanel({ bindingId, status, canManage, busy, onAction }: Se
           </button>
           {moreOpen ? (
             <>
-              <button type="button" className="secondary" disabled={busy} onClick={() => onAction("update")}>
+              {!updateAllowed ? <span className="muted server-console-hint">{t("events.server.updateNeedsStop")}</span> : null}
+              <button
+                type="button"
+                className="secondary"
+                disabled={busy || !updateAllowed}
+                title={updateAllowed ? undefined : t("events.server.updateNeedsStop")}
+                onClick={() => onAction("update")}
+              >
                 {t("events.server.update")}
               </button>
               <button type="button" className="secondary danger" disabled={busy} onClick={confirmKill}>

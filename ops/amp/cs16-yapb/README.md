@@ -62,33 +62,30 @@ Ein Update in AMP (SteamCMD mit `validate`) setzt `liblist.gam` auf das Original
 
 **Sofort:** Instanz stoppen, `./install.sh <pfad> --relink`, Instanz starten. Das dauert eine Sekunde und braucht kein Internet.
 
-**Dauerhaft (Vorschlag, im LAN zu prüfen):** eine zusätzliche Update-Stufe in AMP, die nach SteamCMD `--relink` ausführt.
+**Dauerhaft:** eine zusätzliche Update-Stufe in AMP, die nach SteamCMD `--relink` ausführt. Im LAN getestet am 2026-10-16 auf CS1601: Nach SteamCMD `validate` hängt die Stufe YaPB wieder ein, `yb version` antwortet.
 
-1. Skript und Namensliste in die Instanz legen, damit sie im AMP-Container erreichbar sind:
+1. Skript und Namensliste in die Instanz legen (`amp:amp`, `install.sh` ausführbar):
    - Host: `/home/amp/.ampdata/instances/CS1601/hermes-yapb/`
    - Container: `/AMP/hermes-yapb/`
-2. In der Update-Liste der Instanz eine Stufe nach dem SteamCMD-Eintrag anhängen. Die Liste steht in `GenericModule.kvp` unter `App.UpdateSources` oder in der dort per `@IncludeJson[…]` eingebundenen `…updates.json`:
+2. Instanz mit `ampinstmgr stop CS1601` stoppen und `GenericModule.kvp` sichern.
+3. In `GenericModule.kvp` die einzeilige JSON-Liste unter `App.UpdateSources` um einen Eintrag ergänzen. AMP erwartet numerische Werte:
+   - `UpdateSourcePlatform` 2 = Linux
+   - `UpdateSource` 8 = Executable
+   - `UpdateSourceArch` 3
+
+   Pfade sind relativ zum Instanzverzeichnis:
 
    ```json
-   {
-     "UpdateStageName": "YaPB wieder einhängen (Hermes)",
-     "UpdateSourcePlatform": "Linux",
-     "UpdateSource": "Executable",
-     "UpdateSourceData": "/bin/bash",
-     "UpdateSourceArgs": "/AMP/hermes-yapb/install.sh /AMP/counter-strike/90/cstrike --relink",
-     "SkipOnFailure": false
-   }
+   {"UpdateStageName":"YaPB wieder einhaengen (Hermes)","UpdateStageDescription":null,"UpdateSourcePlatform":2,"UpdateSource":8,"UpdateSourceArch":3,"UpdateSourceData":"/bin/bash","UpdateSourceArgs":"./hermes-yapb/install.sh ./counter-strike/90/cstrike --relink","UpdateSourceVersion":null,"UpdateSourceExtra":null,"UpdateSourceTarget":null,"UnzipUpdateSource":false,"OverwriteExistingFiles":false,"ForceDownloadPlatform":0,"UpdateSourceConditionSetting":null,"UpdateSourceConditionValue":null,"DeleteAfterExtract":false,"RunInBackground":false,"SkipOnFailure":false,"ProcessToolOutput":false,"OneShot":false}
    ```
 
-3. Prüfen:
-   - In AMP „Update“ auslösen.
-   - `--check` zeigt danach wieder „zeigt auf YaPB“.
-   - `yb version` antwortet.
+4. Instanz starten und in AMP „Update“ auslösen. `--check` zeigt danach „zeigt auf YaPB“.
 
-Offene Punkte für den LAN-Test:
-- Feldnamen und Pfadvariablen gegen die echte Datei der Instanz abgleichen.
-- Prüfen, ob AMP die Datei beim Aktualisieren der Vorlagen („Fetch latest configs“) überschreibt.
-- Falls ja, bleibt `--relink` nach Updates ein Handgriff. Der Konsolenhinweis in Hermes nennt ihn.
+Die Stufe übersteht das Zurückschreiben der kvp beim Stoppen. Ob „Fetch latest configs“ bzw. ein Template-Update die Liste überschreibt, ist nicht geprüft. Die Instanz stammt aus `CubeCoders-AMPTemplates`, ein Überschreiben ist also wahrscheinlich. Dann bleibt `--relink` der Handgriff. Rückweg: die gesicherte kvp bei gestoppter Instanz zurückkopieren.
+
+**Update nur bei gestopptem Spiel:**
+- Ein `Core/UpdateApplication` bei laufendem Spiel lässt den `hlds_linux` verwaist weiterlaufen. Er hält Port 27015, und der folgende Start scheitert mit „Address already in use“.
+- Hermes bietet „Update“ deshalb nur an, wenn AMP das Spiel als gestoppt meldet (`Stopped` oder `Failed`). Sonst antwortet es mit `409 amp_update_erst_stoppen`.
 
 ## Hermes
 

@@ -160,6 +160,27 @@ describe("ServerPanel", () => {
     await rendered.cleanup();
   });
 
+  it("allows the game update only while the game is stopped", async () => {
+    const onAction = vi.fn();
+    const open = async (status: ServerStatus) => {
+      const rendered = await render(<ServerPanel bindingId="b-cs2" status={status} canManage busy={false} onAction={onAction} />);
+      const more = Array.from(rendered.container.querySelectorAll("button")).find((b) => b.textContent?.trim() === "Mehr …")!;
+      await act(async () => {
+        more.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+        await flush();
+      });
+      const update = Array.from(rendered.container.querySelectorAll("button")).find((b) => b.textContent?.trim() === "Update")!;
+      return { rendered, update };
+    };
+    const running1 = await open(running);
+    expect(running1.update.disabled).toBe(true);
+    expect(running1.rendered.container.textContent).toContain("Update erst nach „Stopp“ möglich.");
+    await running1.rendered.cleanup();
+    const stopped = await open({ ...running, running: false, appState: "Stopped" });
+    expect(stopped.update.disabled).toBe(false);
+    await stopped.rendered.cleanup();
+  });
+
   it("offers no bot controls for games without bots", async () => {
     const rendered = await render(
       <ServerPanel bindingId="b-mc" status={{ ...running, game: "Minecraft" }} canManage busy={false} onAction={vi.fn()} />

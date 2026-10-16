@@ -20,6 +20,16 @@ export function assertActionOk(raw: unknown) {
   }
 }
 
+/**
+ * Spiel-Update nur bei angehaltenem Spiel. Läuft es noch, verwaist AMP den Spielprozess bei
+ * `Core/UpdateApplication` (Port bleibt belegt, folgender Start scheitert; LAN-Test CS1601).
+ */
+const UPDATE_ALLOWED_STATES = new Set(["Stopped", "Failed"]);
+
+export function updateBlockedReason(status: ReturnType<typeof getServerStatus>): string | null {
+  return status && UPDATE_ALLOWED_STATES.has(status.appState) ? null : "amp_update_erst_stoppen";
+}
+
 export async function runControlAction(settings: HermesSettings, binding: GameServerBinding, action: ControlAction) {
   const status = getServerStatus(binding.id);
   switch (action) {

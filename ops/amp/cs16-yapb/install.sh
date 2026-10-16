@@ -163,7 +163,7 @@ install() {
     log "conf/lang/de_names.cfg existiert schon – bleibt unverändert"
   else
     run cp "$SCRIPT_DIR/de_names.cfg" "$CSTRIKE/addons/yapb/conf/lang/de_names.cfg"
-    log "Bot-Namen: conf/lang/de_names.cfg angelegt"
+    [[ $DRY_RUN -eq 1 ]] || log "Bot-Namen: conf/lang/de_names.cfg angelegt"
   fi
 
   link

@@ -19,7 +19,12 @@ import { checkRateLimit, recordRateLimitFailure } from "../auth/rate-limits";
 import { fetchAmpInstances } from "../integrations/amp/amp-client";
 import { ampInstanceCall, unwrapAmpData } from "../integrations/amp/amp-session";
 import { getAllServerStatus, getServerStatus, pollNow } from "../integrations/amp/amp-status";
-import { CONTROL_ACTIONS, runControlAction, type ControlAction } from "../integrations/amp/amp-control";
+import {
+  CONTROL_ACTIONS,
+  runControlAction,
+  updateBlockedReason,
+  type ControlAction
+} from "../integrations/amp/amp-control";
 import { MAX_CONSOLE_PARTS, splitConsoleCommands } from "../integrations/amp/console-split";
 import { readSettings, type HermesSettings } from "../settings";
 import { BotRequestError, botKindForGame, botRequestSchema, buildBotCommands } from "../../shared/bot-commands";
@@ -362,6 +367,11 @@ export function createAmpIntegrationRouter(context: DatabaseContext) {
     const guard = requireServerManager(request, response);
     if (!guard) return;
     if (!requireCsrf(context, request, response)) return;
+    const blocked = action === "update" ? updateBlockedReason(getServerStatus(guard.binding.id)) : null;
+    if (blocked) {
+      response.status(409).json({ error: blocked });
+      return;
+    }
 
     const rateLimit = checkRateLimit(context, {
       scope: "amp_control",

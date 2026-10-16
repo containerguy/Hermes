@@ -9,7 +9,7 @@ import { CSRF_HEADER } from "../auth/csrf";
 import { bootstrapAdmin } from "../db/bootstrap-admin";
 import { createHermesApp } from "../app";
 import { setAmpFetchForTests } from "../integrations/amp/amp-session";
-import { resetAmpStatusForTests } from "../integrations/amp/amp-status";
+import { pollNow, resetAmpStatusForTests } from "../integrations/amp/amp-status";
 import { maskConsoleSecrets } from "./amp-routes";
 
 type StartedApp = Awaited<ReturnType<typeof createHermesApp>>;
@@ -18,6 +18,17 @@ type AmpCall = { endpoint: string; body: Record<string, unknown> };
 let started: StartedApp | undefined;
 let databasePath: string;
 let ampCalls: AmpCall[] = [];
+/** AppState der CS2-Instanz in GetInstances (20 = Ready, 0 = Stopped). */
+let cs2AppState = 20;
+
+function instancesWithCs2State() {
+  return (fixture as Array<{ AvailableInstances: Array<Record<string, unknown>> }>).map((target) => ({
+    ...target,
+    AvailableInstances: target.AvailableInstances.map((instance) =>
+      instance.InstanceName === "Counter-Strike201" ? { ...instance, AppState: cs2AppState } : instance
+    )
+  }));
+}
 
 const CS2_ID = (fixture as Array<{ AvailableInstances: Array<{ InstanceID: string; InstanceName: string }> }>)
   .flatMap((t) => t.AvailableInstances)
@@ -25,6 +36,7 @@ const CS2_ID = (fixture as Array<{ AvailableInstances: Array<{ InstanceID: strin
 
 function installAmpMock() {
   ampCalls = [];
+  cs2AppState = 20;
   const fetchMock = vi.fn(async (url: unknown, init?: { body?: unknown }) => {
     // nicht-gierig: Proxy-Pfade enthalten ein zweites "/API/" (…/Servers/<id>/API/Core/Stop)
     const endpoint = String(url).replace(/^.*?\/API\//, "");
@@ -43,7 +55,7 @@ function installAmpMock() {
         Message: "You do not have permission to use this method at this time. This method requires the Session.Exists permission."
       };
     } else if (endpoint === "ADSModule/GetInstances") {
-      payload = fixture;
+      payload = instancesWithCs2State();
     } else if (endpoint.endsWith("/API/Core/GetUpdates")) {
       payload = {
         ConsoleEntries: [
@@ -191,11 +203,23 @@ describe("AMP control + status (Phase 15-02)", () => {
       .expect(200);
     expect(ampCalls.some((c) => c.endpoint === `ADSModule/Servers/${CS2_ID}/API/Core/Stop`)).toBe(true);
 
+    // Spiel-Update nur bei gestopptem Spiel (sonst verwaist AMP den Spielprozess)
+    const updateEndpoint = `ADSModule/Servers/${CS2_ID}/API/Core/UpdateApplication`;
+    const runningUpdate = await manager.agent
+      .post(`/api/integrations/amp/instances/${bindingId}/update`)
+      .set(CSRF_HEADER, manager.csrf)
+      .expect(409);
+    expect(runningUpdate.body.error).toBe("amp_update_erst_stoppen");
+    expect(ampCalls.some((c) => c.endpoint === updateEndpoint)).toBe(false);
+    cs2AppState = 0;
+    await pollNow();
     await manager.agent
       .post(`/api/integrations/amp/instances/${bindingId}/update`)
       .set(CSRF_HEADER, manager.csrf)
       .expect(200);
-    expect(ampCalls.some((c) => c.endpoint === `ADSModule/Servers/${CS2_ID}/API/Core/UpdateApplication`)).toBe(true);
+    expect(ampCalls.some((c) => c.endpoint === updateEndpoint)).toBe(true);
+    cs2AppState = 20;
+    await pollNow();
 
     // Unbekannte Aktion / unbekannte Bindung
     await manager.agent

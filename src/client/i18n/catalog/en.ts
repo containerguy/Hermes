@@ -328,6 +328,7 @@ export const enMessages: { [K in keyof typeof deMessages]: string } = {
   "events.server.restart": "Restart",
   "events.server.more": "More …",
   "events.server.update": "Update",
+  "events.server.updateNeedsStop": "Update is only possible after “Stop”.",
   "events.server.kill": "Kill",
   "events.server.confirmKill": "Kill the server process? Unsaved game state will be lost.",
   "events.server.console": "Console",
