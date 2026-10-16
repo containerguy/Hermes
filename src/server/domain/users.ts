@@ -89,3 +89,8 @@ export function canCreateEvent(actor: { role: UserRole }) {
 export function canAssignRoles(actor: { role: UserRole }) {
   return actor.role === "admin";
 }
+
+/** Phase 15 (D-09): Gameserver starten/stoppen/updaten und Konsole nutzen — ab manager. */
+export function canManageServers(actor: { role: UserRole }) {
+  return actor.role === "admin" || actor.role === "manager";
+}

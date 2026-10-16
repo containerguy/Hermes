@@ -75,22 +75,56 @@ const settingsObjectSchema = z.object({
   /** Anzeigename für PayPal-Empfänger in Kassenliste. Leer = kein Hinweis. */
   pizzaPaypalName: z.string().trim().max(120),
   /** Bargeld-Empfänger Hinweis in Kassenliste. Leer = kein Hinweis. */
-  pizzaCashRecipient: z.string().trim().max(120)
+  pizzaCashRecipient: z.string().trim().max(120),
+  /**
+   * CubeCoders AMP: Gameserver-Modul. Zugangsdaten und CA kommen ausschließlich aus der Umgebung
+   * (HERMES_AMP_USERNAME, HERMES_AMP_PASSWORD, HERMES_AMP_CA_FILE), nie aus app_settings.
+   */
+  ampIntegrationEnabled: z.boolean(),
+  /** Basis-URL der AMP-Installation, z. B. http://192.168.1.10:8080/ (ohne /API) */
+  ampBaseUrl: z.string().max(512),
 });
 
-export const settingsSchema = settingsObjectSchema.superRefine((data, ctx) => {
-  if (!data.kioskStreamEnabled) {
-    return;
-  }
-  const parsed = kioskSecretSchema.safeParse(data.kioskStreamSecret);
-  if (!parsed.success) {
-    ctx.addIssue({
-      code: z.ZodIssueCode.custom,
-      path: ["kioskStreamSecret"],
-      message: "kiosk_geheimnis_erforderlich"
-    });
-  }
-});
+export const settingsSchema = settingsObjectSchema
+  .superRefine((data, ctx) => {
+    if (!data.kioskStreamEnabled) {
+      return;
+    }
+    const parsed = kioskSecretSchema.safeParse(data.kioskStreamSecret);
+    if (!parsed.success) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["kioskStreamSecret"],
+        message: "kiosk_geheimnis_erforderlich"
+      });
+    }
+  })
+  .superRefine((data, ctx) => {
+    if (!data.ampIntegrationEnabled) {
+      return;
+    }
+    const trimmedUrl = data.ampBaseUrl.trim();
+    if (!trimmedUrl) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["ampBaseUrl"],
+        message: "amp_url_erforderlich"
+      });
+      return;
+    }
+    try {
+      const parsed = new URL(/^https?:\/\//i.test(trimmedUrl) ? trimmedUrl : `http://${trimmedUrl}`);
+      if (parsed.protocol !== "http:" && parsed.protocol !== "https:") {
+        throw new Error("bad");
+      }
+    } catch {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["ampBaseUrl"],
+        message: "amp_url_ungueltig"
+      });
+    }
+  });
 
 /** Für partielle Updates/Imports ohne `.partial()` auf ein Schema mit Refinement. */
 export const settingsPartialSchema = settingsObjectSchema.partial();
@@ -123,6 +157,7 @@ export type PublicHermesSettings = Pick<
   | "pizzaPaypalHandle"
   | "pizzaPaypalName"
   | "pizzaCashRecipient"
+  | "ampIntegrationEnabled"
 >;
 
 export function pickPublicSettings(full: HermesSettings): PublicHermesSettings {
@@ -149,7 +184,8 @@ export function pickPublicSettings(full: HermesSettings): PublicHermesSettings {
     featuresPizzaEnabled: full.featuresPizzaEnabled,
     pizzaPaypalHandle: full.pizzaPaypalHandle,
     pizzaPaypalName: full.pizzaPaypalName,
-    pizzaCashRecipient: full.pizzaCashRecipient
+    pizzaCashRecipient: full.pizzaCashRecipient,
+    ampIntegrationEnabled: full.ampIntegrationEnabled
   };
 }
 
@@ -180,7 +216,9 @@ export const defaultSettings: HermesSettings = {
   featuresPizzaEnabled: false,
   pizzaPaypalHandle: "",
   pizzaPaypalName: "",
-  pizzaCashRecipient: ""
+  pizzaCashRecipient: "",
+  ampIntegrationEnabled: false,
+  ampBaseUrl: "",
 };
 
 function nowIso() {

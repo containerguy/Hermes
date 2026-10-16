@@ -82,6 +82,34 @@ describe("app flow", () => {
     expect(gameEventsColumns).toContain("details");
     expect(gameEventsColumns).not.toContain("server_host");
     expect(gameEventsColumns).not.toContain("connection_info");
+    // Phase 15: Bindung an eine AMP-Instanz (0020_game_server_bindings.sql)
+    expect(gameEventsColumns).toContain("server_binding_id");
+    const bindingColumns = sqlite
+      .prepare("SELECT name FROM pragma_table_info('game_server_bindings') ORDER BY cid")
+      .all()
+      .map((row) => (row as { name: string }).name);
+    expect(bindingColumns).toEqual(
+      expect.arrayContaining([
+        "game_title_norm",
+        "amp_instance_id",
+        "amp_instance_name",
+        "host",
+        "port",
+        "connect_scheme",
+        "enabled"
+      ])
+    );
+    const bindingIndexes = sqlite
+      .prepare("SELECT name FROM sqlite_master WHERE type = 'index' AND tbl_name = 'game_server_bindings'")
+      .all()
+      .map((row) => (row as { name: string }).name);
+    expect(bindingIndexes).toContain("game_server_bindings_title_unique");
+    const leakedKeys = sqlite
+      .prepare(
+        "SELECT key FROM app_settings WHERE key IN ('ampUsername', 'ampPassword', 'ampTlsSkipVerify')"
+      )
+      .all();
+    expect(leakedKeys).toHaveLength(0);
 
     const apiTokenColumns = sqlite
       .prepare("SELECT name FROM pragma_table_info('user_api_tokens') ORDER BY cid")
@@ -1145,7 +1173,9 @@ describe("app flow", () => {
       featuresPizzaEnabled: false,
       pizzaPaypalHandle: "",
       pizzaPaypalName: "",
-      pizzaCashRecipient: ""
+      pizzaCashRecipient: "",
+      ampIntegrationEnabled: false,
+      ampBaseUrl: "",
     };
 
     await adminAgent
@@ -1674,6 +1704,19 @@ describe("app flow", () => {
       .expect(200);
 
     await request(started!.app).get("/api/kiosk/events?id=kiosk-test-secret-ok").expect(403);
+  });
+
+  it("returns amp_deaktiviert for /api/integrations/amp/instances when integration is off", async () => {
+    await request(started!.app).get("/api/integrations/amp/instances").expect(401);
+
+    const adminAgent = request.agent(started!.app);
+    await login(adminAgent, "hauptadmin");
+    await adminAgent
+      .get("/api/integrations/amp/instances")
+      .expect(403)
+      .expect((response) => {
+        expect(response.body.error).toBe("amp_deaktiviert");
+      });
   });
 
   it("lets organizers create events and cancel their own, but not other users events", async () => {

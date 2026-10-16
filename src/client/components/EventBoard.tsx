@@ -1,5 +1,5 @@
 import React, { FormEvent, useEffect, useState } from "react";
-import type { GameEvent, User } from "../types/core";
+import type { GameEvent, GameServerBinding, ServerStatus, User } from "../types/core";
 import { requestJson } from "../api/request";
 import { ApiError, getErrorMessage } from "../errors/errors";
 import { useI18n } from "../i18n/I18nContext";
@@ -7,19 +7,25 @@ import { useBrandIconSrc } from "../lib/BrandingContext";
 import { fromDatetimeLocal, toDatetimeLocal } from "../lib/event-format";
 import { useCompactTouchShell } from "../lib/useCompactTouchShell";
 import { EventCard } from "./EventCard";
+import { normalizeGameTitle } from "../../shared/game-title";
+import type { ServerAction } from "../gameservers/ServerPanel";
+import { publishServerStatus } from "../gameservers/server-status-bus";
+import { useServerStatus } from "../gameservers/use-server-status";
 
 export function EventBoard({
   currentUser,
   mode = "events",
   emptyBoardTitle = "",
   emptyBoardBody = "",
-  gameCatalog = []
+  gameCatalog = [],
+  ampIntegrationEnabled = false
 }: {
   currentUser: User | null;
   mode?: "events" | "manager";
   emptyBoardTitle?: string;
   emptyBoardBody?: string;
   gameCatalog?: string[];
+  ampIntegrationEnabled?: boolean;
 }) {
   const { t, locale } = useI18n();
   const markSrc = useBrandIconSrc();
@@ -46,12 +52,44 @@ export function EventBoard({
   const compactTouchShell = useCompactTouchShell();
   const [expandedEventId, setExpandedEventId] = useState<string | null>(null);
   const [createFlowOpen, setCreateFlowOpen] = useState(false);
+  // Phase 15: Bindungen Spiel -> AMP-Instanz (fürs Formular) und Live-Status (für die Karten)
+  const [bindings, setBindings] = useState<GameServerBinding[]>([]);
+  const [linkServer, setLinkServer] = useState(true);
+  const [serverBusy, setServerBusy] = useState<Record<string, boolean>>({});
+  const { byBinding: serverStatus, refresh: refreshServerStatus } = useServerStatus(
+    ampIntegrationEnabled,
+    currentUser?.id
+  );
+  const canManageServers = currentUser?.role === "admin" || currentUser?.role === "manager";
 
   const canCreate =
     currentUser?.role === "manager" ||
     currentUser?.role === "organizer" ||
     currentUser?.role === "admin";
   const showCreateForm = canCreate && mode === "manager";
+  const bindingFormVisible = ampIntegrationEnabled && showCreateForm;
+
+  useEffect(() => {
+    if (!bindingFormVisible || !currentUser) {
+      setBindings([]);
+      return undefined;
+    }
+    let cancelled = false;
+    void requestJson<{ bindings: GameServerBinding[] }>("/api/integrations/amp/bindings")
+      .then((result) => {
+        if (!cancelled) setBindings(result.bindings);
+      })
+      .catch(() => {
+        if (!cancelled) setBindings([]);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [bindingFormVisible, currentUser?.id]);
+
+  const matchedBinding = bindings.find(
+    (binding) => binding.gameTitleNorm === normalizeGameTitle(eventDraft.gameTitle)
+  );
 
   async function loadEvents() {
     if (!currentUser) {
@@ -147,6 +185,17 @@ export function EventBoard({
       source.addEventListener("events_changed", () => {
         loadEvents().catch(() => setLiveState("polling"));
       });
+
+      source.addEventListener("servers_changed", (message) => {
+        try {
+          const data = JSON.parse((message as MessageEvent<string>).data) as { servers?: ServerStatus[] };
+          if (Array.isArray(data.servers)) {
+            publishServerStatus(data.servers);
+          }
+        } catch {
+          /* ungültige Nutzlast ignorieren */
+        }
+      });
     }
 
     const poll = window.setInterval(() => {
@@ -178,7 +227,8 @@ export function EventBoard({
             eventDraft.startMode === "scheduled"
               ? fromDatetimeLocal(eventDraft.startsAt)
               : undefined,
-          details: eventDraft.details.trim() || undefined
+          details: eventDraft.details.trim() || undefined,
+          serverBindingId: matchedBinding ? (linkServer ? matchedBinding.id : null) : undefined
         })
       });
       setEventDraft({
@@ -186,6 +236,7 @@ export function EventBoard({
         gameTitle: "",
         details: ""
       });
+      setLinkServer(true);
       await loadEvents();
       setMessage(t("events.msg.saved"));
       setCreateFlowOpen(false);
@@ -318,6 +369,37 @@ export function EventBoard({
     if (!resolvedCatalog.includes(eventDraft.gameTitle)) {
       setEventDraft((draft) => ({ ...draft, gameTitle: "" }));
     }
+  }
+
+  async function runServerAction(bindingId: string, action: ServerAction) {
+    setServerBusy((prev) => ({ ...prev, [bindingId]: true }));
+    setError("");
+    try {
+      await requestJson<{ ok: boolean }>(
+        `/api/integrations/amp/instances/${encodeURIComponent(bindingId)}/${action}`,
+        { method: "POST" }
+      );
+      await refreshServerStatus(true);
+      setMessage(t("events.server.msg.done"));
+    } catch (caught) {
+      setError(getErrorMessage(caught, locale));
+    } finally {
+      setServerBusy((prev) => ({ ...prev, [bindingId]: false }));
+    }
+  }
+
+  function serverBindingFor(event: GameEvent) {
+    if (!ampIntegrationEnabled || !event.serverBindingId) {
+      return undefined;
+    }
+    const bindingId = event.serverBindingId;
+    return {
+      bindingId,
+      status: serverStatus[bindingId] ?? null,
+      canManage: canManageServers,
+      busy: Boolean(serverBusy[bindingId]),
+      onAction: (action: ServerAction) => void runServerAction(bindingId, action)
+    };
   }
 
   function isJoinDisabled(event: GameEvent) {
@@ -455,6 +537,24 @@ export function EventBoard({
           />
         </label>
       </div>
+      {ampIntegrationEnabled && matchedBinding ? (
+        <div className="event-form-server" role="status">
+          <p className="muted">
+            {t("events.form.serverHint", {
+              title: matchedBinding.displayTitle,
+              endpoint: `${matchedBinding.host}:${matchedBinding.port}`
+            })}
+          </p>
+          <label className="checkbox-label">
+            <input
+              type="checkbox"
+              checked={linkServer}
+              onChange={(ev) => setLinkServer(ev.target.checked)}
+            />
+            {t("events.form.linkServer")}
+          </label>
+        </div>
+      ) : null}
       <label>
         {t("events.form.details")}
         <textarea
@@ -550,6 +650,7 @@ export function EventBoard({
                 onArchive={() => changeEventStatus(event.id, "archive")}
                 onCancel={() => changeEventStatus(event.id, "cancel")}
                 onSoftDelete={() => softDeleteEvent(event.id)}
+                server={serverBindingFor(event)}
               />
             ))}
             {events.length === 0 ? (

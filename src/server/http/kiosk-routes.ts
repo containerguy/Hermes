@@ -3,8 +3,25 @@ import { timingSafeEqual } from "node:crypto";
 import { Router } from "express";
 import type { DatabaseContext } from "../db/client";
 import { gameEvents, users } from "../db/schema";
+import { getServerStatus } from "../integrations/amp/amp-status";
 import { readSettings } from "../settings";
 import { refreshEventStatuses } from "./event-routes";
+
+/** Phase 15 (D-14): Serverstatus für den Kiosk — nur diese sechs Felder, keine Geheimnisse. */
+function serializeKioskServer(bindingId: string | null) {
+  const status = bindingId ? getServerStatus(bindingId) : null;
+  if (!status) {
+    return null;
+  }
+  return {
+    running: status.running,
+    appState: status.appState,
+    players: status.players,
+    maxPlayers: status.maxPlayers,
+    host: status.host,
+    port: status.port
+  };
+}
 
 function safeEqualString(a: string, b: string) {
   const bufA = Buffer.from(a, "utf8");
@@ -40,6 +57,7 @@ function serializeKioskEvent(context: DatabaseContext, event: typeof gameEvents.
     createdByUsername: creator?.username ?? "unbekannt",
     joinedCount,
     myParticipation: null,
+    server: serializeKioskServer(event.serverBindingId ?? null),
     cancelledAt: event.cancelledAt,
     archivedAt: event.archivedAt,
     createdAt: event.createdAt,

@@ -21,6 +21,7 @@
 - [ ] **Phase 10: Admin Theme System, Backgrounds, and Copy Refresh** - Admin-selectable gaming theme presets plus custom CSS-token themes, background-image selection from S3 presets, and a project-wide copy refresh to a modern/concise/clear voice.
 - [ ] **Phase 11: Admin Bulk User Import** - CSV/JSON bulk import in AdminPanel with preview, dry-run, Zod validation, duplicate detection, transactional write, and aggregated audit logging.
 - [ ] **Phase 12: Audio and Haptic Notification UX** - Surface audio + haptic affordances in Web Push payloads and the in-app realtime path, with feature-detected, settings-toggleable behavior.
+- [ ] **Phase 15: AMP-Gameserver-Modul** - Hermes als zentrale Oberfläche für die Gameserver: Bindungen Spiel→AMP-Instanz, Live-Status und Verbinden in der Event-Karte, Verwaltung (Start/Stop/Konsole) ab `manager`, Auto-Start/-Stop, Push „Server läuft“. Zugangsdaten nur per Env, TLS gegen eigene CA.
 - [ ] **Phase 13: CI Node 24 Readiness** - Pin GitHub Actions to versions that support Node.js 24 and verify `npm ci/test/build/audit` plus Docker build/push remain green.
 
 ## Phase Details
@@ -86,6 +87,23 @@ Plans:
 - [ ] 12-02-client-toggles-sw-and-haptic-PLAN.md — New `src/client/haptic.ts` feature-detected helper (D-05/D-06/D-12) + tests, two Profile toggles "Hörbare Signale" / "Haptisches Feedback" in LoginPanel (D-08), in-app haptic on `open → ready` and `joined → cancelled` realtime transitions in EventBoard (D-07), `public/sw.js` passthrough of server-finalized `silent`/`vibrate` (removes client-side fallback) (NOTIF-01 client, depends on 12-01).
 **UI hint**: yes
 
+### Phase 15: AMP-Gameserver-Modul
+**Goal**: Spieler finden und betreten Gameserver aus Hermes heraus; die Orga verwaltet die AMP-Instanzen ab Rolle `manager` in Hermes, ohne das AMP-Panel zu brauchen.
+**Depends on**: Phase 8 (Branch `feature/amp-integration`, rebased 2026-10-15)
+**Requirements**: AMP-01, AMP-02, AMP-03, AMP-04, AMP-05
+**Success Criteria** (what must be TRUE):
+  1. AMP-Zugangsdaten liegen nur in Env-Variablen; `app_settings`, Settings-Export und Backups enthalten keine Zugangsdaten; TLS zum Controller wird gegen `HERMES_AMP_CA_FILE` verifiziert.
+  2. Ein Event mit gebundenem Spiel zeigt Status, Spielerzahl und einen funktionierenden Verbinden-Knopf; Statusänderungen kommen ohne Reload.
+  3. `manager` und `admin` können Instanzen starten/stoppen/neu starten/updaten und die Konsole nutzen; `user`/`organizer` erhalten serverseitig 403; jede Aktion steht im Audit-Log.
+  4. Optional aktivierbar: Auto-Start bei `ready`, Auto-Stop nach Leerlauf, Push bei laufendem Server — alles standardmäßig aus.
+**Plans:** 4 plans
+Plans:
+- [x] 15-01-zugang-und-bindings-PLAN.md — Env-Zugang, Session-Cache, CA-Verifikation, Migration `0020_game_server_bindings.sql`, Bindungs-Domain, Admin-Pflege (AMP-01, AMP-02).
+- [x] 15-02-status-und-steuerung-PLAN.md — Statusdienst + SSE, `canManageServers`, Steuer-/Konsolen-Endpunkte mit Audit + Rate-Limit, Kiosk-Status (AMP-03, AMP-04).
+- [x] 15-03-ui-serverpanel-PLAN.md — ServerPanel/Konsole in der Event-Karte, Verbinden-Links, Event-Formular mit Bindungsauswahl (AMP-03, AMP-04).
+- [ ] 15-04-automatik-und-haertung-PLAN.md — Auto-Start/-Stop, Push, README/Compose, e2e (AMP-05).
+**UI hint**: yes
+
 ### Phase 13: CI Node 24 Readiness
 **Goal**: GitHub Actions CI is ready for the Node.js 24 cutover (June 2026) without breaking any existing job.
 **Depends on**: Phase 8
@@ -107,6 +125,7 @@ Plans:
 | 11. Admin Bulk User Import | 0/2 | Not started | — |
 | 12. Audio and Haptic Notification UX | 0/2 | Not started | — |
 | 13. CI Node 24 Readiness | 0/1 | Not started | — |
+| 15. AMP-Gameserver-Modul | 3/4 | In progress (15-01…15-03 complete 2026-10-16) | — |
 
 ## Out-of-band: Pizza Ordering System
 
@@ -116,4 +135,5 @@ Shipped between 2026-05-01 and 2026-05-16 without a v1.2 phase track (4 commits)
 
 Next up:
 
+- Phase 15 (AMP-Gameserver-Modul) ist geplant und nimmt Migration `0019`; Theme/Audio rücken auf `0020`+.
 - v1.2 is paused after Phase 9. Resuming would mean Phase 10 (Theme System) per the original sequence. Renumber the theme/audio migrations before starting (next free number is `0019`).

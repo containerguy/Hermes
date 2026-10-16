@@ -7,6 +7,7 @@ import type {
 } from "../types/core";
 import { useI18n } from "../i18n/I18nContext";
 import { PizzaMenuJsonAdmin } from "../pizza/PizzaMenuJsonAdmin";
+import { BindingsAdmin } from "../gameservers/BindingsAdmin";
 
 function generateKioskStreamSecret(): string {
   const bytes = new Uint8Array(16);
@@ -389,6 +390,36 @@ export function AdminPanelBetrieb({
             </>
           ) : null}
         </fieldset>
+        <fieldset className="admin-fieldset">
+          <legend>{t("admin.amp.title")}</legend>
+          <label className="checkbox-label">
+            <input
+              type="checkbox"
+              checked={settings.ampIntegrationEnabled}
+              onChange={(event) =>
+                onSettingsChange({ ...settings, ampIntegrationEnabled: event.target.checked })
+              }
+            />
+            {t("admin.amp.enabled")}
+          </label>
+          <p className="muted">{t("admin.amp.help")}</p>
+          {settings.ampIntegrationEnabled ? (
+            <>
+              <label>
+                {t("admin.amp.baseUrl")}
+                <input
+                  value={settings.ampBaseUrl}
+                  onChange={(event) => onSettingsChange({ ...settings, ampBaseUrl: event.target.value })}
+                  maxLength={512}
+                  spellCheck={false}
+                  autoComplete="off"
+                  placeholder="https://amp-ctl.lanparty.example"
+                />
+              </label>
+              <p className="muted">{t("admin.amp.envHint")}</p>
+            </>
+          ) : null}
+        </fieldset>
         <button type="submit">{t("admin.settings.save")}</button>
       </form>
 
@@ -516,6 +547,7 @@ export function AdminPanelBetrieb({
         ) : null}
       </section>
       {settings.featuresPizzaEnabled ? <PizzaMenuJsonAdmin /> : null}
+      {settings.ampIntegrationEnabled ? <BindingsAdmin gameCatalog={settings.gameCatalog} /> : null}
     </>
   );
 }

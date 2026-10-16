@@ -24,6 +24,14 @@ These requirements promote captured backlog todos into formal phases. Scope cove
 
 - [ ] **NOTIF-01**: Web Push payloads and the in-app notification path expose audio/haptic affordances where the platform supports them. A profile/settings toggle controls "audible cues" and "haptic feedback"; calls to `navigator.vibrate` and notification audio fields are feature-detected and degrade silently when unsupported (no errors). OS/browser overrides are documented in the toggle description.
 
+### Integrations — Gameserver (CubeCoders AMP)
+
+- [x] **AMP-01**: Hermes verbindet sich als Dienstkonto mit genau einer gecachten Session zum AMP-Controller. Zugangsdaten (`HERMES_AMP_USERNAME`, `HERMES_AMP_PASSWORD`, optional `HERMES_AMP_REMEMBER_TOKEN_FILE`) und CA (`HERMES_AMP_CA_FILE`) kommen ausschließlich aus der Umgebung; `app_settings` enthält keine Zugangsdaten; TLS wird verifiziert.
+- [x] **AMP-02**: Admins binden Spiele aus dem Katalog an AMP-Instanzen (Instanz, Host, Port, Verbinden-Schema). Events erhalten ihre Bindung automatisch über die normalisierte Titelgleichheit und können sie abwählen.
+- [x] **AMP-03**: Jeder angemeldete Nutzer sieht pro gebundenem Event Live-Status (aus/startet/läuft), Spielerzahl und einen Verbinden-Knopf (`steam://connect/…` oder Adresse kopieren); der Kiosk zeigt den Status ohne Geheimnisse.
+- [x] **AMP-04**: Nutzer ab Rolle `manager` verwalten gebundene Instanzen in Hermes: Start, Stop, Neustart, Update, Kill, Konsole lesen und Befehle senden. Rechte werden serverseitig erzwungen, jede Aktion wird auditiert und rate-limitiert; Konsolenausgaben maskieren Passwörter.
+- [ ] **AMP-05**: Optional (standardmäßig aus) startet Hermes die Instanz, wenn ein Event `ready` wird, stoppt sie nach konfigurierbarem Leerlauf ohne aktives Event und sendet den Teilnehmern einmalig einen Push, wenn der Server läuft.
+
 ### CI/Tooling
 
 - [ ] **CI-01**: GitHub Actions workflows are pinned to action versions that support Node.js 24 (the GA runtime from June 2026) for `actions/checkout`, `docker/setup-buildx-action`, `docker/login-action`, `docker/metadata-action`, and `docker/build-push-action`. CI continues to pass `npm ci`, `npm test`, `npm run build`, `npm audit --omit=dev`, and Docker build/push. `INTEGRATIONS.md` reflects the new pinned versions.

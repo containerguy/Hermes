@@ -65,12 +65,84 @@ export type AppSettings = {
   pizzaPaypalName: string;
   /** Bargeld-Empfänger-Hinweis im Anteilsbildschirm. */
   pizzaCashRecipient: string;
+  /** CubeCoders AMP: Instanzen beim Event-Anlegen auswählbar (serverseitig konfiguriert). */
+  ampIntegrationEnabled: boolean;
+  /** Basis-URL ohne /API, z. B. http://192.168.200.98:8080 */
+  ampBaseUrl: string;
 };
 
 /** Build-/Release-Infos aus dem Server (package.json + optional Repo-URL). */
 export type AppReleaseInfo = {
   version: string;
   repoUrl: string;
+};
+
+/** Eintrag aus GET /api/integrations/amp/instances (CubeCoders AMP). */
+export type AmpIntegrationInstance = {
+  id: string;
+  friendlyName: string;
+  instanceName: string;
+  module: string;
+  moduleDisplayName: string;
+  targetName: string;
+  targetHost: string;
+  gamePort: number | null;
+  running: boolean;
+  serverHost: string;
+  connectionInfo: string;
+};
+
+/** Phase 15: Vorschlag aus GET /api/integrations/amp/bindings/suggestions (admin). */
+export type BindingSuggestion = {
+  ampInstanceId: string;
+  ampInstanceName: string;
+  friendlyName: string;
+  moduleDisplayName: string;
+  targetName: string;
+  host: string;
+  port: number | null;
+  connectScheme: "steam" | "minecraft" | "copy";
+  suggestedTitle: string | null;
+  catalogMatches: string[];
+  existingBindingId: string | null;
+};
+
+/** Phase 15: Live-Status einer gebundenen Instanz (GET /api/integrations/amp/status, SSE servers_changed). */
+export type ServerStatus = {
+  bindingId: string;
+  ampInstanceId: string;
+  ampInstanceName: string;
+  /** AMP-Instanz (Prozess/Container) läuft. */
+  instanceRunning: boolean;
+  /** Spieler können sich verbinden (Ready oder Ruhemodus). */
+  running: boolean;
+  appState: string;
+  /** Spiel laut AMP (ModuleDisplayName, sonst Modulname). */
+  game: string | null;
+  players: number | null;
+  maxPlayers: number | null;
+  host: string;
+  /** IPv4 des Hosts (serverseitig aufgelöst) — für steam://connect, das keine DNS-Namen annimmt. */
+  connectIp: string | null;
+  port: number;
+  connectScheme: "steam" | "minecraft" | "copy";
+  updatedAt: string;
+  error: string | null;
+};
+
+/** Phase 15: Bindung Spieltitel -> AMP-Instanz (GET/POST/PUT /api/integrations/amp/bindings). */
+export type GameServerBinding = {
+  id: string;
+  gameTitleNorm: string;
+  displayTitle: string;
+  ampInstanceId: string;
+  ampInstanceName: string;
+  host: string;
+  port: number;
+  connectScheme: "steam" | "minecraft" | "copy";
+  enabled: boolean;
+  createdAt: string;
+  updatedAt: string;
 };
 
 /** Öffentliche App-Einstellungen (ohne Admin-/Betriebsfelder) für Bootstrap ohne Admin-Session. */
@@ -99,6 +171,7 @@ export type PublicAppSettings = Pick<
   | "pizzaPaypalHandle"
   | "pizzaPaypalName"
   | "pizzaCashRecipient"
+  | "ampIntegrationEnabled"
 >;
 
 export type AdminSection =
@@ -206,6 +279,8 @@ export type GameEvent = {
   minPlayers: number;
   maxPlayers: number;
   details: string | null;
+  /** Phase 15: gebundene AMP-Instanz (null = keine). */
+  serverBindingId: string | null;
   status: "open" | "ready" | "running" | "cancelled" | "archived";
   createdByUserId: string;
   createdByUsername: string;

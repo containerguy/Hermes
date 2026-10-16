@@ -4,6 +4,7 @@ import { useI18n } from "../i18n/I18nContext";
 import type { MessageKey } from "../i18n/catalog/index";
 import { Cod4KeyGenerator } from "../cod4/Cod4KeyGenerator";
 import { isCod4Game } from "../cod4/isCod4Game";
+import { ServerPanel, type ServerPanelBinding } from "../gameservers/ServerPanel";
 import {
   capacityPercent,
   getEventStatusClass,
@@ -28,6 +29,8 @@ interface EventCardProps {
   onArchive: () => void;
   onCancel: () => void;
   onSoftDelete: () => void;
+  /** Phase 15: gebundener Server (undefined = Modul aus oder Event ohne Bindung). */
+  server?: ServerPanelBinding;
 }
 
 export function EventCard({
@@ -46,7 +49,8 @@ export function EventCard({
   onUpdateStart,
   onArchive,
   onCancel,
-  onSoftDelete
+  onSoftDelete,
+  server
 }: EventCardProps) {
   const { t, locale } = useI18n();
   const dateTag = locale === "en" ? "en-US" : "de-DE";
@@ -221,6 +225,7 @@ export function EventCard({
               onArchive={onArchive}
               onCancel={onCancel}
               onSoftDelete={onSoftDelete}
+              server={server}
             />
           </article>
         </div>
@@ -247,6 +252,7 @@ interface ExpandedContentProps {
   onArchive: () => void;
   onCancel: () => void;
   onSoftDelete: () => void;
+  server?: ServerPanelBinding;
 }
 
 function ExpandedContent({
@@ -266,7 +272,8 @@ function ExpandedContent({
   onUpdateStart,
   onArchive,
   onCancel,
-  onSoftDelete
+  onSoftDelete,
+  server
 }: ExpandedContentProps) {
   const startAbsolute = new Date(event.startsAt).toLocaleString(dateTag);
   const pct = capacityPercent(event);
@@ -330,6 +337,7 @@ function ExpandedContent({
       ) : (
         <p className="muted event-join-hint">{t("events.conn.missing")}</p>
       )}
+      {server ? <ServerPanel {...server} /> : null}
       {isCod4Game(event.gameTitle) ? <Cod4KeyGenerator /> : null}
       {isActive ? (
         <div className="action-row">

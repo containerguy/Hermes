@@ -30,6 +30,14 @@ export function registerEventsClient(response: Response) {
   };
 }
 
+/** Phase 15: Serverstatus-Änderungen (Payload = vollständige Statusliste, ohne Geheimnisse). */
+export function broadcastServersChanged(servers: unknown[]) {
+  const payload = { servers, at: new Date().toISOString() };
+  for (const client of clients.keys()) {
+    send(client, "servers_changed", payload);
+  }
+}
+
 export function broadcastEventsChanged(reason: string) {
   const payload = {
     reason,

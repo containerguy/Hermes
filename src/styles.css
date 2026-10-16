@@ -2386,3 +2386,112 @@ dd {
   align-items: center;
   gap: 6px;
 }
+
+/* Phase 15: Gameserver-Bereich in der Event-Karte */
+.server-panel {
+  margin-top: 0.75rem;
+  padding: 0.75rem;
+  border: 1px solid var(--border, rgba(0, 0, 0, 0.12));
+  border-radius: 10px;
+  display: grid;
+  gap: 0.6rem;
+}
+.server-panel-head {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
+.server-dot {
+  width: 0.7rem;
+  height: 0.7rem;
+  border-radius: 50%;
+  background: #9ca3af;
+  flex: none;
+}
+.server-dot--starting {
+  background: #f59e0b;
+}
+.server-dot--on {
+  background: #16a34a;
+}
+.server-dot--sleep {
+  background: #16a34a;
+  opacity: 0.55;
+  box-shadow: 0 0 0 2px rgba(22, 163, 74, 0.35);
+}
+.server-dot--error {
+  background: #dc2626;
+}
+.server-state {
+  font-weight: 600;
+}
+.server-players {
+  margin-left: auto;
+  opacity: 0.8;
+}
+.server-connect {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
+.server-endpoint {
+  user-select: all;
+  padding: 0.2rem 0.4rem;
+  border-radius: 6px;
+  background: rgba(0, 0, 0, 0.06);
+}
+.button-link {
+  display: inline-block;
+  padding: 0.45rem 0.9rem;
+  border-radius: 8px;
+  background: var(--color-primary, #0f766e);
+  color: #fff;
+  text-decoration: none;
+  font-weight: 600;
+}
+.server-actions {
+  display: flex;
+  gap: 0.4rem;
+  flex-wrap: wrap;
+}
+.server-console-output {
+  max-height: 14rem;
+  overflow: auto;
+  margin: 0;
+  padding: 0.5rem;
+  border-radius: 8px;
+  background: #111827;
+  color: #e5e7eb;
+  font-size: 0.8rem;
+  white-space: pre-wrap;
+}
+.server-console-input {
+  display: flex;
+  gap: 0.4rem;
+  margin-top: 0.4rem;
+}
+.server-console-input input {
+  flex: 1;
+}
+.server-console-presets {
+  margin-top: 0.4rem;
+}
+.server-console-hint {
+  margin: 0.3rem 0 0;
+  font-size: 0.85rem;
+}
+.event-form-server {
+  display: grid;
+  gap: 0.3rem;
+}
+@media (max-width: 680px) {
+  .server-players {
+    margin-left: 0;
+    width: 100%;
+  }
+  .server-actions button {
+    flex: 1 1 45%;
+  }
+}

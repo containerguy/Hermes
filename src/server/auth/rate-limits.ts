@@ -4,7 +4,12 @@ import net from "node:net";
 import type { DatabaseContext } from "../db/client";
 import { rateLimitAllowlist, rateLimitEntries } from "../db/schema";
  
-export type RateLimitScope = "login_request" | "login_verify" | "invite_register" | "pair_token_create";
+export type RateLimitScope =
+  | "login_request"
+  | "login_verify"
+  | "invite_register"
+  | "pair_token_create"
+  | "amp_control";
  
 type ScopeConfig = {
   windowSeconds: number;
@@ -40,6 +45,9 @@ function getScopeConfig(scope: RateLimitScope): ScopeConfig {
       return { windowSeconds: 30 * 60, maxAttempts: 10, blockSeconds: 30 * 60 };
     case "pair_token_create":
       return { windowSeconds: 10 * 60, maxAttempts: 5, blockSeconds: 15 * 60 };
+    case "amp_control":
+      // Phase 15: Start/Stop/Konsolenbefehle pro User — Klick-Spam abfangen, Orga nicht ausbremsen
+      return { windowSeconds: 60, maxAttempts: 20, blockSeconds: 5 * 60 };
   }
 }
  

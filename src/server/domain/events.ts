@@ -15,7 +15,9 @@ export const eventInputSchema = z
     startsAt: z.string().datetime().optional(),
     minPlayers: z.number().int().min(1).max(256),
     maxPlayers: z.number().int().min(1).max(256),
-    details: z.string().trim().max(4000).optional()
+    details: z.string().trim().max(4000).optional(),
+    /** Phase 15: explizite Bindung (null = bewusst keine); fehlt der Key, wird per Titel zugeordnet. */
+    serverBindingId: z.string().min(1).max(64).nullable().optional()
   })
   .superRefine((value, context) => {
     if (value.maxPlayers < value.minPlayers) {

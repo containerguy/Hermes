@@ -91,7 +91,9 @@ const defaultSettings: AppSettings = {
   featuresPizzaEnabled: false,
   pizzaPaypalHandle: "",
   pizzaPaypalName: "",
-  pizzaCashRecipient: ""
+  pizzaCashRecipient: "",
+  ampIntegrationEnabled: false,
+  ampBaseUrl: "",
 };
 
 function applyTheme(settings: AppSettings) {
@@ -420,6 +422,7 @@ function AppShell({
           emptyBoardTitle={appSettings.shellEventsEmptyTitle}
           emptyBoardBody={appSettings.shellEventsEmptyBody}
           gameCatalog={appSettings.gameCatalog}
+          ampIntegrationEnabled={appSettings.ampIntegrationEnabled}
         />
       </>
     );
