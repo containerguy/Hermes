@@ -43,8 +43,12 @@ import { canManagePizza } from "../domain/users";
 import { buildKassenlistePdf, buildPizzeriaPdf } from "../pdf/pizza-print";
 import { sendPushToEnabledUsers } from "../push/push-service";
 import { broadcastEventsChanged } from "../realtime/event-bus";
-import { readSettings } from "../settings";
+import { readSettings, writeSettings } from "../settings";
 import { handleDomainError } from "./errors";
+
+const paymentModeSchema = z.object({
+  pizzaPaymentMethods: z.enum(["cash_and_paypal", "cash_only", "paypal_only"])
+});
 
 const transitionSchema = z.object({
   transition: z.enum(["open", "lock", "deliver", "reopen"]),
@@ -180,6 +184,8 @@ function loadSerializedState(context: DatabaseContext, currentUserId: string) {
     session: session ?? null,
     menu,
     paymentMethods: offeredPaymentMethods(settings),
+    /** Einstellung hinter `paymentMethods`; ab manager im Pizza-Panel änderbar. */
+    paymentMode: settings.pizzaPaymentMethods,
     myOrder: myOrder ? decorateOrder(myOrder, labels) : null,
     orders: allOrders.map((order) => ({
       ...decorateOrder(order, labels),
@@ -282,6 +288,30 @@ export function createPizzaRouter(context: DatabaseContext) {
     } catch (error) {
       respondDomainError(error, response, "pizza transition failed");
     }
+  });
+
+  /** Bezahlarten ab manager (René, PR #14). Andere Einstellungen bleiben admin vorbehalten. */
+  router.put("/payment-mode", (request, response) => {
+    const actor = requirePizzaManager(context, request, response);
+    if (!actor) return;
+    const parsed = paymentModeSchema.safeParse(request.body);
+    if (!parsed.success) {
+      response.status(400).json({ error: "ungueltige_settings" });
+      return;
+    }
+    const current = readSettings(context);
+    // Nur diesen einen Schlüssel schreiben; die übrigen Einstellungen bleiben unberührt.
+    writeSettings(context, { pizzaPaymentMethods: parsed.data.pizzaPaymentMethods }, actor.id);
+    tryWriteAuditLog(context, {
+      actor,
+      action: "pizza.payment_mode",
+      entityType: "settings",
+      entityId: "app",
+      summary: `Pizza-Bezahlarten: ${parsed.data.pizzaPaymentMethods}`,
+      metadata: { from: current.pizzaPaymentMethods, to: parsed.data.pizzaPaymentMethods }
+    });
+    broadcastEventsChanged("pizza_payment_mode");
+    response.json({ paymentMode: parsed.data.pizzaPaymentMethods, paymentMethods: offeredPaymentMethods(readSettings(context)) });
   });
 
   router.get("/sessions/archived", (request, response) => {

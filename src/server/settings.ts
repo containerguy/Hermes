@@ -255,7 +255,7 @@ export function readSettings(context: DatabaseContext) {
 
 export function writeSettings(
   context: DatabaseContext,
-  settings: HermesSettings,
+  settings: Partial<HermesSettings>,
   updatedByUserId: string
 ) {
   const timestamp = nowIso();

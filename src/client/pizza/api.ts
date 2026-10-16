@@ -5,6 +5,7 @@ import type {
   PizzaItem,
   PizzaPanelState,
   PizzaPaymentMethod,
+  PizzaPaymentMode,
   PizzaSessionTransition
 } from "./types";
 
@@ -154,4 +155,11 @@ export async function removePizzaVariant(variantId: string) {
     { method: "DELETE" }
   );
   return response.result;
+}
+
+export async function setPizzaPaymentMode(mode: PizzaPaymentMode) {
+  return requestJson<{ paymentMode: PizzaPaymentMode; paymentMethods: PizzaPaymentMethod[] }>(
+    `/api/pizza/payment-mode`,
+    { method: "PUT", body: JSON.stringify({ pizzaPaymentMethods: mode }) }
+  );
 }

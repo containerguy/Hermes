@@ -72,6 +72,12 @@ export const restorableTables = [
   "game_server_bindings",
   "game_events",
   "participations",
+  // Pizza in FK-Reihenfolge: Menü → Varianten, Runden → Bestellungen → Positionen (→ Varianten)
+  "pizza_menu_items",
+  "pizza_menu_variants",
+  "pizza_sessions",
+  "pizza_orders",
+  "pizza_order_lines",
   "app_settings",
   "audit_logs",
   "invite_codes",

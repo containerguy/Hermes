@@ -5,6 +5,7 @@ import {
   addPizzaLine,
   archivePizzaSession,
   choosePizzaPaymentMethod,
+  setPizzaPaymentMode,
   deletePizzaLine,
   fetchPizzaState,
   markPizzaPayment,
@@ -21,6 +22,7 @@ import type {
   PizzaOrderWithUser,
   PizzaPanelState,
   PizzaPaymentMethod,
+  PizzaPaymentMode,
   PizzaSessionState,
   PizzaSessionTransition,
   PizzaVariant
@@ -138,6 +140,7 @@ export function PizzaPanel({
           state={state}
           onTransition={(transition) => run(() => transitionPizzaSession(transition))}
           onArchive={(sessionId) => run(() => archivePizzaSession(sessionId))}
+          onPaymentMode={(mode) => run(() => setPizzaPaymentMode(mode))}
           onMenuChanged={reload}
         />
       ) : null}
@@ -187,10 +190,13 @@ interface ManagerControlsProps {
   state: PizzaPanelState;
   onTransition: (transition: PizzaSessionTransition) => Promise<void>;
   onArchive: (sessionId: string) => Promise<void>;
+  onPaymentMode: (mode: PizzaPaymentMode) => Promise<void>;
   onMenuChanged: () => Promise<void>;
 }
 
-function PizzaManagerControls({ state, onTransition, onArchive, onMenuChanged }: ManagerControlsProps) {
+const PAYMENT_MODES: PizzaPaymentMode[] = ["cash_and_paypal", "cash_only", "paypal_only"];
+
+function PizzaManagerControls({ state, onTransition, onArchive, onPaymentMode, onMenuChanged }: ManagerControlsProps) {
   const { t } = useI18n();
   const [panel, setPanel] = useState<"none" | "menu" | "archive">("none");
   const session = state.session;
@@ -274,6 +280,24 @@ function PizzaManagerControls({ state, onTransition, onArchive, onMenuChanged }:
           {panel === "archive" ? t("pizza.admin.hideArchive") : t("pizza.admin.showArchive")}
         </button>
       </div>
+      {state.paymentMode ? (
+        <label className="pizza-panel__payment-mode">
+          {t("pizza.admin.paymentMode")}
+          <select
+            value={state.paymentMode}
+            onChange={(event) => void onPaymentMode(event.target.value as PizzaPaymentMode)}
+          >
+            {PAYMENT_MODES.map((mode) => (
+              <option key={mode} value={mode}>
+                {t(`pizza.admin.paymentMode.${mode}`)}
+              </option>
+            ))}
+          </select>
+        </label>
+      ) : null}
+      {state.paymentMode && state.paymentMode !== "cash_only" && !state.paymentMethods.includes("paypal") ? (
+        <p className="muted">{t("pizza.admin.paymentModeNoPaypal")}</p>
+      ) : null}
       {panel === "menu" ? <PizzaMenuEditor onChanged={onMenuChanged} /> : null}
       {panel === "archive" ? <PizzaArchive /> : null}
     </>

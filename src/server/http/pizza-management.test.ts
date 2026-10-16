@@ -340,4 +340,31 @@ describe("Pizza-Verwaltung ab manager", () => {
     const pdf = await manager.agent.get("/api/pizza/print/kassenliste.pdf").expect(200);
     expect(pdf.headers["content-type"]).toContain("application/pdf");
   });
+
+  it("lässt manager die Bezahlarten im Pizza-Panel ändern, aber keine anderen Einstellungen", async () => {
+    const put = (actor: Actor, body: unknown) =>
+      actor.agent.put("/api/pizza/payment-mode").set(CSRF_HEADER, actor.csrf).send(body as object);
+
+    expect((await state(manager)).paymentMode).toBe("cash_and_paypal");
+    await put(guest, { pizzaPaymentMethods: "cash_only" }).expect(403);
+    await put(organizer, { pizzaPaymentMethods: "cash_only" }).expect(403);
+    await manager.agent.put("/api/pizza/payment-mode").send({ pizzaPaymentMethods: "cash_only" }).expect(403);
+    await put(manager, { pizzaPaymentMethods: "bitcoin" }).expect(400);
+
+    const before = (await admin.agent.get("/api/admin/settings").expect(200)).body.settings;
+    const changed = await put(manager, { pizzaPaymentMethods: "cash_only", appName: "Gekapert" }).expect(200);
+    expect(changed.body).toEqual({ paymentMode: "cash_only", paymentMethods: ["cash"] });
+    const after = (await admin.agent.get("/api/admin/settings").expect(200)).body.settings;
+    expect(after).toEqual({ ...before, pizzaPaymentMethods: "cash_only" });
+    expect((await state(guest)).paymentMethods).toEqual(["cash"]);
+
+    // Admin-Einstellungen bleiben für manager gesperrt
+    await manager.agent.put("/api/admin/settings").set(CSRF_HEADER, manager.csrf).send(after).expect(403);
+
+    const audit = await admin.agent.get("/api/admin/audit-log").expect(200);
+    const entry = (audit.body.auditLogs as Array<{ action: string; metadata: unknown }>).find(
+      (log) => log.action === "pizza.payment_mode"
+    );
+    expect(entry?.metadata).toEqual({ from: "cash_and_paypal", to: "cash_only" });
+  });
 });

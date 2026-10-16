@@ -82,11 +82,15 @@ export interface PizzaGuestTotal {
   totalCents: number;
 }
 
+export type PizzaPaymentMode = "cash_and_paypal" | "cash_only" | "paypal_only";
+
 export interface PizzaPanelState {
   session: PizzaSession | null;
   menu: PizzaItem[];
   /** Aktuell angebotene Bezahlarten (serverseitig aus Settings abgeleitet). */
   paymentMethods: PizzaPaymentMethod[];
+  /** Einstellung hinter `paymentMethods` (ab manager änderbar). */
+  paymentMode?: PizzaPaymentMode;
   myOrder: PizzaOrder | null;
   orders: PizzaOrderWithUser[];
   guestTotals: PizzaGuestTotal[];

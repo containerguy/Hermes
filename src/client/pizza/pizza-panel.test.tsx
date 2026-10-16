@@ -236,6 +236,33 @@ describe("PizzaPanel – Manager", () => {
     });
   });
 
+  it("ändert die Bezahlarten und warnt bei PayPal ohne Handle", async () => {
+    mockApi({
+      "GET /api/pizza/state": panelState({ paymentMode: "paypal_only", paymentMethods: ["cash"] })
+    });
+    const container = await render(<PizzaPanel {...panelProps} currentUserRole="manager" />);
+    expect(container.textContent).toContain("kein PayPal-Handle hinterlegt");
+
+    const select = container.querySelector<HTMLSelectElement>(".pizza-panel__payment-mode select")!;
+    expect(select.value).toBe("paypal_only");
+    await act(async () => {
+      select.value = "cash_only";
+      select.dispatchEvent(new Event("change", { bubbles: true }));
+      await flushMicrotasks();
+    });
+    expect(calls).toContainEqual({
+      url: "/api/pizza/payment-mode",
+      method: "PUT",
+      body: { pizzaPaymentMethods: "cash_only" }
+    });
+  });
+
+  it("zeigt die Bezahlarten-Auswahl nicht für Gäste", async () => {
+    mockApi({ "GET /api/pizza/state": panelState({ paymentMode: "cash_and_paypal" }) });
+    const container = await render(<PizzaPanel {...panelProps} currentUserRole="user" />);
+    expect(container.querySelector(".pizza-panel__payment-mode")).toBeNull();
+  });
+
   it("archiviert nicht, wenn die Bestätigung abgelehnt wird", async () => {
     vi.mocked(window.confirm).mockReturnValue(false);
     mockApi({ "GET /api/pizza/state": panelState() });
