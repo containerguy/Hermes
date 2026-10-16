@@ -177,3 +177,39 @@ Der vollständige Testauftrag für die lokale Session (Regeln, Prüfpunkte, Erge
   `amp-automation-flow.test.ts` +1 (gemocktes AMP: `StartInstance` 1×, erstes `Core/Start` mit
   `Status: false`, Nachstart → `Core/Start` 2×, zweites Audit mit `followUp`). Gesamt 279 Tests grün.
 
+## Nachtrag: LAN-Abnahme und Befunde (PR-Kommentar 2026-10-16)
+
+Ergebnis der lokalen Session (Test-Instanz auf docker01, echte AMP-Server, Produktion unberührt):
+a) Bindungsverwaltung ohne Neuladen **bestanden**; b) Auto-Start einmal pro Event **bestanden**
+(16 s bis `amp.auto_start`, kein Neustart nach manuellem Stopp); c) Nachstart **bestanden**
+(UT2004 mit `AppStartupMode=DoNothing`: Instanz nach ~26 s oben, Nachstart bei +30 s, Ready nach ~2 min);
+d) Push **nicht geprüft** (Browser verweigert Benachrichtigungen; Logik ist durch
+`amp-automation-flow.test.ts` mit gemocktem web-push abgedeckt); e) Leerlauf-Stopp Mechanik **bestanden**.
+
+Behoben auf Grund der Befunde:
+
+- **Leerlauf-Stopp pro Bindung freischalten** (Befund: AMP zählt bei Soldat, UT2004 und CoD4 keine Spieler,
+  `Console.UserJoinRegex` ist leer → „Active Users" immer 0 → Stopp mitten im Spiel möglich).
+  Migration `0021_binding_auto_stop.sql`: `game_server_bindings.auto_stop_enabled INTEGER NOT NULL DEFAULT 0`.
+  Bindungs-Schema/Domain/Typen um `autoStopEnabled` (Standard `false`); Bindungsverwaltung mit Checkbox
+  „Leerlauf-Stopp erlauben", Hinweis zu `UserJoinRegex` und Spalte „Leerlauf-Stopp". Automatik:
+  neue Abhängigkeit `autoStopBindingIds()`, gestoppt wird nur eine freigeschaltete Bindung.
+  README-Hinweis zur Spielerzählung. Bestehende Bindungen sind nach der Migration **nicht** freigeschaltet.
+- **Restore**: `game_server_bindings` fehlte in `restorableTables`. Weil `game_events.server_binding_id`
+  darauf verweist, wäre ein Restore in eine leere Datenbank an der Fremdschlüssel-Prüfung gescheitert.
+  Ergänzt (vor `game_events`) plus Invarianten-Test `restorable-tables.test.ts`: jede Elterntabelle einer
+  wiederhergestellten Tabelle muss selbst wiederhergestellt werden.
+- **Vitest**: `vitest.config.ts` (übernimmt `vite.config.ts`) schließt `e2e/**` aus; `npx vitest run` ohne
+  Filter sammelt die Playwright-Spec nicht mehr ein.
+- Kosmetik: Hilfetext im AMP-Abschnitt beschreibt das heutige Modul und nennt `https://amp-ctl.lanparty.example`
+  statt `http://192.168.200.98:8080`; Target-Namen in der Vorschlagsliste ohne Panel-Port (`retro…:8080` → `retro…`).
+
+Nicht geändert:
+- Windows-spezifisch (`EBUSY` in `push-service-cleanup.test.ts`, `mkdir -p`/`cp` in `build:server`) —
+  CI und Docker laufen auf Linux.
+- Beobachtung außerhalb dieses Plans: Tabellen, die auf wiederhergestellte Tabellen zeigen, selbst aber nicht
+  wiederhergestellt werden (`pairing_tokens` → `sessions`, `user_api_tokens`/`email_change_challenges`/Pizza → `users`),
+  können nach einem Restore die Fremdschlüssel-Prüfung brechen, sobald sie Zeilen enthalten. Vorbestand, nicht Teil von 15-04.
+
+Tests danach: 48 Dateien / 282 Tests grün (`npm test` und `npx vitest run`), `tsc` und Build grün, Playwright 3/3.
+

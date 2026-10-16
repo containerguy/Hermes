@@ -135,5 +135,5 @@ Shipped between 2026-05-01 and 2026-05-16 without a v1.2 phase track (4 commits)
 
 Next up:
 
-- Phase 15 (AMP-Gameserver-Modul): 15-01…15-04 umgesetzt (Migration `0020_game_server_bindings.sql`; `0019` ging an `0019_devices.sql` der persistenten Sitzungen). Offen: Abnahme gegen die echten AMP-Server im LAN, danach Merge nach `main`. Theme/Audio rücken auf `0021`+.
-- v1.2 is paused after Phase 9. Resuming would mean Phase 10 (Theme System) per the original sequence. Renumber the theme/audio migrations before starting (next free number is `0021`).
+- Phase 15 (AMP-Gameserver-Modul): 15-01…15-04 umgesetzt (Migration `0020_game_server_bindings.sql`; `0019` ging an `0019_devices.sql` der persistenten Sitzungen). Offen: Abnahme gegen die echten AMP-Server im LAN, danach Merge nach `main`. Theme/Audio rücken auf `0022`+ (`0021_binding_auto_stop.sql` ging an 15-04).
+- v1.2 is paused after Phase 9. Resuming would mean Phase 10 (Theme System) per the original sequence. Renumber the theme/audio migrations before starting (next free number is `0022`).
