@@ -23,8 +23,13 @@ Versions are annotated tags `vX.Y.Z` on `main`. Each entry mirrors the
   - Hermes builds the game-specific commands itself and sends them one
     by one, with CSRF, the `amp_control` rate limit and audit entries
     `amp.bots_<action>`.
-  - CS2 re-adds bots on "Change level", because `bot_difficulty` only
-    applies to new bots.
+  - Hermes reads the current bot count from the console (`yb list`,
+    `status`; AMP does not count bots as players): **Add** first sets the
+    quota to it, so an old quota is not taken as the bot count. CS2 re-adds
+    that many bots on "Change level", because `bot_difficulty` only applies
+    to new bots. **Count bots** shows the number (`GET …/bots`).
+  - With a fixed team, Hermes turns off `mp_limitteams` and
+    `mp_autoteambalance`; otherwise the game refuses with "Team is stacked".
 - Console templates "Bots (YaPB)" for CS 1.6.
 
 ### Game servers

@@ -22,6 +22,7 @@ export function ServerBots({ bindingId, kind }: { bindingId: string; kind: BotKi
   const [sending, setSending] = useState(false);
   const [notice, setNotice] = useState("");
   const [error, setError] = useState("");
+  const [bots, setBots] = useState<number | null | undefined>(undefined);
 
   const validCount = Number.isInteger(count) && count >= 1 && count <= MAX_BOTS_ADD;
 
@@ -35,6 +36,22 @@ export function ServerBots({ bindingId, kind }: { bindingId: string; kind: BotKi
         body: JSON.stringify(request)
       });
       setNotice(t("events.server.bots.sent"));
+      setBots(undefined);
+    } catch (caught) {
+      setError(getErrorMessage(caught, locale));
+    } finally {
+      setSending(false);
+    }
+  }
+
+  async function countBots() {
+    setSending(true);
+    setError("");
+    try {
+      const result = await requestJson<{ bots: number | null }>(
+        `/api/integrations/amp/instances/${encodeURIComponent(bindingId)}/bots`
+      );
+      setBots(result.bots);
     } catch (caught) {
       setError(getErrorMessage(caught, locale));
     } finally {
@@ -102,17 +119,23 @@ export function ServerBots({ bindingId, kind }: { bindingId: string; kind: BotKi
         <button
           type="button"
           className="secondary"
-          disabled={sending || (kind === "cs2" && !validCount)}
-          onClick={() =>
-            void send(kind === "cs2" ? { action: "setLevel", level, count } : { action: "setLevel", level })
-          }
+          disabled={sending}
+          onClick={() => void send({ action: "setLevel", level })}
         >
           {t("events.server.bots.setLevel")}
         </button>
         <button type="button" className="secondary danger" disabled={sending} onClick={removeAll}>
           {t("events.server.bots.removeAll")}
         </button>
+        <button type="button" className="secondary" disabled={sending} onClick={() => void countBots()}>
+          {t("events.server.bots.count.refresh")}
+        </button>
       </div>
+      {bots !== undefined ? (
+        <p className="server-console-hint">
+          {bots === null ? t("events.server.bots.count.unknown") : t("events.server.bots.count.value", { count: bots })}
+        </p>
+      ) : null}
       <p className="muted server-console-hint">
         {kind === "cs2" ? t("events.server.bots.hintCs2") : t("events.server.bots.hintYapb")}
       </p>

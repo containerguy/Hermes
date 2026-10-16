@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { BotRequestError, botKindForGame, botRequestSchema, buildBotCommands } from "./bot-commands";
+import { BotRequestError, botKindForGame, botRequestSchema, buildBotCommands, parseBotCount } from "./bot-commands";
 
 describe("botKindForGame", () => {
   it("erkennt CS 1.6 (YaPB) und CS2, sonst keine Bots", () => {
@@ -12,8 +12,12 @@ describe("botKindForGame", () => {
 
 describe("buildBotCommands", () => {
   it("YaPB: Hinzufügen stellt die Quote auf normal und fügt einzeln mit Stufe und Team hinzu", () => {
-    expect(buildBotCommands("yapb", { action: "add", count: 2, level: "hard", team: "ct" })).toEqual([
+    // Fester Team: Teamlimit und Ausgleich aus; bekannte Botzahl setzt die Quote (alte Quote aus "Auffüllen")
+    expect(buildBotCommands("yapb", { action: "add", count: 2, level: "hard", team: "ct" }, 4)).toEqual([
+      "mp_limitteams 0",
+      "mp_autoteambalance 0",
       "yb_quota_mode normal",
+      "yb_quota 4",
       "yb add 3 0 2",
       "yb add 3 0 2"
     ]);
@@ -35,6 +39,8 @@ describe("buildBotCommands", () => {
 
   it("CS2: Hinzufügen, Entfernen, Auffüllen", () => {
     expect(buildBotCommands("cs2", { action: "add", count: 2, level: "easy", team: "t" })).toEqual([
+      "mp_limitteams 0",
+      "mp_autoteambalance 0",
       "bot_quota_mode normal",
       "bot_difficulty 0",
       "bot_add_t",
@@ -48,7 +54,18 @@ describe("buildBotCommands", () => {
     ]);
   });
 
-  it("CS2: Stufe ändern setzt die Bots mit Anzahl neu auf und verlangt die Anzahl", () => {
+  it("CS2: Stufe ändern setzt die gelesene Zahl Bots neu auf", () => {
+    expect(buildBotCommands("cs2", { action: "setLevel", level: "easy" }, 1)).toEqual([
+      "bot_quota 0",
+      "bot_kick",
+      "bot_difficulty 0",
+      "bot_quota_mode normal",
+      "bot_add"
+    ]);
+    expect(buildBotCommands("cs2", { action: "setLevel", level: "easy" }, 0)).toEqual(["bot_difficulty 0"]);
+  });
+
+  it("CS2: Stufe ändern mit Anzahl; ohne Anzahl und ohne Botzahl abgelehnt", () => {
     expect(buildBotCommands("cs2", { action: "setLevel", level: "hard", count: 2 })).toEqual([
       "bot_quota 0",
       "bot_kick",
@@ -73,5 +90,14 @@ describe("botRequestSchema", () => {
       level: "normal",
       team: "auto"
     });
+  });
+});
+
+describe("parseBotCount", () => {
+  it("liest YaPB yb list und CS2 status", () => {
+    expect(parseBotCount("yapb", ["[0 ] Turbo normal TE 3", "[1 ] Socke normal TE 3", "2 bots"])).toBe(2);
+    expect(parseBotCount("yapb", ["0 bots"])).toBe(0);
+    expect(parseBotCount("cs2", ["hostname: LAN", "players  : 0 humans, 2 bots (32 max)"])).toBe(2);
+    expect(parseBotCount("cs2", ["Server started"])).toBeNull();
   });
 });

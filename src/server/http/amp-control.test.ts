@@ -10,7 +10,7 @@ import { bootstrapAdmin } from "../db/bootstrap-admin";
 import { createHermesApp } from "../app";
 import { setAmpFetchForTests } from "../integrations/amp/amp-session";
 import { pollNow, resetAmpStatusForTests } from "../integrations/amp/amp-status";
-import { maskConsoleSecrets } from "./amp-routes";
+import { maskConsoleSecrets, setBotCountPollForTests } from "./amp-routes";
 
 type StartedApp = Awaited<ReturnType<typeof createHermesApp>>;
 type AmpCall = { endpoint: string; body: Record<string, unknown> };
@@ -57,10 +57,15 @@ function installAmpMock() {
     } else if (endpoint === "ADSModule/GetInstances") {
       payload = instancesWithCs2State();
     } else if (endpoint.endsWith("/API/Core/GetUpdates")) {
+      const lastSent = [...ampCalls].reverse().find((c) => c.endpoint.endsWith("/API/Core/SendConsoleMessage"));
       payload = {
         ConsoleEntries: [
           { Timestamp: "2026-10-15T20:00:00Z", Source: "Console", Contents: "Server started" },
-          { Timestamp: "2026-10-15T20:00:01Z", Source: "Console", Contents: 'rcon_password "SuperGeheim123"' }
+          { Timestamp: "2026-10-15T20:00:01Z", Source: "Console", Contents: 'rcon_password "SuperGeheim123"' },
+          // Antwort auf `status` (CS2): Hermes liest daraus die Botzahl
+          ...(lastSent?.body.message === "status"
+            ? [{ Timestamp: "2026-10-15T20:00:02Z", Source: "Console", Contents: "players  : 0 humans, 3 bots (32 max)" }]
+            : [])
         ]
       };
     } else {
@@ -299,21 +304,30 @@ describe("AMP control + status (Phase 15-02)", () => {
       .expect(403);
     await manager.agent.post(`/api/integrations/amp/instances/${bindingId}/bots`).send({ action: "removeAll" }).expect(403);
     await bots({ action: "add", count: 21, level: "normal" }).expect(400);
-    await bots({ action: "setLevel", level: "hard" }).expect(400); // CS2 braucht eine Anzahl
     expect(ampCalls.filter((c) => c.endpoint === sendEndpoint)).toEqual([]);
-    await bots({ action: "add", count: 2, level: "hard", team: "ct" }).expect(200);
+    setBotCountPollForTests({ attempts: 3, intervalMs: 1 });
+    const added = await bots({ action: "add", count: 2, level: "hard", team: "ct" }).expect(200);
+    expect(added.body).toMatchObject({ ok: true, botsBefore: 3 });
     expect(ampCalls.filter((c) => c.endpoint === sendEndpoint).map((c) => c.body.message)).toEqual([
+      "status",
+      "mp_limitteams 0",
+      "mp_autoteambalance 0",
       "bot_quota_mode normal",
+      "bot_quota 3",
       "bot_difficulty 2",
       "bot_add_ct",
       "bot_add_ct"
     ]);
+    const counted = await manager.agent.get(`/api/integrations/amp/instances/${bindingId}/bots`).expect(200);
+    expect(counted.body).toEqual({ kind: "cs2", bots: 3 });
+    await user.agent.get(`/api/integrations/amp/instances/${bindingId}/bots`).expect(403);
+    setBotCountPollForTests(null);
     const botAudit = await admin.get("/api/admin/audit-log").expect(200);
     expect(
       (botAudit.body.auditLogs as Array<{ action: string; metadata: Record<string, unknown> }>).find(
         (e) => e.action === "amp.bots_add"
       )?.metadata
-    ).toMatchObject({ kind: "cs2", count: 2, level: "hard", team: "ct", commands: 4, sent: 4 });
+    ).toMatchObject({ kind: "cs2", count: 2, level: "hard", team: "ct", commands: 7, sent: 7, botsBefore: 3 });
 
     // Kiosk liefert genau die sechs Serverfelder
     await manager.agent

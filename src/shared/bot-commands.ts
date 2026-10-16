@@ -26,7 +26,10 @@ export const botRequestSchema = z.discriminatedUnion("action", [
   z.object({
     action: z.literal("setLevel"),
     level: botLevelSchema,
-    /** Nur CS2: Bots werden mit dieser Anzahl neu aufgesetzt, weil bot_difficulty nur für neue Bots gilt. */
+    /**
+     * Nur CS2: Bots werden mit dieser Anzahl neu aufgesetzt, weil bot_difficulty nur für neue Bots gilt.
+     * Ohne Angabe nimmt Hermes die vom Server gelesene Botzahl.
+     */
     count: z.number().int().min(1).max(MAX_BOTS_ADD).optional()
   }),
   z.object({
@@ -46,9 +49,22 @@ export function botKindForGame(game: string | null | undefined): BotKind | null 
   return null;
 }
 
-/** Ob die Aktion für diese Bot-Art eine Anzahl braucht (CS2: Stufe ändern = neu aufsetzen). */
-export function botActionNeedsCount(kind: BotKind, action: BotRequest["action"]): boolean {
-  return action === "add" || action === "fill" || (kind === "cs2" && action === "setLevel");
+/** Konsolenbefehl, dessen Antwort die Zahl der Bots im Spiel enthält. */
+export function botCountQuery(kind: BotKind): string {
+  return kind === "yapb" ? "yb list" : "status";
+}
+
+/**
+ * Botzahl aus Konsolenzeilen: YaPB `yb list` endet mit „N bots“, CS2 `status` enthält
+ * „players : H humans, B bots“. Nimmt den letzten Treffer; null ohne Treffer.
+ */
+export function parseBotCount(kind: BotKind, lines: string[]): number | null {
+  const pattern = kind === "yapb" ? /(?:^|\s)(\d+) bots?\s*$/ : /players\s*:\s*\d+ humans?,\s*(\d+) bots?/;
+  for (let index = lines.length - 1; index >= 0; index -= 1) {
+    const match = pattern.exec(lines[index].trim());
+    if (match) return Number.parseInt(match[1], 10);
+  }
+  return null;
 }
 
 // YaPB: 0 Neuling … 4 Gott; CS2: 0 leicht … 3 Experte
@@ -62,18 +78,24 @@ export class BotRequestError extends Error {}
 
 /**
  * Befehlsfolge für eine Bot-Aktion, in der Reihenfolge, in der sie gesendet werden muss.
+ * `currentBots` ist die vom Server gelesene Botzahl (null, wenn unbekannt).
  *
- * „Hinzufügen“ stellt die Quote auf `normal`: Im Modus `fill` würde die Quote die neuen Bots
- * sonst wieder kicken, sobald Menschen drin sind. `yb add`/`bot_add` erhöhen die Quote selbst.
+ * „Hinzufügen“ stellt die Quote auf `normal` und auf die aktuelle Botzahl: Im Modus `fill` würde
+ * die Quote neue Bots sonst wieder kicken, und eine alte Quote (z. B. 10 aus „Auffüllen“) würde
+ * im Modus `normal` als Botzahl gelten. `yb add`/`bot_add` erhöhen die Quote danach selbst.
+ * Mit festem Team fallen Teamlimit und Ausgleich weg, sonst lehnt das Spiel ab „Team is stacked“.
  */
-export function buildBotCommands(kind: BotKind, request: BotRequest): string[] {
+export function buildBotCommands(kind: BotKind, request: BotRequest, currentBots: number | null = null): string[] {
   const repeat = (command: string, count: number) => Array.from({ length: count }, () => command);
+  const teamUnlock = request.action === "add" && request.team !== "auto" ? ["mp_limitteams 0", "mp_autoteambalance 0"] : [];
 
   if (kind === "yapb") {
     switch (request.action) {
       case "add":
         return [
+          ...teamUnlock,
           "yb_quota_mode normal",
+          ...(currentBots === null ? [] : [`yb_quota ${currentBots}`]),
           ...repeat(`yb add ${YAPB_LEVEL[request.level]} 0 ${YAPB_TEAM[request.team]}`, request.count)
         ];
       case "removeAll":
@@ -88,21 +110,26 @@ export function buildBotCommands(kind: BotKind, request: BotRequest): string[] {
   switch (request.action) {
     case "add":
       return [
+        ...teamUnlock,
         "bot_quota_mode normal",
+        ...(currentBots === null ? [] : [`bot_quota ${currentBots}`]),
         `bot_difficulty ${CS2_LEVEL[request.level]}`,
         ...repeat(CS2_ADD[request.team], request.count)
       ];
     case "removeAll":
       return ["bot_quota 0", "bot_kick"];
-    case "setLevel":
-      if (!request.count) throw new BotRequestError("bots_anzahl_erforderlich");
+    case "setLevel": {
+      const count = request.count ?? currentBots;
+      if (count === null || count === undefined) throw new BotRequestError("botzahl_unbekannt");
+      if (count === 0) return [`bot_difficulty ${CS2_LEVEL[request.level]}`];
       return [
         "bot_quota 0",
         "bot_kick",
         `bot_difficulty ${CS2_LEVEL[request.level]}`,
         "bot_quota_mode normal",
-        ...repeat("bot_add", request.count)
+        ...repeat("bot_add", Math.min(count, MAX_BOTS_ADD))
       ];
+    }
     case "fill":
       return ["bot_quota_mode fill", `bot_difficulty ${CS2_LEVEL[request.level]}`, `bot_quota ${request.count}`];
   }

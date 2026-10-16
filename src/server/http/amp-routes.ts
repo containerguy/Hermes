@@ -27,7 +27,15 @@ import {
 } from "../integrations/amp/amp-control";
 import { MAX_CONSOLE_PARTS, splitConsoleCommands } from "../integrations/amp/console-split";
 import { readSettings, type HermesSettings } from "../settings";
-import { BotRequestError, botKindForGame, botRequestSchema, buildBotCommands } from "../../shared/bot-commands";
+import {
+  BotRequestError,
+  botCountQuery,
+  botKindForGame,
+  botRequestSchema,
+  buildBotCommands,
+  parseBotCount,
+  type BotKind
+} from "../../shared/bot-commands";
 import type { GameServerBinding } from "../domain/gameservers/bindings";
 
 /* ---------- Phase 15-02: Steuerung + Konsole ---------- */
@@ -90,6 +98,30 @@ async function sendConsoleSequence(settings: HermesSettings, binding: GameServer
     }
   }
   return { sent, failure: null };
+}
+
+/** Warten auf die Konsolenantwort zur Botzahl: AMP liefert RCON-Antworten nach kurzer Zeit nach. */
+let botCountPoll = { attempts: 8, intervalMs: 400 };
+
+export function setBotCountPollForTests(value: { attempts: number; intervalMs: number } | null) {
+  botCountPoll = value ?? { attempts: 8, intervalMs: 400 };
+}
+
+/** Botzahl über die Konsole lesen (`yb list` bzw. `status`); null, wenn keine Antwort kommt. */
+async function readBotCount(settings: HermesSettings, binding: GameServerBinding, kind: BotKind) {
+  const { cursor } = await fetchConsole(settings, binding, Number.MAX_SAFE_INTEGER);
+  const { failure } = await sendConsoleSequence(settings, binding, [botCountQuery(kind)]);
+  if (failure) return null;
+  for (let attempt = 0; attempt < botCountPoll.attempts; attempt += 1) {
+    await new Promise((resolve) => setTimeout(resolve, botCountPoll.intervalMs));
+    const { lines } = await fetchConsole(settings, binding, cursor);
+    const count = parseBotCount(
+      kind,
+      lines.map((line) => line.text)
+    );
+    if (count !== null) return count;
+  }
+  return null;
 }
 
 const KNOWN_AMP_ERRORS = new Set([
@@ -486,17 +518,6 @@ export function createAmpIntegrationRouter(context: DatabaseContext) {
       response.status(400).json({ error: "bots_nicht_unterstuetzt" });
       return;
     }
-    let commands: string[];
-    try {
-      commands = buildBotCommands(kind, parsed.data);
-    } catch (error) {
-      if (error instanceof BotRequestError) {
-        response.status(400).json({ error: error.message });
-        return;
-      }
-      throw error;
-    }
-
     const rateLimit = checkRateLimit(context, {
       scope: "amp_control",
       key: `user:${guard.user.id}`,
@@ -508,7 +529,28 @@ export function createAmpIntegrationRouter(context: DatabaseContext) {
     }
     recordRateLimitFailure(context, { scope: "amp_control", key: `user:${guard.user.id}` });
 
-    const { sent, failure } = await sendConsoleSequence(readSettings(context), guard.binding, commands);
+    const settings = readSettings(context);
+    // Botzahl nur lesen, wo sie die Befehle bestimmt: Quote vor „Hinzufügen“, CS2-Stufe ohne Anzahl
+    const needsCount =
+      parsed.data.action === "add" || (kind === "cs2" && parsed.data.action === "setLevel" && !parsed.data.count);
+    let currentBots: number | null = null;
+    try {
+      currentBots = needsCount ? await readBotCount(settings, guard.binding, kind) : null;
+    } catch {
+      currentBots = null;
+    }
+    let commands: string[];
+    try {
+      commands = buildBotCommands(kind, parsed.data, currentBots);
+    } catch (error) {
+      if (error instanceof BotRequestError) {
+        response.status(409).json({ error: error.message });
+        return;
+      }
+      throw error;
+    }
+
+    const { sent, failure } = await sendConsoleSequence(settings, guard.binding, commands);
     if (sent > 0) {
       writeAuditLog(context, {
         actor: guard.user,
@@ -521,7 +563,8 @@ export function createAmpIntegrationRouter(context: DatabaseContext) {
           kind,
           ...parsed.data,
           commands: commands.length,
-          sent
+          sent,
+          botsBefore: currentBots
         }
       });
     }
@@ -529,7 +572,34 @@ export function createAmpIntegrationRouter(context: DatabaseContext) {
       response.status(502).json({ error: mapAmpErrorToCode(failure) });
       return;
     }
-    response.json({ ok: true, commands: commands.length });
+    response.json({ ok: true, commands: commands.length, botsBefore: currentBots });
+  });
+
+  /** Zahl der Bots im Spiel (liest die Konsole; AMP zählt Bots nicht als Spieler). */
+  router.get("/instances/:bindingId/bots", async (request, response) => {
+    const guard = requireServerManager(request, response);
+    if (!guard) return;
+    const kind = botKindForGame(getServerStatus(guard.binding.id)?.game);
+    if (!kind) {
+      response.status(400).json({ error: "bots_nicht_unterstuetzt" });
+      return;
+    }
+    const rateLimit = checkRateLimit(context, {
+      scope: "amp_control",
+      key: `user:${guard.user.id}`,
+      sourceIp: request.ip
+    });
+    if (!rateLimit.ok) {
+      response.status(429).json({ error: rateLimit.error, retryAfterSeconds: rateLimit.retryAfterSeconds });
+      return;
+    }
+    recordRateLimitFailure(context, { scope: "amp_control", key: `user:${guard.user.id}` });
+    try {
+      response.json({ kind, bots: await readBotCount(readSettings(context), guard.binding, kind) });
+    } catch (error) {
+      const msg = error instanceof Error ? error.message : "amp_anfrage_fehlgeschlagen";
+      response.status(502).json({ error: mapAmpErrorToCode(msg) });
+    }
   });
 
   return router;

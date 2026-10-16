@@ -93,17 +93,22 @@ Die Stufe übersteht das Zurückschreiben der kvp beim Stoppen. Ob „Fetch late
 
 | Aktion | CS 1.6 (YaPB) | CS2 |
 |---|---|---|
-| Hinzufügen | `yb_quota_mode normal`, dann `yb add <1–4> 0 <1\|2\|5>` × N | `bot_quota_mode normal`, `bot_difficulty <0–3>`, `bot_add[_t\|_ct]` × N |
-| Auffüllen auf N | `yb_quota_mode fill`, `yb_difficulty`, `yb_quota N` | `bot_quota_mode fill`, `bot_difficulty`, `bot_quota N` |
-| Stufe für alle ändern | `yb_difficulty <1–4>` | alle kicken und mit der Anzahl neu aufsetzen, weil `bot_difficulty` nur für neue Bots gilt |
+| Hinzufügen | ggf. `mp_limitteams 0`, `mp_autoteambalance 0`; `yb_quota_mode normal`, `yb_quota <aktuell>`, `yb add <1–4> 0 <1\|2\|5>` × N | ggf. Teamlimit aus wie links; `bot_quota_mode normal`, `bot_quota <aktuell>`, `bot_difficulty <0–3>`, `bot_add[_t\|_ct]` × N |
+| Auffüllen auf N | `yb_quota_mode fill`, `yb_difficulty`, `yb_quota N` | `bot_quota_mode fill`, `bot_difficulty`, `bot_quota N`. Bots kommen erst, wenn ein Mensch joint (`bot_join_after_player`). |
+| Stufe für alle ändern | `yb_difficulty <1–4>`, wirkt sofort auf vorhandene Bots (LAN-Test F2) | alle kicken und mit der aktuellen Zahl neu aufsetzen, weil `bot_difficulty` nur für neue Bots gilt |
 | Alle entfernen | `yb_quota 0`, `yb kickall` | `bot_quota 0`, `bot_kick` |
+| Bots zählen | `yb list` → „N bots“ | `status` → „players : H humans, B bots“ |
 
-Den Ablauf macht Hermes serverseitig über `POST /api/integrations/amp/instances/:bindingId/bots`:
+Die aktuelle Botzahl liest Hermes aus der Konsolenantwort, weil AMP Bots nicht als Spieler zählt. Hermes braucht sie aus zwei Gründen:
+- „Hinzufügen“ setzt die Quote vorher auf die aktuelle Zahl. Eine alte Quote, etwa 10 aus „Auffüllen“, würde im Modus `normal` sonst als Botzahl gelten.
+- CS2 setzt bei „Stufe für alle ändern“ genauso viele Bots neu auf.
+
+Mit festem Team (T/CT) schaltet Hermes Teamlimit und Teamausgleich ab, sonst lehnt das Spiel mit „Team is stacked“ ab.
+
+Den Ablauf macht Hermes serverseitig über `POST /api/integrations/amp/instances/:bindingId/bots`, die Botzahl kommt über `GET …/bots`:
 - Die Befehle werden einzeln gesendet.
 - Es gilt das Rate-Limit `amp_control`.
 - Das Audit-Log schreibt `amp.bots_<aktion>`.
-
-„Hinzufügen“ stellt die Quote auf `normal`, weil eine Füll-Quote neue Bots sonst wieder kickt, sobald Menschen drin sind.
 
 **Konsolenvorlagen:**
 
