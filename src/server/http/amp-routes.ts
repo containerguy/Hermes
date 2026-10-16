@@ -17,7 +17,7 @@ import { suggestBindings } from "../domain/gameservers/suggestions";
 import { canAssignRoles, canManageServers } from "../domain/users";
 import { checkRateLimit, recordRateLimitFailure } from "../auth/rate-limits";
 import { fetchAmpInstances } from "../integrations/amp/amp-client";
-import { ampCall, unwrapAmpData } from "../integrations/amp/amp-session";
+import { ampCall, ampInstanceCall, unwrapAmpData } from "../integrations/amp/amp-session";
 import { getAllServerStatus, getServerStatus, pollNow } from "../integrations/amp/amp-status";
 import { readSettings, type HermesSettings } from "../settings";
 import type { GameServerBinding } from "../domain/gameservers/bindings";
@@ -26,11 +26,6 @@ import type { GameServerBinding } from "../domain/gameservers/bindings";
 
 const CONTROL_ACTIONS = ["start", "stop", "restart", "update", "kill"] as const;
 type ControlAction = (typeof CONTROL_ACTIONS)[number];
-
-/** Instanz-Proxy des Controllers: Methoden der Ziel-Instanz unter ADSModule/Servers/{id}/API/… */
-function instanceMethod(binding: GameServerBinding, method: string) {
-  return `ADSModule/Servers/${encodeURIComponent(binding.ampInstanceId)}/API/${method}`;
-}
 
 /** AMP ActionResult: `{ Status: boolean, Reason?: string }`, ggf. in `result` verpackt. */
 function assertActionOk(raw: unknown) {
@@ -51,27 +46,27 @@ async function runControlAction(settings: HermesSettings, binding: GameServerBin
         );
         // Die Instanz bootet gerade; Core/Start kann noch scheitern — der Poller zeigt den Verlauf.
         try {
-          assertActionOk(await ampCall(settings, instanceMethod(binding, "Core/Start")));
+          assertActionOk(await ampInstanceCall(settings, binding.ampInstanceId, "Core/Start"));
         } catch {
           /* Instanz noch nicht erreichbar */
         }
         return;
       }
-      assertActionOk(await ampCall(settings, instanceMethod(binding, "Core/Start")));
+      assertActionOk(await ampInstanceCall(settings, binding.ampInstanceId, "Core/Start"));
       return;
     }
     case "stop":
-      assertActionOk(await ampCall(settings, instanceMethod(binding, "Core/Stop")));
+      assertActionOk(await ampInstanceCall(settings, binding.ampInstanceId, "Core/Stop"));
       return;
     case "restart":
-      assertActionOk(await ampCall(settings, instanceMethod(binding, "Core/Restart")));
+      assertActionOk(await ampInstanceCall(settings, binding.ampInstanceId, "Core/Restart"));
       return;
     case "update":
       // Spiel-Update (SteamCMD o. ä.) — nicht ADSModule/UpgradeInstance, das wäre das AMP-Upgrade.
-      assertActionOk(await ampCall(settings, instanceMethod(binding, "Core/UpdateApplication")));
+      assertActionOk(await ampInstanceCall(settings, binding.ampInstanceId, "Core/UpdateApplication"));
       return;
     case "kill":
-      assertActionOk(await ampCall(settings, instanceMethod(binding, "Core/Kill")));
+      assertActionOk(await ampInstanceCall(settings, binding.ampInstanceId, "Core/Kill"));
       return;
   }
 }
@@ -90,7 +85,7 @@ export function maskConsoleSecrets(text: string) {
  * werden die Zeilen serverseitig gepuffert und per Cursor (seq) an beliebig viele Betrachter verteilt.
  */
 async function fetchConsole(settings: HermesSettings, binding: GameServerBinding, since: number) {
-  const raw = unwrapAmpData(await ampCall(settings, instanceMethod(binding, "Core/GetUpdates")));
+  const raw = unwrapAmpData(await ampInstanceCall(settings, binding.ampInstanceId, "Core/GetUpdates"));
   const entries =
     raw && typeof raw === "object" && Array.isArray((raw as { ConsoleEntries?: unknown }).ConsoleEntries)
       ? ((raw as { ConsoleEntries: unknown[] }).ConsoleEntries as Record<string, unknown>[])
@@ -123,6 +118,7 @@ const KNOWN_AMP_ERRORS = new Set([
   "amp_nicht_konfiguriert",
   "amp_zugang_erforderlich",
   "amp_ca_ungueltig",
+  "amp_instanz_nicht_verfuegbar",
   "amp_auth_fehlgeschlagen",
   "amp_antwort_unlesbar",
   "amp_http_fehler",
@@ -456,7 +452,7 @@ export function createAmpIntegrationRouter(context: DatabaseContext) {
     recordRateLimitFailure(context, { scope: "amp_control", key: `user:${guard.user.id}` });
 
     try {
-      await ampCall(readSettings(context), instanceMethod(guard.binding, "Core/SendConsoleMessage"), {
+      await ampInstanceCall(readSettings(context), guard.binding.ampInstanceId, "Core/SendConsoleMessage", {
         message: parsed.data.command
       });
     } catch (error) {

@@ -2387,6 +2387,11 @@ dd {
 .server-dot--on {
   background: #16a34a;
 }
+.server-dot--sleep {
+  background: #16a34a;
+  opacity: 0.55;
+  box-shadow: 0 0 0 2px rgba(22, 163, 74, 0.35);
+}
 .server-dot--error {
   background: #dc2626;
 }

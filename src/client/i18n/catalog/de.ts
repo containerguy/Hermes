@@ -301,6 +301,7 @@ export const deMessages = {
   "events.server.status.loading": "Serverstatus wird geladen …",
   "events.server.status.off": "Server aus",
   "events.server.status.starting": "Server startet …",
+  "events.server.status.sleep": "Ruhemodus – startet beim Verbinden",
   "events.server.status.on": "Server läuft",
   "events.server.status.error": "Serverstatus unbekannt",
   "events.server.statusHint": "AMP antwortet gerade nicht, angezeigt wird der letzte bekannte Stand.",

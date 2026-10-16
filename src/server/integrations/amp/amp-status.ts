@@ -19,7 +19,7 @@ export type ServerStatus = {
   ampInstanceName: string;
   /** AMP-Instanz (Prozess/Container) läuft. */
   instanceRunning: boolean;
-  /** Spielserver ist bereit (AppState Ready). */
+  /** Spieler können sich verbinden (AppState Ready oder Ruhemodus/Sleeping). */
   running: boolean;
   appState: string;
   players: number | null;
@@ -100,6 +100,9 @@ export function appStateName(raw: unknown): string {
 }
 
 const DEFAULT_INTERVAL_MS = 15_000;
+
+/** Zustände, in denen Spieler sich verbinden können (Ready oder Ruhemodus). */
+const JOINABLE_STATES = new Set(["Ready", "PreparingForSleep", "Sleeping"]);
 
 const cache = new Map<string, ServerStatus>();
 let timer: ReturnType<typeof setInterval> | null = null;
@@ -214,7 +217,8 @@ export function applyInstancesSnapshot(
         next = {
           ...baseStatus(binding, ips),
           instanceRunning: row.Running === true || row.running === true,
-          running: appState === "Ready",
+          // Ruhemodus (Universal Sleep): Server wacht beim ersten Verbindungsversuch auf -> beitretbar
+          running: JOINABLE_STATES.has(appState),
           appState,
           ...readPlayers(row),
           updatedAt: timestamp,

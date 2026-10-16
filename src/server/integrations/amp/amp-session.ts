@@ -22,6 +22,8 @@ export type AmpSession = { sessionId: string; obtainedAt: number; baseUrl: strin
 
 let fetchImpl: FetchLike = undiciFetch;
 let session: AmpSession | null = null;
+/** Instanz-ID -> Instanz-SESSIONID (siehe ampInstanceCall). */
+const instanceSessions = new Map<string, string>();
 let loginInFlight: Promise<AmpSession> | null = null;
 let rememberToken: string | null | undefined; // undefined = noch nicht von Platte gelesen
 let queue: Promise<unknown> = Promise.resolve();
@@ -58,6 +60,8 @@ export function setAmpFetchForTests(fn: FetchLike | null) {
 export function resetAmpSession() {
   session = null;
   loginInFlight = null;
+  // Instanz-Sitzungen hängen am Controller-Login; nach dessen Verlust neu anmelden.
+  instanceSessions.clear();
 }
 
 export function unwrapAmpData(raw: unknown): unknown {
@@ -271,6 +275,82 @@ export function ampCall<T = unknown>(
   body: Record<string, unknown> = {}
 ): Promise<T> {
   const run = queue.then(() => callWithSession(settings, method, body, true)) as Promise<T>;
+  queue = run.catch(() => undefined);
+  return run;
+}
+
+/* ---------- Instanz-Sitzungen ----------
+ * Die Controller-Session gilt NICHT auf den Instanzen: Aufrufe über `ADSModule/Servers/{id}/API/…`
+ * scheitern sonst mit "requires the Session.Exists permission". Jede Instanz braucht einen eigenen
+ * Login über denselben Proxy (verifiziert 2026-10-16 gegen amp-ctl, alle Targets).
+ */
+function instancePath(instanceId: string, method: string) {
+  return `ADSModule/Servers/${encodeURIComponent(instanceId)}/API/${method}`;
+}
+
+async function instanceLogin(settings: HermesSettings, instanceId: string): Promise<string> {
+  const creds = getAmpCredentials();
+  if (!creds) {
+    throw new Error("amp_zugang_erforderlich");
+  }
+  const raw = (await callWithSession(
+    settings,
+    instancePath(instanceId, "Core/Login"),
+    { username: creds.username, password: creds.password, token: "", rememberMe: false },
+    true
+  )) as LoginResponse | null;
+  if (!raw?.success || !raw.sessionID) {
+    throw new Error("amp_auth_fehlgeschlagen");
+  }
+  instanceSessions.set(instanceId, raw.sessionID);
+  return raw.sessionID;
+}
+
+async function callInstance(
+  settings: HermesSettings,
+  instanceId: string,
+  method: string,
+  body: Record<string, unknown>,
+  allowRetry: boolean
+): Promise<unknown> {
+  const current = await getAmpSession(settings);
+  const sessionId = instanceSessions.get(instanceId) ?? (await instanceLogin(settings, instanceId));
+  const { status, parsed } = await rawPost(current.baseUrl, instancePath(instanceId, method), {
+    ...body,
+    SESSIONID: sessionId
+  });
+
+  if (isSessionLost(status, parsed)) {
+    instanceSessions.delete(instanceId);
+    if (allowRetry) {
+      return callInstance(settings, instanceId, method, body, false);
+    }
+    throw new Error("amp_auth_fehlgeschlagen");
+  }
+  if (status >= 400) {
+    throw new Error("amp_http_fehler");
+  }
+  if (isAmpApiError(parsed)) {
+    const title = parsed.Title ?? "";
+    if (/Instance Unavailable/i.test(title)) {
+      // Instanz (AMP-Prozess) läuft nicht — Sitzung verwerfen, sie gilt nach dem Start nicht mehr
+      instanceSessions.delete(instanceId);
+      throw new Error("amp_instanz_nicht_verfuegbar");
+    }
+    const message = [parsed.Title, parsed.Message].filter(Boolean).join(": ");
+    throw new Error(message || "amp_api_fehler");
+  }
+  return parsed;
+}
+
+/** Serialisierter Aufruf einer Methode auf einer Instanz (eigene Instanz-Session, Re-Login bei Ablauf). */
+export function ampInstanceCall<T = unknown>(
+  settings: HermesSettings,
+  instanceId: string,
+  method: string,
+  body: Record<string, unknown> = {}
+): Promise<T> {
+  const run = queue.then(() => callInstance(settings, instanceId, method, body, true)) as Promise<T>;
   queue = run.catch(() => undefined);
   return run;
 }

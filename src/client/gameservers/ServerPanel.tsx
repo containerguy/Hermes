@@ -16,11 +16,12 @@ export type ServerPanelBinding = {
   onAction: (action: ServerAction) => void;
 };
 
-type DotState = "off" | "starting" | "on" | "error";
+type DotState = "off" | "starting" | "on" | "sleep" | "error";
 
 function dotState(status: ServerStatus | null): DotState {
   if (!status) return "off";
   if (status.error) return "error";
+  if (status.appState === "Sleeping" || status.appState === "PreparingForSleep") return "sleep";
   if (status.running) return "on";
   if (["Starting", "Restarting", "PreStart", "Configuring", "Installing", "Updating"].includes(status.appState)) {
     return "starting";
@@ -46,6 +47,8 @@ export function ServerPanel({ bindingId, status, canManage, busy, onAction }: Se
     ? t("events.server.status.loading")
     : state === "on"
       ? t("events.server.status.on")
+      : state === "sleep"
+        ? t("events.server.status.sleep")
       : state === "starting"
         ? t("events.server.status.starting")
         : state === "error"
@@ -72,7 +75,7 @@ export function ServerPanel({ bindingId, status, canManage, busy, onAction }: Se
         <span className={`server-dot server-dot--${state}`} aria-hidden="true" />
         <span className="server-state">
           {stateLabel}
-          {status && status.appState !== "Ready" && status.appState !== "Stopped" && status.appState !== "Undefined"
+          {status && state !== "sleep" && status.appState !== "Ready" && status.appState !== "Stopped" && status.appState !== "Undefined"
             ? ` · ${status.appState}`
             : ""}
         </span>

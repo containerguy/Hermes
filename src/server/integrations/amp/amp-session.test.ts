@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { defaultSettings, type HermesSettings } from "../../settings";
-import { ampCall, setAmpFetchForTests } from "./amp-session";
+import { ampCall, ampInstanceCall, setAmpFetchForTests } from "./amp-session";
 
 type Call = { endpoint: string; body: Record<string, unknown> };
 
@@ -20,7 +20,8 @@ function jsonResponse(status: number, body: unknown) {
 function installFetch(handler: (call: Call, index: number) => { status: number; body: unknown }) {
   const calls: Call[] = [];
   const fetchMock = vi.fn(async (url: unknown, init?: { body?: unknown }) => {
-    const endpoint = String(url).replace(/^.*\/API\//, "");
+    // nicht-gierig: Proxy-Pfade enthalten ein zweites "/API/" (…/Servers/<id>/API/Core/…)
+    const endpoint = String(url).replace(/^.*?\/API\//, "");
     const body = JSON.parse(String(init?.body ?? "{}")) as Record<string, unknown>;
     const call = { endpoint, body };
     calls.push(call);
@@ -116,6 +117,50 @@ describe("amp-session", () => {
     expect(logins.map((c) => c.body.password)).toEqual(["OLD-TOKEN", "geheim"]);
     expect(fs.readFileSync(tokenFile, "utf8").trim()).toBe("NEW-TOKEN");
     fs.rmSync(tokenFile, { force: true });
+  });
+
+  it("logs in per instance through the controller proxy and reuses that session", async () => {
+    let instanceLogins = 0;
+    const calls = installFetch(({ endpoint, body }) => {
+      if (endpoint === "Core/Login") {
+        return { status: 200, body: { success: true, sessionID: "S1" } };
+      }
+      if (endpoint === "ADSModule/Servers/inst-1/API/Core/Login") {
+        instanceLogins += 1;
+        return { status: 200, body: { success: true, sessionID: `I${instanceLogins}` } };
+      }
+      if (endpoint === "ADSModule/Servers/inst-1/API/Core/GetStatus") {
+        // erste Instanz-Session läuft nach dem ersten Aufruf ab
+        if (body.SESSIONID === "I1" && calls.filter((c) => c.endpoint.endsWith("GetStatus")).length > 1) {
+          return { status: 200, body: { Title: "Unauthorized Access", Message: "requires the Session.Exists permission" } };
+        }
+        return { status: 200, body: { State: 20 } };
+      }
+      return { status: 200, body: {} };
+    });
+
+    expect(await ampInstanceCall(settings, "inst-1", "Core/GetStatus")).toEqual({ State: 20 });
+    expect(await ampInstanceCall(settings, "inst-1", "Core/GetStatus")).toEqual({ State: 20 });
+
+    const statusCalls = calls.filter((c) => c.endpoint.endsWith("GetStatus"));
+    expect(statusCalls.map((c) => c.body.SESSIONID)).toEqual(["I1", "I1", "I2"]);
+    expect(instanceLogins).toBe(2);
+    const instanceLogin = calls.find((c) => c.endpoint.endsWith("/API/Core/Login"));
+    expect(instanceLogin?.body).toMatchObject({ username: "hermes", password: "geheim", SESSIONID: "S1" });
+  });
+
+  it("maps an unavailable instance to amp_instanz_nicht_verfuegbar", async () => {
+    installFetch(({ endpoint }) => {
+      if (endpoint === "Core/Login") return { status: 200, body: { success: true, sessionID: "S1" } };
+      if (endpoint.endsWith("/API/Core/Login")) return { status: 200, body: { success: true, sessionID: "I1" } };
+      return {
+        status: 200,
+        body: { Title: "Instance Unavailable", Message: "The requested instance is not available at this time." }
+      };
+    });
+    await expect(ampInstanceCall(settings, "inst-off", "Core/GetUpdates")).rejects.toThrow(
+      "amp_instanz_nicht_verfuegbar"
+    );
   });
 
   it("fails without env credentials and never touches the network", async () => {

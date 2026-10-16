@@ -96,6 +96,23 @@ describe("ServerPanel", () => {
     await rendered.cleanup();
   });
 
+  it("shows sleeping servers as joinable with a connect link", async () => {
+    const rendered = await render(
+      <ServerPanel
+        bindingId="b-cs2"
+        status={{ ...running, appState: "Sleeping", running: true, players: 0 }}
+        canManage={false}
+        busy={false}
+        onAction={vi.fn()}
+      />
+    );
+    expect(rendered.container.textContent).toContain("Ruhemodus – startet beim Verbinden");
+    expect(rendered.container.textContent).not.toContain("Sleeping");
+    expect(rendered.container.querySelector(".server-dot--sleep")).toBeTruthy();
+    expect(rendered.container.querySelector("a.button-link")).toBeTruthy();
+    await rendered.cleanup();
+  });
+
   it("renders a copyable address for the copy scheme and a loading state without status", async () => {
     const rendered = await render(
       <ServerPanel

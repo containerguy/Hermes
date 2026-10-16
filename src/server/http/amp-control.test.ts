@@ -33,6 +33,15 @@ function installAmpMock() {
     let payload: unknown;
     if (endpoint === "Core/Login") {
       payload = { success: true, sessionID: "S-TEST", rememberMeToken: "R" };
+    } else if (endpoint.endsWith("/API/Core/Login")) {
+      // Instanz-Login über den Controller-Proxy
+      payload = { success: true, sessionID: "I-TEST" };
+    } else if (endpoint.includes("/API/") && body.SESSIONID !== "I-TEST") {
+      // Instanz-Methoden ohne Instanz-Session lehnt AMP ab (wie im echten Betrieb)
+      payload = {
+        Title: "Unauthorized Access",
+        Message: "You do not have permission to use this method at this time. This method requires the Session.Exists permission."
+      };
     } else if (endpoint === "ADSModule/GetInstances") {
       payload = fixture;
     } else if (endpoint.endsWith("/API/Core/GetUpdates")) {

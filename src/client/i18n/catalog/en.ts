@@ -302,6 +302,7 @@ export const enMessages: { [K in keyof typeof deMessages]: string } = {
   "events.server.status.loading": "Loading server status …",
   "events.server.status.off": "Server off",
   "events.server.status.starting": "Server starting …",
+  "events.server.status.sleep": "Sleeping – wakes up on connect",
   "events.server.status.on": "Server running",
   "events.server.status.error": "Server status unknown",
   "events.server.statusHint": "AMP is not responding right now; showing the last known state.",
