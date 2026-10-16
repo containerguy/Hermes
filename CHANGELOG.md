@@ -4,9 +4,95 @@ Versions are annotated tags `vX.Y.Z` on `main`. Each entry mirrors the
 `chore(release): vX.Y.Z` commit that bumps `package.json`,
 `package-lock.json`, and `src/server/openapi/hermes-api.yaml`.
 
-## Unreleased — Persistent sessions and devices
+## v0.12.0 — Game servers (AMP), persistent sessions, pizza management (2026-10-16)
 
-### Behavior change
+Covers everything merged to `main` since v0.11.0: persistent sessions and
+devices (#10), dependency fixes (#11), the game server module for CubeCoders
+AMP (#1, #12) and pizza management (#14).
+
+### Upgrade notes
+
+- Migrations `0019_devices`, `0020_game_server_bindings`,
+  `0021_binding_auto_stop` and `0022_pizza_management` run on start.
+- `0022` archives old pizza rounds once: every round that is delivered or
+  not the newest one disappears from the current view and stays in the
+  archive. The newest undelivered round stays active.
+- The AMP module is off by default (`ampIntegrationEnabled`). It needs
+  `HERMES_AMP_USERNAME`/`HERMES_AMP_PASSWORD` and the base URL in
+  `Admin → Betrieb`.
+- S3 restore now also restores the pizza tables. Snapshots must still have
+  the same migration level as the live database.
+
+### Game servers (CubeCoders AMP)
+
+- Admins bind AMP instances to game titles (`game_server_bindings`), with
+  suggestions from AMP matched against the game catalog. Events with a
+  matching title link to the binding automatically; managers can pick or
+  clear the binding per event.
+- Event cards show the server status (running, players, joinable incl.
+  sleep mode) and a connect action (Steam link with resolved IP,
+  Minecraft address, or copy).
+- From the manager role: start, stop, restart, update, kill, and a server
+  console with masked secrets, per-game command templates (CS 2, CS 1.6,
+  CoD4, Minecraft, Factorio, Soldat; UT2004 points to WebAdmin), rate
+  limit and audit log.
+- Automation (opt-in settings): auto-start the bound server when an event
+  becomes ready (at most once per event, with one follow-up start after
+  `ADSModule/StartInstance`), idle stop after N minutes with 0 players for
+  bindings that allow it (`autoStopEnabled`, default off), push
+  "Server läuft" to joined participants with notifications enabled.
+- Kiosk shows the server status of events.
+- Configuration: `HERMES_AMP_USERNAME`, `HERMES_AMP_PASSWORD`, optional
+  `HERMES_AMP_REMEMBER_TOKEN_FILE` and `HERMES_AMP_CA_FILE` (CA pinning);
+  settings `ampIntegrationEnabled`, `ampBaseUrl`, `ampAutoStartOnReady`,
+  `ampAutoStopIdleMinutes`.
+- Fix: `game_server_bindings` is part of S3 restore; Vitest no longer
+  picks up Playwright specs.
+
+### Pizza management
+
+- From the manager role (not only admin): edit menu items, variants and
+  prices in the pizza panel; variants referenced by orders are deactivated
+  instead of deleted, price snapshots of existing orders stay unchanged.
+- Rounds can be archived in any state (with a warning for undelivered
+  rounds), archived rounds are listed with totals and unpaid count, their
+  cash list PDF stays available, and they can be deleted for good.
+- Cash payment: setting `pizzaPaymentMethods` (`cash_and_paypal`,
+  `cash_only`, `paypal_only`); guests choose cash or PayPal, managers mark
+  orders as paid in cash or via PayPal. Managers change the payment methods
+  directly in the pizza panel (`PUT /api/pizza/payment-mode`). PayPal is
+  only offered when a PayPal handle is set.
+- Fix: a failed round transition (e.g. a second "delivered" click) no
+  longer archives the round or creates an empty draft.
+- Archived rounds are frozen: order lines, the guest's payment method and
+  the payment status can no longer be changed (`409 pizza_runde_archiviert`),
+  also not by managers. The archive dialog shows how many orders are still
+  unpaid. Empty orders are removed when a round is archived and not counted
+  in the archive.
+- Cash list PDF: payment status as plain text (`[x] bezahlt (Bar)`,
+  `[ ] offen – PayPal gewählt`) instead of check box glyphs the built-in
+  font cannot render; "Gedruckt" uses Europe/Berlin time.
+- All pizza write routes require the CSRF header; new error codes are
+  translated (de/en).
+- Changing the payment methods resets open orders whose chosen method is
+  no longer offered (to the single remaining method, otherwise unset).
+- Fix (also on v0.11.0): admin restore from S3 failed for every snapshot
+  with `no such column: "users"` because the column lookup quoted the
+  table name as an identifier, which SQLite builds without DQS reject.
+  A test now runs backup and restore through the real routes.
+- S3 uploads no longer use "flexible checksums" (`aws-chunked`), which
+  some S3-compatible services store as part of the object.
+- Pizza tables (`pizza_menu_items`, `pizza_menu_variants`,
+  `pizza_sessions`, `pizza_orders`, `pizza_order_lines`) are part of S3
+  restore. A test requires an explicit restore decision for every table.
+
+### Dependencies
+
+- `npm audit` fixes: proxy-addr, nodemailer 10.1.1, qs, body-parser.
+
+### Persistent sessions and devices
+
+#### Behavior change
 
 - Sessions no longer hard-expire 30 days after login. They now expire after
   `HERMES_SESSION_TTL_DAYS` (default 180, max 400) days **without use**; every
@@ -16,7 +102,7 @@ Versions are annotated tags `vX.Y.Z` on `main`. Each entry mirrors the
   an admin role/email change or a remote "Abmelden" keeps the device and its
   name; the next login on the same browser reuses it.
 
-### Server
+#### Server
 
 - Migration `0019_devices.sql`: new `devices` table (per user, HMAC-hashed
   device key, name, `forgotten_at`), `sessions.device_id` and
@@ -35,7 +121,7 @@ Versions are annotated tags `vX.Y.Z` on `main`. Each entry mirrors the
 - Renaming a session renames its device. Soft-deleting a user removes their
   devices. `devices` is part of S3 snapshot restore.
 
-### Client
+#### Client
 
 - The login form hides the device-name field when this browser is already
   known for the entered user ("Dieses Gerät ist als „…" bekannt.").
@@ -45,7 +131,7 @@ Versions are annotated tags `vX.Y.Z` on `main`. Each entry mirrors the
   the home-screen app needs pairing.
 - "Dieses Gerät vergessen" uses the new endpoint.
 
-### Configuration
+#### Configuration
 
 - `HERMES_DEVICE_KEY_SECRET` (documented now; set once and keep stable).
 - `HERMES_SESSION_TTL_DAYS` (optional).

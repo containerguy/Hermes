@@ -10,6 +10,7 @@ interface ImportResponse {
   itemCount: number;
   deactivated: number;
   variantsRemoved: number;
+  variantsDeactivated?: number;
 }
 
 export function PizzaMenuJsonAdmin() {
@@ -47,7 +48,7 @@ export function PizzaMenuJsonAdmin() {
         body: JSON.stringify(parsed)
       });
       setStatus(
-        `Import OK — ${result.itemCount} Einträge, ${result.deactivated} deaktiviert, ${result.variantsRemoved} Varianten entfernt.`
+        `Import OK — ${result.itemCount} Einträge, ${result.deactivated} deaktiviert, ${result.variantsRemoved} Varianten entfernt, ${result.variantsDeactivated ?? 0} Varianten deaktiviert (in Bestellungen verwendet).`
       );
       await loadCurrent();
     } catch (err) {
@@ -89,10 +90,11 @@ export function PizzaMenuJsonAdmin() {
       <h2>Menü als JSON</h2>
       <p className="muted">
         Schema: {"{"} items: [{"{"} id?, number?, name, ingredients?, allergens?, category, active?,
-        sortOrder?, variants: [{"{"} id?, sizeLabel, priceCents, sortOrder? {"}"}] {"}"}] {"}"}.
+        sortOrder?, variants: [{"{"} id?, sizeLabel, priceCents, sortOrder?, active? {"}"}] {"}"}] {"}"}.
         Beim Import werden Einträge per id geupdatet (oder neu angelegt). Fehlende Einträge werden
-        deaktiviert; fehlende Varianten werden entfernt sofern keine bestehende Bestellung sie
-        referenziert.
+        deaktiviert; fehlende Varianten werden entfernt bzw. deaktiviert, wenn eine bestehende
+        Bestellung sie referenziert. Einzelne Artikel und Preise lassen sich bequemer direkt in der
+        Pizzabestellung unter „Menü verwalten“ pflegen (ab manager).
       </p>
 
       {error ? (

@@ -92,6 +92,7 @@ const defaultSettings: AppSettings = {
   pizzaPaypalHandle: "",
   pizzaPaypalName: "",
   pizzaCashRecipient: "",
+  pizzaPaymentMethods: "cash_and_paypal",
   ampIntegrationEnabled: false,
   ampBaseUrl: "",
   ampAutoStartOnReady: false,

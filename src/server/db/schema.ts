@@ -401,28 +401,39 @@ export const pizzaMenuVariants = sqliteTable(
       .references(() => pizzaMenuItems.id, { onDelete: "cascade" }),
     sizeLabel: text("size_label"),
     priceCents: integer("price_cents").notNull(),
-    sortOrder: integer("sort_order").notNull().default(0)
+    sortOrder: integer("sort_order").notNull().default(0),
+    /** 0022: Varianten mit Bestellhistorie werden deaktiviert statt gelöscht. */
+    active: integer("active", { mode: "boolean" }).notNull().default(true)
   },
   (table) => [index("pizza_menu_variants_item_idx").on(table.itemId)]
 );
 
-export const pizzaSessions = sqliteTable("pizza_sessions", {
-  id: text("id").primaryKey(),
-  state: text("state", { enum: ["draft", "open", "locked", "delivered"] })
-    .notNull()
-    .default("draft"),
-  label: text("label"),
-  openedAt: text("opened_at"),
-  openedByUserId: text("opened_by_user_id").references(() => users.id, { onDelete: "set null" }),
-  lockedAt: text("locked_at"),
-  lockedByUserId: text("locked_by_user_id").references(() => users.id, { onDelete: "set null" }),
-  deliveredAt: text("delivered_at"),
-  deliveredByUserId: text("delivered_by_user_id").references(() => users.id, {
-    onDelete: "set null"
-  }),
-  createdAt: text("created_at").notNull(),
-  updatedAt: text("updated_at").notNull()
-});
+export const pizzaSessions = sqliteTable(
+  "pizza_sessions",
+  {
+    id: text("id").primaryKey(),
+    state: text("state", { enum: ["draft", "open", "locked", "delivered"] })
+      .notNull()
+      .default("draft"),
+    label: text("label"),
+    openedAt: text("opened_at"),
+    openedByUserId: text("opened_by_user_id").references(() => users.id, { onDelete: "set null" }),
+    lockedAt: text("locked_at"),
+    lockedByUserId: text("locked_by_user_id").references(() => users.id, { onDelete: "set null" }),
+    deliveredAt: text("delivered_at"),
+    deliveredByUserId: text("delivered_by_user_id").references(() => users.id, {
+      onDelete: "set null"
+    }),
+    /** 0022: Archivierte Runden verschwinden aus der aktuellen Ansicht. */
+    archivedAt: text("archived_at"),
+    archivedByUserId: text("archived_by_user_id").references(() => users.id, {
+      onDelete: "set null"
+    }),
+    createdAt: text("created_at").notNull(),
+    updatedAt: text("updated_at").notNull()
+  },
+  (table) => [index("pizza_sessions_archived_created_idx").on(table.archivedAt, table.createdAt)]
+);
 
 export const pizzaOrders = sqliteTable(
   "pizza_orders",
@@ -439,6 +450,8 @@ export const pizzaOrders = sqliteTable(
     })
       .notNull()
       .default("unpaid"),
+    /** 0022: Gewählte Bezahlart; null = noch nicht gewählt. */
+    paymentMethod: text("payment_method", { enum: ["cash", "paypal"] }),
     paidAt: text("paid_at"),
     paidByAdminId: text("paid_by_admin_id").references(() => users.id, { onDelete: "set null" }),
     createdAt: text("created_at").notNull(),

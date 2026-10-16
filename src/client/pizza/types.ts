@@ -2,6 +2,7 @@ export type PizzaSessionState = "draft" | "open" | "locked" | "delivered";
 export type PizzaSessionTransition = "open" | "lock" | "deliver" | "reopen";
 export type PizzaCategory = "pizza" | "pasta";
 export type PizzaPaymentStatus = "unpaid" | "paid_paypal" | "paid_cash";
+export type PizzaPaymentMethod = "cash" | "paypal";
 
 export interface PizzaVariant {
   id: string;
@@ -9,6 +10,7 @@ export interface PizzaVariant {
   sizeLabel: string | null;
   priceCents: number;
   sortOrder: number;
+  active: boolean;
 }
 
 export interface PizzaItem {
@@ -30,6 +32,20 @@ export interface PizzaSession {
   openedAt: string | null;
   lockedAt: string | null;
   deliveredAt: string | null;
+  archivedAt?: string | null;
+}
+
+export interface PizzaArchivedSession {
+  id: string;
+  state: PizzaSessionState;
+  label: string | null;
+  createdAt: string;
+  openedAt: string | null;
+  deliveredAt: string | null;
+  archivedAt: string;
+  orderCount: number;
+  unpaidCount: number;
+  totalCents: number;
 }
 
 export interface PizzaOrderLine {
@@ -40,6 +56,10 @@ export interface PizzaOrderLine {
   priceCentsSnapshot: number;
   customNote: string | null;
   createdAt: string;
+  /** Vom Server aufgelöste Bezeichnung (auch für deaktivierte Artikel/Varianten). */
+  itemNumber?: string | null;
+  itemName?: string;
+  sizeLabel?: string | null;
 }
 
 export interface PizzaOrder {
@@ -47,6 +67,7 @@ export interface PizzaOrder {
   sessionId: string;
   userId: string;
   paymentStatus: PizzaPaymentStatus;
+  paymentMethod: PizzaPaymentMethod | null;
   paidAt: string | null;
   paidByAdminId: string | null;
   lines: PizzaOrderLine[];
@@ -61,9 +82,15 @@ export interface PizzaGuestTotal {
   totalCents: number;
 }
 
+export type PizzaPaymentMode = "cash_and_paypal" | "cash_only" | "paypal_only";
+
 export interface PizzaPanelState {
   session: PizzaSession | null;
   menu: PizzaItem[];
+  /** Aktuell angebotene Bezahlarten (serverseitig aus Settings abgeleitet). */
+  paymentMethods: PizzaPaymentMethod[];
+  /** Einstellung hinter `paymentMethods` (ab manager änderbar). */
+  paymentMode?: PizzaPaymentMode;
   myOrder: PizzaOrder | null;
   orders: PizzaOrderWithUser[];
   guestTotals: PizzaGuestTotal[];

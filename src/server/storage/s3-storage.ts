@@ -72,6 +72,12 @@ export const restorableTables = [
   "game_server_bindings",
   "game_events",
   "participations",
+  // Pizza in FK-Reihenfolge: Menü → Varianten, Runden → Bestellungen → Positionen (→ Varianten)
+  "pizza_menu_items",
+  "pizza_menu_variants",
+  "pizza_sessions",
+  "pizza_orders",
+  "pizza_order_lines",
   "app_settings",
   "audit_logs",
   "invite_codes",
@@ -255,7 +261,11 @@ function createS3Client() {
       region: config.region,
       endpoint: config.endpoint,
       credentials: config.credentials,
-      forcePathStyle: true
+      forcePathStyle: true,
+      // Keine "flexible checksums" (aws-chunked mit CRC-Trailer): Manche S3-kompatiblen Dienste
+      // speichern die Chunk-Rahmung mit ins Objekt, der Snapshot ist dann keine SQLite-Datei mehr.
+      requestChecksumCalculation: "WHEN_REQUIRED",
+      responseChecksumValidation: "WHEN_REQUIRED"
     })
   };
 }
@@ -550,8 +560,9 @@ function listTableNames(db: Database.Database) {
 
 function readColumns(db: Database.Database, table: string) {
   return db
-    .prepare(`SELECT name FROM pragma_table_info(${quoteIdentifier(table)}) ORDER BY cid`)
-    .all()
+    // Tabellenname als Parameter: Ein Bezeichner in "…" wäre ohne DQS (better-sqlite3 ≥ 12) ein Fehler.
+    .prepare("SELECT name FROM pragma_table_info(?) ORDER BY cid")
+    .all(table)
     .map((row) => (row as { name: string }).name);
 }
 

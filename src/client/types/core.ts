@@ -65,6 +65,8 @@ export type AppSettings = {
   pizzaPaypalName: string;
   /** Bargeld-Empfänger-Hinweis im Anteilsbildschirm. */
   pizzaCashRecipient: string;
+  /** Angebotene Bezahlarten; PayPal zusätzlich nur mit gesetztem Handle. */
+  pizzaPaymentMethods: "cash_and_paypal" | "cash_only" | "paypal_only";
   /** CubeCoders AMP: Instanzen beim Event-Anlegen auswählbar (serverseitig konfiguriert). */
   ampIntegrationEnabled: boolean;
   /** Basis-URL des AMP-Controllers ohne /API, z. B. https://amp-ctl.lanparty.example */
@@ -177,6 +179,7 @@ export type PublicAppSettings = Pick<
   | "pizzaPaypalHandle"
   | "pizzaPaypalName"
   | "pizzaCashRecipient"
+  | "pizzaPaymentMethods"
   | "ampIntegrationEnabled"
 >;
 
