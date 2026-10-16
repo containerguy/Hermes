@@ -5,8 +5,8 @@
  *
  * Konsolenweg je Spiel laut AMP-Template (CubeCoders/AMPTemplates) und Test gegen amp-ctl
  * am 2026-10-16: CS2/CS 1.6/Factorio über RCON (antworten), Minecraft über das native Modul,
- * CoD4/Soldat über STDIN (ohne sichtbare Rückmeldung bzw. nicht geprüft), UT2004 nimmt
- * auf der Konsole nichts an → WebAdmin.
+ * CoD4 über Quake-RCON (Instanz umgestellt, STDIN erreicht den Wine-Server nicht), Soldat über
+ * STDIN ohne sichtbare Rückmeldung, UT2004 nimmt auf der Konsole nichts an → WebAdmin.
  */
 
 type Text = { de: string; en: string };
@@ -146,10 +146,10 @@ const cs16: GameCommandSet = {
 const cod4: GameCommandSet = {
   key: "cod4",
   name: "Call of Duty 4",
-  console: "untested",
+  console: "ok",
   hint: t(
-    "Konsole läuft über STDIN — Ausgabe kann fehlen, Wirkung im Spiel prüfen. Vanilla-CoD4 hat keine Bots.",
-    "Console goes through STDIN — output may be missing, check the effect in game. Vanilla CoD4 has no bots."
+    "Befehle gehen per RCON an den Server. Vanilla-CoD4 hat keine Bots.",
+    "Commands are sent via RCON. Vanilla CoD4 has no bots."
   ),
   groups: [
     { label: t("Info"), presets: [p(t("Status & Spielerliste", "Status & player list"), "status")] },
