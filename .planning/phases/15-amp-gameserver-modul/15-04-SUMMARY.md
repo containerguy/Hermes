@@ -127,6 +127,9 @@ Bewusste Folgen, die René kennen sollte:
 
 ## Offen / für die Abnahme im LAN
 
+Der vollständige Testauftrag für die lokale Session (Regeln, Prüfpunkte, Ergebnis als PR-Kommentar) steht in
+`15-04-LAN-ABNAHME-AUFTRAG.md` in diesem Ordner.
+
 1. **Manuell gegen echte AMP-Server** (Setting an): Event „Factorio" auf `ready` bringen → Instanz
    startet binnen ~30 s, Audit `amp.auto_start`; Push kam genau einmal an die „dabei"-Teilnehmer;
    Event archivieren, `ampAutoStopIdleMinutes` (z. B. 10) abwarten → Instanz stoppt, Audit `amp.auto_stop`.
