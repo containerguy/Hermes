@@ -74,6 +74,14 @@ AMP (#1, #12) and pizza management (#14).
   font cannot render; "Gedruckt" uses Europe/Berlin time.
 - All pizza write routes require the CSRF header; new error codes are
   translated (de/en).
+- Changing the payment methods resets open orders whose chosen method is
+  no longer offered (to the single remaining method, otherwise unset).
+- Fix (also on v0.11.0): admin restore from S3 failed for every snapshot
+  with `no such column: "users"` because the column lookup quoted the
+  table name as an identifier, which SQLite builds without DQS reject.
+  A test now runs backup and restore through the real routes.
+- S3 uploads no longer use "flexible checksums" (`aws-chunked`), which
+  some S3-compatible services store as part of the object.
 - Pizza tables (`pizza_menu_items`, `pizza_menu_variants`,
   `pizza_sessions`, `pizza_orders`, `pizza_order_lines`) are part of S3
   restore. A test requires an explicit restore decision for every table.

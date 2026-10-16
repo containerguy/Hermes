@@ -310,3 +310,20 @@ export function markPayment(
 }
 
 export { PizzaOrderLimitError };
+
+/** Nach einer Änderung der Bezahlarten: offene Bestellungen mit nicht mehr angebotener Bezahlart neu setzen. */
+export function resetUnofferedPaymentMethods(
+  context: DatabaseContext,
+  sessionId: string,
+  offered: PizzaPaymentMethod[],
+  fallback: PizzaPaymentMethod | null
+) {
+  const placeholders = offered.map(() => "?").join(", ");
+  context.sqlite
+    .prepare(
+      `UPDATE pizza_orders SET payment_method = ?, updated_at = ?
+       WHERE session_id = ? AND payment_status = 'unpaid'
+         AND payment_method IS NOT NULL AND payment_method NOT IN (${placeholders})`
+    )
+    .run(fallback, nowIso(), sessionId, ...offered);
+}

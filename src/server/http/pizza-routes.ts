@@ -26,6 +26,7 @@ import {
   getOrderForUser,
   listOrdersForSession,
   markPayment,
+  resetUnofferedPaymentMethods,
   setPaymentMethod,
   updateLine
 } from "../domain/pizza/orders";
@@ -302,6 +303,13 @@ export function createPizzaRouter(context: DatabaseContext) {
     const current = readSettings(context);
     // Nur diesen einen Schlüssel schreiben; die übrigen Einstellungen bleiben unberührt.
     writeSettings(context, { pizzaPaymentMethods: parsed.data.pizzaPaymentMethods }, actor.id);
+    // Offene Bestellungen der aktuellen Runde mit einer nicht mehr angebotenen Bezahlart neu setzen
+    // (eine verbleibende Bezahlart wird vorausgewählt, sonst wählt der Gast neu).
+    const offered = offeredPaymentMethods(readSettings(context));
+    const active = getActiveSession(context);
+    if (active) {
+      resetUnofferedPaymentMethods(context, active.id, offered, defaultPaymentMethod(offered));
+    }
     tryWriteAuditLog(context, {
       actor,
       action: "pizza.payment_mode",
@@ -311,7 +319,7 @@ export function createPizzaRouter(context: DatabaseContext) {
       metadata: { from: current.pizzaPaymentMethods, to: parsed.data.pizzaPaymentMethods }
     });
     broadcastEventsChanged("pizza_payment_mode");
-    response.json({ paymentMode: parsed.data.pizzaPaymentMethods, paymentMethods: offeredPaymentMethods(readSettings(context)) });
+    response.json({ paymentMode: parsed.data.pizzaPaymentMethods, paymentMethods: offered });
   });
 
   router.get("/sessions/archived", (request, response) => {

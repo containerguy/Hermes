@@ -382,8 +382,14 @@ describe("Pizza-Verwaltung ab manager", () => {
     await manager.agent.put("/api/pizza/payment-mode").send({ pizzaPaymentMethods: "cash_only" }).expect(403);
     await put(manager, { pizzaPaymentMethods: "bitcoin" }).expect(400);
 
+    // Offene Bestellung mit PayPal-Wahl: nach "nur Bargeld" auf Bargeld umgestellt
+    await post(manager, "/api/pizza/transitions", { transition: "open" }).expect(200);
+    await post(guest, "/api/pizza/lines", { variantId: "v-003-30", qty: 1 }).expect(201);
+    await post(guest, "/api/pizza/orders/mine/payment-method", { method: "paypal" }).expect(204);
+
     const before = (await admin.agent.get("/api/admin/settings").expect(200)).body.settings;
     const changed = await put(manager, { pizzaPaymentMethods: "cash_only", appName: "Gekapert" }).expect(200);
+    expect((await state(guest)).myOrder.paymentMethod).toBe("cash");
     expect(changed.body).toEqual({ paymentMode: "cash_only", paymentMethods: ["cash"] });
     const after = (await admin.agent.get("/api/admin/settings").expect(200)).body.settings;
     expect(after).toEqual({ ...before, pizzaPaymentMethods: "cash_only" });
