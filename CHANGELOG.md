@@ -4,6 +4,17 @@ Versions are annotated tags `vX.Y.Z` on `main`. Each entry mirrors the
 `chore(release): vX.Y.Z` commit that bumps `package.json`,
 `package-lock.json`, and `src/server/openapi/hermes-api.yaml`.
 
+## v0.14.1 — CS 1.6 fun maps in the map template (2026-10-17)
+
+### Game servers
+
+- The CS 1.6 console templates get a new group "Fun maps" next to the
+  standard maps, each as `changelevel <map>`: `fy_pool_day`, `fy_poolparty`,
+  `fy_snow`, `fy_iceworld`, `aim_map`, `awp_map`, `35hp_2_2`,
+  `de_dust2_2x2`, `fy_mario` and `smb2_land_v2`.
+- `smb2_land_v2` (Super Mario Bros. 2) carries a note: bots cannot find
+  their way on this map, so it is only for rounds with humans.
+
 ## v0.14.0 — Connect button for UT2004 and Factorio (2026-10-17)
 
 ### Game servers
