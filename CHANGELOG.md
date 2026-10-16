@@ -71,7 +71,9 @@ AMP (#1, #12) and pizza management (#14).
   in the archive.
 - Cash list PDF: payment status as plain text (`[x] bezahlt (Bar)`,
   `[ ] offen – PayPal gewählt`) instead of check box glyphs the built-in
-  font cannot render; "Gedruckt" uses Europe/Berlin time.
+  font cannot render; "Gedruckt" uses Europe/Berlin time. The PayPal and
+  cash recipients are printed whenever an order chose that method, even if
+  it is no longer offered.
 - All pizza write routes require the CSRF header; new error codes are
   translated (de/en).
 - Changing the payment methods resets open orders whose chosen method is
