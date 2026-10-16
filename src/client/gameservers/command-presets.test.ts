@@ -47,6 +47,36 @@ describe("commandSetForGame", () => {
     expect(set?.splitCommands).toBe(true);
   });
 
+  it("CS 1.6 bietet die installierten Fun-Maps als eigene Gruppe neben den Standard-Maps", () => {
+    const set = commandSetForGame("Counter-Strike 1.6");
+    const standard = set?.groups.find((group) => group.label.de === "Map wechseln");
+    expect(standard?.presets.map((preset) => preset.command)).toContain("changelevel de_dust2");
+
+    const fun = set?.groups.find((group) => group.label.de === "Fun-Maps");
+    expect(fun?.label.en).toBe("Fun maps");
+    const commands = fun?.presets.map((preset) => preset.command) ?? [];
+    expect(commands).toEqual([
+      "changelevel fy_pool_day",
+      "changelevel fy_poolparty",
+      "changelevel fy_snow",
+      "changelevel fy_iceworld",
+      "changelevel aim_map",
+      "changelevel awp_map",
+      "changelevel 35hp_2_2",
+      "changelevel de_dust2_2x2",
+      "changelevel fy_mario",
+      "changelevel smb2_land_v2"
+    ]);
+    for (const command of commands) expect(command.length).toBeLessThan(200);
+
+    const smb2 = fun?.presets.find((preset) => preset.command === "changelevel smb2_land_v2");
+    expect(smb2?.label.de).toBe("Super Mario Bros. 2 (ohne Bots)");
+    expect(smb2?.note?.de).toContain("Bots finden sich auf dieser Map nicht zurecht");
+    expect(smb2?.note?.en).toBeTruthy();
+    // nur die Map ohne Bot-Navigation trägt einen Hinweis
+    expect(fun?.presets.filter((preset) => preset.note)).toHaveLength(1);
+  });
+
   it("teilt nur bei Konsolen auf, in denen ; Befehle trennt", () => {
     expect(commandSetForGame("Counter-Strike 2")?.splitCommands).toBe(true);
     expect(commandSetForGame("Call of Duty 4")?.splitCommands).toBe(true);

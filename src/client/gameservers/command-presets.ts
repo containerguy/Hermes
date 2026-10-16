@@ -149,6 +149,31 @@ const cs16: GameCommandSet = {
       ])
     },
     {
+      // Zusätzlich auf dem Server installiert (Stand 2026-10-17); .bsp-Namen exakt, Groß-/Kleinschreibung zählt.
+      label: t("Fun-Maps", "Fun maps"),
+      presets: [
+        ...maps((m) => `changelevel ${m}`, [
+          ["fy_pool_day", "Pool Day"],
+          ["fy_poolparty", "Pool Party"],
+          ["fy_snow", "Snow"],
+          ["fy_iceworld", "Iceworld"],
+          ["aim_map", "Aim Map"],
+          ["awp_map", "AWP Map"],
+          ["35hp_2_2", "35 HP"],
+          ["de_dust2_2x2", "Dust2 2x2"],
+          ["fy_mario", "Mario (mit Bots)"]
+        ]),
+        p(
+          t("Super Mario Bros. 2 (ohne Bots)"),
+          "changelevel smb2_land_v2",
+          t(
+            "Bots finden sich auf dieser Map nicht zurecht – nur für Runden mit Menschen.",
+            "Bots can't find their way on this map – only for rounds with humans."
+          )
+        )
+      ]
+    },
+    {
       label: t("Runde", "Round"),
       presets: [
         p(t("Runde neu starten", "Restart round"), "sv_restart 1"),
