@@ -101,11 +101,31 @@ const cs16: GameCommandSet = {
   name: "Counter-Strike 1.6",
   console: "ok",
   hint: t(
-    "CS 1.6 hat ohne Zusatz-Mod (z. B. PodBot) keine Bots.",
-    "CS 1.6 has no bots without an add-on (e.g. PodBot)."
+    "Bots kommen über den Mod YaPB (ops/amp/cs16-yapb). Ohne installierten Mod antworten die yb-Befehle mit „Unknown command“.",
+    "Bots come from the YaPB mod (ops/amp/cs16-yapb). Without the mod, yb commands answer “Unknown command”."
   ),
   groups: [
     { label: t("Info"), presets: [p(t("Status & Spielerliste", "Status & player list"), "status")] },
+    {
+      label: t("Bots (YaPB)"),
+      presets: [
+        p(
+          t("Mit Bots auffüllen auf 10 Spieler", "Fill up to 10 players with bots"),
+          "yb_quota_mode fill; yb_quota 10",
+          t("Bots gehen, sobald Menschen joinen.", "Bots leave as soon as humans join.")
+        ),
+        p(t("Einen Bot hinzufügen", "Add one bot"), "yb add"),
+        p(t("Bot zu den Terroristen", "Bot to Terrorists"), "yb add 2 0 1"),
+        p(t("Bot zu den Counter-Terroristen", "Bot to Counter-Terrorists"), "yb add 2 0 2"),
+        p(t("Einen Bot entfernen", "Remove one bot"), "yb kick"),
+        p(t("Alle Bots entfernen", "Remove all bots"), "yb_quota 0; yb kickall"),
+        p(t("Bots leicht", "Bots easy"), "yb_difficulty 1"),
+        p(t("Bots normal", "Bots normal"), "yb_difficulty 2"),
+        p(t("Bots schwer", "Bots hard"), "yb_difficulty 3"),
+        p(t("Welche Bots sind drin?", "Which bots are in?"), "yb list"),
+        p(t("YaPB-Version prüfen", "Check YaPB version"), "yb version")
+      ]
+    },
     {
       label: t("Map wechseln", "Change map"),
       presets: maps((m) => `changelevel ${m}`, [
