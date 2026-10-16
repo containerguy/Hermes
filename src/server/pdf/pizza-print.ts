@@ -20,6 +20,8 @@ export interface KassenlisteGuestRow {
   displayName: string | null;
   totalCents: number;
   paymentStatus: "unpaid" | "paid_paypal" | "paid_cash";
+  /** Vom Gast gewählte Bezahlart; null/undefined = noch nicht gewählt. */
+  paymentMethod?: "cash" | "paypal" | null;
   lines: Array<{
     number: string | null;
     name: string;
@@ -113,7 +115,11 @@ export async function buildKassenlistePdf(input: KassenlistePrintInput): Promise
         ? "☑ PayPal"
         : guest.paymentStatus === "paid_cash"
           ? "☑ Bar"
-          : "☐ PayPal   ☐ Bar";
+          : guest.paymentMethod === "cash"
+            ? "☐ Bar (gewählt)"
+            : guest.paymentMethod === "paypal"
+              ? "☐ PayPal (gewählt)"
+              : "☐ PayPal   ☐ Bar";
     doc.fontSize(10).fillColor("#555").text(`Status: ${status}`);
     doc.fillColor("black");
     for (const line of guest.lines) {

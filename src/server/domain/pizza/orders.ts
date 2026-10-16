@@ -5,6 +5,7 @@ import { pizzaOrderLines, pizzaOrders, pizzaSessions } from "../../db/schema";
 import { AppError } from "../../http/errors";
 import { canMarkPayment, canPlaceOrder } from "./lifecycle";
 import { getVariantWithItem } from "./menu";
+import type { PizzaPaymentMethod } from "./payment";
 import {
   assertCanAddLine,
   assertValidNote,
@@ -29,7 +30,12 @@ function assertSessionOpen(state: string) {
   }
 }
 
-function getOrCreateOrder(context: DatabaseContext, sessionId: string, userId: string) {
+function getOrCreateOrder(
+  context: DatabaseContext,
+  sessionId: string,
+  userId: string,
+  paymentMethod: PizzaPaymentMethod | null
+) {
   const existing = context.db
     .select()
     .from(pizzaOrders)
@@ -46,6 +52,7 @@ function getOrCreateOrder(context: DatabaseContext, sessionId: string, userId: s
       sessionId,
       userId,
       paymentStatus: "unpaid",
+      paymentMethod,
       createdAt: now,
       updatedAt: now
     })
@@ -78,6 +85,8 @@ export interface AddLineInput {
   variantId: string;
   qty: number;
   customNote?: string | null;
+  /** Vorauswahl für neue Bestellungen (bei genau einer angebotenen Bezahlart). */
+  defaultPaymentMethod?: PizzaPaymentMethod | null;
 }
 
 export function addLine(context: DatabaseContext, input: AddLineInput) {
@@ -92,7 +101,12 @@ export function addLine(context: DatabaseContext, input: AddLineInput) {
     throw new PizzaOrderError("variant_missing", "Variante nicht gefunden", 404);
   }
 
-  const order = getOrCreateOrder(context, input.sessionId, input.userId);
+  const order = getOrCreateOrder(
+    context,
+    input.sessionId,
+    input.userId,
+    input.defaultPaymentMethod ?? null
+  );
   const existingLines = listLinesForOrder(context, order.id);
   assertCanAddLine(existingLines);
 
@@ -204,7 +218,45 @@ export function cancelOpenOrderForUser(context: DatabaseContext, sessionId: stri
   return true;
 }
 
-export type PaymentMethod = "paypal" | "cash";
+export type PaymentMethod = PizzaPaymentMethod;
+
+/**
+ * Gast wählt seine Bezahlart (Bargeld/PayPal). Nur solange die Bestellung nicht als bezahlt
+ * markiert ist und nur aus den aktuell angebotenen Bezahlarten.
+ */
+export function setPaymentMethod(
+  context: DatabaseContext,
+  input: {
+    sessionId: string;
+    userId: string;
+    method: PizzaPaymentMethod;
+    offered: PizzaPaymentMethod[];
+  }
+) {
+  if (!input.offered.includes(input.method)) {
+    throw new PizzaOrderError(
+      "pizza_bezahlart_nicht_verfuegbar",
+      "Diese Bezahlart wird nicht angeboten"
+    );
+  }
+  const order = context.db
+    .select()
+    .from(pizzaOrders)
+    .where(and(eq(pizzaOrders.sessionId, input.sessionId), eq(pizzaOrders.userId, input.userId)))
+    .get();
+  if (!order) {
+    throw new PizzaOrderError("pizza_bestellung_nicht_gefunden", "Keine eigene Bestellung", 404);
+  }
+  if (order.paymentStatus !== "unpaid") {
+    throw new PizzaOrderError("pizza_bereits_bezahlt", "Bestellung ist bereits bezahlt", 409);
+  }
+  context.db
+    .update(pizzaOrders)
+    .set({ paymentMethod: input.method, updatedAt: nowIso() })
+    .where(eq(pizzaOrders.id, order.id))
+    .run();
+  return order.id;
+}
 
 export function markPayment(
   context: DatabaseContext,
@@ -236,6 +288,8 @@ export function markPayment(
     .update(pizzaOrders)
     .set({
       paymentStatus: status,
+      // Bezahlt markiert = tatsächlich genutzte Bezahlart; "offen" behält die Wahl des Gasts.
+      paymentMethod: input.method === "unpaid" ? order.paymentMethod : input.method,
       paidAt: status === "unpaid" ? null : now,
       paidByAdminId: status === "unpaid" ? null : input.adminId,
       updatedAt: now

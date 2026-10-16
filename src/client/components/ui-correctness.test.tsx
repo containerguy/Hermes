@@ -170,6 +170,7 @@ describe("ui correctness structure contracts", () => {
       pizzaPaypalHandle: "",
       pizzaPaypalName: "",
       pizzaCashRecipient: "",
+      pizzaPaymentMethods: "cash_and_paypal",
       ampIntegrationEnabled: false,
       ampBaseUrl: "",
     };
