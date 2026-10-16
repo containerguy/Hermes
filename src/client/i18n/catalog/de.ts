@@ -467,6 +467,10 @@ export const deMessages = {
   "admin.amp.enabled": "AMP-Anbindung aktivieren",
   "admin.amp.baseUrl": "AMP-Basis-URL",
   "admin.amp.envHint": "Zugangsdaten und CA werden auf dem Server per Umgebung gesetzt (HERMES_AMP_USERNAME, HERMES_AMP_PASSWORD, HERMES_AMP_CA_FILE).",
+  "admin.amp.autoStart": "Server automatisch starten, wenn ein Event bereit ist",
+  "admin.amp.autoStopIdle": "Leerlauf-Stopp nach Minuten (0 = aus)",
+  "admin.amp.automationHelp":
+    "Auto-Start greift höchstens einmal pro Event. Gestoppt wird nur ein Server ohne aktives Event, der die ganze Zeit 0 Spieler hatte.",
   "admin.amp.bindings.title": "Server-Bindungen",
   "admin.amp.bindings.help": "Verknüpft Spieltitel aus dem Katalog mit AMP-Instanzen. Events mit passendem Titel bekommen die Bindung automatisch.",
   "admin.amp.bindings.empty": "Noch keine Bindungen angelegt.",

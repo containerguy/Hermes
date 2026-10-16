@@ -417,6 +417,35 @@ export function AdminPanelBetrieb({
                 />
               </label>
               <p className="muted">{t("admin.amp.envHint")}</p>
+              <label className="checkbox-label">
+                <input
+                  type="checkbox"
+                  checked={settings.ampAutoStartOnReady}
+                  onChange={(event) =>
+                    onSettingsChange({ ...settings, ampAutoStartOnReady: event.target.checked })
+                  }
+                />
+                {t("admin.amp.autoStart")}
+              </label>
+              <label>
+                {t("admin.amp.autoStopIdle")}
+                <input
+                  type="number"
+                  inputMode="numeric"
+                  min={0}
+                  max={1440}
+                  step={1}
+                  value={settings.ampAutoStopIdleMinutes}
+                  onChange={(event) => {
+                    const parsed = Number.parseInt(event.target.value, 10);
+                    onSettingsChange({
+                      ...settings,
+                      ampAutoStopIdleMinutes: Number.isFinite(parsed) ? Math.min(1440, Math.max(0, parsed)) : 0
+                    });
+                  }}
+                />
+              </label>
+              <p className="muted">{t("admin.amp.automationHelp")}</p>
             </>
           ) : null}
         </fieldset>

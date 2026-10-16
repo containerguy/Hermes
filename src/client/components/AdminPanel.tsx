@@ -74,6 +74,8 @@ const defaultSettings: AppSettings = {
   pizzaCashRecipient: "",
   ampIntegrationEnabled: false,
   ampBaseUrl: "",
+  ampAutoStartOnReady: false,
+  ampAutoStopIdleMinutes: 0,
 };
 
 export function AdminPanel({

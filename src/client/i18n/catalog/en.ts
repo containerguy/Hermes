@@ -469,6 +469,10 @@ export const enMessages: { [K in keyof typeof deMessages]: string } = {
   "admin.amp.enabled": "Enable AMP integration",
   "admin.amp.baseUrl": "AMP base URL",
   "admin.amp.envHint": "Credentials and CA are configured on the server via environment (HERMES_AMP_USERNAME, HERMES_AMP_PASSWORD, HERMES_AMP_CA_FILE).",
+  "admin.amp.autoStart": "Start the server automatically when an event is ready",
+  "admin.amp.autoStopIdle": "Idle stop after minutes (0 = off)",
+  "admin.amp.automationHelp":
+    "Auto-start triggers at most once per event. Only servers without an active event that had 0 players the whole time are stopped.",
   "admin.amp.bindings.title": "Server bindings",
   "admin.amp.bindings.help": "Links game titles from the catalog to AMP instances. Events with a matching title get the binding automatically.",
   "admin.amp.bindings.empty": "No bindings yet.",

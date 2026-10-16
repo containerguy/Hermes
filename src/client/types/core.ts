@@ -69,6 +69,10 @@ export type AppSettings = {
   ampIntegrationEnabled: boolean;
   /** Basis-URL ohne /API, z. B. http://192.168.200.98:8080 */
   ampBaseUrl: string;
+  /** Gebundene Instanz automatisch starten, sobald ein Event bereit ist (nur Admin-Ansicht). */
+  ampAutoStartOnReady: boolean;
+  /** Leerlauf-Stopp nach Minuten ohne aktives Event und ohne Spieler (0 = aus). */
+  ampAutoStopIdleMinutes: number;
 };
 
 /** Build-/Release-Infos aus dem Server (package.json + optional Repo-URL). */
