@@ -874,13 +874,18 @@ export function createPizzaRouter(context: DatabaseContext) {
       })
       .sort((a, b) => (a.displayName ?? a.username).localeCompare(b.displayName ?? b.username));
 
+    // Empfänger auch drucken, wenn eine Bestellung die Bezahlart gewählt hat, die heute nicht mehr
+    // angeboten wird (archivierte Runden behalten ihre Wahl; LAN-Prüfung K1).
+    const showPaypal = offered.includes("paypal") || guests.some((guest) => guest.paymentMethod === "paypal");
+    const showCash = offered.includes("cash") || guests.some((guest) => guest.paymentMethod === "cash");
+
     try {
       const buffer = await buildKassenlistePdf({
         eventTitle: session.label ?? settings.appName ?? "Pizzabestellung",
         printedAt: new Date(),
-        paypalName: offered.includes("paypal") ? settings.pizzaPaypalName || null : null,
-        paypalHandle: offered.includes("paypal") ? settings.pizzaPaypalHandle || null : null,
-        cashRecipient: offered.includes("cash") ? settings.pizzaCashRecipient || null : null,
+        paypalName: showPaypal ? settings.pizzaPaypalName || null : null,
+        paypalHandle: showPaypal ? settings.pizzaPaypalHandle || null : null,
+        cashRecipient: showCash ? settings.pizzaCashRecipient || null : null,
         guests
       });
       response.setHeader("Content-Type", "application/pdf");
