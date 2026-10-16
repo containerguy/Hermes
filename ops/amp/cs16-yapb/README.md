@@ -93,15 +93,17 @@ Die Stufe übersteht das Zurückschreiben der kvp beim Stoppen. Ob „Fetch late
 
 | Aktion | CS 1.6 (YaPB) | CS2 |
 |---|---|---|
-| Hinzufügen | ggf. `mp_limitteams 0`, `mp_autoteambalance 0`; `yb_quota_mode normal`, `yb_quota <aktuell>`, `yb add <1–4> 0 <1\|2\|5>` × N | ggf. Teamlimit aus wie links; `bot_quota_mode normal`, `bot_quota <aktuell>`, `bot_difficulty <0–3>`, `bot_add[_t\|_ct]` × N |
+| Hinzufügen | ggf. `mp_limitteams 0`, `mp_autoteambalance 0`; `yb_quota_mode fill`, `yb_quota <Menschen+Bots>`, `yb add <1–4> 0 <1\|2\|5>` × N | ggf. Teamlimit aus wie links; `bot_quota_mode fill`, `bot_quota <Menschen+Bots>`, `bot_difficulty <0–3>`, `bot_add[_t\|_ct]` × N |
 | Auffüllen auf N | `yb_quota_mode fill`, `yb_difficulty`, `yb_quota N` | `bot_quota_mode fill`, `bot_difficulty`, `bot_quota N`. Bots kommen erst, wenn ein Mensch joint (`bot_join_after_player`). |
-| Stufe für alle ändern | `yb_difficulty <1–4>`, wirkt sofort auf vorhandene Bots (LAN-Test F2) | alle kicken und mit der aktuellen Zahl neu aufsetzen, weil `bot_difficulty` nur für neue Bots gilt |
+| Stufe für alle ändern | `yb_difficulty <1–4>`, wirkt sofort auf vorhandene Bots (LAN-Test F2) | `bot_quota 0`, `bot_kick`, `bot_difficulty`, `bot_quota_mode fill`, `bot_quota <Menschen>`, `bot_add` × Bots, weil `bot_difficulty` nur für neue Bots gilt |
 | Alle entfernen | `yb_quota 0`, `yb kickall` | `bot_quota 0`, `bot_kick` |
-| Bots zählen | `yb list` → „N bots“ | `status` → „players : H humans, B bots“ |
+| Bots zählen | `yb list` → „N bots“, `status` → „players : N active“ (Menschen + Bots) | `status` → „players : H humans, B bots“ |
 
-Die aktuelle Botzahl liest Hermes aus der Konsolenantwort, weil AMP Bots nicht als Spieler zählt. Hermes braucht sie aus zwei Gründen:
-- „Hinzufügen“ setzt die Quote vorher auf die aktuelle Zahl. Eine alte Quote, etwa 10 aus „Auffüllen“, würde im Modus `normal` sonst als Botzahl gelten.
-- CS2 setzt bei „Stufe für alle ändern“ genauso viele Bots neu auf.
+**Alle Aktionen laufen im Quotenmodus `fill`**, denn nur dort machen Bots Platz, sobald Menschen joinen. Das hat der LAN-Test mit René gezeigt: Im Modus `normal` blieben die Bots, `yb_autovacate` griff nicht.
+
+„Hinzufügen“ setzt die Quote deshalb erst auf den aktuellen Stand (Menschen + Bots). Jedes `yb add` bzw. `bot_add` erhöht sie um eins und bringt genau diesen Bot mit Stufe und Team.
+
+Die Zahlen liest Hermes aus der Konsolenantwort, weil AMP Bots nicht als Spieler zählt. Ohne Antwort lehnt Hermes „Hinzufügen“ mit `409 botzahl_unbekannt` ab, statt zu raten.
 
 Mit festem Team (T/CT) schaltet Hermes Teamlimit und Teamausgleich ab, sonst lehnt das Spiel mit „Team is stacked“ ab.
 

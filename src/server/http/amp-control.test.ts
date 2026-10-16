@@ -312,14 +312,14 @@ describe("AMP control + status (Phase 15-02)", () => {
       "status",
       "mp_limitteams 0",
       "mp_autoteambalance 0",
-      "bot_quota_mode normal",
+      "bot_quota_mode fill",
       "bot_quota 3",
       "bot_difficulty 2",
       "bot_add_ct",
       "bot_add_ct"
     ]);
     const counted = await manager.agent.get(`/api/integrations/amp/instances/${bindingId}/bots`).expect(200);
-    expect(counted.body).toEqual({ kind: "cs2", bots: 3 });
+    expect(counted.body).toEqual({ kind: "cs2", bots: 3, humans: 0 });
     await user.agent.get(`/api/integrations/amp/instances/${bindingId}/bots`).expect(403);
     setBotCountPollForTests(null);
     const botAudit = await admin.get("/api/admin/audit-log").expect(200);

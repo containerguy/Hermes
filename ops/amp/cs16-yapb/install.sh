@@ -98,8 +98,11 @@ status() {
   if [[ -f "$CFG" ]]; then
     log "yb_quota:       $(sed -n 's/^yb_quota "\(.*\)"/\1/p' "$CFG")"
   fi
-  local graphs
-  graphs=$(find "$CSTRIKE/addons/yapb/data/graph" -name '*.graph' 2>/dev/null | wc -l)
+  local graphs=0
+  # ohne Verzeichnis würde find unter pipefail das Skript beenden
+  if [[ -d "$CSTRIKE/addons/yapb/data/graph" ]]; then
+    graphs=$(find "$CSTRIKE/addons/yapb/data/graph" -name '*.graph' | wc -l)
+  fi
   log "Graph-Dateien:  $graphs"
 }
 
@@ -214,6 +217,10 @@ uninstall() {
     run cp -a "$LIBLIST$BACKUP_SUFFIX" "$LIBLIST"
     run rm -f "$LIBLIST$BACKUP_SUFFIX"
     log "liblist.gam wiederhergestellt"
+  elif [[ "$(read_gamedll)" == "$YAPB_SO" ]]; then
+    # ohne Sicherung (z. B. nach einem AMP-Update mit anschließendem --relink) auf die Spiel-DLL zurück
+    run sed -i "s|^\([[:space:]]*gamedll_linux[[:space:]]*\)\"[^\"]*\"|\1\"dlls/cs.so\"|" "$LIBLIST"
+    log "liblist.gam: gamedll_linux -> dlls/cs.so (keine Sicherung vorhanden)"
   fi
   if [[ -f "$PLUGINS" ]] && grep -qE "^[[:space:]]*linux[[:space:]]+$YAPB_SO" "$PLUGINS"; then
     run sed -i "\|^[[:space:]]*linux[[:space:]]\+$YAPB_SO|d" "$PLUGINS"
@@ -221,6 +228,8 @@ uninstall() {
     log "YaPB aus plugins.ini entfernt"
   fi
   run rm -rf "$CSTRIKE/addons/yapb"
+  # leeres addons/ (nur von uns angelegt) mit aufräumen
+  [[ -d "$CSTRIKE/addons" ]] && run rmdir --ignore-fail-on-non-empty "$CSTRIKE/addons"
   log "addons/yapb entfernt"
 }
 

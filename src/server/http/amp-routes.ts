@@ -29,11 +29,12 @@ import { MAX_CONSOLE_PARTS, splitConsoleCommands } from "../integrations/amp/con
 import { readSettings, type HermesSettings } from "../settings";
 import {
   BotRequestError,
-  botCountQuery,
+  botCountQueries,
   botKindForGame,
   botRequestSchema,
   buildBotCommands,
-  parseBotCount,
+  parseBotCounts,
+  type BotCounts,
   type BotKind
 } from "../../shared/bot-commands";
 import type { GameServerBinding } from "../domain/gameservers/bindings";
@@ -107,19 +108,24 @@ export function setBotCountPollForTests(value: { attempts: number; intervalMs: n
   botCountPoll = value ?? { attempts: 8, intervalMs: 400 };
 }
 
-/** Botzahl über die Konsole lesen (`yb list` bzw. `status`); null, wenn keine Antwort kommt. */
-async function readBotCount(settings: HermesSettings, binding: GameServerBinding, kind: BotKind) {
+/** Bots und Menschen über die Konsole lesen (`yb list`/`status`); null, wenn keine Antwort kommt. */
+async function readBotCounts(
+  settings: HermesSettings,
+  binding: GameServerBinding,
+  kind: BotKind
+): Promise<BotCounts | null> {
   const { cursor } = await fetchConsole(settings, binding, Number.MAX_SAFE_INTEGER);
-  const { failure } = await sendConsoleSequence(settings, binding, [botCountQuery(kind)]);
+  const { failure } = await sendConsoleSequence(settings, binding, botCountQueries(kind));
   if (failure) return null;
+  const seen: string[] = [];
+  let since = cursor;
   for (let attempt = 0; attempt < botCountPoll.attempts; attempt += 1) {
     await new Promise((resolve) => setTimeout(resolve, botCountPoll.intervalMs));
-    const { lines } = await fetchConsole(settings, binding, cursor);
-    const count = parseBotCount(
-      kind,
-      lines.map((line) => line.text)
-    );
-    if (count !== null) return count;
+    const { lines, cursor: next } = await fetchConsole(settings, binding, since);
+    since = next;
+    seen.push(...lines.map((line) => line.text));
+    const counts = parseBotCounts(kind, seen);
+    if (counts) return counts;
   }
   return null;
 }
@@ -530,18 +536,17 @@ export function createAmpIntegrationRouter(context: DatabaseContext) {
     recordRateLimitFailure(context, { scope: "amp_control", key: `user:${guard.user.id}` });
 
     const settings = readSettings(context);
-    // Botzahl nur lesen, wo sie die Befehle bestimmt: Quote vor „Hinzufügen“, CS2-Stufe ohne Anzahl
-    const needsCount =
-      parsed.data.action === "add" || (kind === "cs2" && parsed.data.action === "setLevel" && !parsed.data.count);
-    let currentBots: number | null = null;
+    // Zählen nur, wo es die Befehle bestimmt: Quote vor „Hinzufügen“, CS2 „Stufe ändern“
+    const needsCounts = parsed.data.action === "add" || (kind === "cs2" && parsed.data.action === "setLevel");
+    let counts: BotCounts | null = null;
     try {
-      currentBots = needsCount ? await readBotCount(settings, guard.binding, kind) : null;
+      counts = needsCounts ? await readBotCounts(settings, guard.binding, kind) : null;
     } catch {
-      currentBots = null;
+      counts = null;
     }
     let commands: string[];
     try {
-      commands = buildBotCommands(kind, parsed.data, currentBots);
+      commands = buildBotCommands(kind, parsed.data, counts);
     } catch (error) {
       if (error instanceof BotRequestError) {
         response.status(409).json({ error: error.message });
@@ -564,7 +569,8 @@ export function createAmpIntegrationRouter(context: DatabaseContext) {
           ...parsed.data,
           commands: commands.length,
           sent,
-          botsBefore: currentBots
+          botsBefore: counts?.bots ?? null,
+          humansBefore: counts?.humans ?? null
         }
       });
     }
@@ -572,7 +578,7 @@ export function createAmpIntegrationRouter(context: DatabaseContext) {
       response.status(502).json({ error: mapAmpErrorToCode(failure) });
       return;
     }
-    response.json({ ok: true, commands: commands.length, botsBefore: currentBots });
+    response.json({ ok: true, commands: commands.length, botsBefore: counts?.bots ?? null });
   });
 
   /** Zahl der Bots im Spiel (liest die Konsole; AMP zählt Bots nicht als Spieler). */
@@ -595,7 +601,8 @@ export function createAmpIntegrationRouter(context: DatabaseContext) {
     }
     recordRateLimitFailure(context, { scope: "amp_control", key: `user:${guard.user.id}` });
     try {
-      response.json({ kind, bots: await readBotCount(readSettings(context), guard.binding, kind) });
+      const counts = await readBotCounts(readSettings(context), guard.binding, kind);
+      response.json({ kind, bots: counts?.bots ?? null, humans: counts?.humans ?? null });
     } catch (error) {
       const msg = error instanceof Error ? error.message : "amp_anfrage_fehlgeschlagen";
       response.status(502).json({ error: mapAmpErrorToCode(msg) });

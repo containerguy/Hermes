@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { BotRequestError, botKindForGame, botRequestSchema, buildBotCommands, parseBotCount } from "./bot-commands";
+import { BotRequestError, botKindForGame, botRequestSchema, buildBotCommands, parseBotCounts } from "./bot-commands";
 
 describe("botKindForGame", () => {
   it("erkennt CS 1.6 (YaPB) und CS2, sonst keine Bots", () => {
@@ -11,20 +11,24 @@ describe("botKindForGame", () => {
 });
 
 describe("buildBotCommands", () => {
-  it("YaPB: Hinzufügen stellt die Quote auf normal und fügt einzeln mit Stufe und Team hinzu", () => {
-    // Fester Team: Teamlimit und Ausgleich aus; bekannte Botzahl setzt die Quote (alte Quote aus "Auffüllen")
-    expect(buildBotCommands("yapb", { action: "add", count: 2, level: "hard", team: "ct" }, 4)).toEqual([
+  it("YaPB: Hinzufügen im Modus fill, Quote erst auf den aktuellen Stand, dann einzeln mit Stufe und Team", () => {
+    // 3 Menschen + 4 Bots: Quote 7, jedes yb add erhöht sie um eins (Bots machen so Platz für Menschen)
+    expect(buildBotCommands("yapb", { action: "add", count: 2, level: "hard", team: "ct" }, { bots: 4, humans: 3 })).toEqual([
       "mp_limitteams 0",
       "mp_autoteambalance 0",
-      "yb_quota_mode normal",
-      "yb_quota 4",
+      "yb_quota_mode fill",
+      "yb_quota 7",
       "yb add 3 0 2",
       "yb add 3 0 2"
     ]);
-    expect(buildBotCommands("yapb", { action: "add", count: 1, level: "easy", team: "auto" })).toEqual([
-      "yb_quota_mode normal",
+    expect(buildBotCommands("yapb", { action: "add", count: 1, level: "easy", team: "auto" }, { bots: 0, humans: 0 })).toEqual([
+      "yb_quota_mode fill",
+      "yb_quota 0",
       "yb add 1 0 5"
     ]);
+    expect(() => buildBotCommands("yapb", { action: "add", count: 1, level: "easy", team: "auto" })).toThrow(
+      BotRequestError
+    );
   });
 
   it("YaPB: Entfernen, Stufe und Auffüllen", () => {
@@ -38,10 +42,11 @@ describe("buildBotCommands", () => {
   });
 
   it("CS2: Hinzufügen, Entfernen, Auffüllen", () => {
-    expect(buildBotCommands("cs2", { action: "add", count: 2, level: "easy", team: "t" })).toEqual([
+    expect(buildBotCommands("cs2", { action: "add", count: 2, level: "easy", team: "t" }, { bots: 1, humans: 2 })).toEqual([
       "mp_limitteams 0",
       "mp_autoteambalance 0",
-      "bot_quota_mode normal",
+      "bot_quota_mode fill",
+      "bot_quota 3",
       "bot_difficulty 0",
       "bot_add_t",
       "bot_add_t"
@@ -54,27 +59,50 @@ describe("buildBotCommands", () => {
     ]);
   });
 
-  it("CS2: Stufe ändern setzt die gelesene Zahl Bots neu auf", () => {
-    expect(buildBotCommands("cs2", { action: "setLevel", level: "easy" }, 1)).toEqual([
+  it("CS2: Stufe ändern setzt die gelesenen Bots im Modus fill neu auf", () => {
+    expect(buildBotCommands("cs2", { action: "setLevel", level: "easy" }, { bots: 2, humans: 1 })).toEqual([
       "bot_quota 0",
       "bot_kick",
       "bot_difficulty 0",
-      "bot_quota_mode normal",
-      "bot_add"
-    ]);
-    expect(buildBotCommands("cs2", { action: "setLevel", level: "easy" }, 0)).toEqual(["bot_difficulty 0"]);
-  });
-
-  it("CS2: Stufe ändern mit Anzahl; ohne Anzahl und ohne Botzahl abgelehnt", () => {
-    expect(buildBotCommands("cs2", { action: "setLevel", level: "hard", count: 2 })).toEqual([
-      "bot_quota 0",
-      "bot_kick",
-      "bot_difficulty 2",
-      "bot_quota_mode normal",
+      "bot_quota_mode fill",
+      "bot_quota 1",
       "bot_add",
       "bot_add"
     ]);
+    expect(buildBotCommands("cs2", { action: "setLevel", level: "hard", count: 1 }, { bots: 5, humans: 0 })).toEqual([
+      "bot_quota 0",
+      "bot_kick",
+      "bot_difficulty 2",
+      "bot_quota_mode fill",
+      "bot_quota 0",
+      "bot_add"
+    ]);
+    expect(buildBotCommands("cs2", { action: "setLevel", level: "easy" }, { bots: 0, humans: 3 })).toEqual([
+      "bot_difficulty 0"
+    ]);
     expect(() => buildBotCommands("cs2", { action: "setLevel", level: "hard" })).toThrow(BotRequestError);
+  });
+});
+
+describe("parseBotCounts", () => {
+  it("YaPB: Bots aus yb list, Menschen aus status abzüglich Bots", () => {
+    expect(
+      parseBotCounts("yapb", [
+        "[0 ] Turbo normal TE 3",
+        "[1 ] Socke normal TE 3",
+        "2 bots",
+        "hostname:  LAN",
+        "players : 3 active (24 max)"
+      ])
+    ).toEqual({ bots: 2, humans: 1 });
+    expect(parseBotCounts("yapb", ["2 bots"])).toBeNull();
+    // Chatzeilen zählen nicht
+    expect(parseBotCounts("yapb", ["Turbo : wir sind 5 bots", "players : 1 active (24 max)"])).toBeNull();
+  });
+
+  it("CS2: Menschen und Bots aus status", () => {
+    expect(parseBotCounts("cs2", ["hostname: LAN", "players  : 1 humans, 2 bots (32 max)"])).toEqual({ bots: 2, humans: 1 });
+    expect(parseBotCounts("cs2", ["Server started"])).toBeNull();
   });
 });
 
@@ -90,14 +118,5 @@ describe("botRequestSchema", () => {
       level: "normal",
       team: "auto"
     });
-  });
-});
-
-describe("parseBotCount", () => {
-  it("liest YaPB yb list und CS2 status", () => {
-    expect(parseBotCount("yapb", ["[0 ] Turbo normal TE 3", "[1 ] Socke normal TE 3", "2 bots"])).toBe(2);
-    expect(parseBotCount("yapb", ["0 bots"])).toBe(0);
-    expect(parseBotCount("cs2", ["hostname: LAN", "players  : 0 humans, 2 bots (32 max)"])).toBe(2);
-    expect(parseBotCount("cs2", ["Server started"])).toBeNull();
   });
 });

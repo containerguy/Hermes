@@ -49,22 +49,38 @@ export function botKindForGame(game: string | null | undefined): BotKind | null 
   return null;
 }
 
-/** Konsolenbefehl, dessen Antwort die Zahl der Bots im Spiel enthält. */
-export function botCountQuery(kind: BotKind): string {
-  return kind === "yapb" ? "yb list" : "status";
+export type BotCounts = { bots: number; humans: number };
+
+/** Konsolenbefehle, deren Antworten Bots und Menschen im Spiel enthalten. */
+export function botCountQueries(kind: BotKind): string[] {
+  // GoldSrc-`status` zählt Bots als Spieler mit, `yb list` liefert die Bots
+  return kind === "yapb" ? ["yb list", "status"] : ["status"];
+}
+
+function lastMatch(lines: string[], pattern: RegExp) {
+  for (let index = lines.length - 1; index >= 0; index -= 1) {
+    const match = pattern.exec(lines[index].trim());
+    if (match) return match;
+  }
+  return null;
 }
 
 /**
- * Botzahl aus Konsolenzeilen: YaPB `yb list` endet mit „N bots“, CS2 `status` enthält
- * „players : H humans, B bots“. Nimmt den letzten Treffer; null ohne Treffer.
+ * Bots und Menschen aus Konsolenzeilen. YaPB: `yb list` endet mit „N bots“, GoldSrc-`status`
+ * zeigt „players : N active“ (Menschen + Bots). CS2-`status`: „players : H humans, B bots“.
+ * Nimmt jeweils den letzten Treffer; null, solange nicht alles da ist.
  */
-export function parseBotCount(kind: BotKind, lines: string[]): number | null {
-  const pattern = kind === "yapb" ? /(?:^|\s)(\d+) bots?\s*$/ : /players\s*:\s*\d+ humans?,\s*(\d+) bots?/;
-  for (let index = lines.length - 1; index >= 0; index -= 1) {
-    const match = pattern.exec(lines[index].trim());
-    if (match) return Number.parseInt(match[1], 10);
+export function parseBotCounts(kind: BotKind, lines: string[]): BotCounts | null {
+  if (kind === "cs2") {
+    const match = lastMatch(lines, /^players\s*:\s*(\d+) humans?,\s*(\d+) bots?/);
+    return match ? { humans: Number.parseInt(match[1], 10), bots: Number.parseInt(match[2], 10) } : null;
   }
-  return null;
+  // ganze Zeile, damit Chatzeilen wie „… 5 bots“ nicht zählen
+  const bots = lastMatch(lines, /^(\d+) bots?$/);
+  const players = lastMatch(lines, /^players\s*:\s*(\d+)\s+active/);
+  if (!bots || !players) return null;
+  const botCount = Number.parseInt(bots[1], 10);
+  return { bots: botCount, humans: Math.max(Number.parseInt(players[1], 10) - botCount, 0) };
 }
 
 // YaPB: 0 Neuling … 4 Gott; CS2: 0 leicht … 3 Experte
@@ -78,26 +94,33 @@ export class BotRequestError extends Error {}
 
 /**
  * Befehlsfolge für eine Bot-Aktion, in der Reihenfolge, in der sie gesendet werden muss.
- * `currentBots` ist die vom Server gelesene Botzahl (null, wenn unbekannt).
+ * `counts` sind die vom Server gelesenen Bots und Menschen (null, wenn unbekannt).
  *
- * „Hinzufügen“ stellt die Quote auf `normal` und auf die aktuelle Botzahl: Im Modus `fill` würde
- * die Quote neue Bots sonst wieder kicken, und eine alte Quote (z. B. 10 aus „Auffüllen“) würde
- * im Modus `normal` als Botzahl gelten. `yb add`/`bot_add` erhöhen die Quote danach selbst.
- * Mit festem Team fallen Teamlimit und Ausgleich weg, sonst lehnt das Spiel ab „Team is stacked“.
+ * Alle Aktionen laufen im Quotenmodus `fill`, denn nur dort machen Bots Platz, sobald Menschen
+ * joinen (LAN-Test mit René: im Modus `normal` blieben die Bots). „Hinzufügen“ setzt die Quote
+ * deshalb erst auf den aktuellen Stand (Menschen + Bots); jedes `yb add`/`bot_add` erhöht sie um
+ * eins und bringt genau diesen Bot mit Stufe und Team. Mit festem Team fallen Teamlimit und
+ * Ausgleich weg, sonst lehnt das Spiel mit „Team is stacked“ ab.
  */
-export function buildBotCommands(kind: BotKind, request: BotRequest, currentBots: number | null = null): string[] {
+export function buildBotCommands(kind: BotKind, request: BotRequest, counts: BotCounts | null = null): string[] {
   const repeat = (command: string, count: number) => Array.from({ length: count }, () => command);
   const teamUnlock = request.action === "add" && request.team !== "auto" ? ["mp_limitteams 0", "mp_autoteambalance 0"] : [];
+  const requireCounts = () => {
+    if (!counts) throw new BotRequestError("botzahl_unbekannt");
+    return counts;
+  };
 
   if (kind === "yapb") {
     switch (request.action) {
-      case "add":
+      case "add": {
+        const { bots, humans } = requireCounts();
         return [
           ...teamUnlock,
-          "yb_quota_mode normal",
-          ...(currentBots === null ? [] : [`yb_quota ${currentBots}`]),
+          "yb_quota_mode fill",
+          `yb_quota ${humans + bots}`,
           ...repeat(`yb add ${YAPB_LEVEL[request.level]} 0 ${YAPB_TEAM[request.team]}`, request.count)
         ];
+      }
       case "removeAll":
         return ["yb_quota 0", "yb kickall"];
       case "setLevel":
@@ -108,26 +131,29 @@ export function buildBotCommands(kind: BotKind, request: BotRequest, currentBots
   }
 
   switch (request.action) {
-    case "add":
+    case "add": {
+      const { bots, humans } = requireCounts();
       return [
         ...teamUnlock,
-        "bot_quota_mode normal",
-        ...(currentBots === null ? [] : [`bot_quota ${currentBots}`]),
+        "bot_quota_mode fill",
+        `bot_quota ${humans + bots}`,
         `bot_difficulty ${CS2_LEVEL[request.level]}`,
         ...repeat(CS2_ADD[request.team], request.count)
       ];
+    }
     case "removeAll":
       return ["bot_quota 0", "bot_kick"];
     case "setLevel": {
-      const count = request.count ?? currentBots;
-      if (count === null || count === undefined) throw new BotRequestError("botzahl_unbekannt");
+      const { bots, humans } = requireCounts();
+      const count = Math.min(request.count ?? bots, MAX_BOTS_ADD);
       if (count === 0) return [`bot_difficulty ${CS2_LEVEL[request.level]}`];
       return [
         "bot_quota 0",
         "bot_kick",
         `bot_difficulty ${CS2_LEVEL[request.level]}`,
-        "bot_quota_mode normal",
-        ...repeat("bot_add", Math.min(count, MAX_BOTS_ADD))
+        "bot_quota_mode fill",
+        `bot_quota ${humans}`,
+        ...repeat("bot_add", count)
       ];
     }
     case "fill":

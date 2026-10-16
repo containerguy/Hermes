@@ -23,14 +23,18 @@ Versions are annotated tags `vX.Y.Z` on `main`. Each entry mirrors the
   - Hermes builds the game-specific commands itself and sends them one
     by one, with CSRF, the `amp_control` rate limit and audit entries
     `amp.bots_<action>`.
-  - Hermes reads the current bot count from the console (`yb list`,
-    `status`; AMP does not count bots as players): **Add** first sets the
-    quota to it, so an old quota is not taken as the bot count. CS2 re-adds
-    that many bots on "Change level", because `bot_difficulty` only applies
-    to new bots. **Count bots** shows the number (`GET …/bots`).
+  - All actions use the `fill` quota mode, the only one in which bots make
+    room for joining humans (tested in the LAN). Hermes reads bots and
+    humans from the console (`yb list`, `status`; AMP does not count bots
+    as players): **Add** first sets the quota to humans + bots, then each
+    `yb add`/`bot_add` raises it by one. CS2 re-adds the bots on
+    "Change level", because `bot_difficulty` only applies to new bots.
+    **Count bots** shows the number (`GET …/bots`).
   - With a fixed team, Hermes turns off `mp_limitteams` and
     `mp_autoteambalance`; otherwise the game refuses with "Team is stacked".
 - Console templates "Bots (YaPB)" for CS 1.6.
+- `install.sh --uninstall` also works without a backup of `liblist.gam`
+  and no longer stops early when the waypoint folder is missing.
 
 ### Game servers
 
