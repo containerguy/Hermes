@@ -139,7 +139,13 @@ export function ServerBots({ bindingId, kind }: { bindingId: string; kind: BotKi
       <p className="muted server-console-hint">
         {kind === "cs2" ? t("events.server.bots.hintCs2") : t("events.server.bots.hintYapb")}
       </p>
-      {notice ? <p className="muted server-console-hint">{notice}</p> : null}
+      {sending ? (
+        <p className="muted server-console-hint" role="status">
+          {t("events.server.bots.running")}
+        </p>
+      ) : notice ? (
+        <p className="muted server-console-hint">{notice}</p>
+      ) : null}
       {error ? (
         <p className="error" role="alert">
           {error}

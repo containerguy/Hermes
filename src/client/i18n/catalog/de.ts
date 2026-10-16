@@ -353,6 +353,7 @@ export const deMessages = {
   "events.server.bots.count.refresh": "Bots zählen",
   "events.server.bots.confirmRemoveAll": "Alle Bots vom Server entfernen?",
   "events.server.bots.sent": "Gesendet. Die Konsole zeigt die Antwort des Servers.",
+  "events.server.bots.running": "Läuft … (bei CS2 einige Sekunden)",
   "events.server.bots.hintYapb": "„Auffüllen“ hält die Spielerzahl, Bots gehen, sobald Menschen joinen. „Stufe für alle ändern“ gilt sofort. Mit festem Team hebt Hermes Teamlimit und Teamausgleich auf.",
   "events.server.bots.hintCs2": "„Auffüllen“ hält die Spielerzahl; CS2 schickt die Bots erst, wenn ein Mensch joint. „Stufe für alle ändern“ setzt die Bots neu auf, weil CS2 die Stufe nur für neue Bots übernimmt. Mit festem Team hebt Hermes Teamlimit und Teamausgleich auf.",
   "events.server.consoleEmpty": "Noch keine Ausgabe.",

@@ -354,6 +354,7 @@ export const enMessages: { [K in keyof typeof deMessages]: string } = {
   "events.server.bots.count.refresh": "Count bots",
   "events.server.bots.confirmRemoveAll": "Remove all bots from the server?",
   "events.server.bots.sent": "Sent. The console shows the server's answer.",
+  "events.server.bots.running": "Running … (a few seconds on CS2)",
   "events.server.bots.hintYapb": "“Fill” keeps the player count; bots leave as soon as humans join. “Change level for all” applies immediately. With a fixed team, Hermes lifts the team limit and auto balance.",
   "events.server.bots.hintCs2": "“Fill” keeps the player count; CS2 only sends the bots once a human joins. “Change level for all” re-adds the bots, because CS2 only applies the level to new bots. With a fixed team, Hermes lifts the team limit and auto balance.",
   "events.server.consoleEmpty": "No output yet.",
