@@ -664,6 +664,7 @@ export const deMessages = {
   "pizza.panel.title": "Pizzabestellung",
   "pizza.panel.titleWithLabel": "Pizzabestellung — {label}",
   "pizza.panel.loading": "Pizza-Bestellung lädt…",
+  "pizza.panel.stale": "Live-Aktualisierung gerade nicht möglich – angezeigt wird der letzte Stand.",
   "pizza.state.draft": "Noch nicht offen",
   "pizza.state.open": "Bestellung offen",
   "pizza.state.locked": "Geschlossen",

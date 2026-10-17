@@ -665,6 +665,7 @@ export const enMessages: { [K in keyof typeof deMessages]: string } = {
   "pizza.panel.title": "Pizza order",
   "pizza.panel.titleWithLabel": "Pizza order — {label}",
   "pizza.panel.loading": "Loading pizza order…",
+  "pizza.panel.stale": "Live update unavailable right now – showing the last known state.",
   "pizza.state.draft": "Not open yet",
   "pizza.state.open": "Ordering open",
   "pizza.state.locked": "Closed",

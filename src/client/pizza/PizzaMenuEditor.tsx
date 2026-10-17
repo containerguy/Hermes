@@ -1,6 +1,7 @@
-import { useEffect, useMemo, useState, type FormEvent } from "react";
+import { useEffect, useMemo, useRef, useState, type FormEvent } from "react";
 import { getErrorMessage } from "../errors/errors";
 import { useI18n } from "../i18n/I18nContext";
+import { useEventsChanged } from "../realtime/use-events-changed";
 import {
   fetchPizzaAdminMenu,
   removePizzaItem,
@@ -29,6 +30,7 @@ export function PizzaMenuEditor({ onChanged }: PizzaMenuEditorProps) {
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [creating, setCreating] = useState(false);
   const [feedback, setFeedback] = useState<Feedback>(null);
+  const mutating = useRef(0);
 
   async function load() {
     try {
@@ -42,8 +44,24 @@ export function PizzaMenuEditor({ onChanged }: PizzaMenuEditorProps) {
     void load();
   }, []);
 
+  // Live: Menüänderungen anderer Manager still übernehmen. Offene Formulare behalten ihre
+  // Eingaben (State wird nur beim Mounten aus den Daten initialisiert, Keys sind Artikel-IDs).
+  // Während einer eigenen Änderung lädt `mutate` ohnehin danach neu.
+  useEventsChanged(
+    () => {
+      if (mutating.current > 0) return;
+      fetchPizzaAdminMenu()
+        .then(setItems)
+        .catch(() => {
+          /* Hintergrund-Fehler: bisherigen Stand behalten */
+        });
+    },
+    (reason) => reason === null || reason === "pizza_menu_changed"
+  );
+
   /** Führt eine Änderung aus, lädt das Menü neu und meldet Erfolg oder Fehler. */
   async function mutate(action: () => Promise<string | void>) {
+    mutating.current += 1;
     try {
       const status = await action();
       setFeedback(status ? { kind: "status", text: status } : null);
@@ -53,6 +71,8 @@ export function PizzaMenuEditor({ onChanged }: PizzaMenuEditorProps) {
     } catch (err) {
       setFeedback({ kind: "error", text: getErrorMessage(err, locale) });
       return false;
+    } finally {
+      mutating.current -= 1;
     }
   }
 
