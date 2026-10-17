@@ -4,6 +4,26 @@ Versions are annotated tags `vX.Y.Z` on `main`. Each entry mirrors the
 `chore(release): vX.Y.Z` commit that bumps `package.json`,
 `package-lock.json`, and `src/server/openapi/hermes-api.yaml`.
 
+## v0.14.2 — Pizza panel updates live (2026-10-17)
+
+### Pizza
+
+- The pizza panel now refreshes live for everyone: a newly opened round,
+  new menu items, menu and order changes appear without reloading the page.
+  It previously listened for a window event that was never fired.
+- The existing realtime connection of the event board forwards
+  `events_changed` together with its reason through a small client bus
+  (`src/client/realtime/events-changed-bus.ts`); there is still only one
+  `EventSource` per page. The panel reloads on `pizza_*` reasons, debounced
+  by 300 ms; after a reconnect it resyncs once. The menu editor picks up
+  `pizza_menu_changed` from other managers.
+- Live refreshes never discard unsaved input: they do not show the loading
+  state or unmount anything, so a typed special request, an open menu, an
+  open menu editor form or the archive view stay as they are. Refreshes
+  never run in parallel, a signal during your own action is merged into the
+  reload after it, and a failed background refresh keeps the last state and
+  shows only a subtle hint.
+
 ## v0.14.1 — CS 1.6 fun maps in the map template (2026-10-17)
 
 ### Game servers
