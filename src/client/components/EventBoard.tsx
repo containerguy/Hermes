@@ -11,6 +11,7 @@ import { normalizeGameTitle } from "../../shared/game-title";
 import type { ServerAction } from "../gameservers/ServerPanel";
 import { publishServerStatus } from "../gameservers/server-status-bus";
 import { useServerStatus } from "../gameservers/use-server-status";
+import { parseEventsChangedReason, publishEventsChanged } from "../realtime/events-changed-bus";
 
 export function EventBoard({
   currentUser,
@@ -145,6 +146,7 @@ export function EventBoard({
     let retryMs = 1_000;
     let reconnectTimer: number | null = null;
     let source: EventSource | null = null;
+    let hadConnection = false;
 
     function scheduleReconnect() {
       if (closed || reconnectTimer !== null) {
@@ -170,6 +172,11 @@ export function EventBoard({
       source.onopen = () => {
         retryMs = 1_000;
         setLiveState("live");
+        if (hadConnection) {
+          // Während der Unterbrechung verpasste Änderungen: Abonnenten (Pizza-Panel) gleichen ab.
+          publishEventsChanged(null);
+        }
+        hadConnection = true;
       };
 
       source.onerror = () => {
@@ -182,8 +189,9 @@ export function EventBoard({
         setLiveState("live");
       });
 
-      source.addEventListener("events_changed", () => {
+      source.addEventListener("events_changed", (message) => {
         loadEvents().catch(() => setLiveState("polling"));
+        publishEventsChanged(parseEventsChangedReason((message as MessageEvent<string>).data));
       });
 
       source.addEventListener("servers_changed", (message) => {

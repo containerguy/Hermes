@@ -1,6 +1,8 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { getErrorMessage } from "../errors/errors";
 import { useI18n, type TFunction } from "../i18n/I18nContext";
+import { isPizzaReason } from "../realtime/events-changed-bus";
+import { useEventsChanged } from "../realtime/use-events-changed";
 import {
   addPizzaLine,
   archivePizzaSession,
@@ -73,34 +75,88 @@ export function PizzaPanel({
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [showMenu, setShowMenu] = useState(false);
+  /** Letzter Hintergrund-Abgleich schlug fehl; der bisherige Stand bleibt sichtbar. */
+  const [stale, setStale] = useState(false);
+  const sync = useRef<{ running: Promise<void> | null; again: boolean; foreground: boolean }>({
+    running: null,
+    again: false,
+    foreground: false
+  });
+  /** Laufende eigene Aktionen; Live-Signale währenddessen gehen im Reload danach auf. */
+  const busy = useRef(0);
+  const livePending = useRef(false);
 
-  async function reload() {
+  async function fetchOnce(foreground: boolean) {
     try {
       const next = await fetchPizzaState();
       setState(next);
-      setError(null);
+      setStale(false);
+      if (foreground) setError(null);
     } catch (err) {
-      setError(getErrorMessage(err, locale));
+      // Hintergrund-Fehler nur dezent melden und den bisherigen Stand behalten.
+      if (foreground) setError(getErrorMessage(err, locale));
+      else setStale(true);
     } finally {
       setLoading(false);
     }
   }
 
+  /**
+   * Lädt den Zustand. Nie mehr als ein Request gleichzeitig: Anfragen während eines laufenden
+   * Ladevorgangs werden zu genau einem weiteren Durchlauf zusammengefasst. `loading` bleibt
+   * dabei unberührt, damit Eingaben in den Kindkomponenten nicht ausgehängt werden.
+   */
+  function reload(foreground = true): Promise<void> {
+    const current = sync.current;
+    current.foreground = current.foreground || foreground;
+    if (current.running) {
+      current.again = true;
+      return current.running;
+    }
+    current.running = (async () => {
+      try {
+        do {
+          current.again = false;
+          const asForeground = current.foreground;
+          current.foreground = false;
+          await fetchOnce(asForeground);
+        } while (current.again);
+      } finally {
+        current.running = null;
+      }
+    })();
+    return current.running;
+  }
+
   async function run(action: () => Promise<unknown>) {
+    busy.current += 1;
+    let ok = false;
     try {
       await action();
-      await reload();
+      ok = true;
     } catch (err) {
       setError(getErrorMessage(err, locale));
+    } finally {
+      busy.current -= 1;
     }
+    const pending = livePending.current && busy.current === 0;
+    if (pending) livePending.current = false;
+    if (ok) await reload(true);
+    else if (pending) await reload(false);
   }
 
   useEffect(() => {
-    void reload();
-    const onRefresh = () => void reload();
-    window.addEventListener("hermes:events-refresh", onRefresh);
-    return () => window.removeEventListener("hermes:events-refresh", onRefresh);
+    void reload(true);
   }, []);
+
+  // Live: `events_changed` mit Grund `pizza_*` (oder ohne Grund) → stiller Abgleich.
+  useEventsChanged(() => {
+    if (busy.current > 0) {
+      livePending.current = true;
+      return;
+    }
+    void reload(false);
+  }, isPizzaReason);
 
   const isManager = currentUserRole === "admin" || currentUserRole === "manager";
   const myTotalCents = useMemo(() => orderTotal(state?.myOrder ?? null), [state]);
@@ -132,6 +188,11 @@ export function PizzaPanel({
       {error ? (
         <p className="pizza-panel__error" role="alert">
           {error}
+        </p>
+      ) : null}
+      {stale && !error ? (
+        <p className="muted pizza-panel__stale" role="status">
+          {t("pizza.panel.stale")}
         </p>
       ) : null}
 
