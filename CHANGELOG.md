@@ -4,6 +4,74 @@ Versions are annotated tags `vX.Y.Z` on `main`. Each entry mirrors the
 `chore(release): vX.Y.Z` commit that bumps `package.json`,
 `package-lock.json`, and `src/server/openapi/hermes-api.yaml`.
 
+## v0.15.0 — Pizza: free categories, CSV/YAML menu import/export, extras with surcharge (2026-10-18)
+
+### Upgrade note
+
+- Migration `0024_pizza_categories_extras` runs automatically on start. It
+  creates the categories "Pizza" (`cat-pizza`) and "Pasta" (`cat-pasta`),
+  assigns every existing menu item to one of them and rebuilds
+  `pizza_menu_items` with `category_id` instead of the fixed
+  `pizza`/`pasta` check. Item IDs, variants, order lines and price snapshots
+  stay unchanged; old orders show the same totals. It also creates the
+  tables for extras (`pizza_menu_extras`, `pizza_menu_extra_categories`,
+  `pizza_order_line_extras`).
+- Take a backup before updating, as for every migration. Restores need a
+  snapshot with the same migration state; snapshots from v0.14.x can be
+  restored into v0.14.x only. The new tables are part of the restore.
+- The menu JSON export now contains `categories` and `categoryId` per item.
+  The JSON import still accepts older exports with `category: "pizza"` or
+  `"pasta"`; unknown category names are created.
+
+### Pizza
+
+- Free categories: managers create, rename, sort, activate and deactivate
+  categories in "Manage menu". Names are unique regardless of case. Only
+  empty categories can be deleted; otherwise deactivate them. Guests see
+  the menu grouped by category in that order; inactive categories and
+  their items are hidden and cannot be ordered.
+- Extras with surcharge (e.g. "extra ham +1.50 €"): a fixed price per extra,
+  independent of the size, offered only for the selected categories. Guests
+  tick any number of extras per order line (each at most once), also later
+  in "My order" while the round is open. Line price = (variant price + sum
+  of extras) × quantity, shown in "My order", the overview, the cash list,
+  the pizzeria PDF (same variant with different extras = separate row) and
+  the archive. Name and price of each extra are stored as a snapshot on the
+  line; price changes only affect new orders. Extras that were already
+  ordered are only deactivated when removed. Closed rounds reject changes,
+  archived rounds stay frozen.
+- Menu import/export as YAML and CSV in "Manage menu":
+  - YAML holds the complete menu (categories in order → items with number,
+    name, ingredients, allergens, active → variants with label, price in €,
+    active) plus extras with their categories.
+  - CSV uses `;` and UTF-8 with BOM for Excel: one menu file with one row
+    per variant (`kategorie;nummer;artikel;zutaten;allergene;variante;preis_eur;aktiv`)
+    and a separate extras file (`extra;preis_eur;kategorien;aktiv`,
+    categories separated by `|`). Prices accept comma or dot. Cells starting
+    with `=`, `+`, `-` or `@` are prefixed with `'` on export (no formula
+    injection) and restored on import. Excel files saved as Windows-1252 are
+    detected in the browser.
+  - Import always shows a preview first (new, changed, unchanged and
+    removed entries per categories, items, variants and extras; errors with
+    line numbers), then "Apply" writes everything in one transaction.
+    Matching uses category and item names or item numbers. Like the JSON
+    import, missing items and categories are deactivated and missing
+    variants and extras removed, or only deactivated if they were ordered.
+    Price snapshots of past orders never change. Limit 256 KiB.
+- New endpoints (manager and up, CSRF for writes, audit entries
+  `pizza.menu.category.*`, `pizza.menu.extra.*`, `pizza.menu.import`):
+  `POST /api/pizza/admin/categories`, `POST …/categories/order`,
+  `POST …/categories/:id/active`, `DELETE …/categories/:id`,
+  `POST /api/pizza/admin/extras`, `POST …/extras/:id/active`,
+  `DELETE …/extras/:id`, `GET /api/pizza/admin/menu/export.yaml`,
+  `GET …/menu/export.csv`, `GET …/menu/extras-export.csv`,
+  `POST …/menu/transfer/preview`, `POST …/menu/transfer/apply`.
+  `POST /api/pizza/lines` and `PATCH /api/pizza/lines/:lineId` accept
+  `extraIds`.
+- Live refresh keeps all new inputs: the extras selection in the order
+  form, the category and extras editors and the import text and preview
+  (a preview is only marked as possibly outdated).
+
 ## v0.14.2 — Pizza panel updates live (2026-10-17)
 
 ### Pizza
