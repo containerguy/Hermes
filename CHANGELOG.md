@@ -16,6 +16,11 @@ Versions are annotated tags `vX.Y.Z` on `main`. Each entry mirrors the
   stay unchanged; old orders show the same totals. It also creates the
   tables for extras (`pizza_menu_extras`, `pizza_menu_extra_categories`,
   `pizza_order_line_extras`).
+- The migration runner now counts foreign key violations before and after
+  each migration and rolls a migration back if it creates new ones (it runs
+  with foreign keys off). Violations that already existed do not block the
+  start. Never run `0024` by hand without the runner: with foreign keys on,
+  dropping `pizza_menu_items` would delete all variants by cascade.
 - Take a backup before updating, as for every migration. Restores need a
   snapshot with the same migration state; snapshots from v0.14.x can be
   restored into v0.14.x only. The new tables are part of the restore.

@@ -6,6 +6,9 @@
 --    bleiben unverändert. pizza_menu_variants verweist per Namen auf pizza_menu_items und bleibt
 --    gültig, weil nur die neue Tabelle umbenannt wird (die alte wird gelöscht, nicht umbenannt).
 --    Fremdschlüssel: migrate.ts schaltet foreign_keys vor der Transaktion aus.
+--    NIE ohne den Runner ausführen: Mit eingeschalteten Fremdschlüsseln löscht DROP TABLE
+--    pizza_menu_items per ON DELETE CASCADE alle Varianten. Der Runner bricht zudem ab, wenn eine
+--    Migration neue Fremdschlüssel-Verletzungen erzeugt.
 -- 3. Extras: pizza_menu_extras, Zuordnung zu Kategorien (n:m) und pizza_order_line_extras mit
 --    Name- und Preis-Snapshot je Bestellposition. Ein Preis pro Variante lässt sich später als
 --    eigene Tabelle (z. B. pizza_extra_variant_prices) ergänzen, ohne diese Tabellen umzubauen.
