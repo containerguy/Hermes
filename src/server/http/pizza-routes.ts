@@ -42,6 +42,15 @@ import {
   type PizzaMenuItemRow
 } from "../domain/pizza/menu";
 import {
+  applyMenuTransfer,
+  buildMenuDocument,
+  extrasToCsv,
+  MENU_TRANSFER_MAX_CHARS,
+  menuToCsv,
+  menuToYaml,
+  previewMenuTransfer
+} from "../domain/pizza/menu-transfer";
+import {
   addLine,
   deleteLine,
   getOrderForUser,
@@ -187,6 +196,32 @@ const menuImportSchema = z.object({
     .max(100)
     .optional()
 });
+
+const menuTransferSchema = z.object({
+  format: z.enum(["yaml", "csv", "extras_csv"]),
+  content: z.string().min(1).max(MENU_TRANSFER_MAX_CHARS)
+});
+
+function parseMenuTransferBody(body: unknown, response: Response) {
+  const parsed = menuTransferSchema.safeParse(body);
+  if (!parsed.success) {
+    const tooLarge = parsed.error.issues.some((issue) => issue.code === "too_big");
+    response.status(tooLarge ? 413 : 400).json({ error: tooLarge ? "pizza_import_zu_gross" : "ungueltige_eingabe" });
+    return null;
+  }
+  return parsed.data;
+}
+
+function sendDownload(response: Response, contentType: string, filename: string, body: string) {
+  response.setHeader("Content-Type", contentType);
+  response.setHeader("Content-Disposition", `attachment; filename="${filename}"`);
+  response.setHeader("Cache-Control", "no-store");
+  response.send(body);
+}
+
+function today() {
+  return new Date().toISOString().slice(0, 10);
+}
 
 type LineLabel = {
   itemNumber: string | null;
@@ -929,6 +964,56 @@ export function createPizzaRouter(context: DatabaseContext) {
       categories: categories.map(({ id, name, sortOrder, active }) => ({ id, name, sortOrder, active })),
       items
     });
+  });
+
+  // --- Import/Export als YAML und CSV (ab manager) ------------------------------------------
+
+  router.get("/admin/menu/export.yaml", (request, response) => {
+    if (!requirePizzaManager(context, request, response)) return;
+    sendDownload(response, "application/yaml; charset=utf-8", `pizza-menu-${today()}.yaml`, menuToYaml(buildMenuDocument(context)));
+  });
+
+  router.get("/admin/menu/export.csv", (request, response) => {
+    if (!requirePizzaManager(context, request, response)) return;
+    sendDownload(response, "text/csv; charset=utf-8", `pizza-menu-${today()}.csv`, menuToCsv(buildMenuDocument(context)));
+  });
+
+  router.get("/admin/menu/extras-export.csv", (request, response) => {
+    if (!requirePizzaManager(context, request, response)) return;
+    sendDownload(response, "text/csv; charset=utf-8", `pizza-extras-${today()}.csv`, extrasToCsv(buildMenuDocument(context)));
+  });
+
+  /** Vorschau: zählt neue/geänderte/unveränderte Einträge, meldet Fehler mit Zeilennummer, schreibt nichts. */
+  router.post("/admin/menu/transfer/preview", (request, response) => {
+    if (!requirePizzaManager(context, request, response)) return;
+    const body = parseMenuTransferBody(request.body, response);
+    if (!body) return;
+    response.json(previewMenuTransfer(context, body.format, body.content));
+  });
+
+  router.post("/admin/menu/transfer/apply", (request, response) => {
+    const actor = requirePizzaManager(context, request, response);
+    if (!actor) return;
+    const body = parseMenuTransferBody(request.body, response);
+    if (!body) return;
+    try {
+      const result = applyMenuTransfer(context, body.format, body.content);
+      if (result.errors.length > 0) {
+        response.status(400).json({ error: "pizza_import_fehlerhaft", result });
+        return;
+      }
+      tryWriteAuditLog(context, {
+        actor,
+        action: "pizza.menu.import",
+        entityType: "pizza_menu",
+        summary: `Pizza-Menü importiert (${body.format === "yaml" ? "YAML" : body.format === "csv" ? "CSV" : "Extras-CSV"})`,
+        metadata: { format: body.format, counts: result.counts }
+      });
+      broadcastEventsChanged("pizza_menu_changed");
+      response.json(result);
+    } catch (error) {
+      respondDomainError(error, response, "pizza menu transfer failed");
+    }
   });
 
   router.put("/admin/menu/import", (request, response) => {

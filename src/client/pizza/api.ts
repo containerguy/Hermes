@@ -240,3 +240,39 @@ export async function setPizzaPaymentMode(mode: PizzaPaymentMode) {
     { method: "PUT", body: JSON.stringify({ pizzaPaymentMethods: mode }) }
   );
 }
+
+export type PizzaMenuTransferFormat = "yaml" | "csv" | "extras_csv";
+
+export interface PizzaMenuTransferIssue {
+  line: number | null;
+  code: string;
+  params?: Record<string, string | number>;
+}
+
+export interface PizzaMenuTransferCounts {
+  new: number;
+  changed: number;
+  unchanged: number;
+  removed: number;
+}
+
+export interface PizzaMenuTransferResult {
+  format: PizzaMenuTransferFormat;
+  sections: { menu: boolean; extras: boolean };
+  counts: Record<"categories" | "items" | "variants" | "extras", PizzaMenuTransferCounts>;
+  errors: PizzaMenuTransferIssue[];
+}
+
+export async function previewPizzaMenuTransfer(format: PizzaMenuTransferFormat, content: string) {
+  return requestJson<PizzaMenuTransferResult>(`/api/pizza/admin/menu/transfer/preview`, {
+    method: "POST",
+    body: JSON.stringify({ format, content })
+  });
+}
+
+export async function applyPizzaMenuTransfer(format: PizzaMenuTransferFormat, content: string) {
+  return requestJson<PizzaMenuTransferResult>(`/api/pizza/admin/menu/transfer/apply`, {
+    method: "POST",
+    body: JSON.stringify({ format, content })
+  });
+}

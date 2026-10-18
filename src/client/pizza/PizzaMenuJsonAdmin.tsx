@@ -94,7 +94,8 @@ export function PizzaMenuJsonAdmin() {
         Beim Import werden Einträge per id geupdatet (oder neu angelegt). Fehlende Einträge werden
         deaktiviert; fehlende Varianten werden entfernt bzw. deaktiviert, wenn eine bestehende
         Bestellung sie referenziert. Einzelne Artikel und Preise lassen sich bequemer direkt in der
-        Pizzabestellung unter „Menü verwalten“ pflegen (ab manager).
+        Pizzabestellung unter „Menü verwalten“ pflegen (ab manager); dort gibt es auch Import und
+        Export als YAML und CSV (Excel) mit Vorschau.
       </p>
 
       {error ? (

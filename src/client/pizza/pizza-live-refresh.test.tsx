@@ -311,6 +311,45 @@ describe("PizzaPanel – Live-Aktualisierung", () => {
     expect(fresh.value).toBe("Knoblauch");
   });
 
+  it("behält Importtext und Vorschau im Menü-Editor bei fremden Menüänderungen", async () => {
+    let adminMenu = [margherita];
+    routes["GET /api/pizza/state"] = () => ({ ...openState([margherita]), session: null, myOrder: null, orders: [], guestTotals: [] });
+    routes["GET /api/pizza/admin/menu"] = () => ({ items: adminMenu, categories: [], extras: [] });
+    routes["POST /api/pizza/admin/menu/transfer/preview"] = () => ({
+      format: "yaml",
+      sections: { menu: true, extras: true },
+      counts: {
+        categories: { new: 1, changed: 0, unchanged: 1, removed: 0 },
+        items: { new: 2, changed: 0, unchanged: 1, removed: 0 },
+        variants: { new: 2, changed: 0, unchanged: 1, removed: 0 },
+        extras: { new: 1, changed: 0, unchanged: 0, removed: 0 }
+      },
+      errors: []
+    });
+    const container = await render(<PizzaPanel {...props} currentUserRole="manager" />);
+    await click(buttonByText(container, "Menü verwalten"));
+
+    const textarea = byAriaLabel<HTMLTextAreaElement>(container, "Inhalt der Importdatei")!;
+    await act(async () => {
+      Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, "value")?.set?.call(textarea, "kategorien:\n  - name: Salate\n");
+      textarea.dispatchEvent(new Event("input", { bubbles: true }));
+      await flushMicrotasks();
+    });
+    await click(buttonByText(container, "Vorschau"));
+    expect(container.querySelector('[data-testid="pizza-transfer-preview"]')).not.toBeNull();
+
+    adminMenu = [margherita, funghi];
+    await liveSignal("pizza_menu_changed");
+
+    expect(count("GET", "/api/pizza/admin/menu")).toBe(2);
+    expect(container.querySelector('[data-testid="pizza-menu-item-pi-002"]')).not.toBeNull();
+    expect(byAriaLabel<HTMLTextAreaElement>(container, "Inhalt der Importdatei")).toBe(textarea);
+    expect(textarea.value).toBe("kategorien:\n  - name: Salate\n");
+    expect(container.querySelector('[data-testid="pizza-transfer-preview"]')).not.toBeNull();
+    expect(container.textContent).toContain("Das Menü wurde inzwischen geändert");
+    expect(calls.some((call) => call.url.endsWith("/transfer/apply"))).toBe(false);
+  });
+
   it("behält eine angefangene Umbenennung und neue Kategorie im Kategorie-Editor", async () => {
     let categories = [
       { id: "cat-pizza", name: "Pizza", sortOrder: 1, active: true, itemCount: 2 },

@@ -15,6 +15,7 @@ import {
 } from "./api";
 import { PizzaCategoryEditor } from "./PizzaCategoryEditor";
 import { PizzaExtrasEditor } from "./PizzaExtrasEditor";
+import { PizzaMenuTransfer } from "./PizzaMenuTransfer";
 import { centsToInput, formatEuro, parseEuroToCents } from "./price";
 import type { PizzaCategory, PizzaExtra, PizzaItem, PizzaVariant } from "./types";
 
@@ -129,6 +130,16 @@ export function PizzaMenuEditor({ onChanged }: PizzaMenuEditorProps) {
           categories={categories}
           mutate={mutate}
           onInvalid={(text) => setFeedback({ kind: "error", text })}
+        />
+      </details>
+
+      <details className="pizza-menu-editor__section">
+        <summary>{t("pizza.transfer.title")}</summary>
+        <PizzaMenuTransfer
+          onChanged={async () => {
+            await load();
+            await onChanged?.();
+          }}
         />
       </details>
 
