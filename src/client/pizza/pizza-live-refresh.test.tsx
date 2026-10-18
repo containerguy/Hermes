@@ -289,6 +289,61 @@ describe("PizzaPanel – Live-Aktualisierung", () => {
     expect(JSON.parse(String(post?.[1]?.body))).toMatchObject({ variantId: "pi-001-30", extraIds: ["x-ham"] });
   });
 
+  it("behält die Extras-Auswahl, wenn der Artikel währenddessen die Kategorie wechselt", async () => {
+    const ham = { id: "x-ham", name: "extra Schinken", priceCents: 150, active: true, sortOrder: 1, categoryIds: ["cat-pizza", "cat-spezial"] };
+    const categories = [
+      { id: "cat-pizza", name: "Pizza", sortOrder: 1 },
+      { id: "cat-spezial", name: "Spezial", sortOrder: 2 }
+    ];
+    let state: PizzaPanelState = { ...openState([margherita, funghi]), categories, extras: [ham] };
+    routes["GET /api/pizza/state"] = () => state;
+    routes["POST /api/pizza/lines"] = () => ({ lineId: "l2", orderId: "o1" });
+    const container = await render(<PizzaPanel {...props} currentUserRole="user" />);
+
+    await click(buttonByText(container, "Menü öffnen (2 frei)"));
+    await click(byAriaLabel(container, "extra Schinken für Funghi"));
+
+    // Ein Manager verschiebt Funghi nach „Spezial“: der Eintrag wird in der neuen Gruppe neu gemountet
+    state = { ...state, menu: [margherita, { ...funghi, categoryId: "cat-spezial" }] };
+    await liveSignal("pizza_menu_changed");
+
+    const checkbox = byAriaLabel<HTMLInputElement>(container, "extra Schinken für Funghi")!;
+    expect(checkbox.closest("details")?.querySelector("summary")?.textContent).toContain("Spezial");
+    expect(checkbox.checked).toBe(true);
+    expect(byAriaLabel<HTMLInputElement>(container, "extra Schinken für Margherita")!.checked).toBe(false);
+    expect(calls.some((call) => call.method !== "GET")).toBe(false);
+  });
+
+  it("behält angehakte Kategorien in einer Extras-Zeile", async () => {
+    let extras = [{ id: "x-ham", name: "extra Schinken", priceCents: 150, active: true, sortOrder: 1, categoryIds: ["cat-pizza"] }];
+    const categories = [
+      { id: "cat-pizza", name: "Pizza", sortOrder: 1, active: true, itemCount: 2 },
+      { id: "cat-pasta", name: "Pasta", sortOrder: 2, active: true, itemCount: 0 }
+    ];
+    routes["GET /api/pizza/state"] = () => ({ ...openState([margherita]), session: null, myOrder: null, orders: [], guestTotals: [] });
+    routes["GET /api/pizza/admin/menu"] = () => ({ items: [margherita], categories, extras });
+    const container = await render(<PizzaPanel {...props} currentUserRole="manager" />);
+
+    await click(buttonByText(container, "Menü verwalten"));
+    const pasta = byAriaLabel<HTMLInputElement>(container, "Kategorie für extra Schinken: Pasta")!;
+    const pizza = byAriaLabel<HTMLInputElement>(container, "Kategorie für extra Schinken: Pizza")!;
+    await click(pasta);
+    await click(pizza);
+    const newCategory = byAriaLabel<HTMLInputElement>(container, "Kategorie für neues Extra: Pasta")!;
+    await click(newCategory);
+
+    // Ein anderer Manager ändert den Preis desselben Extras
+    extras = [{ ...extras[0], priceCents: 200 }];
+    await liveSignal("pizza_menu_changed");
+
+    expect(count("GET", "/api/pizza/admin/menu")).toBe(2);
+    expect(byAriaLabel<HTMLInputElement>(container, "Kategorie für extra Schinken: Pasta")).toBe(pasta);
+    expect(pasta.checked).toBe(true);
+    expect(pizza.checked).toBe(false);
+    expect(newCategory.checked).toBe(true);
+    expect(calls.some((call) => call.method !== "GET")).toBe(false);
+  });
+
   it("behält Eingaben im Extras-Editor", async () => {
     let extras = [{ id: "x-ham", name: "extra Schinken", priceCents: 150, active: true, sortOrder: 1, categoryIds: ["cat-pizza"] }];
     const categories = [{ id: "cat-pizza", name: "Pizza", sortOrder: 1, active: true, itemCount: 2 }];

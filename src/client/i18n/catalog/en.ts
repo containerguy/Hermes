@@ -800,7 +800,6 @@ export const enMessages: { [K in keyof typeof deMessages]: string } = {
   "pizza.extras.deactivated": "Already ordered – deactivated instead of deleted.",
   "pizza.extras.removeConfirm": "Remove extra “{name}”? Extras that were already ordered are only deactivated.",
   "pizza.transfer.title": "Import/export (YAML, CSV)",
-  "pizza.transfer.help": "YAML contains the full menu including extras. CSV (delimiter ;, UTF-8 for Excel) exists for the menu (one row per variant; “aktiv” applies to the variant) and separately for extras (separate categories with |). Prices with comma or dot. Imports match category and item names or item numbers. Missing items and categories are deactivated, missing variants and extras are removed or – if already ordered – only deactivated. Past orders keep their prices.",
   "pizza.transfer.exportYaml": "Menu as YAML",
   "pizza.transfer.exportCsv": "Menu as CSV",
   "pizza.transfer.exportExtrasCsv": "Extras as CSV",
@@ -849,5 +848,10 @@ export const enMessages: { [K in keyof typeof deMessages]: string } = {
   "pizza.transfer.error.item_conflict": "Item “{name}”: field “{field}” differs from the first row.",
   "pizza.transfer.error.unknown_category": "Unknown category “{name}”.",
   "pizza.transfer.error.too_many_variants": "“{name}” has more than {max} variants.",
-  "pizza.transfer.error.too_many_rows": "Too many entries (max. {max})."
+  "pizza.transfer.error.too_many_rows": "Too many entries (max. {max}).",
+  "pizza.transfer.warning.many_removed": "Caution: {count} of {total} {kind} would be removed or deactivated. Is this perhaps only a partial file?",
+  "pizza.transfer.confirmRemovals": "Yes, apply and remove or deactivate these entries",
+  "pizza.transfer.staleRejected": "The menu has changed in the meantime. Nothing was applied – see the new preview below.",
+  "pizza.transfer.error.unknown_field": "Unknown field “{field}” (typo?).",
+  "pizza.transfer.help": "YAML contains the full menu including extras and empty categories. CSV (delimiter ;, UTF-8 for Excel) exists for the menu (one row per variant, separate columns artikel_aktiv and variante_aktiv) and separately for extras (separate categories with |). Prices with comma or dot. Imports match category and item names or item numbers. Missing items are deactivated, missing variants and extras are removed or – if already ordered – only deactivated; only the YAML import deactivates missing categories. Hermes asks before removing many entries. Past orders keep their prices."
 };

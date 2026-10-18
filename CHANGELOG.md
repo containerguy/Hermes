@@ -45,19 +45,40 @@ Versions are annotated tags `vX.Y.Z` on `main`. Each entry mirrors the
     name, ingredients, allergens, active → variants with label, price in €,
     active) plus extras with their categories.
   - CSV uses `;` and UTF-8 with BOM for Excel: one menu file with one row
-    per variant (`kategorie;nummer;artikel;zutaten;allergene;variante;preis_eur;aktiv`)
+    per variant
+    (`kategorie;nummer;artikel;zutaten;allergene;artikel_aktiv;variante;preis_eur;variante_aktiv`)
     and a separate extras file (`extra;preis_eur;kategorien;aktiv`,
-    categories separated by `|`). Prices accept comma or dot. Cells starting
-    with `=`, `+`, `-` or `@` are prefixed with `'` on export (no formula
-    injection) and restored on import. Excel files saved as Windows-1252 are
-    detected in the browser.
+    categories separated by `|`). Item and variant status have separate
+    columns, so an export followed by an unchanged import changes nothing
+    (also for a deactivated item with active variants or an active item
+    whose only variant is deactivated). The older layout with a single
+    `aktiv` column is still accepted; it then applies to the variant and
+    leaves the status of existing items as it is. Prices accept comma or
+    dot. Cells starting with `=`, `+`, `-` or `@` are prefixed with `'` on
+    export (no formula injection) and restored on import. Excel files saved
+    as Windows-1252 are detected in the browser.
+  - Unknown YAML keys and unknown or missing CSV columns are errors with a
+    line number, so a typo such as `artikl:` cannot silently deactivate
+    items.
   - Import always shows a preview first (new, changed, unchanged and
     removed entries per categories, items, variants and extras; errors with
     line numbers), then "Apply" writes everything in one transaction.
     Matching uses category and item names or item numbers. Like the JSON
-    import, missing items and categories are deactivated and missing
-    variants and extras removed, or only deactivated if they were ordered.
-    Price snapshots of past orders never change. Limit 256 KiB.
+    import, missing items are deactivated and missing variants and extras
+    removed, or only deactivated if they were ordered. Missing categories
+    are deactivated only by the YAML import; CSV cannot list empty
+    categories and leaves them alone. Price snapshots of past orders never
+    change. Limit 256 KiB.
+  - Existing sort values are kept as long as the file order matches the
+    order shown (also for equal values such as 0), so the first round trip
+    does not renumber anything.
+  - If an import would remove more than 10 entries or more than 20 % of a
+    kind (likely a partial file), the preview warns and "Apply" needs an
+    extra confirmation (`409 pizza_import_bestaetigung_noetig` otherwise).
+  - "Apply" only accepts the preview the user saw: if the menu changed in
+    the meantime, the server answers `409 pizza_menu_geaendert` with a fresh
+    preview and changes nothing. A preview marked as outdated by a live
+    update must be recalculated before applying.
 - New endpoints (manager and up, CSRF for writes, audit entries
   `pizza.menu.category.*`, `pizza.menu.extra.*`, `pizza.menu.import`):
   `POST /api/pizza/admin/categories`, `POST …/categories/order`,
@@ -69,8 +90,10 @@ Versions are annotated tags `vX.Y.Z` on `main`. Each entry mirrors the
   `POST /api/pizza/lines` and `PATCH /api/pizza/lines/:lineId` accept
   `extraIds`.
 - Live refresh keeps all new inputs: the extras selection in the order
-  form, the category and extras editors and the import text and preview
-  (a preview is only marked as possibly outdated).
+  form (also when an item moves to another category meanwhile), the
+  category and extras editors including the category checkboxes of an
+  extra, and the import text and preview (a preview is only marked as
+  possibly outdated).
 
 ## v0.14.2 — Pizza panel updates live (2026-10-17)
 

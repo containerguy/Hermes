@@ -199,7 +199,11 @@ const menuImportSchema = z.object({
 
 const menuTransferSchema = z.object({
   format: z.enum(["yaml", "csv", "extras_csv"]),
-  content: z.string().min(1).max(MENU_TRANSFER_MAX_CHARS)
+  content: z.string().min(1).max(MENU_TRANSFER_MAX_CHARS),
+  /** Nur beim Übernehmen: `menuVersion` der gezeigten Vorschau. */
+  expectedVersion: z.string().max(64).optional(),
+  /** Nur beim Übernehmen: Bestätigung der Warnung „viele Einträge werden entfernt“. */
+  confirmRemovals: z.boolean().optional()
 });
 
 function parseMenuTransferBody(body: unknown, response: Response) {
@@ -997,9 +1001,21 @@ export function createPizzaRouter(context: DatabaseContext) {
     const body = parseMenuTransferBody(request.body, response);
     if (!body) return;
     try {
-      const result = applyMenuTransfer(context, body.format, body.content);
-      if (result.errors.length > 0) {
+      const { outcome, result } = applyMenuTransfer(context, body.format, body.content, {
+        expectedVersion: body.expectedVersion,
+        confirmRemovals: body.confirmRemovals
+      });
+      if (outcome === "errors") {
         response.status(400).json({ error: "pizza_import_fehlerhaft", result });
+        return;
+      }
+      if (outcome === "stale") {
+        // Menü hat sich seit der Vorschau geändert: nichts übernehmen, neue Vorschau mitliefern.
+        response.status(409).json({ error: "pizza_menu_geaendert", result });
+        return;
+      }
+      if (outcome === "confirm") {
+        response.status(409).json({ error: "pizza_import_bestaetigung_noetig", result });
         return;
       }
       tryWriteAuditLog(context, {

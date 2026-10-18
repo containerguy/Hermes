@@ -7,7 +7,7 @@
  * wenn sie schon bestellt wurden. Preis-Snapshots alter Bestellungen bleiben unberührt.
  * Zuordnung über Namen (ohne Groß-/Kleinschreibung) bzw. Artikelnummer, nicht über IDs.
  */
-import { randomUUID } from "node:crypto";
+import { createHash, randomUUID } from "node:crypto";
 import { eq } from "drizzle-orm";
 import { LineCounter, parseDocument, Scalar, stringify, type Node } from "yaml";
 import { z } from "zod";
@@ -28,7 +28,23 @@ const MAX_VARIANTS_PER_ITEM = 8;
 const MAX_EXTRAS = 200;
 const MAX_CSV_ROWS = 5000;
 
-export const MENU_CSV_HEADER = ["kategorie", "nummer", "artikel", "zutaten", "allergene", "variante", "preis_eur", "aktiv"];
+/** Menü-CSV: getrennte Spalten für Artikel- und Varianten-Status, damit der Roundtrip verlustfrei ist. */
+export const MENU_CSV_HEADER = [
+  "kategorie",
+  "nummer",
+  "artikel",
+  "zutaten",
+  "allergene",
+  "artikel_aktiv",
+  "variante",
+  "preis_eur",
+  "variante_aktiv"
+];
+/** Älteres Format mit einer `aktiv`-Spalte; sie gilt beim Import für die Variante. */
+export const LEGACY_MENU_CSV_HEADER = ["kategorie", "nummer", "artikel", "zutaten", "allergene", "variante", "preis_eur", "aktiv"];
+/** Ab so vielen bzw. diesem Anteil entfernter Einträge verlangt „Übernehmen“ eine Bestätigung. */
+const REMOVAL_WARN_COUNT = 10;
+const REMOVAL_WARN_SHARE = 0.2;
 export const EXTRAS_CSV_HEADER = ["extra", "preis_eur", "kategorien", "aktiv"];
 
 // --- Dokumentmodell ------------------------------------------------------------------------------
@@ -45,7 +61,10 @@ export interface DocItem {
   name: string;
   ingredients: string | null;
   allergens: string | null;
-  active: boolean;
+  /** undefined = Status bestehender Artikel unverändert lassen (altes CSV ohne artikel_aktiv). */
+  active: boolean | undefined;
+  /** Status, falls der Artikel neu angelegt wird und `active` fehlt. */
+  activeIfNew?: boolean;
   line: number | null;
   variants: DocVariant[];
 }
@@ -69,6 +88,11 @@ export interface DocExtra {
 export interface MenuDocument {
   categories?: DocCategory[];
   extras?: DocExtra[];
+  /**
+   * Nur YAML bildet alle Kategorien ab (auch leere). CSV kennt nur Kategorien mit Artikeln,
+   * deshalb deaktiviert ein CSV-Import keine Kategorien.
+   */
+  deactivateMissingCategories?: boolean;
 }
 
 export interface TransferIssue {
@@ -95,6 +119,10 @@ export interface TransferResult {
     extras: TransferCounts;
   };
   errors: TransferIssue[];
+  /** Hinweise, z. B. viele Entfernungen („Teil-Datei?“); Übernehmen braucht dann eine Bestätigung. */
+  warnings: TransferIssue[];
+  /** Fingerabdruck des Menüs zum Zeitpunkt der Vorschau; Übernehmen lehnt bei Abweichung ab. */
+  menuVersion: string;
 }
 
 // --- Preise und Flags ----------------------------------------------------------------------------
@@ -138,6 +166,7 @@ export function buildMenuDocument(context: DatabaseContext): Required<MenuDocume
   const categories = listCategories(context);
   const items = listAllMenu(context);
   return {
+    deactivateMissingCategories: true,
     categories: categories.map((category) => ({
       name: category.name,
       active: category.active,
@@ -217,14 +246,20 @@ export function menuToCsv(doc: Required<MenuDocument>): string {
   const rows: string[][] = [MENU_CSV_HEADER];
   for (const category of doc.categories) {
     for (const item of category.items) {
-      const base = [category.name, item.number ?? "", item.name, item.ingredients ?? "", item.allergens ?? ""];
+      const base = [
+        category.name,
+        item.number ?? "",
+        item.name,
+        item.ingredients ?? "",
+        item.allergens ?? "",
+        yesNo(item.active !== false)
+      ];
       if (item.variants.length === 0) {
-        rows.push([...base, "", "", yesNo(item.active)]);
+        rows.push([...base, "", "", ""]);
         continue;
       }
       for (const variant of item.variants) {
-        // Eine aktiv-Spalte je Zeile: aktiv nur, wenn Artikel und Variante aktiv sind.
-        rows.push([...base, variant.label ?? "", formatPriceCsv(variant.priceCents), yesNo(item.active && variant.active)]);
+        rows.push([...base, variant.label ?? "", formatPriceCsv(variant.priceCents), yesNo(variant.active)]);
       }
     }
   }
@@ -250,13 +285,15 @@ const optionalText = (max: number) =>
     .pipe(z.string().max(max).nullable());
 const priceInput = z.union([z.number(), z.string()]);
 
-const yamlVariantSchema = z.object({
+// strictObject: Unbekannte Schlüssel (Tippfehler wie `artikl:`) sind ein Fehler, statt still
+// ignoriert zu werden und dabei Artikel zu deaktivieren.
+const yamlVariantSchema = z.strictObject({
   bezeichnung: optionalText(32),
   preis_eur: priceInput,
   aktiv: z.boolean().optional()
 });
 
-const yamlItemSchema = z.object({
+const yamlItemSchema = z.strictObject({
   nummer: optionalText(16),
   name: textOrNumber.pipe(z.string().min(1).max(120)),
   zutaten: optionalText(500),
@@ -265,20 +302,22 @@ const yamlItemSchema = z.object({
   varianten: z.array(yamlVariantSchema).max(MAX_VARIANTS_PER_ITEM).optional()
 });
 
-const yamlCategorySchema = z.object({
+const yamlCategorySchema = z.strictObject({
   name: textOrNumber.pipe(z.string().min(1).max(PIZZA_CATEGORY_NAME_MAX_LEN)),
   aktiv: z.boolean().optional(),
   artikel: z.array(yamlItemSchema).max(MAX_ITEMS).optional()
 });
 
-const yamlExtraSchema = z.object({
+const yamlExtraSchema = z.strictObject({
   name: textOrNumber.pipe(z.string().min(1).max(PIZZA_EXTRA_NAME_MAX_LEN)),
   preis_eur: priceInput,
   kategorien: z.array(textOrNumber.pipe(z.string().min(1).max(PIZZA_CATEGORY_NAME_MAX_LEN))).max(MAX_CATEGORIES).optional(),
   aktiv: z.boolean().optional()
 });
 
-const yamlDocumentSchema = z.object({
+const yamlDocumentSchema = z.strictObject({
+  format: z.literal("hermes-pizza-menu").optional(),
+  version: z.literal(1).optional(),
   kategorien: z.array(yamlCategorySchema).max(MAX_CATEGORIES).optional(),
   extras: z.array(yamlExtraSchema).max(MAX_EXTRAS).optional()
 });
@@ -323,17 +362,25 @@ export function parseMenuYaml(text: string): { doc: MenuDocument; errors: Transf
   if (!parsed.success) {
     return {
       doc: {},
-      errors: parsed.error.issues.slice(0, 20).map((issue) => ({
-        line: lineOfPath(document, counter, issue.path),
-        code: "invalid_field",
-        params: { field: String([...issue.path].reverse().find((part) => typeof part === "string") ?? "") }
-      }))
+      errors: parsed.error.issues.slice(0, 20).map((issue) =>
+        issue.code === "unrecognized_keys"
+          ? {
+              line: lineOfPath(document, counter, [...issue.path, issue.keys[0]]),
+              code: "unknown_field",
+              params: { field: issue.keys.join(", ") }
+            }
+          : {
+              line: lineOfPath(document, counter, issue.path),
+              code: "invalid_field",
+              params: { field: String([...issue.path].reverse().find((part) => typeof part === "string") ?? "") }
+            }
+      )
     };
   }
 
   const errors: TransferIssue[] = [];
   const data = parsed.data;
-  const doc: MenuDocument = {};
+  const doc: MenuDocument = { deactivateMissingCategories: true };
   if (data.kategorien) {
     doc.categories = data.kategorien.map((category, categoryIndex) => ({
       name: category.name,
@@ -394,7 +441,14 @@ export function parseMenuYaml(text: string): { doc: MenuDocument; errors: Transf
 
 // --- Parser: CSV ---------------------------------------------------------------------------------
 
-function readCsvTable(text: string, header: string[]) {
+interface CsvTable {
+  rows: Array<{ line: number; cells: string[] }>;
+  errors: TransferIssue[];
+  /** Index der erkannten Kopfzeile in `headers`. */
+  headerIndex?: number;
+}
+
+function readCsvTable(text: string, headers: string[][]): CsvTable {
   const errors: TransferIssue[] = [];
   const parsed = parseCsv(text);
   if (!parsed.ok) {
@@ -404,13 +458,16 @@ function readCsvTable(text: string, header: string[]) {
   if (nonEmpty.length === 0) return { rows: [], errors: [{ line: 1, code: "empty" }] };
   const [head, ...rows] = nonEmpty;
   const normalizedHead = head.cells.map((cell) => cell.trim().toLowerCase());
-  while (normalizedHead.length > header.length && normalizedHead.at(-1) === "") normalizedHead.pop();
-  if (normalizedHead.join(";") !== header.join(";")) {
+  while (normalizedHead.length > 0 && normalizedHead.at(-1) === "") normalizedHead.pop();
+  // Unbekannte oder fehlende Spalten sind ein Fehler (keine stille Zuordnung).
+  const headerIndex = headers.findIndex((candidate) => candidate.join(";") === normalizedHead.join(";"));
+  if (headerIndex === -1) {
     if (normalizedHead.length === 1 && /[,\t]/.test(normalizedHead[0])) {
       return { rows: [], errors: [{ line: head.line, code: "csv_delimiter" }] };
     }
-    return { rows: [], errors: [{ line: head.line, code: "csv_header", params: { expected: header.join(";") } }] };
+    return { rows: [], errors: [{ line: head.line, code: "csv_header", params: { expected: headers[0].join(";") } }] };
   }
+  const header = headers[headerIndex];
   if (rows.length > MAX_CSV_ROWS) {
     return { rows: [], errors: [{ line: null, code: "too_many_rows", params: { max: MAX_CSV_ROWS } }] };
   }
@@ -424,7 +481,7 @@ function readCsvTable(text: string, header: string[]) {
     }
     result.push({ line: row.line, cells: cells.map((cell) => unguardCell(cell.trim())) });
   }
-  return { rows: result, errors };
+  return { rows: result, errors, headerIndex };
 }
 
 const csvMenuRowSchema = z.object({
@@ -437,13 +494,17 @@ const csvMenuRowSchema = z.object({
 });
 
 export function parseMenuCsv(text: string): { doc: MenuDocument; errors: TransferIssue[] } {
-  const { rows, errors } = readCsvTable(text, MENU_CSV_HEADER);
+  const { rows, errors, headerIndex } = readCsvTable(text, [MENU_CSV_HEADER, LEGACY_MENU_CSV_HEADER]);
+  const legacy = headerIndex === 1;
   const categories: DocCategory[] = [];
   const categoryByKey = new Map<string, DocCategory>();
   const itemByKey = new Map<string, { item: DocItem; category: DocCategory; hadEmptyVariant: boolean }>();
 
   for (const { line, cells } of rows) {
-    const [kategorie, nummer, artikel, zutaten, allergene, variante, preis, aktiv] = cells;
+    const [kategorie, nummer, artikel, zutaten, allergene] = cells;
+    const [itemAktiv, variante, preis, variantAktiv] = legacy
+      ? [null, cells[5], cells[6], cells[7]]
+      : [cells[5], cells[6], cells[7], cells[8]];
     const checked = csvMenuRowSchema.safeParse({ kategorie, nummer, artikel, zutaten, allergene, variante });
     if (!checked.success) {
       for (const issue of checked.error.issues.slice(0, 3)) {
@@ -451,12 +512,17 @@ export function parseMenuCsv(text: string): { doc: MenuDocument; errors: Transfe
       }
       continue;
     }
-    const active = parseActiveFlag(aktiv);
+    const emptyVariant = variante === "" && preis === "";
+    const active = parseActiveFlag(variantAktiv);
     if (active === null) {
-      errors.push({ line, code: "invalid_active", params: { value: aktiv } });
+      errors.push({ line, code: "invalid_active", params: { value: variantAktiv } });
       continue;
     }
-    const emptyVariant = variante === "" && preis === "";
+    const itemActive = itemAktiv === null ? undefined : parseActiveFlag(itemAktiv);
+    if (itemActive === null) {
+      errors.push({ line, code: "invalid_active", params: { value: itemAktiv ?? "" } });
+      continue;
+    }
     const priceCents = emptyVariant ? 0 : parsePriceToCents(preis);
     if (priceCents === null) {
       errors.push({ line, code: "invalid_price", params: { value: preis } });
@@ -486,17 +552,23 @@ export function parseMenuCsv(text: string): { doc: MenuDocument; errors: Transfe
         errors.push({ line, code: "item_conflict", params: { name: artikel, field: conflict } });
         continue;
       }
+      if (existing.item.active !== itemActive) {
+        errors.push({ line, code: "item_conflict", params: { name: artikel, field: "artikel_aktiv" } });
+        continue;
+      }
       if (emptyVariant || existing.hadEmptyVariant) {
         errors.push({ line, code: "invalid_price", params: { value: preis } });
         continue;
       }
-      existing.item.active = existing.item.active || active;
+      existing.item.activeIfNew = existing.item.activeIfNew || active;
       existing.item.variants.push({ label: emptyToNull(variante), priceCents, active, line });
       continue;
     }
     const item: DocItem = {
       ...fields,
-      active,
+      // Altes Format: Artikel-Status bestehender Artikel bleibt; neue sind aktiv, wenn eine Zeile aktiv ist.
+      active: itemActive,
+      activeIfNew: emptyVariant ? true : active,
       line,
       variants: emptyVariant ? [] : [{ label: emptyToNull(variante), priceCents, active, line }]
     };
@@ -504,11 +576,11 @@ export function parseMenuCsv(text: string): { doc: MenuDocument; errors: Transfe
     category.items.push(item);
   }
   if (rows.length === 0 && errors.length === 0) errors.push({ line: 1, code: "empty" });
-  return { doc: { categories }, errors };
+  return { doc: { categories, deactivateMissingCategories: false }, errors };
 }
 
 export function parseExtrasCsv(text: string): { doc: MenuDocument; errors: TransferIssue[] } {
-  const { rows, errors } = readCsvTable(text, EXTRAS_CSV_HEADER);
+  const { rows, errors } = readCsvTable(text, [EXTRAS_CSV_HEADER]);
   const extras: DocExtra[] = [];
   for (const { line, cells } of rows) {
     const [name, preis, kategorien, aktiv] = cells;
@@ -556,19 +628,36 @@ function emptyCounts(): TransferCounts {
   return { new: 0, changed: 0, unchanged: 0, removed: 0 };
 }
 
+/** Namensvergleich wie SQLite `ORDER BY name` (BINARY). */
+function binaryCompare(a: string, b: string) {
+  return a < b ? -1 : a > b ? 1 : 0;
+}
+
+function germanCompare(a: string, b: string) {
+  return a.localeCompare(b, "de");
+}
+
 /**
- * Sortierwerte in Dateireihenfolge: bestehende Werte bleiben, solange sie aufsteigend sind,
- * sonst der nächste freie Wert. So ändert ein unveränderter Export beim Re-Import nichts.
+ * Sortierwerte in Dateireihenfolge: bestehende Werte bleiben, solange sie nicht fallen. Gleiche
+ * Werte (z. B. mehrfach 0) bleiben, wenn die Datei sie in der Reihenfolge des Namens-Tiebreaks
+ * der Anzeige führt; sonst gibt es den nächsten Wert. So ändert ein unveränderter Export beim
+ * Re-Import nichts, und eine geänderte Reihenfolge in der Datei kommt trotzdem an.
  */
-function assignSortOrders(existing: Array<number | null>): number[] {
-  let previous = 0;
-  return existing.map((value) => {
-    if (value !== null && value > previous) {
-      previous = value;
-      return value;
-    }
-    previous += 1;
-    return previous;
+function assignSortOrders(
+  existing: Array<number | null>,
+  names: string[] = [],
+  compare?: (a: string, b: string) => number
+): number[] {
+  let previous: number | null = null;
+  let previousName: string | null = null;
+  return existing.map((value, index) => {
+    const name = names[index] ?? "";
+    const tieOk = !compare || previousName === null || compare(previousName, name) <= 0;
+    const fits = value !== null && (previous === null || value > previous || (value === previous && tieOk));
+    const assigned: number = fits ? value! : (previous ?? 0) + 1;
+    previous = assigned;
+    previousName = name;
+    return assigned;
   });
 }
 
@@ -653,7 +742,9 @@ function reconcile(context: DatabaseContext, doc: MenuDocument, apply: boolean) 
       doc.categories.map((category) => {
         const id = categoryIdByKey.get(nameKey(category.name));
         return id ? (dbCategories.find((row) => row.id === id)?.sortOrder ?? null) : null;
-      })
+      }),
+      doc.categories.map((category) => category.name),
+      binaryCompare
     );
 
     doc.categories.forEach((docCategory, categoryIndex) => {
@@ -697,11 +788,15 @@ function reconcile(context: DatabaseContext, doc: MenuDocument, apply: boolean) 
         return { docItem, match };
       });
       const itemSorts = assignSortOrders(
-        resolved.map(({ match }) => (match && match.categoryId === categoryId ? match.sortOrder : null))
+        resolved.map(({ match }) => (match && match.categoryId === categoryId ? match.sortOrder : null)),
+        resolved.map(({ docItem }) => docItem.name),
+        germanCompare
       );
 
       resolved.forEach(({ docItem, match }, itemIndex) => {
         const sortOrder = itemSorts[itemIndex];
+        // Artikel-Status nur aus der Datei, wenn sie ihn enthält; Varianten nie wegen des Artikels anfassen.
+        const itemActive = docItem.active ?? match?.active ?? docItem.activeIfNew ?? true;
         let itemId: string;
         if (match) {
           itemId = match.id;
@@ -710,7 +805,7 @@ function reconcile(context: DatabaseContext, doc: MenuDocument, apply: boolean) 
             match.name !== docItem.name ||
             match.ingredients !== docItem.ingredients ||
             match.allergens !== docItem.allergens ||
-            match.active !== docItem.active ||
+            match.active !== itemActive ||
             match.categoryId !== categoryId ||
             match.sortOrder !== sortOrder;
           counts.items[changed ? "changed" : "unchanged"] += 1;
@@ -722,7 +817,7 @@ function reconcile(context: DatabaseContext, doc: MenuDocument, apply: boolean) 
                 name: docItem.name,
                 ingredients: docItem.ingredients,
                 allergens: docItem.allergens,
-                active: docItem.active,
+                active: itemActive,
                 categoryId,
                 sortOrder,
                 updatedAt: now
@@ -742,7 +837,7 @@ function reconcile(context: DatabaseContext, doc: MenuDocument, apply: boolean) 
                 name: docItem.name,
                 ingredients: docItem.ingredients,
                 allergens: docItem.allergens,
-                active: docItem.active,
+                active: itemActive,
                 categoryId,
                 sortOrder,
                 createdAt: now,
@@ -820,6 +915,7 @@ function reconcile(context: DatabaseContext, doc: MenuDocument, apply: boolean) 
       }
     }
     for (const dbCategory of dbCategories) {
+      if (!doc.deactivateMissingCategories) break;
       if (matchedCategories.has(dbCategory.id) || !dbCategory.active) continue;
       counts.categories.removed += 1;
       if (apply) {
@@ -840,7 +936,11 @@ function reconcile(context: DatabaseContext, doc: MenuDocument, apply: boolean) 
       if (found) matched.add(found.id);
       return found;
     });
-    const sorts = assignSortOrders(resolved.map((found) => found?.sortOrder ?? null));
+    const sorts = assignSortOrders(
+      resolved.map((found) => found?.sortOrder ?? null),
+      doc.extras.map((extra) => extra.name),
+      binaryCompare
+    );
     doc.extras.forEach((docExtra, index) => {
       const found = resolved[index];
       const sortOrder = sorts[index];
@@ -903,6 +1003,25 @@ function sortIssues(errors: TransferIssue[]) {
   return [...errors].sort((a, b) => (a.line ?? 0) - (b.line ?? 0)).slice(0, 50);
 }
 
+/** Fingerabdruck des gesamten Menüs (Kategorien, Artikel, Varianten, Extras). */
+export function menuVersion(context: DatabaseContext): string {
+  const snapshot = JSON.stringify({ c: listCategories(context), i: listAllMenu(context), e: listExtras(context) });
+  return createHash("sha256").update(snapshot).digest("hex").slice(0, 16);
+}
+
+/** Warnung, wenn ein Import viele Einträge entfernen würde (vermutlich eine Teil-Datei). */
+function removalWarnings(counts: TransferResult["counts"]): TransferIssue[] {
+  const warnings: TransferIssue[] = [];
+  for (const kind of ["categories", "items", "variants", "extras"] as const) {
+    const { changed, unchanged, removed } = counts[kind];
+    const total = changed + unchanged + removed;
+    if (removed > REMOVAL_WARN_COUNT || (total > 0 && removed / total > REMOVAL_WARN_SHARE)) {
+      warnings.push({ line: null, code: "many_removed", params: { kind, count: removed, total } });
+    }
+  }
+  return warnings;
+}
+
 /** Vorschau: zählt neue, geänderte und unveränderte Einträge und meldet Fehler mit Zeilennummer. */
 export function previewMenuTransfer(context: DatabaseContext, format: MenuTransferFormat, text: string): TransferResult {
   const { doc, errors } = parseMenuTransfer(format, text);
@@ -915,16 +1034,39 @@ export function previewMenuTransfer(context: DatabaseContext, format: MenuTransf
     format,
     sections: { menu: Boolean(doc.categories), extras: Boolean(doc.extras) },
     counts,
-    errors: sortIssues(allErrors)
+    errors: sortIssues(allErrors),
+    warnings: allErrors.length > 0 ? [] : removalWarnings(counts),
+    menuVersion: menuVersion(context)
   };
 }
 
+export interface ApplyMenuTransferOptions {
+  /** `menuVersion` der Vorschau; weicht das Menü inzwischen ab, wird nichts übernommen. */
+  expectedVersion?: string;
+  /** Bestätigung für Warnungen (viele Entfernungen). */
+  confirmRemovals?: boolean;
+}
+
+export type ApplyMenuTransferOutcome = "applied" | "errors" | "stale" | "confirm";
+
 /** Übernehmen: parst und prüft erneut und schreibt alles in einer Transaktion (oder gar nichts). */
-export function applyMenuTransfer(context: DatabaseContext, format: MenuTransferFormat, text: string): TransferResult {
+export function applyMenuTransfer(
+  context: DatabaseContext,
+  format: MenuTransferFormat,
+  text: string,
+  options: ApplyMenuTransferOptions = {}
+): { outcome: ApplyMenuTransferOutcome; result: TransferResult } {
   return context.sqlite.transaction(() => {
     const preview = previewMenuTransfer(context, format, text);
-    if (preview.errors.length > 0) return preview;
+    if (preview.errors.length > 0) return { outcome: "errors" as const, result: preview };
+    if (options.expectedVersion && options.expectedVersion !== preview.menuVersion) {
+      return { outcome: "stale" as const, result: preview };
+    }
+    if (preview.warnings.length > 0 && !options.confirmRemovals) {
+      return { outcome: "confirm" as const, result: preview };
+    }
     const { doc } = parseMenuTransfer(format, text);
-    return { ...preview, counts: reconcile(context, doc, true) };
+    const counts = reconcile(context, doc, true);
+    return { outcome: "applied" as const, result: { ...preview, counts, menuVersion: menuVersion(context) } };
   })();
 }

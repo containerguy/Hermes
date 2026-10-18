@@ -56,7 +56,8 @@ const KNOWN_ISSUE_CODES = new Set([
   "item_conflict",
   "unknown_category",
   "too_many_variants",
-  "too_many_rows"
+  "too_many_rows",
+  "unknown_field"
 ]);
 
 export function issueText(t: TFunction, issue: PizzaMenuTransferIssue) {
@@ -77,6 +78,8 @@ export function PizzaMenuTransfer({ onChanged }: { onChanged?: () => Promise<voi
   const [content, setContent] = useState("");
   const [preview, setPreview] = useState<{ result: PizzaMenuTransferResult; format: string; content: string } | null>(null);
   const [stale, setStale] = useState(false);
+  /** Bestätigung der Warnung „viele Einträge werden entfernt“ (gilt nur für die aktuelle Vorschau). */
+  const [confirmRemovals, setConfirmRemovals] = useState(false);
   const [busy, setBusy] = useState<"preview" | "apply" | null>(null);
   const [status, setStatus] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -93,16 +96,23 @@ export function PizzaMenuTransfer({ onChanged }: { onChanged?: () => Promise<voi
   );
 
   const previewMatches = preview !== null && preview.format === format && preview.content === content;
-  const canApply = previewMatches && preview.result.errors.length === 0 && busy === null;
+  const needsConfirm = (preview?.result.warnings ?? []).length > 0;
+  // Veraltete Vorschau (Menü inzwischen geändert) erst neu berechnen; der Server lehnt sie ohnehin ab.
+  const canApply =
+    previewMatches && preview.result.errors.length === 0 && busy === null && !stale && (!needsConfirm || confirmRemovals);
+
+  function showPreview(result: PizzaMenuTransferResult) {
+    setPreview({ result, format, content });
+    setStale(false);
+    setConfirmRemovals(false);
+  }
 
   async function runPreview() {
     setBusy("preview");
     setError(null);
     setStatus(null);
     try {
-      const result = await previewPizzaMenuTransfer(format, content);
-      setPreview({ result, format, content });
-      setStale(false);
+      showPreview(await previewPizzaMenuTransfer(format, content));
     } catch (err) {
       setError(getErrorMessage(err, locale));
     } finally {
@@ -115,17 +125,22 @@ export function PizzaMenuTransfer({ onChanged }: { onChanged?: () => Promise<voi
     setError(null);
     ownAction.current = true;
     try {
-      const result = await applyPizzaMenuTransfer(format, content);
+      const result = await applyPizzaMenuTransfer(format, content, {
+        expectedVersion: preview?.result.menuVersion,
+        confirmRemovals
+      });
       setPreview(null);
+      setConfirmRemovals(false);
       setStale(false);
       setStatus(t("pizza.transfer.applied", { summary: summarize(t, result) }));
       await onChanged?.();
     } catch (err) {
-      // Fehler in der Datei (z. B. inzwischen geändertes Menü): neue Vorschau mit Zeilennummern zeigen.
-      const result = err instanceof ApiError ? (err.body as { result?: PizzaMenuTransferResult }).result : undefined;
-      if (result) {
-        setPreview({ result, format, content });
-        setStale(false);
+      // Fehler in der Datei, inzwischen geändertes Menü (409) oder fehlende Bestätigung: neue
+      // Vorschau zeigen, damit der Nutzer die aktuellen Zahlen sieht, bevor er erneut übernimmt.
+      const body = err instanceof ApiError ? (err.body as { error?: string; result?: PizzaMenuTransferResult }) : undefined;
+      if (body?.result) {
+        showPreview(body.result);
+        if (body.error === "pizza_menu_geaendert") setError(t("pizza.transfer.staleRejected"));
       } else {
         setError(getErrorMessage(err, locale));
       }
@@ -210,6 +225,27 @@ export function PizzaMenuTransfer({ onChanged }: { onChanged?: () => Promise<voi
             </p>
           ) : null}
           {!previewMatches ? <p className="muted">{t("pizza.transfer.edited")}</p> : null}
+          {preview.result.errors.length === 0 && needsConfirm ? (
+            <div className="pizza-transfer__warnings" role="alert">
+              {preview.result.warnings.map((warning, index) => (
+                <p key={index} className="pizza-panel__error">
+                  {t("pizza.transfer.warning.many_removed", {
+                    kind: t(`pizza.transfer.row.${String(warning.params?.kind ?? "items")}` as MessageKey),
+                    count: warning.params?.count ?? 0,
+                    total: warning.params?.total ?? 0
+                  })}
+                </p>
+              ))}
+              <label className="pizza-extras__option">
+                <input
+                  type="checkbox"
+                  checked={confirmRemovals}
+                  onChange={(event) => setConfirmRemovals(event.target.checked)}
+                />
+                {t("pizza.transfer.confirmRemovals")}
+              </label>
+            </div>
+          ) : null}
           {preview.result.errors.length > 0 ? (
             <>
               <p className="pizza-panel__error">{t("pizza.transfer.errors", { count: preview.result.errors.length })}</p>

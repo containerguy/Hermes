@@ -261,6 +261,10 @@ export interface PizzaMenuTransferResult {
   sections: { menu: boolean; extras: boolean };
   counts: Record<"categories" | "items" | "variants" | "extras", PizzaMenuTransferCounts>;
   errors: PizzaMenuTransferIssue[];
+  /** z. B. viele Entfernungen; Übernehmen braucht dann `confirmRemovals`. */
+  warnings: PizzaMenuTransferIssue[];
+  /** Fingerabdruck des Menüs zum Zeitpunkt der Vorschau. */
+  menuVersion: string;
 }
 
 export async function previewPizzaMenuTransfer(format: PizzaMenuTransferFormat, content: string) {
@@ -270,9 +274,18 @@ export async function previewPizzaMenuTransfer(format: PizzaMenuTransferFormat, 
   });
 }
 
-export async function applyPizzaMenuTransfer(format: PizzaMenuTransferFormat, content: string) {
+export async function applyPizzaMenuTransfer(
+  format: PizzaMenuTransferFormat,
+  content: string,
+  options: { expectedVersion?: string; confirmRemovals?: boolean } = {}
+) {
   return requestJson<PizzaMenuTransferResult>(`/api/pizza/admin/menu/transfer/apply`, {
     method: "POST",
-    body: JSON.stringify({ format, content })
+    body: JSON.stringify({
+      format,
+      content,
+      ...(options.expectedVersion ? { expectedVersion: options.expectedVersion } : {}),
+      ...(options.confirmRemovals ? { confirmRemovals: true } : {})
+    })
   });
 }

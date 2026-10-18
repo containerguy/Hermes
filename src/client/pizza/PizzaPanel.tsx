@@ -439,6 +439,11 @@ function PizzaOrderEditor({ state, showMenu, onToggleMenu, run }: OrderEditorPro
   const myLines = state.myOrder?.lines ?? [];
   const myTotal = orderTotal(state.myOrder);
   const remaining = 3 - myLines.length;
+  // Extras-Auswahl je Artikel-ID hier statt im Menüeintrag: Sie übersteht Live-Abgleiche, auch
+  // wenn ein Artikel währenddessen die Kategorie wechselt und sein Eintrag neu gemountet wird.
+  const [extraSelections, setExtraSelections] = useState<Record<string, string[]>>({});
+  const selectExtras = (itemId: string, update: (current: string[]) => string[]) =>
+    setExtraSelections((current) => ({ ...current, [itemId]: update(current[itemId] ?? []) }));
 
   return (
     <div className="pizza-panel__editor">
@@ -515,6 +520,8 @@ function PizzaOrderEditor({ state, showMenu, onToggleMenu, run }: OrderEditorPro
           menu={state.menu}
           categories={state.categories}
           extras={state.extras}
+          selections={extraSelections}
+          onSelect={selectExtras}
           onAdd={(variantId, extraIds) => run(() => addPizzaLine({ variantId, qty: 1, extraIds }))}
         />
       ) : null}
@@ -596,15 +603,22 @@ function LineExtrasEditor({
   );
 }
 
+type ExtraSelections = Record<string, string[]>;
+type SelectExtras = (itemId: string, update: (current: string[]) => string[]) => void;
+
 function PizzaMenuBrowser({
   menu,
   categories,
   extras,
+  selections,
+  onSelect,
   onAdd
 }: {
   menu: PizzaItem[];
   categories: PizzaCategory[] | undefined;
   extras: PizzaExtra[] | undefined;
+  selections: ExtraSelections;
+  onSelect: SelectExtras;
   onAdd: (variantId: string, extraIds: string[]) => Promise<boolean | void>;
 }) {
   const { t } = useI18n();
@@ -617,7 +631,7 @@ function PizzaMenuBrowser({
       {groups.map((group) => (
         <details key={group.id} open={group.id === initiallyOpen}>
           <summary>{t("pizza.menu.categoryCount", { name: group.name, count: group.items.length })}</summary>
-          <PizzaMenuList items={group.items} extras={extras} onAdd={onAdd} />
+          <PizzaMenuList items={group.items} extras={extras} selections={selections} onSelect={onSelect} onAdd={onAdd} />
         </details>
       ))}
     </div>
@@ -627,36 +641,52 @@ function PizzaMenuBrowser({
 function PizzaMenuList({
   items,
   extras,
+  selections,
+  onSelect,
   onAdd
 }: {
   items: PizzaItem[];
   extras: PizzaExtra[] | undefined;
+  selections: ExtraSelections;
+  onSelect: SelectExtras;
   onAdd: (variantId: string, extraIds: string[]) => Promise<boolean | void>;
 }) {
   return (
     <ul className="pizza-menu-list">
       {items.map((item) => (
-        <PizzaMenuEntry key={item.id} item={item} extras={extrasForCategory(extras, item.categoryId)} onAdd={onAdd} />
+        <PizzaMenuEntry
+          key={item.id}
+          item={item}
+          extras={extrasForCategory(extras, item.categoryId)}
+          selected={selections[item.id] ?? []}
+          onSelect={(update) => onSelect(item.id, update)}
+          onAdd={onAdd}
+        />
       ))}
     </ul>
   );
 }
 
 /**
- * Ein Artikel im Bestellformular. Die Extras-Auswahl lebt im State dieses Eintrags (Key =
- * Artikel-ID) und übersteht daher jeden Live-Abgleich; erst das Hinzufügen setzt sie zurück.
+ * Ein Artikel im Bestellformular. Die Extras-Auswahl liegt im Bestellformular (je Artikel-ID)
+ * und übersteht daher jeden Live-Abgleich; erst das Hinzufügen setzt sie zurück.
  */
 function PizzaMenuEntry({
   item,
   extras,
+  selected,
+  onSelect,
   onAdd
 }: {
   item: PizzaItem;
   extras: PizzaExtra[];
+  selected: string[];
+  onSelect: (update: (current: string[]) => string[]) => void;
   onAdd: (variantId: string, extraIds: string[]) => Promise<boolean | void>;
 }) {
   const { t } = useI18n();
-  const [selected, setSelected] = useState<string[]>([]);
+  const setSelected = (next: string[] | ((current: string[]) => string[])) =>
+    onSelect(typeof next === "function" ? next : () => next);
   // Inzwischen deaktivierte Extras fallen still aus der Auswahl.
   const chosen = selected.filter((id) => extras.some((extra) => extra.id === id));
   const surcharge = extras

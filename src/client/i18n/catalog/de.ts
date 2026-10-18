@@ -799,7 +799,6 @@ export const deMessages = {
   "pizza.extras.deactivated": "Wurde schon bestellt – deaktiviert statt gelöscht.",
   "pizza.extras.removeConfirm": "Extra „{name}“ entfernen? Bereits bestellte Extras werden nur deaktiviert.",
   "pizza.transfer.title": "Import/Export (YAML, CSV)",
-  "pizza.transfer.help": "YAML enthält das komplette Menü mit Extras. CSV (Trennzeichen ;, UTF-8 für Excel) gibt es für das Menü (eine Zeile pro Variante; „aktiv“ gilt für die Variante) und getrennt für Extras (Kategorien mit | trennen). Preise mit Komma oder Punkt. Beim Import zählen Kategorie- und Artikelnamen bzw. Artikelnummern. Fehlende Artikel und Kategorien werden deaktiviert, fehlende Varianten und Extras entfernt oder – wenn schon bestellt – nur deaktiviert. Alte Bestellungen behalten ihre Preise.",
   "pizza.transfer.exportYaml": "Menü als YAML",
   "pizza.transfer.exportCsv": "Menü als CSV",
   "pizza.transfer.exportExtrasCsv": "Extras als CSV",
@@ -848,5 +847,10 @@ export const deMessages = {
   "pizza.transfer.error.item_conflict": "Artikel „{name}“: Feld „{field}“ weicht von der ersten Zeile ab.",
   "pizza.transfer.error.unknown_category": "Unbekannte Kategorie „{name}“.",
   "pizza.transfer.error.too_many_variants": "„{name}“ hat mehr als {max} Varianten.",
-  "pizza.transfer.error.too_many_rows": "Zu viele Einträge (höchstens {max})."
+  "pizza.transfer.error.too_many_rows": "Zu viele Einträge (höchstens {max}).",
+  "pizza.transfer.warning.many_removed": "Achtung: {count} von {total} {kind} würden entfernt bzw. deaktiviert. Ist das vielleicht nur eine Teil-Datei?",
+  "pizza.transfer.confirmRemovals": "Ja, so übernehmen und diese Einträge entfernen bzw. deaktivieren",
+  "pizza.transfer.staleRejected": "Das Menü wurde inzwischen geändert. Nichts übernommen – unten steht die neue Vorschau.",
+  "pizza.transfer.error.unknown_field": "Unbekanntes Feld „{field}“ (Tippfehler?).",
+  "pizza.transfer.help": "YAML enthält das komplette Menü mit Extras, auch leere Kategorien. CSV (Trennzeichen ;, UTF-8 für Excel) gibt es für das Menü (eine Zeile pro Variante, getrennte Spalten artikel_aktiv und variante_aktiv) und getrennt für Extras (Kategorien mit | trennen). Preise mit Komma oder Punkt. Beim Import zählen Kategorie- und Artikelnamen bzw. Artikelnummern. Fehlende Artikel werden deaktiviert, fehlende Varianten und Extras entfernt oder – wenn schon bestellt – nur deaktiviert; fehlende Kategorien deaktiviert nur der YAML-Import. Bei vielen Entfernungen fragt Hermes nach. Alte Bestellungen behalten ihre Preise."
 } as const;

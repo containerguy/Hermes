@@ -6,7 +6,7 @@ import { runMigrations } from "../../db/migrate";
 import * as schema from "../../db/schema";
 import { csvCell, parseCsv, unguardCell, UTF8_BOM } from "./csv";
 import { listExtras, upsertExtra } from "./extras";
-import { listAllMenu, upsertItem, upsertVariant } from "./menu";
+import { listAllMenu, setItemActive, setVariantActive, upsertItem, upsertVariant } from "./menu";
 import {
   applyMenuTransfer,
   buildMenuDocument,
@@ -16,7 +16,7 @@ import {
   parsePriceToCents,
   previewMenuTransfer
 } from "./menu-transfer";
-import { listCategories } from "./categories";
+import { listCategories, upsertCategory } from "./categories";
 
 let context: DatabaseContext;
 
@@ -117,10 +117,10 @@ describe("Export und Roundtrip", () => {
 
     const csv = menuToCsv(doc);
     expect(csv.startsWith(UTF8_BOM)).toBe(true);
-    expect(csv.split("\r\n")[0]).toBe(`${UTF8_BOM}kategorie;nummer;artikel;zutaten;allergene;variante;preis_eur;aktiv`);
-    expect(csv).toContain("Pizza;01;Margherita;Tomatensauce & Oregano belegt mit Käse;1,AC;24cm;4,00;ja");
+    expect(csv.split("\r\n")[0]).toBe(`${UTF8_BOM}kategorie;nummer;artikel;zutaten;allergene;artikel_aktiv;variante;preis_eur;variante_aktiv`);
+    expect(csv).toContain("Pizza;01;Margherita;Tomatensauce & Oregano belegt mit Käse;1,AC;ja;24cm;4,00;ja");
     // Formel-Injection: Zellen mit = + - @ beginnen mit '
-    expect(csv).toContain(`Pizza;'=99;'-Spezial @Haus;"Tomaten; Käse, ""scharf""";1,AC;30cm;10,50;ja`);
+    expect(csv).toContain(`Pizza;'=99;'-Spezial @Haus;"Tomaten; Käse, ""scharf""";1,AC;ja;30cm;10,50;ja`);
     const csvPreview = previewMenuTransfer(context, "csv", csv);
     expect(csvPreview.errors).toEqual([]);
     expect(csvPreview.sections).toEqual({ menu: true, extras: false });
@@ -160,7 +160,8 @@ describe("Import", () => {
       { line: 7, code: "csv_columns", params: { expected: 8, actual: 6 } }
     ]);
     const result = applyMenuTransfer(context, "csv", csv);
-    expect(result.errors.length).toBeGreaterThan(0);
+    expect(result.outcome).toBe("errors");
+    expect(result.result.errors.length).toBeGreaterThan(0);
     expect(listAllMenu(context).find((item) => item.id === "pi-001")?.variants[1].priceCents).toBe(700);
 
     const dup = previewMenuTransfer(context, "csv", "kategorie;nummer;artikel;zutaten;allergene;variante;preis_eur;aktiv\nPizza;01;Margherita;;;30cm;7;ja\nPizza;01;Margherita;;;30cm;8;ja");
@@ -225,14 +226,31 @@ describe("Import", () => {
     // Vorschau schreibt nichts
     expect(listCategories(context)).toHaveLength(2);
 
-    const result = applyMenuTransfer(context, "yaml", yaml);
+    // 89 entfernte Artikel: Übernehmen verlangt eine Bestätigung und schreibt vorher nichts
+    expect(preview.warnings).toEqual([
+      { line: null, code: "many_removed", params: { kind: "categories", count: 1, total: 2 } },
+      { line: null, code: "many_removed", params: { kind: "items", count: 89, total: 90 } },
+      { line: null, code: "many_removed", params: { kind: "variants", count: 1, total: 3 } }
+    ]);
+    expect(applyMenuTransfer(context, "yaml", yaml).outcome).toBe("confirm");
+    expect(listCategories(context)).toHaveLength(2);
+    // Menü inzwischen geändert → veraltete Vorschau wird abgelehnt
+    expect(applyMenuTransfer(context, "yaml", yaml, { expectedVersion: "veraltet", confirmRemovals: true }).outcome).toBe("stale");
+    expect(listCategories(context)).toHaveLength(2);
+
+    const { outcome, result } = applyMenuTransfer(context, "yaml", yaml, {
+      expectedVersion: preview.menuVersion,
+      confirmRemovals: true
+    });
+    expect(outcome).toBe("applied");
     expect(result.counts).toEqual(preview.counts);
 
     const categories = listCategories(context);
     expect(categories.map((category) => [category.name, category.active, category.sortOrder])).toEqual([
+      // gleicher Sortierwert, Reihenfolge über den Namen wie in der Datei
       ["Salate", true, 1],
-      ["Pasta", false, 2],
-      ["pizza", true, 2]
+      ["pizza", true, 1],
+      ["Pasta", false, 2]
     ]);
     const margherita = listAllMenu(context).find((item) => item.id === "pi-001")!;
     expect(margherita.active).toBe(true);
@@ -253,7 +271,7 @@ describe("Import", () => {
 
   it("importiert Extras per CSV mit Kategorien und Komma-Preisen", () => {
     const csv = `${UTF8_BOM}extra;preis_eur;kategorien;aktiv\r\nextra Käse;1,50;Pizza|Pasta;ja\r\nRucola;0.8;pizza;\r\nTrüffel;3;Pizza;nein\r\n`;
-    const result = applyMenuTransfer(context, "extras_csv", csv);
+    const { result } = applyMenuTransfer(context, "extras_csv", csv);
     expect(result.errors).toEqual([]);
     expect(result.sections).toEqual({ menu: false, extras: true });
     expect(listExtras(context).map((extra) => [extra.name, extra.priceCents, extra.categoryIds, extra.active])).toEqual([
@@ -272,5 +290,84 @@ describe("Import", () => {
 
   it("lehnt zu große Dateien ab", () => {
     expect(previewMenuTransfer(context, "yaml", "#".repeat(300 * 1024)).errors[0].code).toBe("too_large");
+  });
+});
+
+describe("Roundtrip mit Sonderfällen (Review B1/N1)", () => {
+  function prepareSpecialCases() {
+    // deaktivierter Artikel mit aktiven Varianten (Knopf „Deaktivieren“ im Menü-Editor)
+    setItemActive(context, "pi-007", false);
+    // aktiver Artikel, dessen einzige Variante deaktiviert ist
+    setVariantActive(context, "v-pa-058", false);
+    // leere Kategorie
+    upsertCategory(context, { name: "Getränke" });
+    // neue Artikel mit Sortierung 0 (Standard des Artikel-Formulars), Gleichstand über den Namen
+    for (const name of ["Zeta-Pizza", "Alpha-Pizza"]) {
+      const id = upsertItem(context, { name, categoryId: "cat-pizza", sortOrder: 0 });
+      upsertVariant(context, { itemId: id, sizeLabel: null, priceCents: 900 });
+    }
+    upsertExtra(context, { name: "Oliven", priceCents: 80, categoryIds: ["cat-pizza"], active: false });
+  }
+
+  function stateSnapshot() {
+    return JSON.stringify({ menu: listAllMenu(context), categories: listCategories(context), extras: listExtras(context) });
+  }
+
+  const unchanged = (total: number) => ({ new: 0, changed: 0, unchanged: total, removed: 0 });
+
+  for (const format of ["yaml", "csv"] as const) {
+    it(`ändert beim ${format.toUpperCase()}-Roundtrip nichts`, () => {
+      prepareSpecialCases();
+      const doc = buildMenuDocument(context);
+      const text = format === "yaml" ? menuToYaml(doc) : menuToCsv(doc);
+      const before = stateSnapshot();
+      const items = listAllMenu(context);
+      const variants = items.reduce((sum, item) => sum + item.variants.length, 0);
+
+      const preview = previewMenuTransfer(context, format, text);
+      expect(preview.errors).toEqual([]);
+      expect(preview.warnings).toEqual([]);
+      // CSV kennt die leere Kategorie nicht, lässt sie aber unangetastet
+      expect(preview.counts.categories).toEqual(unchanged(format === "yaml" ? 3 : 2));
+      expect(preview.counts.items).toEqual(unchanged(items.length));
+      expect(preview.counts.variants).toEqual(unchanged(variants));
+
+      const { outcome } = applyMenuTransfer(context, format, text, { expectedVersion: preview.menuVersion });
+      expect(outcome).toBe("applied");
+      expect(stateSnapshot()).toBe(before);
+      const after = listAllMenu(context);
+      expect(after.find((item) => item.id === "pi-007")).toMatchObject({ active: false });
+      expect(after.find((item) => item.id === "pi-007")!.variants.every((variant) => variant.active)).toBe(true);
+      expect(after.find((item) => item.id === "pa-058")).toMatchObject({ active: true });
+      expect(listCategories(context).find((category) => category.name === "Getränke")?.active).toBe(true);
+    });
+  }
+
+  it("liest das alte CSV-Format mit einer aktiv-Spalte, ohne den Artikel-Status zu ändern", () => {
+    setItemActive(context, "pi-007", false);
+    const csv = ["kategorie;nummer;artikel;zutaten;allergene;variante;preis_eur;aktiv", "Pizza;07;Parmá;;;30cm;8,00;ja"].join("\n");
+    const preview = previewMenuTransfer(context, "csv", csv);
+    expect(preview.errors).toEqual([]);
+    // Teil-Datei: Warnung statt stillem Entfernen
+    expect(preview.warnings.map((warning) => warning.params?.kind)).toEqual(["items", "variants"]);
+    applyMenuTransfer(context, "csv", csv, { confirmRemovals: true });
+    const parma = listAllMenu(context).find((item) => item.id === "pi-007")!;
+    expect(parma.active).toBe(false);
+    expect(parma.variants.map((variant) => [variant.sizeLabel, variant.priceCents, variant.active])).toEqual([["30cm", 800, true]]);
+    // Kategorien bleiben beim CSV-Import aktiv
+    expect(listCategories(context).every((category) => category.active)).toBe(true);
+  });
+
+  it("lehnt unbekannte YAML-Schlüssel und CSV-Spalten ab (Review N2)", () => {
+    const yaml = buildMenuDocument(context);
+    const text = menuToYaml(yaml).replace("    artikel:\n", "    artikl:\n");
+    const preview = previewMenuTransfer(context, "yaml", text);
+    expect(preview.errors[0]).toMatchObject({ code: "unknown_field", params: { field: "artikl" } });
+    expect(preview.errors[0].line).toBeGreaterThan(1);
+    expect(previewMenuTransfer(context, "yaml", "kategorien:\n  - name: Pizza\n    farbe: rot\n").errors).toEqual([
+      { line: 3, code: "unknown_field", params: { field: "farbe" } }
+    ]);
+    const csv = "kategorie;nummer;artikel;zutaten;allergene;artikel_aktiv;variante;preis_eur;variante_aktiv;notiz\nPizza;01;Margherita;;;ja;30cm;7;ja;x";
+    expect(previewMenuTransfer(context, "csv", csv).errors[0].code).toBe("csv_header");
   });
 });

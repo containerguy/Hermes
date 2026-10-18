@@ -92,6 +92,8 @@ function result(overrides: Partial<PizzaMenuTransferResult> = {}): PizzaMenuTran
       extras: counts()
     },
     errors: [],
+    warnings: [],
+    menuVersion: "v1",
     ...overrides
   };
 }
@@ -147,7 +149,7 @@ describe("PizzaMenuTransfer", () => {
     expect(calls).toContainEqual({
       url: "/api/pizza/admin/menu/transfer/apply",
       method: "POST",
-      body: { format: "csv", content: CSV }
+      body: { format: "csv", content: CSV, expectedVersion: "v1" }
     });
     expect(container.textContent).toContain("Übernommen – Kategorien: 0 neu, 0 geändert, 0 entfernt");
     expect(onChanged).toHaveBeenCalled();
@@ -210,7 +212,60 @@ describe("PizzaMenuTransfer", () => {
     expect(container.querySelector('[data-testid="pizza-transfer-preview"]')).not.toBeNull();
     expect(container.textContent).toContain("Das Menü wurde inzwischen geändert");
     expect(calls.filter((call) => call.url.endsWith("/apply"))).toHaveLength(0);
+    // Veraltete Vorschau: erst neu prüfen, dann übernehmen
+    expect(button(container, "Übernehmen")!.disabled).toBe(true);
+    await click(button(container, "Vorschau"));
+    expect(container.textContent).not.toContain("Das Menü wurde inzwischen geändert");
     expect(button(container, "Übernehmen")!.disabled).toBe(false);
+  });
+
+  it("verlangt bei vielen Entfernungen eine Bestätigung", async () => {
+    mockApi({
+      "POST /api/pizza/admin/menu/transfer/preview": () =>
+        result({
+          counts: { ...result().counts, items: counts({ unchanged: 1, removed: 89 }) },
+          warnings: [{ line: null, code: "many_removed", params: { kind: "items", count: 89, total: 90 } }]
+        }),
+      "POST /api/pizza/admin/menu/transfer/apply": () => result()
+    });
+    const container = await render(<PizzaMenuTransfer />);
+    await typeText(container.querySelector("textarea")!, CSV);
+    await click(button(container, "Vorschau"));
+    expect(container.textContent).toContain("Achtung: 89 von 90 Artikel würden entfernt bzw. deaktiviert");
+    expect(button(container, "Übernehmen")!.disabled).toBe(true);
+
+    const confirm = Array.from(container.querySelectorAll<HTMLInputElement>(".pizza-transfer__warnings input"))[0];
+    await click(confirm);
+    expect(button(container, "Übernehmen")!.disabled).toBe(false);
+    await click(button(container, "Übernehmen"));
+    expect(calls).toContainEqual({
+      url: "/api/pizza/admin/menu/transfer/apply",
+      method: "POST",
+      body: { format: "yaml", content: CSV, expectedVersion: "v1", confirmRemovals: true }
+    });
+  });
+
+  it("zeigt bei 409 (Menü inzwischen geändert) die neue Vorschau statt zu übernehmen", async () => {
+    mockApi({
+      "POST /api/pizza/admin/menu/transfer/preview": () => result(),
+      "POST /api/pizza/admin/menu/transfer/apply": () => {
+        throw new ApiError({
+          code: "pizza_menu_geaendert",
+          status: 409,
+          body: {
+            error: "pizza_menu_geaendert",
+            result: result({ menuVersion: "v2", counts: { ...result().counts, items: counts({ changed: 7, unchanged: 83 }) } })
+          }
+        });
+      }
+    });
+    const container = await render(<PizzaMenuTransfer />);
+    await typeText(container.querySelector("textarea")!, CSV);
+    await click(button(container, "Vorschau"));
+    await click(button(container, "Übernehmen"));
+    expect(container.textContent).toContain("Das Menü wurde inzwischen geändert. Nichts übernommen");
+    const items = container.querySelector('[data-testid="pizza-transfer-count-items"]')!;
+    expect(Array.from(items.querySelectorAll("td")).map((cell) => cell.textContent)).toEqual(["0", "7", "83", "0"]);
   });
 });
 

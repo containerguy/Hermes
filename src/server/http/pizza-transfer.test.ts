@@ -44,7 +44,7 @@ describe("Pizza-Menü Import/Export (YAML, CSV)", () => {
     expect(csv.headers["content-type"]).toContain("text/csv");
     const csvText = text(csv);
     expect(csvText.charCodeAt(0)).toBe(0xfeff);
-    expect(csvText.split("\r\n")[1]).toBe("Pizza;01;Margherita;Tomatensauce & Oregano belegt mit Käse;1,AC;24cm;4,00;ja");
+    expect(csvText.split("\r\n")[1]).toBe("Pizza;01;Margherita;Tomatensauce & Oregano belegt mit Käse;1,AC;ja;24cm;4,00;ja");
 
     const extras = await env.manager.agent.get("/api/pizza/admin/menu/extras-export.csv").buffer(true).expect(200);
     expect(text(extras)).toBe("﻿extra;preis_eur;kategorien;aktiv\r\n");
@@ -52,7 +52,7 @@ describe("Pizza-Menü Import/Export (YAML, CSV)", () => {
 
   it("zeigt eine Vorschau und übernimmt erst danach, mit Audit und Live-Signal", async () => {
     const csv = (await env.manager.agent.get("/api/pizza/admin/menu/export.csv").buffer(true).expect(200)).text;
-    const changed = csv.replace("Pizza;01;Margherita;Tomatensauce & Oregano belegt mit Käse;1,AC;24cm;4,00;ja", "Pizza;01;Margherita;Tomatensauce & Oregano belegt mit Käse;1,AC;24cm;4.50;ja");
+    const changed = csv.replace("Pizza;01;Margherita;Tomatensauce & Oregano belegt mit Käse;1,AC;ja;24cm;4,00;ja", "Pizza;01;Margherita;Tomatensauce & Oregano belegt mit Käse;1,AC;ja;24cm;4.50;ja");
 
     const preview = await post(env.manager, "/api/pizza/admin/menu/transfer/preview", { format: "csv", content: changed }).expect(200);
     expect(preview.body.errors).toEqual([]);
@@ -75,6 +75,45 @@ describe("Pizza-Menü Import/Export (YAML, CSV)", () => {
     expect(broken.body.result.errors).toEqual([{ line: 2, code: "invalid_price", params: { value: "teuer" } }]);
     state = await pizzaState(env.guest);
     expect(state.menu).toHaveLength(90);
+  });
+
+  it("lehnt veraltete Vorschauen ab und verlangt bei Teil-Dateien eine Bestätigung", async () => {
+    const csv = (await env.manager.agent.get("/api/pizza/admin/menu/export.csv").buffer(true).expect(200)).text;
+    const preview = await post(env.manager, "/api/pizza/admin/menu/transfer/preview", { format: "csv", content: csv }).expect(200);
+    expect(preview.body.warnings).toEqual([]);
+    const version = preview.body.menuVersion as string;
+    expect(version).toMatch(/^[0-9a-f]{16}$/);
+
+    // Ein anderer Manager ändert das Menü → Übernehmen der alten Vorschau: 409 mit neuer Vorschau
+    await post(env.manager, "/api/pizza/admin/items/pi-002/active", { active: false }).expect(204);
+    const stale = await post(env.manager, "/api/pizza/admin/menu/transfer/apply", {
+      format: "csv",
+      content: csv,
+      expectedVersion: version
+    }).expect(409);
+    expect(stale.body.error).toBe("pizza_menu_geaendert");
+    expect(stale.body.result.menuVersion).not.toBe(version);
+    expect(stale.body.result.counts.items.changed).toBe(1);
+    expect((await pizzaState(env.guest)).menu.some((item: { id: string }) => item.id === "pi-002")).toBe(false);
+
+    // Teil-Datei: Warnung und 409 ohne Bestätigung, danach mit Bestätigung
+    const partial = csv.split("\r\n").slice(0, 4).join("\r\n");
+    const warned = await post(env.manager, "/api/pizza/admin/menu/transfer/preview", { format: "csv", content: partial }).expect(200);
+    expect(warned.body.warnings[0]).toMatchObject({ code: "many_removed", params: { kind: "items", count: 88 } });
+    const refused = await post(env.manager, "/api/pizza/admin/menu/transfer/apply", {
+      format: "csv",
+      content: partial,
+      expectedVersion: warned.body.menuVersion
+    }).expect(409);
+    expect(refused.body.error).toBe("pizza_import_bestaetigung_noetig");
+    expect((await pizzaState(env.guest)).menu.length).toBeGreaterThan(80);
+    await post(env.manager, "/api/pizza/admin/menu/transfer/apply", {
+      format: "csv",
+      content: partial,
+      expectedVersion: warned.body.menuVersion,
+      confirmRemovals: true
+    }).expect(200);
+    expect((await pizzaState(env.guest)).menu).toHaveLength(1);
   });
 
   it("importiert Extras per YAML und bietet sie Gästen an", async () => {
