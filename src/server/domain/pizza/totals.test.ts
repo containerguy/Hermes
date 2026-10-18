@@ -4,6 +4,7 @@ import {
   formatEuro,
   guestTotals,
   lineTotalCents,
+  lineUnitCents,
   orderTotalCents,
   sessionTotalCents
 } from "./totals";
@@ -20,6 +21,18 @@ describe("pizza totals math", () => {
         { qty: 2, priceCentsSnapshot: 850 }
       ])
     ).toBe(2400);
+  });
+
+  it("adds extras to the unit price before multiplying by qty", () => {
+    const line = {
+      qty: 3,
+      priceCentsSnapshot: 700,
+      extras: [{ priceCentsSnapshot: 150 }, { priceCentsSnapshot: 50 }]
+    };
+    expect(lineUnitCents(line)).toBe(900);
+    expect(lineTotalCents(line)).toBe(2700);
+    expect(lineTotalCents({ qty: 1, priceCentsSnapshot: 700, extras: [] })).toBe(700);
+    expect(orderTotalCents([line, { qty: 1, priceCentsSnapshot: 650 }])).toBe(3350);
   });
 
   it("returns zero for empty order", () => {

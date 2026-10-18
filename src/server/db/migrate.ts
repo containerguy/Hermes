@@ -8,7 +8,14 @@ import { persistDatabaseSnapshot, restoreDatabaseFromStorageIfNeeded } from "../
 const currentFile = fileURLToPath(import.meta.url);
 const migrationsDirectory = path.join(path.dirname(currentFile), "migrations");
 
-export function runMigrations(sqlite: Database.Database = createSqliteClient()) {
+function countForeignKeyViolations(sqlite: Database.Database) {
+  return sqlite.prepare("PRAGMA foreign_key_check").all().length;
+}
+
+export function runMigrations(
+  sqlite: Database.Database = createSqliteClient(),
+  directory: string = migrationsDirectory
+) {
   sqlite.exec(`
     CREATE TABLE IF NOT EXISTS schema_migrations (
       name TEXT PRIMARY KEY,
@@ -23,7 +30,7 @@ export function runMigrations(sqlite: Database.Database = createSqliteClient()) 
   );
 
   const migrationFiles = fs
-    .readdirSync(migrationsDirectory)
+    .readdirSync(directory)
     .filter((file) => file.endsWith(".sql"))
     .sort();
 
@@ -36,14 +43,24 @@ export function runMigrations(sqlite: Database.Database = createSqliteClient()) 
       continue;
     }
 
-    const sql = fs.readFileSync(path.join(migrationsDirectory, file), "utf8");
+    const sql = fs.readFileSync(path.join(directory, file), "utf8");
 
     // PRAGMA foreign_keys in .sql is ignored inside BEGIN TRANSACTION; some migrations
     // (e.g. rebuilding `users`) must run with FK checks off for the whole batch.
     sqlite.pragma("foreign_keys = OFF");
     try {
       sqlite.transaction(() => {
+        // Mit abgeschalteten Fremdschlüsseln fällt ein verlorener Verweis (z. B. beim Neuaufbau
+        // einer Tabelle) nicht auf. Darum vorher/nachher zählen: Neue Verletzungen rollen die
+        // Migration zurück. Altlasten vor der Migration blockieren den Start nicht.
+        const before = countForeignKeyViolations(sqlite);
         sqlite.exec(sql);
+        const after = countForeignKeyViolations(sqlite);
+        if (after > before) {
+          throw new Error(
+            `[Hermes] Migration ${file} würde ${after - before} Fremdschlüssel-Verletzung(en) erzeugen und wurde zurückgerollt.`
+          );
+        }
         insertMigration.run(file, new Date().toISOString());
       })();
     } finally {

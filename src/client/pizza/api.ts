@@ -2,6 +2,7 @@ import { requestJson } from "../api/request";
 import type {
   PizzaArchivedSession,
   PizzaCategory,
+  PizzaExtra,
   PizzaItem,
   PizzaPanelState,
   PizzaPaymentMethod,
@@ -29,20 +30,22 @@ export async function addPizzaLine(input: {
   variantId: string;
   qty: number;
   customNote?: string | null;
+  extraIds?: string[];
 }) {
   return requestJson<{ lineId: string; orderId: string }>(`/api/pizza/lines`, {
     method: "POST",
     body: JSON.stringify({
       variantId: input.variantId,
       qty: input.qty,
-      customNote: input.customNote ?? null
+      customNote: input.customNote ?? null,
+      ...(input.extraIds && input.extraIds.length > 0 ? { extraIds: input.extraIds } : {})
     })
   });
 }
 
 export async function updatePizzaLine(
   lineId: string,
-  patch: { qty?: number; customNote?: string | null }
+  patch: { qty?: number; customNote?: string | null; extraIds?: string[] }
 ) {
   await requestJson<void>(`/api/pizza/lines/${encodeURIComponent(lineId)}`, {
     method: "PATCH",
@@ -90,9 +93,49 @@ export async function deleteArchivedPizzaSession(sessionId: string) {
   });
 }
 
-export async function fetchPizzaAdminMenu() {
-  const response = await requestJson<{ items: PizzaItem[] }>(`/api/pizza/admin/menu`);
-  return response.items;
+export interface PizzaAdminMenu {
+  items: PizzaItem[];
+  categories: PizzaCategory[];
+  extras: PizzaExtra[];
+}
+
+export async function fetchPizzaAdminMenu(): Promise<PizzaAdminMenu> {
+  const response = await requestJson<Partial<PizzaAdminMenu>>(`/api/pizza/admin/menu`);
+  return {
+    items: response.items ?? [],
+    categories: response.categories ?? [],
+    extras: response.extras ?? []
+  };
+}
+
+export interface PizzaExtraInput {
+  id?: string;
+  name: string;
+  priceCents: number;
+  categoryIds: string[];
+  active?: boolean;
+}
+
+export async function savePizzaExtra(input: PizzaExtraInput) {
+  return requestJson<{ id: string }>(`/api/pizza/admin/extras`, {
+    method: "POST",
+    body: JSON.stringify(input)
+  });
+}
+
+export async function setPizzaExtraActive(extraId: string, active: boolean) {
+  await requestJson<void>(`/api/pizza/admin/extras/${encodeURIComponent(extraId)}/active`, {
+    method: "POST",
+    body: JSON.stringify({ active })
+  });
+}
+
+export async function removePizzaExtra(extraId: string) {
+  const response = await requestJson<{ result: PizzaRemovalResult }>(
+    `/api/pizza/admin/extras/${encodeURIComponent(extraId)}`,
+    { method: "DELETE" }
+  );
+  return response.result;
 }
 
 export interface PizzaItemInput {
@@ -101,8 +144,42 @@ export interface PizzaItemInput {
   name: string;
   ingredients: string | null;
   allergens: string | null;
-  category: PizzaCategory;
+  categoryId: string;
   sortOrder?: number;
+}
+
+export interface PizzaCategoryInput {
+  id?: string;
+  name: string;
+  sortOrder?: number;
+  active?: boolean;
+}
+
+export async function savePizzaCategory(input: PizzaCategoryInput) {
+  return requestJson<{ id: string }>(`/api/pizza/admin/categories`, {
+    method: "POST",
+    body: JSON.stringify(input)
+  });
+}
+
+export async function setPizzaCategoryActive(categoryId: string, active: boolean) {
+  await requestJson<void>(`/api/pizza/admin/categories/${encodeURIComponent(categoryId)}/active`, {
+    method: "POST",
+    body: JSON.stringify({ active })
+  });
+}
+
+export async function reorderPizzaCategories(ids: string[]) {
+  await requestJson<void>(`/api/pizza/admin/categories/order`, {
+    method: "POST",
+    body: JSON.stringify({ ids })
+  });
+}
+
+export async function deletePizzaCategory(categoryId: string) {
+  await requestJson<void>(`/api/pizza/admin/categories/${encodeURIComponent(categoryId)}`, {
+    method: "DELETE"
+  });
 }
 
 export async function savePizzaItem(input: PizzaItemInput) {
@@ -162,4 +239,53 @@ export async function setPizzaPaymentMode(mode: PizzaPaymentMode) {
     `/api/pizza/payment-mode`,
     { method: "PUT", body: JSON.stringify({ pizzaPaymentMethods: mode }) }
   );
+}
+
+export type PizzaMenuTransferFormat = "yaml" | "csv" | "extras_csv";
+
+export interface PizzaMenuTransferIssue {
+  line: number | null;
+  code: string;
+  params?: Record<string, string | number>;
+}
+
+export interface PizzaMenuTransferCounts {
+  new: number;
+  changed: number;
+  unchanged: number;
+  removed: number;
+}
+
+export interface PizzaMenuTransferResult {
+  format: PizzaMenuTransferFormat;
+  sections: { menu: boolean; extras: boolean };
+  counts: Record<"categories" | "items" | "variants" | "extras", PizzaMenuTransferCounts>;
+  errors: PizzaMenuTransferIssue[];
+  /** z. B. viele Entfernungen; Übernehmen braucht dann `confirmRemovals`. */
+  warnings: PizzaMenuTransferIssue[];
+  /** Fingerabdruck des Menüs zum Zeitpunkt der Vorschau. */
+  menuVersion: string;
+}
+
+export async function previewPizzaMenuTransfer(format: PizzaMenuTransferFormat, content: string) {
+  return requestJson<PizzaMenuTransferResult>(`/api/pizza/admin/menu/transfer/preview`, {
+    method: "POST",
+    body: JSON.stringify({ format, content })
+  });
+}
+
+export async function applyPizzaMenuTransfer(
+  format: PizzaMenuTransferFormat,
+  content: string,
+  options: { expectedVersion?: string; confirmRemovals?: boolean } = {}
+) {
+  return requestJson<PizzaMenuTransferResult>(`/api/pizza/admin/menu/transfer/apply`, {
+    method: "POST",
+    body: JSON.stringify({
+      format,
+      content,
+      ...(options.expectedVersion ? { expectedVersion: options.expectedVersion } : {}),
+      ...(options.confirmRemovals ? { confirmRemovals: true } : {})
+    })
+  });
 }

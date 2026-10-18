@@ -2652,3 +2652,77 @@ dd {
 .server-bots-fields label {
   flex: 1 1 8rem;
 }
+
+/* v0.15.0: Pizza-Kategorien, Extras, Import/Export */
+.pizza-extras {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 12px;
+  margin: 6px 0;
+  padding: 6px 8px;
+  border: 1px solid rgba(0, 0, 0, 0.1);
+  border-radius: 6px;
+}
+.pizza-extras legend {
+  font-size: 0.85em;
+  padding: 0 4px;
+}
+.pizza-extras__option {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 0.9em;
+}
+.pizza-extras__categories {
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: 4px 10px;
+}
+.pizza-line__extras {
+  list-style: none;
+  margin: 2px 0 0;
+  padding-left: 12px;
+  font-size: 0.85em;
+  opacity: 0.85;
+}
+.pizza-line__extras-edit summary,
+.pizza-menu-editor__section summary {
+  cursor: pointer;
+}
+.pizza-line__extras-edit {
+  margin: 4px 0;
+  font-size: 0.9em;
+}
+.pizza-line__extras-edit .pizza-extras__option {
+  margin-right: 12px;
+}
+.pizza-menu-editor__section {
+  margin: 10px 0;
+  padding: 8px 10px;
+  border: 1px solid rgba(0, 0, 0, 0.1);
+  border-radius: 8px;
+}
+.pizza-menu-editor__section > summary {
+  font-weight: 600;
+}
+.pizza-transfer__counts {
+  border-collapse: collapse;
+  margin: 8px 0;
+  font-size: 0.9em;
+}
+.pizza-transfer__counts th,
+.pizza-transfer__counts td {
+  padding: 2px 10px 2px 0;
+  text-align: left;
+}
+.pizza-transfer__errors {
+  margin: 6px 0;
+  padding-left: 18px;
+}
+.pizza-transfer__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+  margin: 6px 0;
+}

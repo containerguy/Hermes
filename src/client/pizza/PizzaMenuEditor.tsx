@@ -10,10 +10,14 @@ import {
   savePizzaVariant,
   setPizzaItemActive,
   setPizzaVariantActive,
+  type PizzaAdminMenu,
   type PizzaRemovalResult
 } from "./api";
+import { PizzaCategoryEditor } from "./PizzaCategoryEditor";
+import { PizzaExtrasEditor } from "./PizzaExtrasEditor";
+import { PizzaMenuTransfer } from "./PizzaMenuTransfer";
 import { centsToInput, formatEuro, parseEuroToCents } from "./price";
-import type { PizzaCategory, PizzaItem, PizzaVariant } from "./types";
+import type { PizzaCategory, PizzaExtra, PizzaItem, PizzaVariant } from "./types";
 
 interface PizzaMenuEditorProps {
   /** Wird nach jeder Änderung aufgerufen, damit das Bestell-Panel das Menü neu lädt. */
@@ -26,15 +30,23 @@ type Feedback = { kind: "status" | "error"; text: string } | null;
 export function PizzaMenuEditor({ onChanged }: PizzaMenuEditorProps) {
   const { t, locale } = useI18n();
   const [items, setItems] = useState<PizzaItem[] | null>(null);
+  const [categories, setCategories] = useState<PizzaCategory[]>([]);
+  const [extras, setExtras] = useState<PizzaExtra[]>([]);
   const [query, setQuery] = useState("");
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [creating, setCreating] = useState(false);
   const [feedback, setFeedback] = useState<Feedback>(null);
   const mutating = useRef(0);
 
+  function apply(menu: PizzaAdminMenu) {
+    setItems(menu.items);
+    setCategories(menu.categories);
+    setExtras(menu.extras);
+  }
+
   async function load() {
     try {
-      setItems(await fetchPizzaAdminMenu());
+      apply(await fetchPizzaAdminMenu());
     } catch (err) {
       setFeedback({ kind: "error", text: getErrorMessage(err, locale) });
     }
@@ -51,7 +63,7 @@ export function PizzaMenuEditor({ onChanged }: PizzaMenuEditorProps) {
     () => {
       if (mutating.current > 0) return;
       fetchPizzaAdminMenu()
-        .then(setItems)
+        .then(apply)
         .catch(() => {
           /* Hintergrund-Fehler: bisherigen Stand behalten */
         });
@@ -90,6 +102,8 @@ export function PizzaMenuEditor({ onChanged }: PizzaMenuEditorProps) {
     );
   }, [items, query]);
 
+  const categoryNames = new Map(categories.map((category) => [category.id, category.name]));
+
   return (
     <section className="pizza-menu-editor" aria-label={t("pizza.menuEditor.aria")}>
       <h4>{t("pizza.menuEditor.title")}</h4>
@@ -103,6 +117,31 @@ export function PizzaMenuEditor({ onChanged }: PizzaMenuEditorProps) {
           {feedback.text}
         </p>
       ) : null}
+
+      <details className="pizza-menu-editor__section">
+        <summary>{t("pizza.categories.title", { count: categories.length })}</summary>
+        <PizzaCategoryEditor categories={categories} mutate={mutate} />
+      </details>
+
+      <details className="pizza-menu-editor__section">
+        <summary>{t("pizza.extras.title", { count: extras.length })}</summary>
+        <PizzaExtrasEditor
+          extras={extras}
+          categories={categories}
+          mutate={mutate}
+          onInvalid={(text) => setFeedback({ kind: "error", text })}
+        />
+      </details>
+
+      <details className="pizza-menu-editor__section">
+        <summary>{t("pizza.transfer.title")}</summary>
+        <PizzaMenuTransfer
+          onChanged={async () => {
+            await load();
+            await onChanged?.();
+          }}
+        />
+      </details>
 
       <div className="pizza-menu-editor__toolbar">
         <label className="pizza-menu-editor__search">
@@ -118,6 +157,7 @@ export function PizzaMenuEditor({ onChanged }: PizzaMenuEditorProps) {
 
       {creating ? (
         <ItemForm
+          categories={categories}
           submitLabel={t("pizza.menuEditor.createItem")}
           onCancel={() => setCreating(false)}
           onSubmit={async (input) => {
@@ -150,6 +190,9 @@ export function PizzaMenuEditor({ onChanged }: PizzaMenuEditorProps) {
               <div className="pizza-menu-editor__head">
                 <span className="pizza-menu-item__number">{item.number ?? "—"}</span>
                 <strong>{item.name}</strong>
+                <span className="pizza-panel__pill pizza-menu-editor__category">
+                  {categoryNames.get(item.categoryId) ?? "—"}
+                </span>
                 {!item.active ? (
                   <span className="pizza-panel__pill">{t("pizza.menuEditor.inactive")}</span>
                 ) : null}
@@ -204,6 +247,7 @@ export function PizzaMenuEditor({ onChanged }: PizzaMenuEditorProps) {
                 <div className="pizza-menu-editor__details">
                   <ItemForm
                     item={item}
+                    categories={categories}
                     submitLabel={t("pizza.menuEditor.save")}
                     onSubmit={async (input) => {
                       await mutate(async () => {
@@ -279,7 +323,7 @@ interface ItemFormInput {
   name: string;
   ingredients: string | null;
   allergens: string | null;
-  category: PizzaCategory;
+  categoryId: string;
   sortOrder: number;
 }
 
@@ -290,11 +334,13 @@ function emptyToNull(value: string) {
 
 function ItemForm({
   item,
+  categories,
   submitLabel,
   onSubmit,
   onCancel
 }: {
   item?: PizzaItem;
+  categories: PizzaCategory[];
   submitLabel: string;
   onSubmit: (input: ItemFormInput) => Promise<void>;
   onCancel?: () => void;
@@ -304,7 +350,10 @@ function ItemForm({
   const [name, setName] = useState(item?.name ?? "");
   const [ingredients, setIngredients] = useState(item?.ingredients ?? "");
   const [allergens, setAllergens] = useState(item?.allergens ?? "");
-  const [category, setCategory] = useState<PizzaCategory>(item?.category ?? "pizza");
+  // Ohne Auswahl gilt beim Speichern die erste Kategorie (auch wenn die Liste erst später lädt).
+  const [categoryId, setCategoryId] = useState(item?.categoryId ?? "");
+  const sortedCategories = [...categories].sort((a, b) => a.sortOrder - b.sortOrder || a.name.localeCompare(b.name));
+  const effectiveCategoryId = categoryId || sortedCategories[0]?.id || "";
   const [sortOrder, setSortOrder] = useState(String(item?.sortOrder ?? 0));
   const [error, setError] = useState<string | null>(null);
 
@@ -314,13 +363,17 @@ function ItemForm({
       setError(t("pizza.menuEditor.nameRequired"));
       return;
     }
+    if (!effectiveCategoryId) {
+      setError(t("pizza.menuEditor.categoryRequired"));
+      return;
+    }
     setError(null);
     await onSubmit({
       number: emptyToNull(number),
       name: name.trim(),
       ingredients: emptyToNull(ingredients),
       allergens: emptyToNull(allergens),
-      category,
+      categoryId: effectiveCategoryId,
       sortOrder: Number.parseInt(sortOrder, 10) || 0
     });
   }
@@ -354,9 +407,13 @@ function ItemForm({
       </label>
       <label>
         {t("pizza.menuEditor.category")}
-        <select value={category} onChange={(event) => setCategory(event.target.value as PizzaCategory)}>
-          <option value="pizza">{t("pizza.menuEditor.categoryPizza")}</option>
-          <option value="pasta">{t("pizza.menuEditor.categoryPasta")}</option>
+        <select value={effectiveCategoryId} onChange={(event) => setCategoryId(event.target.value)}>
+          {sortedCategories.map((category) => (
+            <option key={category.id} value={category.id}>
+              {category.name}
+              {category.active === false ? ` (${t("pizza.menuEditor.inactive")})` : ""}
+            </option>
+          ))}
         </select>
       </label>
       <label>

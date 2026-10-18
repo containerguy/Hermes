@@ -95,7 +95,7 @@ function item(id: string, number: string, name: string): PizzaItem {
     name,
     ingredients: null,
     allergens: null,
-    category: "pizza",
+    categoryId: "cat-pizza",
     active: true,
     sortOrder: Number(number),
     variants: [
@@ -260,6 +260,175 @@ describe("PizzaPanel – Live-Aktualisierung", () => {
     expect(nameInput.value).toBe("Hausspezial");
     expect(byAriaLabel<HTMLInputElement>(container, "Preis in €: Margherita 30cm")).toBe(price);
     expect(price.value).toBe("9,50");
+  });
+
+  it("behält die Extras-Auswahl im Bestellformular und schickt sie danach mit", async () => {
+    const ham = { id: "x-ham", name: "extra Schinken", priceCents: 150, active: true, sortOrder: 1, categoryIds: ["cat-pizza"] };
+    let state: PizzaPanelState = { ...openState([margherita]), extras: [ham] };
+    routes["GET /api/pizza/state"] = () => state;
+    routes["POST /api/pizza/lines"] = () => ({ lineId: "l2", orderId: "o1" });
+    const container = await render(<PizzaPanel {...props} currentUserRole="user" />);
+
+    await click(buttonByText(container, "Menü öffnen (2 frei)"));
+    const checkbox = byAriaLabel<HTMLInputElement>(container, "extra Schinken für Margherita")!;
+    await click(checkbox);
+    expect(checkbox.checked).toBe(true);
+
+    state = { ...openState([margherita, funghi]), extras: [ham] };
+    await liveSignal("pizza_menu_changed", "pizza_line_added");
+
+    expect(count("GET", "/api/pizza/state")).toBe(2);
+    expect(byAriaLabel<HTMLInputElement>(container, "extra Schinken für Margherita")).toBe(checkbox);
+    expect(checkbox.checked).toBe(true);
+    expect(byAriaLabel<HTMLInputElement>(container, "extra Schinken für Funghi")!.checked).toBe(false);
+    expect(calls.some((call) => call.method !== "GET")).toBe(false);
+
+    const entry = container.querySelector<HTMLElement>('[data-testid="pizza-menu-entry-pi-001"]')!;
+    await click(Array.from(entry.querySelectorAll("button")).find((button) => button.textContent?.includes("30cm")));
+    const post = requestJsonMock.mock.calls.find(([url, options]) => url === "/api/pizza/lines" && options?.method === "POST");
+    expect(JSON.parse(String(post?.[1]?.body))).toMatchObject({ variantId: "pi-001-30", extraIds: ["x-ham"] });
+  });
+
+  it("behält die Extras-Auswahl, wenn der Artikel währenddessen die Kategorie wechselt", async () => {
+    const ham = { id: "x-ham", name: "extra Schinken", priceCents: 150, active: true, sortOrder: 1, categoryIds: ["cat-pizza", "cat-spezial"] };
+    const categories = [
+      { id: "cat-pizza", name: "Pizza", sortOrder: 1 },
+      { id: "cat-spezial", name: "Spezial", sortOrder: 2 }
+    ];
+    let state: PizzaPanelState = { ...openState([margherita, funghi]), categories, extras: [ham] };
+    routes["GET /api/pizza/state"] = () => state;
+    routes["POST /api/pizza/lines"] = () => ({ lineId: "l2", orderId: "o1" });
+    const container = await render(<PizzaPanel {...props} currentUserRole="user" />);
+
+    await click(buttonByText(container, "Menü öffnen (2 frei)"));
+    await click(byAriaLabel(container, "extra Schinken für Funghi"));
+
+    // Ein Manager verschiebt Funghi nach „Spezial“: der Eintrag wird in der neuen Gruppe neu gemountet
+    state = { ...state, menu: [margherita, { ...funghi, categoryId: "cat-spezial" }] };
+    await liveSignal("pizza_menu_changed");
+
+    const checkbox = byAriaLabel<HTMLInputElement>(container, "extra Schinken für Funghi")!;
+    expect(checkbox.closest("details")?.querySelector("summary")?.textContent).toContain("Spezial");
+    expect(checkbox.checked).toBe(true);
+    expect(byAriaLabel<HTMLInputElement>(container, "extra Schinken für Margherita")!.checked).toBe(false);
+    expect(calls.some((call) => call.method !== "GET")).toBe(false);
+  });
+
+  it("behält angehakte Kategorien in einer Extras-Zeile", async () => {
+    let extras = [{ id: "x-ham", name: "extra Schinken", priceCents: 150, active: true, sortOrder: 1, categoryIds: ["cat-pizza"] }];
+    const categories = [
+      { id: "cat-pizza", name: "Pizza", sortOrder: 1, active: true, itemCount: 2 },
+      { id: "cat-pasta", name: "Pasta", sortOrder: 2, active: true, itemCount: 0 }
+    ];
+    routes["GET /api/pizza/state"] = () => ({ ...openState([margherita]), session: null, myOrder: null, orders: [], guestTotals: [] });
+    routes["GET /api/pizza/admin/menu"] = () => ({ items: [margherita], categories, extras });
+    const container = await render(<PizzaPanel {...props} currentUserRole="manager" />);
+
+    await click(buttonByText(container, "Menü verwalten"));
+    const pasta = byAriaLabel<HTMLInputElement>(container, "Kategorie für extra Schinken: Pasta")!;
+    const pizza = byAriaLabel<HTMLInputElement>(container, "Kategorie für extra Schinken: Pizza")!;
+    await click(pasta);
+    await click(pizza);
+    const newCategory = byAriaLabel<HTMLInputElement>(container, "Kategorie für neues Extra: Pasta")!;
+    await click(newCategory);
+
+    // Ein anderer Manager ändert den Preis desselben Extras
+    extras = [{ ...extras[0], priceCents: 200 }];
+    await liveSignal("pizza_menu_changed");
+
+    expect(count("GET", "/api/pizza/admin/menu")).toBe(2);
+    expect(byAriaLabel<HTMLInputElement>(container, "Kategorie für extra Schinken: Pasta")).toBe(pasta);
+    expect(pasta.checked).toBe(true);
+    expect(pizza.checked).toBe(false);
+    expect(newCategory.checked).toBe(true);
+    expect(calls.some((call) => call.method !== "GET")).toBe(false);
+  });
+
+  it("behält Eingaben im Extras-Editor", async () => {
+    let extras = [{ id: "x-ham", name: "extra Schinken", priceCents: 150, active: true, sortOrder: 1, categoryIds: ["cat-pizza"] }];
+    const categories = [{ id: "cat-pizza", name: "Pizza", sortOrder: 1, active: true, itemCount: 2 }];
+    routes["GET /api/pizza/state"] = () => ({ ...openState([margherita]), session: null, myOrder: null, orders: [], guestTotals: [] });
+    routes["GET /api/pizza/admin/menu"] = () => ({ items: [margherita], categories, extras });
+    const container = await render(<PizzaPanel {...props} currentUserRole="manager" />);
+
+    await click(buttonByText(container, "Menü verwalten"));
+    const price = byAriaLabel<HTMLInputElement>(container, "Preis in €: extra Schinken")!;
+    await type(price, "2,50");
+    const fresh = byAriaLabel<HTMLInputElement>(container, "Neues Extra")!;
+    await type(fresh, "Knoblauch");
+
+    extras = [...extras, { id: "x-olive", name: "Oliven", priceCents: 80, active: true, sortOrder: 2, categoryIds: ["cat-pizza"] }];
+    await liveSignal("pizza_menu_changed");
+
+    expect(container.querySelector('[data-testid="pizza-extra-x-olive"]')).not.toBeNull();
+    expect(byAriaLabel<HTMLInputElement>(container, "Preis in €: extra Schinken")).toBe(price);
+    expect(price.value).toBe("2,50");
+    expect(fresh.value).toBe("Knoblauch");
+  });
+
+  it("behält Importtext und Vorschau im Menü-Editor bei fremden Menüänderungen", async () => {
+    let adminMenu = [margherita];
+    routes["GET /api/pizza/state"] = () => ({ ...openState([margherita]), session: null, myOrder: null, orders: [], guestTotals: [] });
+    routes["GET /api/pizza/admin/menu"] = () => ({ items: adminMenu, categories: [], extras: [] });
+    routes["POST /api/pizza/admin/menu/transfer/preview"] = () => ({
+      format: "yaml",
+      sections: { menu: true, extras: true },
+      counts: {
+        categories: { new: 1, changed: 0, unchanged: 1, removed: 0 },
+        items: { new: 2, changed: 0, unchanged: 1, removed: 0 },
+        variants: { new: 2, changed: 0, unchanged: 1, removed: 0 },
+        extras: { new: 1, changed: 0, unchanged: 0, removed: 0 }
+      },
+      errors: []
+    });
+    const container = await render(<PizzaPanel {...props} currentUserRole="manager" />);
+    await click(buttonByText(container, "Menü verwalten"));
+
+    const textarea = byAriaLabel<HTMLTextAreaElement>(container, "Inhalt der Importdatei")!;
+    await act(async () => {
+      Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, "value")?.set?.call(textarea, "kategorien:\n  - name: Salate\n");
+      textarea.dispatchEvent(new Event("input", { bubbles: true }));
+      await flushMicrotasks();
+    });
+    await click(buttonByText(container, "Vorschau"));
+    expect(container.querySelector('[data-testid="pizza-transfer-preview"]')).not.toBeNull();
+
+    adminMenu = [margherita, funghi];
+    await liveSignal("pizza_menu_changed");
+
+    expect(count("GET", "/api/pizza/admin/menu")).toBe(2);
+    expect(container.querySelector('[data-testid="pizza-menu-item-pi-002"]')).not.toBeNull();
+    expect(byAriaLabel<HTMLTextAreaElement>(container, "Inhalt der Importdatei")).toBe(textarea);
+    expect(textarea.value).toBe("kategorien:\n  - name: Salate\n");
+    expect(container.querySelector('[data-testid="pizza-transfer-preview"]')).not.toBeNull();
+    expect(container.textContent).toContain("Das Menü wurde inzwischen geändert");
+    expect(calls.some((call) => call.url.endsWith("/transfer/apply"))).toBe(false);
+  });
+
+  it("behält eine angefangene Umbenennung und neue Kategorie im Kategorie-Editor", async () => {
+    let categories = [
+      { id: "cat-pizza", name: "Pizza", sortOrder: 1, active: true, itemCount: 2 },
+      { id: "cat-pasta", name: "Pasta", sortOrder: 2, active: true, itemCount: 0 }
+    ];
+    routes["GET /api/pizza/state"] = () => ({ ...openState([margherita]), session: null, myOrder: null, orders: [], guestTotals: [] });
+    routes["GET /api/pizza/admin/menu"] = () => ({ items: [margherita], categories });
+    const container = await render(<PizzaPanel {...props} currentUserRole="manager" />);
+
+    await click(buttonByText(container, "Menü verwalten"));
+    const rename = byAriaLabel<HTMLInputElement>(container, "Name der Kategorie: Pasta")!;
+    await type(rename, "Pasta & Aufläufe");
+    const fresh = byAriaLabel<HTMLInputElement>(container, "Neue Kategorie")!;
+    await type(fresh, "Salate");
+
+    categories = [...categories, { id: "cat-drinks", name: "Getränke", sortOrder: 3, active: true, itemCount: 0 }];
+    await liveSignal("pizza_menu_changed");
+
+    expect(count("GET", "/api/pizza/admin/menu")).toBe(2);
+    expect(container.querySelector('[data-testid="pizza-category-cat-drinks"]')).not.toBeNull();
+    expect(byAriaLabel<HTMLInputElement>(container, "Name der Kategorie: Pasta")).toBe(rename);
+    expect(rename.value).toBe("Pasta & Aufläufe");
+    expect(fresh.value).toBe("Salate");
+    expect(calls.some((call) => call.method !== "GET")).toBe(false);
   });
 
   it("legt Hintergrund-Fehler nicht als Alarm über das Panel und behält den Stand", async () => {

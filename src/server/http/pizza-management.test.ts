@@ -105,7 +105,7 @@ describe("Pizza-Verwaltung ab manager", () => {
   it("erlaubt Menüpflege und Archiv nur ab manager", async () => {
     for (const actor of [guest, organizer]) {
       await actor.agent.get("/api/pizza/admin/menu").expect(403);
-      await post(actor, "/api/pizza/admin/items", { name: "Test", category: "pizza" }).expect(403);
+      await post(actor, "/api/pizza/admin/items", { name: "Test", categoryId: "cat-pizza" }).expect(403);
       await post(actor, "/api/pizza/admin/variants", {
         itemId: "pi-001",
         sizeLabel: "30cm",
@@ -121,7 +121,7 @@ describe("Pizza-Verwaltung ab manager", () => {
     const created = await post(manager, "/api/pizza/admin/items", {
       number: "99",
       name: "Hausspezial",
-      category: "pizza"
+      categoryId: "cat-pizza"
     }).expect(200);
     await post(manager, "/api/pizza/admin/variants", {
       itemId: created.body.id,

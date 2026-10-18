@@ -1,6 +1,13 @@
 export type PizzaSessionState = "draft" | "open" | "locked" | "delivered";
 export type PizzaSessionTransition = "open" | "lock" | "deliver" | "reopen";
-export type PizzaCategory = "pizza" | "pasta";
+/** Frei pflegbare Menü-Kategorie (v0.15.0). `itemCount` liefert nur die Menüverwaltung. */
+export interface PizzaCategory {
+  id: string;
+  name: string;
+  sortOrder: number;
+  active?: boolean;
+  itemCount?: number;
+}
 export type PizzaPaymentStatus = "unpaid" | "paid_paypal" | "paid_cash";
 export type PizzaPaymentMethod = "cash" | "paypal";
 
@@ -19,10 +26,27 @@ export interface PizzaItem {
   name: string;
   ingredients: string | null;
   allergens: string | null;
-  category: PizzaCategory;
+  categoryId: string;
   active: boolean;
   sortOrder: number;
   variants: PizzaVariant[];
+}
+
+/** Extra mit festem Aufpreis, angeboten für die genannten Kategorien. */
+export interface PizzaExtra {
+  id: string;
+  name: string;
+  priceCents: number;
+  active: boolean;
+  sortOrder: number;
+  categoryIds: string[];
+}
+
+/** Extra an einer Bestellposition mit Name- und Preis-Snapshot. */
+export interface PizzaOrderLineExtra {
+  extraId: string;
+  name: string;
+  priceCentsSnapshot: number;
 }
 
 export interface PizzaSession {
@@ -56,6 +80,11 @@ export interface PizzaOrderLine {
   priceCentsSnapshot: number;
   customNote: string | null;
   createdAt: string;
+  /** Extras der Position (seit v0.15.0); der Positionspreis enthält sie. */
+  extras?: PizzaOrderLineExtra[];
+  /** Kategorie des Artikels, für die Auswahl passender Extras. */
+  itemId?: string | null;
+  categoryId?: string | null;
   /** Vom Server aufgelöste Bezeichnung (auch für deaktivierte Artikel/Varianten). */
   itemNumber?: string | null;
   itemName?: string;
@@ -86,7 +115,11 @@ export type PizzaPaymentMode = "cash_and_paypal" | "cash_only" | "paypal_only";
 
 export interface PizzaPanelState {
   session: PizzaSession | null;
+  /** Aktive Kategorien in Sortierreihenfolge. */
+  categories?: PizzaCategory[];
   menu: PizzaItem[];
+  /** Aktive Extras; je Artikel gelten die seiner Kategorie. */
+  extras?: PizzaExtra[];
   /** Aktuell angebotene Bezahlarten (serverseitig aus Settings abgeleitet). */
   paymentMethods: PizzaPaymentMethod[];
   /** Einstellung hinter `paymentMethods` (ab manager änderbar). */

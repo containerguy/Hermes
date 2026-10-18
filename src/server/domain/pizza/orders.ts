@@ -1,7 +1,8 @@
 import { and, asc, eq } from "drizzle-orm";
 import { randomUUID } from "node:crypto";
 import type { DatabaseContext } from "../../db/client";
-import { pizzaOrderLines, pizzaOrders, pizzaSessions } from "../../db/schema";
+import { pizzaOrderLineExtras, pizzaOrderLines, pizzaOrders, pizzaSessions } from "../../db/schema";
+import { getExtraById, PIZZA_MAX_EXTRAS_PER_LINE, resolveExtraPriceCents } from "./extras";
 import { AppError } from "../../http/errors";
 import { canMarkPayment, canPlaceOrder } from "./lifecycle";
 import { getVariantWithItem } from "./menu";
@@ -79,13 +80,80 @@ function getSession(context: DatabaseContext, sessionId: string) {
   return session;
 }
 
+export interface PizzaLineExtra {
+  extraId: string;
+  name: string;
+  priceCentsSnapshot: number;
+}
+
 function listLinesForOrder(context: DatabaseContext, orderId: string) {
-  return context.db
+  const lines = context.db
     .select()
     .from(pizzaOrderLines)
     .where(eq(pizzaOrderLines.orderId, orderId))
     .orderBy(asc(pizzaOrderLines.createdAt))
     .all();
+  const extras = context.sqlite
+    .prepare(
+      `SELECT e.line_id AS lineId, e.extra_id AS extraId, e.name_snapshot AS name, e.price_cents_snapshot AS priceCentsSnapshot
+       FROM pizza_order_line_extras e
+       JOIN pizza_order_lines l ON l.id = e.line_id
+       WHERE l.order_id = ?
+       ORDER BY e.rowid`
+    )
+    .all(orderId) as Array<PizzaLineExtra & { lineId: string }>;
+  const byLine = new Map<string, PizzaLineExtra[]>();
+  for (const { lineId, ...extra } of extras) {
+    const list = byLine.get(lineId) ?? [];
+    list.push(extra);
+    byLine.set(lineId, list);
+  }
+  return lines.map((line) => ({ ...line, extras: byLine.get(line.id) ?? [] }));
+}
+
+function assertExtraIdsShape(extraIds: string[]) {
+  if (extraIds.length > PIZZA_MAX_EXTRAS_PER_LINE) {
+    throw new PizzaOrderError("pizza_zu_viele_extras", `Höchstens ${PIZZA_MAX_EXTRAS_PER_LINE} Extras pro Position`);
+  }
+  if (new Set(extraIds).size !== extraIds.length) {
+    throw new PizzaOrderError("pizza_extra_doppelt", "Jedes Extra höchstens einmal pro Position");
+  }
+}
+
+/**
+ * Prüft neu gewählte Extras: aktiv und für die Kategorie des Artikels angeboten. Bereits an der
+ * Position hängende Extras (`keep`) bleiben auch erhalten, wenn sie inzwischen deaktiviert sind.
+ */
+function resolveNewExtras(
+  context: DatabaseContext,
+  extraIds: string[],
+  categoryId: string,
+  variantId: string,
+  keep: Set<string> = new Set()
+) {
+  return extraIds
+    .filter((id) => !keep.has(id))
+    .map((id) => {
+      const extra = getExtraById(context, id);
+      if (!extra || !extra.active || !extra.categoryIds.includes(categoryId)) {
+        throw new PizzaOrderError("pizza_extra_nicht_verfuegbar", "Extra ist für diesen Artikel nicht verfügbar");
+      }
+      return { id: extra.id, name: extra.name, priceCents: resolveExtraPriceCents(extra, variantId) };
+    });
+}
+
+function insertLineExtras(
+  context: DatabaseContext,
+  lineId: string,
+  extras: Array<{ id: string; name: string; priceCents: number }>
+) {
+  const now = nowIso();
+  for (const extra of extras) {
+    context.db
+      .insert(pizzaOrderLineExtras)
+      .values({ lineId, extraId: extra.id, nameSnapshot: extra.name, priceCentsSnapshot: extra.priceCents, createdAt: now })
+      .run();
+  }
 }
 
 export interface AddLineInput {
@@ -94,11 +162,17 @@ export interface AddLineInput {
   variantId: string;
   qty: number;
   customNote?: string | null;
+  /** Gewählte Extras (jedes höchstens einmal, nur der Kategorie des Artikels). */
+  extraIds?: string[];
   /** Vorauswahl für neue Bestellungen (bei genau einer angebotenen Bezahlart). */
   defaultPaymentMethod?: PizzaPaymentMethod | null;
 }
 
 export function addLine(context: DatabaseContext, input: AddLineInput) {
+  return context.sqlite.transaction(() => addLineInTransaction(context, input))();
+}
+
+function addLineInTransaction(context: DatabaseContext, input: AddLineInput) {
   const session = getSession(context, input.sessionId);
   assertSessionOpen(session);
   assertValidQty(input.qty);
@@ -109,6 +183,9 @@ export function addLine(context: DatabaseContext, input: AddLineInput) {
   if (!variantWithItem) {
     throw new PizzaOrderError("variant_missing", "Variante nicht gefunden", 404);
   }
+  const extraIds = input.extraIds ?? [];
+  assertExtraIdsShape(extraIds);
+  const extras = resolveNewExtras(context, extraIds, variantWithItem.item.categoryId, input.variantId);
 
   const order = getOrCreateOrder(
     context,
@@ -132,6 +209,7 @@ export function addLine(context: DatabaseContext, input: AddLineInput) {
       createdAt: nowIso()
     })
     .run();
+  insertLineExtras(context, id, extras);
 
   return { lineId: id, orderId: order.id };
 }
@@ -141,6 +219,8 @@ export interface UpdateLineInput {
   userId: string;
   qty?: number;
   customNote?: string | null;
+  /** Ersetzt die Extras der Position; behaltene Extras behalten ihren Preis-Snapshot. */
+  extraIds?: string[];
 }
 
 function findLineWithOrder(context: DatabaseContext, lineId: string) {
@@ -160,6 +240,10 @@ function findLineWithOrder(context: DatabaseContext, lineId: string) {
 }
 
 export function updateLine(context: DatabaseContext, input: UpdateLineInput) {
+  context.sqlite.transaction(() => updateLineInTransaction(context, input))();
+}
+
+function updateLineInTransaction(context: DatabaseContext, input: UpdateLineInput) {
   const found = findLineWithOrder(context, input.lineId);
   if (!found) throw new PizzaOrderError("line_missing", "Position nicht gefunden", 404);
   if (found.order.userId !== input.userId) {
@@ -178,8 +262,45 @@ export function updateLine(context: DatabaseContext, input: UpdateLineInput) {
     assertValidNote(note);
     update.customNote = note;
   }
+  if (input.extraIds !== undefined) {
+    replaceLineExtras(context, found.line, input.extraIds);
+  }
   if (Object.keys(update).length === 0) return;
   context.db.update(pizzaOrderLines).set(update).where(eq(pizzaOrderLines.id, input.lineId)).run();
+}
+
+function replaceLineExtras(
+  context: DatabaseContext,
+  line: { id: string; variantId: string },
+  extraIds: string[]
+) {
+  assertExtraIdsShape(extraIds);
+  const current = context.db
+    .select()
+    .from(pizzaOrderLineExtras)
+    .where(eq(pizzaOrderLineExtras.lineId, line.id))
+    .all();
+  const currentIds = new Set(current.map((extra) => extra.extraId));
+  const wanted = new Set(extraIds);
+  const toAdd = extraIds.filter((id) => !currentIds.has(id));
+  if (toAdd.length > 0) {
+    const variantWithItem = getVariantWithItem(context, line.variantId);
+    if (!variantWithItem) {
+      throw new PizzaOrderError("pizza_extra_nicht_verfuegbar", "Extra ist für diesen Artikel nicht verfügbar");
+    }
+    insertLineExtras(
+      context,
+      line.id,
+      resolveNewExtras(context, toAdd, variantWithItem.item.categoryId, line.variantId)
+    );
+  }
+  for (const extra of current) {
+    if (!wanted.has(extra.extraId)) {
+      context.sqlite
+        .prepare("DELETE FROM pizza_order_line_extras WHERE line_id = ? AND extra_id = ?")
+        .run(line.id, extra.extraId);
+    }
+  }
 }
 
 export function deleteLine(context: DatabaseContext, lineId: string, userId: string) {

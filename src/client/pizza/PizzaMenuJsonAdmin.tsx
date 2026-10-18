@@ -89,12 +89,13 @@ export function PizzaMenuJsonAdmin() {
       <p className="eyebrow">Pizzabestellung</p>
       <h2>Menü als JSON</h2>
       <p className="muted">
-        Schema: {"{"} items: [{"{"} id?, number?, name, ingredients?, allergens?, category, active?,
+        Schema: {"{"} items: [{"{"} id?, number?, name, ingredients?, allergens?, categoryId | category (Name), active?,
         sortOrder?, variants: [{"{"} id?, sizeLabel, priceCents, sortOrder?, active? {"}"}] {"}"}] {"}"}.
         Beim Import werden Einträge per id geupdatet (oder neu angelegt). Fehlende Einträge werden
         deaktiviert; fehlende Varianten werden entfernt bzw. deaktiviert, wenn eine bestehende
         Bestellung sie referenziert. Einzelne Artikel und Preise lassen sich bequemer direkt in der
-        Pizzabestellung unter „Menü verwalten“ pflegen (ab manager).
+        Pizzabestellung unter „Menü verwalten“ pflegen (ab manager); dort gibt es auch Import und
+        Export als YAML und CSV (Excel) mit Vorschau.
       </p>
 
       {error ? (

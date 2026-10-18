@@ -8,6 +8,27 @@ import { enforceApiTokenWriteAccess } from "../auth/hermes-auth";
 import type { DatabaseContext } from "../db/client";
 import { pizzaMenuItems, pizzaMenuVariants, users } from "../db/schema";
 import {
+  deleteCategory,
+  findCategoryByName,
+  getCategoryById,
+  listActiveCategories,
+  listCategories,
+  PIZZA_CATEGORY_NAME_MAX_LEN,
+  reorderCategories,
+  setCategoryActive,
+  upsertCategory
+} from "../domain/pizza/categories";
+import {
+  getExtraById,
+  listActiveExtras,
+  listExtras,
+  PIZZA_EXTRA_NAME_MAX_LEN,
+  PIZZA_MAX_EXTRAS_PER_LINE,
+  removeExtra,
+  setExtraActive,
+  upsertExtra
+} from "../domain/pizza/extras";
+import {
   getItemById,
   getVariantById,
   listActiveMenu,
@@ -20,6 +41,15 @@ import {
   upsertVariant,
   type PizzaMenuItemRow
 } from "../domain/pizza/menu";
+import {
+  applyMenuTransfer,
+  buildMenuDocument,
+  extrasToCsv,
+  MENU_TRANSFER_MAX_CHARS,
+  menuToCsv,
+  menuToYaml,
+  previewMenuTransfer
+} from "../domain/pizza/menu-transfer";
 import {
   addLine,
   deleteLine,
@@ -39,7 +69,7 @@ import {
   listArchivedSessions,
   transitionSession
 } from "../domain/pizza/sessions";
-import { guestTotals } from "../domain/pizza/totals";
+import { guestTotals, lineTotalCents } from "../domain/pizza/totals";
 import { canManagePizza } from "../domain/users";
 import { buildKassenlistePdf, buildPizzeriaPdf } from "../pdf/pizza-print";
 import { sendPushToEnabledUsers } from "../push/push-service";
@@ -56,15 +86,28 @@ const transitionSchema = z.object({
   label: z.string().trim().max(120).optional()
 });
 
+const extraIdsSchema = z.array(z.string().min(1).max(64)).max(PIZZA_MAX_EXTRAS_PER_LINE);
+
 const addLineSchema = z.object({
   variantId: z.string().min(1),
   qty: z.number().int().min(1).max(3),
-  customNote: z.string().trim().max(200).nullable().optional()
+  customNote: z.string().trim().max(200).nullable().optional(),
+  extraIds: extraIdsSchema.optional()
 });
 
 const updateLineSchema = z.object({
   qty: z.number().int().min(1).max(3).optional(),
-  customNote: z.string().trim().max(200).nullable().optional()
+  customNote: z.string().trim().max(200).nullable().optional(),
+  extraIds: extraIdsSchema.optional()
+});
+
+const extraUpsertSchema = z.object({
+  id: z.string().min(1).max(64).optional(),
+  name: z.string().trim().min(1).max(PIZZA_EXTRA_NAME_MAX_LEN),
+  priceCents: z.number().int().min(0).max(100_000),
+  categoryIds: z.array(z.string().min(1).max(64)).max(100),
+  active: z.boolean().optional(),
+  sortOrder: z.number().int().min(0).max(100_000).optional()
 });
 
 const paymentSchema = z.object({
@@ -81,9 +124,22 @@ const itemUpsertSchema = z.object({
   name: z.string().trim().min(1).max(120),
   ingredients: z.string().trim().max(500).nullable().optional(),
   allergens: z.string().trim().max(120).nullable().optional(),
-  category: z.enum(["pizza", "pasta"]),
+  categoryId: z.string().min(1).max(64),
   active: z.boolean().optional(),
   sortOrder: z.number().int().optional()
+});
+
+const categoryNameSchema = z.string().trim().min(1).max(PIZZA_CATEGORY_NAME_MAX_LEN);
+
+const categoryUpsertSchema = z.object({
+  id: z.string().min(1).max(64).optional(),
+  name: categoryNameSchema,
+  sortOrder: z.number().int().min(0).max(100_000).optional(),
+  active: z.boolean().optional()
+});
+
+const categoryOrderSchema = z.object({
+  ids: z.array(z.string().min(1).max(64)).min(1).max(200)
 });
 
 const variantUpsertSchema = z.object({
@@ -106,7 +162,9 @@ const menuImportSchema = z.object({
         name: z.string().trim().min(1).max(120),
         ingredients: z.string().trim().max(500).nullable().optional(),
         allergens: z.string().trim().max(120).nullable().optional(),
-        category: z.enum(["pizza", "pasta"]),
+        /** Bevorzugt; fehlt sie oder ist unbekannt, gilt `category` (Name, auch alte Exporte „pizza“/„pasta“). */
+        categoryId: z.string().max(64).optional(),
+        category: categoryNameSchema.optional(),
         active: z.boolean().optional(),
         sortOrder: z.number().int().optional(),
         variants: z
@@ -120,12 +178,62 @@ const menuImportSchema = z.object({
             })
           )
           .max(8)
+      }).refine((item) => Boolean(item.categoryId || item.category), {
+        message: "categoryId oder category erforderlich",
+        path: ["category"]
       })
     )
-    .max(500)
+    .max(500),
+  categories: z
+    .array(
+      z.object({
+        id: z.string().max(64).optional(),
+        name: categoryNameSchema,
+        sortOrder: z.number().int().min(0).max(100_000).optional(),
+        active: z.boolean().optional()
+      })
+    )
+    .max(100)
+    .optional()
 });
 
-type LineLabel = { itemNumber: string | null; itemName: string; sizeLabel: string | null };
+const menuTransferSchema = z.object({
+  format: z.enum(["yaml", "csv", "extras_csv"]),
+  content: z.string().min(1).max(MENU_TRANSFER_MAX_CHARS),
+  /** Nur beim Übernehmen: `menuVersion` der gezeigten Vorschau. */
+  expectedVersion: z.string().max(64).optional(),
+  /** Nur beim Übernehmen: Bestätigung der Warnung „viele Einträge werden entfernt“. */
+  confirmRemovals: z.boolean().optional()
+});
+
+function parseMenuTransferBody(body: unknown, response: Response) {
+  const parsed = menuTransferSchema.safeParse(body);
+  if (!parsed.success) {
+    const tooLarge = parsed.error.issues.some((issue) => issue.code === "too_big");
+    response.status(tooLarge ? 413 : 400).json({ error: tooLarge ? "pizza_import_zu_gross" : "ungueltige_eingabe" });
+    return null;
+  }
+  return parsed.data;
+}
+
+function sendDownload(response: Response, contentType: string, filename: string, body: string) {
+  response.setHeader("Content-Type", contentType);
+  response.setHeader("Content-Disposition", `attachment; filename="${filename}"`);
+  response.setHeader("Cache-Control", "no-store");
+  response.send(body);
+}
+
+function today() {
+  return new Date().toISOString().slice(0, 10);
+}
+
+type LineLabel = {
+  itemNumber: string | null;
+  itemName: string;
+  sizeLabel: string | null;
+  itemId: string | null;
+  categoryId: string | null;
+};
 
 /**
  * Bezeichnungen aller Varianten (auch deaktivierter), damit vergangene Bestellzeilen ihren
@@ -138,7 +246,9 @@ function buildLineLabels(menu: PizzaMenuItemRow[]) {
       labels.set(variant.id, {
         itemNumber: item.number,
         itemName: item.name,
-        sizeLabel: variant.sizeLabel
+        sizeLabel: variant.sizeLabel,
+        itemId: item.id,
+        categoryId: item.categoryId
       });
     }
   }
@@ -146,7 +256,9 @@ function buildLineLabels(menu: PizzaMenuItemRow[]) {
 }
 
 function labelFor(labels: Map<string, LineLabel>, variantId: string): LineLabel {
-  return labels.get(variantId) ?? { itemNumber: null, itemName: "[entfernt]", sizeLabel: null };
+  return (
+    labels.get(variantId) ?? { itemNumber: null, itemName: "[entfernt]", sizeLabel: null, itemId: null, categoryId: null }
+  );
 }
 
 type OrderWithLines = ReturnType<typeof listOrdersForSession>[number];
@@ -173,6 +285,8 @@ function loadSerializedState(context: DatabaseContext, currentUserId: string) {
   const settings = readSettings(context);
   const session = getActiveSession(context);
   const menu = listActiveMenu(context);
+  const categories = listActiveCategories(context);
+  const activeCategoryIds = new Set(categories.map((category) => category.id));
   const labels = buildLineLabels(listAllMenu(context));
   const myOrder = session ? getOrderForUser(context, session.id, currentUserId) : null;
   const allOrders = session ? listOrdersForSession(context, session.id) : [];
@@ -183,7 +297,13 @@ function loadSerializedState(context: DatabaseContext, currentUserId: string) {
 
   return {
     session: session ?? null,
+    /** Aktive Kategorien in Sortierreihenfolge; inaktive sind für Gäste unsichtbar. */
+    categories: categories.map(({ id, name, sortOrder }) => ({ id, name, sortOrder })),
     menu,
+    /** Aktive Extras; je Artikel gelten nur die seiner Kategorie. */
+    extras: listActiveExtras(context)
+      .map((extra) => ({ ...extra, categoryIds: extra.categoryIds.filter((id) => activeCategoryIds.has(id)) }))
+      .filter((extra) => extra.categoryIds.length > 0),
     paymentMethods: offeredPaymentMethods(settings),
     /** Einstellung hinter `paymentMethods`; ab manager im Pizza-Panel änderbar. */
     paymentMode: settings.pizzaPaymentMethods,
@@ -197,7 +317,8 @@ function loadSerializedState(context: DatabaseContext, currentUserId: string) {
         userId: order.userId,
         lines: order.lines.map((line) => ({
           qty: line.qty,
-          priceCentsSnapshot: line.priceCentsSnapshot
+          priceCentsSnapshot: line.priceCentsSnapshot,
+          extras: line.extras
         }))
       }))
     )
@@ -385,6 +506,7 @@ export function createPizzaRouter(context: DatabaseContext) {
         variantId: parsed.data.variantId,
         qty: parsed.data.qty,
         customNote: parsed.data.customNote ?? null,
+        extraIds: parsed.data.extraIds ?? [],
         defaultPaymentMethod: defaultPaymentMethod(offeredPaymentMethods(readSettings(context)))
       });
       broadcastEventsChanged("pizza_line_added");
@@ -406,7 +528,8 @@ export function createPizzaRouter(context: DatabaseContext) {
         lineId: request.params.lineId,
         userId: actor.id,
         qty: parsed.data.qty,
-        customNote: parsed.data.customNote
+        customNote: parsed.data.customNote,
+        extraIds: parsed.data.extraIds
       });
       broadcastEventsChanged("pizza_line_updated");
       response.status(204).end();
@@ -484,7 +607,185 @@ export function createPizzaRouter(context: DatabaseContext) {
 
   router.get("/admin/menu", (request, response) => {
     if (!requirePizzaManager(context, request, response)) return;
-    response.json({ items: listAllMenu(context) });
+    response.json({ items: listAllMenu(context), categories: listCategories(context), extras: listExtras(context) });
+  });
+
+  // --- Extras (ab manager) -------------------------------------------------------------------
+
+  router.post("/admin/extras", (request, response) => {
+    const actor = requirePizzaManager(context, request, response);
+    if (!actor) return;
+    const parsed = extraUpsertSchema.safeParse(request.body);
+    if (!parsed.success) {
+      response.status(400).json({ error: "ungueltige_eingabe" });
+      return;
+    }
+    const previous = parsed.data.id ? getExtraById(context, parsed.data.id) : undefined;
+    try {
+      const id = upsertExtra(context, parsed.data);
+      tryWriteAuditLog(context, {
+        actor,
+        action: previous ? "pizza.menu.extra.update" : "pizza.menu.extra.create",
+        entityType: "pizza_menu_extra",
+        entityId: id,
+        summary: `Pizza-Extra ${previous ? "geändert" : "angelegt"}: ${parsed.data.name}`,
+        metadata: {
+          priceCents: parsed.data.priceCents,
+          previousPriceCents: previous?.priceCents ?? null,
+          categoryIds: parsed.data.categoryIds
+        }
+      });
+      broadcastEventsChanged("pizza_menu_changed");
+      response.json({ id });
+    } catch (error) {
+      respondDomainError(error, response, "pizza extra upsert failed");
+    }
+  });
+
+  router.post("/admin/extras/:id/active", (request, response) => {
+    const actor = requirePizzaManager(context, request, response);
+    if (!actor) return;
+    const parsed = activeSchema.safeParse(request.body);
+    if (!parsed.success) {
+      response.status(400).json({ error: "ungueltige_eingabe" });
+      return;
+    }
+    const extra = getExtraById(context, request.params.id);
+    if (!extra) {
+      response.status(404).json({ error: "pizza_extra_nicht_gefunden" });
+      return;
+    }
+    setExtraActive(context, extra.id, parsed.data.active);
+    tryWriteAuditLog(context, {
+      actor,
+      action: parsed.data.active ? "pizza.menu.extra.activate" : "pizza.menu.extra.deactivate",
+      entityType: "pizza_menu_extra",
+      entityId: extra.id,
+      summary: `Pizza-Extra ${parsed.data.active ? "aktiviert" : "deaktiviert"}: ${extra.name}`
+    });
+    broadcastEventsChanged("pizza_menu_changed");
+    response.status(204).end();
+  });
+
+  router.delete("/admin/extras/:id", (request, response) => {
+    const actor = requirePizzaManager(context, request, response);
+    if (!actor) return;
+    const extra = getExtraById(context, request.params.id);
+    const result = removeExtra(context, request.params.id);
+    if (!extra || !result) {
+      response.status(404).json({ error: "pizza_extra_nicht_gefunden" });
+      return;
+    }
+    tryWriteAuditLog(context, {
+      actor,
+      action: result === "deleted" ? "pizza.menu.extra.delete" : "pizza.menu.extra.deactivate",
+      entityType: "pizza_menu_extra",
+      entityId: extra.id,
+      summary:
+        result === "deleted"
+          ? `Pizza-Extra gelöscht: ${extra.name}`
+          : `Pizza-Extra deaktiviert (in Bestellungen verwendet): ${extra.name}`
+    });
+    broadcastEventsChanged("pizza_menu_changed");
+    response.json({ result });
+  });
+
+  // --- Kategorien (ab manager) ---------------------------------------------------------------
+
+  router.post("/admin/categories", (request, response) => {
+    const actor = requirePizzaManager(context, request, response);
+    if (!actor) return;
+    const parsed = categoryUpsertSchema.safeParse(request.body);
+    if (!parsed.success) {
+      response.status(400).json({ error: "ungueltige_eingabe" });
+      return;
+    }
+    const previous = parsed.data.id ? getCategoryById(context, parsed.data.id) : undefined;
+    try {
+      const id = upsertCategory(context, parsed.data);
+      tryWriteAuditLog(context, {
+        actor,
+        action: previous ? "pizza.menu.category.update" : "pizza.menu.category.create",
+        entityType: "pizza_menu_category",
+        entityId: id,
+        summary: previous
+          ? `Pizza-Kategorie geändert: ${previous.name}${previous.name !== parsed.data.name ? ` → ${parsed.data.name}` : ""}`
+          : `Pizza-Kategorie angelegt: ${parsed.data.name}`,
+        metadata: { name: parsed.data.name, previousName: previous?.name ?? null }
+      });
+      broadcastEventsChanged("pizza_menu_changed");
+      response.json({ id });
+    } catch (error) {
+      respondDomainError(error, response, "pizza category upsert failed");
+    }
+  });
+
+  router.post("/admin/categories/order", (request, response) => {
+    const actor = requirePizzaManager(context, request, response);
+    if (!actor) return;
+    const parsed = categoryOrderSchema.safeParse(request.body);
+    if (!parsed.success || new Set(parsed.data.ids).size !== parsed.data.ids.length) {
+      response.status(400).json({ error: "ungueltige_eingabe" });
+      return;
+    }
+    try {
+      reorderCategories(context, parsed.data.ids);
+      tryWriteAuditLog(context, {
+        actor,
+        action: "pizza.menu.category.reorder",
+        entityType: "pizza_menu_category",
+        summary: "Pizza-Kategorien neu sortiert",
+        metadata: { ids: parsed.data.ids }
+      });
+      broadcastEventsChanged("pizza_menu_changed");
+      response.status(204).end();
+    } catch (error) {
+      respondDomainError(error, response, "pizza category reorder failed");
+    }
+  });
+
+  router.post("/admin/categories/:id/active", (request, response) => {
+    const actor = requirePizzaManager(context, request, response);
+    if (!actor) return;
+    const parsed = activeSchema.safeParse(request.body);
+    if (!parsed.success) {
+      response.status(400).json({ error: "ungueltige_eingabe" });
+      return;
+    }
+    const category = getCategoryById(context, request.params.id);
+    if (!category) {
+      response.status(404).json({ error: "pizza_kategorie_nicht_gefunden" });
+      return;
+    }
+    setCategoryActive(context, category.id, parsed.data.active);
+    tryWriteAuditLog(context, {
+      actor,
+      action: parsed.data.active ? "pizza.menu.category.activate" : "pizza.menu.category.deactivate",
+      entityType: "pizza_menu_category",
+      entityId: category.id,
+      summary: `Pizza-Kategorie ${parsed.data.active ? "aktiviert" : "deaktiviert"}: ${category.name}`
+    });
+    broadcastEventsChanged("pizza_menu_changed");
+    response.status(204).end();
+  });
+
+  router.delete("/admin/categories/:id", (request, response) => {
+    const actor = requirePizzaManager(context, request, response);
+    if (!actor) return;
+    try {
+      const category = deleteCategory(context, request.params.id);
+      tryWriteAuditLog(context, {
+        actor,
+        action: "pizza.menu.category.delete",
+        entityType: "pizza_menu_category",
+        entityId: category.id,
+        summary: `Pizza-Kategorie gelöscht: ${category.name}`
+      });
+      broadcastEventsChanged("pizza_menu_changed");
+      response.status(204).end();
+    } catch (error) {
+      respondDomainError(error, response, "pizza category delete failed");
+    }
   });
 
   router.post("/admin/items", (request, response) => {
@@ -496,16 +797,21 @@ export function createPizzaRouter(context: DatabaseContext) {
       return;
     }
     const existed = parsed.data.id ? Boolean(getItemById(context, parsed.data.id)) : false;
-    const id = upsertItem(context, parsed.data);
-    tryWriteAuditLog(context, {
-      actor,
-      action: existed ? "pizza.menu.item.update" : "pizza.menu.item.create",
-      entityType: "pizza_menu_item",
-      entityId: id,
-      summary: `Pizza-Menüeintrag ${existed ? "geändert" : "angelegt"}: ${parsed.data.name}`
-    });
-    broadcastEventsChanged("pizza_menu_changed");
-    response.json({ id });
+    try {
+      const id = upsertItem(context, parsed.data);
+      tryWriteAuditLog(context, {
+        actor,
+        action: existed ? "pizza.menu.item.update" : "pizza.menu.item.create",
+        entityType: "pizza_menu_item",
+        entityId: id,
+        summary: `Pizza-Menüeintrag ${existed ? "geändert" : "angelegt"}: ${parsed.data.name}`,
+        metadata: { categoryId: parsed.data.categoryId }
+      });
+      broadcastEventsChanged("pizza_menu_changed");
+      response.json({ id });
+    } catch (error) {
+      respondDomainError(error, response, "pizza item upsert failed");
+    }
   });
 
   router.post("/admin/items/:id/active", (request, response) => {
@@ -638,13 +944,16 @@ export function createPizzaRouter(context: DatabaseContext) {
 
   router.get("/admin/menu/export", (request, response) => {
     if (!requirePizzaManager(context, request, response)) return;
+    const categories = listCategories(context);
+    const categoryNames = new Map(categories.map((category) => [category.id, category.name]));
     const items = listAllMenu(context).map((item) => ({
       id: item.id,
       number: item.number,
       name: item.name,
       ingredients: item.ingredients,
       allergens: item.allergens,
-      category: item.category,
+      categoryId: item.categoryId,
+      category: categoryNames.get(item.categoryId) ?? null,
       active: item.active,
       sortOrder: item.sortOrder,
       variants: item.variants.map((variant) => ({
@@ -655,7 +964,72 @@ export function createPizzaRouter(context: DatabaseContext) {
         active: variant.active
       }))
     }));
-    response.json({ items });
+    response.json({
+      categories: categories.map(({ id, name, sortOrder, active }) => ({ id, name, sortOrder, active })),
+      items
+    });
+  });
+
+  // --- Import/Export als YAML und CSV (ab manager) ------------------------------------------
+
+  router.get("/admin/menu/export.yaml", (request, response) => {
+    if (!requirePizzaManager(context, request, response)) return;
+    sendDownload(response, "application/yaml; charset=utf-8", `pizza-menu-${today()}.yaml`, menuToYaml(buildMenuDocument(context)));
+  });
+
+  router.get("/admin/menu/export.csv", (request, response) => {
+    if (!requirePizzaManager(context, request, response)) return;
+    sendDownload(response, "text/csv; charset=utf-8", `pizza-menu-${today()}.csv`, menuToCsv(buildMenuDocument(context)));
+  });
+
+  router.get("/admin/menu/extras-export.csv", (request, response) => {
+    if (!requirePizzaManager(context, request, response)) return;
+    sendDownload(response, "text/csv; charset=utf-8", `pizza-extras-${today()}.csv`, extrasToCsv(buildMenuDocument(context)));
+  });
+
+  /** Vorschau: zählt neue/geänderte/unveränderte Einträge, meldet Fehler mit Zeilennummer, schreibt nichts. */
+  router.post("/admin/menu/transfer/preview", (request, response) => {
+    if (!requirePizzaManager(context, request, response)) return;
+    const body = parseMenuTransferBody(request.body, response);
+    if (!body) return;
+    response.json(previewMenuTransfer(context, body.format, body.content));
+  });
+
+  router.post("/admin/menu/transfer/apply", (request, response) => {
+    const actor = requirePizzaManager(context, request, response);
+    if (!actor) return;
+    const body = parseMenuTransferBody(request.body, response);
+    if (!body) return;
+    try {
+      const { outcome, result } = applyMenuTransfer(context, body.format, body.content, {
+        expectedVersion: body.expectedVersion,
+        confirmRemovals: body.confirmRemovals
+      });
+      if (outcome === "errors") {
+        response.status(400).json({ error: "pizza_import_fehlerhaft", result });
+        return;
+      }
+      if (outcome === "stale") {
+        // Menü hat sich seit der Vorschau geändert: nichts übernehmen, neue Vorschau mitliefern.
+        response.status(409).json({ error: "pizza_menu_geaendert", result });
+        return;
+      }
+      if (outcome === "confirm") {
+        response.status(409).json({ error: "pizza_import_bestaetigung_noetig", result });
+        return;
+      }
+      tryWriteAuditLog(context, {
+        actor,
+        action: "pizza.menu.import",
+        entityType: "pizza_menu",
+        summary: `Pizza-Menü importiert (${body.format === "yaml" ? "YAML" : body.format === "csv" ? "CSV" : "Extras-CSV"})`,
+        metadata: { format: body.format, counts: result.counts }
+      });
+      broadcastEventsChanged("pizza_menu_changed");
+      response.json(result);
+    } catch (error) {
+      respondDomainError(error, response, "pizza menu transfer failed");
+    }
   });
 
   router.put("/admin/menu/import", (request, response) => {
@@ -678,6 +1052,16 @@ export function createPizzaRouter(context: DatabaseContext) {
 
     try {
       const tx = context.sqlite.transaction(() => {
+        for (const categoryInput of parsed.data.categories ?? []) {
+          const byId = categoryInput.id ? getCategoryById(context, categoryInput.id) : undefined;
+          const target = byId ?? findCategoryByName(context, categoryInput.name);
+          upsertCategory(context, { ...categoryInput, id: target?.id });
+        }
+        const resolveCategoryId = (itemInput: { categoryId?: string; category?: string }) => {
+          if (itemInput.categoryId && getCategoryById(context, itemInput.categoryId)) return itemInput.categoryId;
+          const name = itemInput.category ?? "";
+          return findCategoryByName(context, name)?.id ?? upsertCategory(context, { name });
+        };
         for (const itemInput of parsed.data.items) {
           const itemId = upsertItem(context, {
             id: itemInput.id,
@@ -685,7 +1069,7 @@ export function createPizzaRouter(context: DatabaseContext) {
             name: itemInput.name,
             ingredients: itemInput.ingredients ?? null,
             allergens: itemInput.allergens ?? null,
-            category: itemInput.category,
+            categoryId: resolveCategoryId(itemInput),
             active: itemInput.active ?? true,
             sortOrder: itemInput.sortOrder ?? 0
           });
@@ -748,6 +1132,7 @@ export function createPizzaRouter(context: DatabaseContext) {
         variantsDeactivated: stats.variantsDeactivated
       });
     } catch (error) {
+      if (handleDomainError(error, response)) return;
       console.error("[Hermes] pizza menu import failed", error);
       response.status(500).json({ error: "import_fehler" });
     }
@@ -771,6 +1156,7 @@ export function createPizzaRouter(context: DatabaseContext) {
       number: string | null;
       name: string;
       sizeLabel: string | null;
+      extras: string[];
       qty: number;
       customNotes: string[];
       sortKey: string;
@@ -783,7 +1169,9 @@ export function createPizzaRouter(context: DatabaseContext) {
         if (!variant) continue;
         const item = itemsById.get(variant.itemId);
         if (!item) continue;
-        const key = `${item.id}:${variant.id}`;
+        // Gleiche Variante mit anderen Extras ist für die Pizzeria eine eigene Zeile.
+        const extraNames = line.extras.map((extra) => extra.name).sort((a, b) => a.localeCompare(b, "de"));
+        const key = `${item.id}:${variant.id}:${line.extras.map((extra) => extra.extraId).sort().join(",")}`;
         const existing = aggregateMap.get(key);
         const note = line.customNote;
         if (existing) {
@@ -794,9 +1182,10 @@ export function createPizzaRouter(context: DatabaseContext) {
             number: item.number,
             name: item.name,
             sizeLabel: variant.sizeLabel,
+            extras: extraNames,
             qty: line.qty,
             customNotes: note ? [`${line.qty}× ${note}`] : [],
-            sortKey: `${item.number ?? "zzz"}:${variant.sortOrder}`
+            sortKey: `${item.number ?? "zzz"}:${variant.sortOrder}:${extraNames.join(",")}`
           });
         }
       }
@@ -808,6 +1197,7 @@ export function createPizzaRouter(context: DatabaseContext) {
         number: row.number,
         name: row.name,
         sizeLabel: row.sizeLabel,
+        extras: row.extras,
         qty: row.qty,
         customNote: row.customNotes.length > 0 ? row.customNotes.join("; ") : null
       }));
@@ -849,10 +1239,7 @@ export function createPizzaRouter(context: DatabaseContext) {
     const guests = orders
       .map((order) => {
         const user = usersById.get(order.userId);
-        const totalCents = order.lines.reduce(
-          (sum, line) => sum + line.qty * line.priceCentsSnapshot,
-          0
-        );
+        const totalCents = order.lines.reduce((sum, line) => sum + lineTotalCents(line), 0);
         return {
           username: user?.username ?? "[gelöschter user]",
           displayName: user?.displayName ?? null,
@@ -867,6 +1254,7 @@ export function createPizzaRouter(context: DatabaseContext) {
               sizeLabel: label.sizeLabel,
               qty: line.qty,
               priceCentsSnapshot: line.priceCentsSnapshot,
+              extras: line.extras.map((extra) => ({ name: extra.name, priceCentsSnapshot: extra.priceCentsSnapshot })),
               customNote: line.customNote
             };
           })

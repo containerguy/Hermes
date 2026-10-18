@@ -1,6 +1,9 @@
 export interface PizzaLineForTotal {
   qty: number;
+  /** Variantenpreis zum Bestellzeitpunkt. */
   priceCentsSnapshot: number;
+  /** Extras mit Preis-Snapshot; fehlt bei Positionen ohne Extras (z. B. vor v0.15.0). */
+  extras?: Array<{ priceCentsSnapshot: number }>;
 }
 
 export interface PizzaOrderForTotal {
@@ -13,8 +16,14 @@ export interface PizzaGuestTotal {
   totalCents: number;
 }
 
+/** Stückpreis einer Position: Variantenpreis plus Summe der Extras. */
+export function lineUnitCents(line: PizzaLineForTotal): number {
+  return line.priceCentsSnapshot + (line.extras ?? []).reduce((sum, extra) => sum + extra.priceCentsSnapshot, 0);
+}
+
+/** Positionspreis = (Variantenpreis + Summe der Extras) × Menge. */
 export function lineTotalCents(line: PizzaLineForTotal): number {
-  return line.qty * line.priceCentsSnapshot;
+  return line.qty * lineUnitCents(line);
 }
 
 export function orderTotalCents(lines: PizzaLineForTotal[]): number {

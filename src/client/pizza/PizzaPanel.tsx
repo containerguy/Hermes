@@ -16,8 +16,10 @@ import {
 } from "./api";
 import { PizzaArchive } from "./PizzaArchive";
 import { PizzaMenuEditor } from "./PizzaMenuEditor";
-import { formatEuro } from "./price";
+import { formatEuro, lineTotalCents } from "./price";
 import type {
+  PizzaCategory,
+  PizzaExtra,
   PizzaItem,
   PizzaOrder,
   PizzaOrderLine,
@@ -46,7 +48,27 @@ function buildPaypalUrl(handle: string, cents: number): string | null {
 
 function orderTotal(order: PizzaOrder | null): number {
   if (!order) return 0;
-  return order.lines.reduce((sum, line) => sum + line.qty * line.priceCentsSnapshot, 0);
+  return order.lines.reduce((sum, line) => sum + lineTotalCents(line), 0);
+}
+
+/** Aktive Extras, die für eine Kategorie angeboten werden. */
+function extrasForCategory(extras: PizzaExtra[] | undefined, categoryId: string | null | undefined) {
+  if (!categoryId) return [];
+  return (extras ?? []).filter((extra) => extra.active !== false && extra.categoryIds.includes(categoryId));
+}
+
+/** Extras einer Position mit Aufpreis (Snapshot), z. B. „+ extra Schinken (+1,50 €)“. */
+function LineExtrasList({ line }: { line: PizzaOrderLine }) {
+  if (!line.extras || line.extras.length === 0) return null;
+  return (
+    <ul className="pizza-line__extras">
+      {line.extras.map((extra) => (
+        <li key={extra.extraId}>
+          + {extra.name} (+{formatEuro(extra.priceCentsSnapshot)})
+        </li>
+      ))}
+    </ul>
+  );
 }
 
 function methodLabel(t: TFunction, method: PizzaPaymentMethod | null): string {
@@ -143,6 +165,7 @@ export function PizzaPanel({
     if (pending) livePending.current = false;
     if (ok) await reload(true);
     else if (pending) await reload(false);
+    return ok;
   }
 
   useEffect(() => {
@@ -249,9 +272,9 @@ export function PizzaPanel({
 
 interface ManagerControlsProps {
   state: PizzaPanelState;
-  onTransition: (transition: PizzaSessionTransition) => Promise<void>;
-  onArchive: (sessionId: string) => Promise<void>;
-  onPaymentMode: (mode: PizzaPaymentMode) => Promise<void>;
+  onTransition: (transition: PizzaSessionTransition) => Promise<unknown>;
+  onArchive: (sessionId: string) => Promise<unknown>;
+  onPaymentMode: (mode: PizzaPaymentMode) => Promise<unknown>;
   onMenuChanged: () => Promise<void>;
 }
 
@@ -375,7 +398,7 @@ function PaymentMethodPicker({
 }: {
   offered: PizzaPaymentMethod[];
   value: PizzaPaymentMethod | null;
-  onChange: (method: PizzaPaymentMethod) => Promise<void>;
+  onChange: (method: PizzaPaymentMethod) => Promise<unknown>;
 }) {
   const { t } = useI18n();
   if (offered.length <= 1) {
@@ -408,7 +431,7 @@ interface OrderEditorProps {
   state: PizzaPanelState;
   showMenu: boolean;
   onToggleMenu: () => void;
-  run: (action: () => Promise<unknown>) => Promise<void>;
+  run: (action: () => Promise<unknown>) => Promise<boolean | void>;
 }
 
 function PizzaOrderEditor({ state, showMenu, onToggleMenu, run }: OrderEditorProps) {
@@ -416,6 +439,11 @@ function PizzaOrderEditor({ state, showMenu, onToggleMenu, run }: OrderEditorPro
   const myLines = state.myOrder?.lines ?? [];
   const myTotal = orderTotal(state.myOrder);
   const remaining = 3 - myLines.length;
+  // Extras-Auswahl je Artikel-ID hier statt im Menüeintrag: Sie übersteht Live-Abgleiche, auch
+  // wenn ein Artikel währenddessen die Kategorie wechselt und sein Eintrag neu gemountet wird.
+  const [extraSelections, setExtraSelections] = useState<Record<string, string[]>>({});
+  const selectExtras = (itemId: string, update: (current: string[]) => string[]) =>
+    setExtraSelections((current) => ({ ...current, [itemId]: update(current[itemId] ?? []) }));
 
   return (
     <div className="pizza-panel__editor">
@@ -428,10 +456,10 @@ function PizzaOrderEditor({ state, showMenu, onToggleMenu, run }: OrderEditorPro
             <li key={line.id} className="pizza-line">
               <div className="pizza-line__main">
                 <span className="pizza-line__name">{lineTitle(t, state.menu, line, true)}</span>
-                <span className="pizza-line__price">
-                  {formatEuro(line.qty * line.priceCentsSnapshot)}
-                </span>
+                <span className="pizza-line__price">{formatEuro(lineTotalCents(line))}</span>
               </div>
+              <LineExtrasList line={line} />
+              <LineExtrasEditor line={line} menu={state.menu} extras={state.extras} run={run} />
               <div className="pizza-line__controls">
                 <label>
                   {t("pizza.editor.qty")}
@@ -490,78 +518,226 @@ function PizzaOrderEditor({ state, showMenu, onToggleMenu, run }: OrderEditorPro
       {showMenu && remaining > 0 ? (
         <PizzaMenuBrowser
           menu={state.menu}
-          onAdd={(variantId) => run(() => addPizzaLine({ variantId, qty: 1 }))}
+          categories={state.categories}
+          extras={state.extras}
+          selections={extraSelections}
+          onSelect={selectExtras}
+          onAdd={(variantId, extraIds) => run(() => addPizzaLine({ variantId, qty: 1, extraIds }))}
         />
       ) : null}
     </div>
   );
 }
 
+interface MenuGroup {
+  id: string;
+  name: string;
+  items: PizzaItem[];
+}
+
+/** Gruppiert das bestellbare Menü nach Kategorie in deren Sortierreihenfolge. */
+export function groupMenuByCategory(menu: PizzaItem[], categories: PizzaCategory[] | undefined, fallbackName: string) {
+  const sorted = [...(categories ?? [])].sort((a, b) => a.sortOrder - b.sortOrder || a.name.localeCompare(b.name));
+  const groups: MenuGroup[] = sorted.map((category) => ({ id: category.id, name: category.name, items: [] }));
+  const byId = new Map(groups.map((group) => [group.id, group]));
+  let rest: MenuGroup | null = null;
+  for (const item of menu) {
+    const group = byId.get(item.categoryId);
+    if (group) {
+      group.items.push(item);
+    } else {
+      rest ??= { id: "__rest", name: fallbackName, items: [] };
+      rest.items.push(item);
+    }
+  }
+  return [...groups, ...(rest ? [rest] : [])].filter((group) => group.items.length > 0);
+}
+
+/**
+ * Extras einer bestehenden Position ändern (nur in offener Runde sichtbar). Angeboten werden die
+ * aktiven Extras der Kategorie; schon gewählte bleiben abwählbar, auch wenn sie inzwischen
+ * deaktiviert sind.
+ */
+function LineExtrasEditor({
+  line,
+  menu,
+  extras,
+  run
+}: {
+  line: PizzaOrderLine;
+  menu: PizzaItem[];
+  extras: PizzaExtra[] | undefined;
+  run: (action: () => Promise<unknown>) => Promise<boolean | void>;
+}) {
+  const { t } = useI18n();
+  const categoryId = line.categoryId ?? findItem(menu, findVariant(menu, line.variantId)?.itemId ?? "")?.categoryId;
+  const selected = (line.extras ?? []).map((extra) => extra.extraId);
+  const offered = extrasForCategory(extras, categoryId);
+  const options = [
+    ...offered.map((extra) => ({ id: extra.id, name: extra.name, priceCents: extra.priceCents })),
+    ...(line.extras ?? [])
+      .filter((extra) => !offered.some((offer) => offer.id === extra.extraId))
+      .map((extra) => ({ id: extra.extraId, name: extra.name, priceCents: extra.priceCentsSnapshot }))
+  ];
+  if (options.length === 0) return null;
+
+  function toggle(extraId: string, checked: boolean) {
+    const next = checked ? [...selected, extraId] : selected.filter((id) => id !== extraId);
+    void run(() => updatePizzaLine(line.id, { extraIds: next }));
+  }
+
+  return (
+    <details className="pizza-line__extras-edit">
+      <summary>{t("pizza.extras.change", { count: selected.length })}</summary>
+      {options.map((option) => (
+        <label key={option.id} className="pizza-extras__option">
+          <input
+            type="checkbox"
+            checked={selected.includes(option.id)}
+            onChange={(event) => toggle(option.id, event.target.checked)}
+          />
+          {option.name} (+{formatEuro(option.priceCents)})
+        </label>
+      ))}
+    </details>
+  );
+}
+
+type ExtraSelections = Record<string, string[]>;
+type SelectExtras = (itemId: string, update: (current: string[]) => string[]) => void;
+
 function PizzaMenuBrowser({
   menu,
+  categories,
+  extras,
+  selections,
+  onSelect,
   onAdd
 }: {
   menu: PizzaItem[];
-  onAdd: (variantId: string) => Promise<void>;
+  categories: PizzaCategory[] | undefined;
+  extras: PizzaExtra[] | undefined;
+  selections: ExtraSelections;
+  onSelect: SelectExtras;
+  onAdd: (variantId: string, extraIds: string[]) => Promise<boolean | void>;
 }) {
   const { t } = useI18n();
-  const pizzas = menu.filter((item) => item.category === "pizza");
-  const pasta = menu.filter((item) => item.category === "pasta");
+  const groups = groupMenuByCategory(menu, categories, t("pizza.menu.otherCategory"));
+  // Nur die beim Öffnen erste Kategorie startet aufgeklappt; spätere Live-Änderungen der
+  // Reihenfolge klappen nichts auf oder zu.
+  const [initiallyOpen] = useState(() => groups[0]?.id ?? null);
   return (
     <div className="pizza-menu-browser">
-      {pizzas.length > 0 ? (
-        <details open>
-          <summary>{t("pizza.menu.pizza", { count: pizzas.length })}</summary>
-          <PizzaMenuList items={pizzas} onAdd={onAdd} />
+      {groups.map((group) => (
+        <details key={group.id} open={group.id === initiallyOpen}>
+          <summary>{t("pizza.menu.categoryCount", { name: group.name, count: group.items.length })}</summary>
+          <PizzaMenuList items={group.items} extras={extras} selections={selections} onSelect={onSelect} onAdd={onAdd} />
         </details>
-      ) : null}
-      {pasta.length > 0 ? (
-        <details>
-          <summary>{t("pizza.menu.pasta", { count: pasta.length })}</summary>
-          <PizzaMenuList items={pasta} onAdd={onAdd} />
-        </details>
-      ) : null}
+      ))}
     </div>
   );
 }
 
 function PizzaMenuList({
   items,
+  extras,
+  selections,
+  onSelect,
   onAdd
 }: {
   items: PizzaItem[];
-  onAdd: (variantId: string) => Promise<void>;
+  extras: PizzaExtra[] | undefined;
+  selections: ExtraSelections;
+  onSelect: SelectExtras;
+  onAdd: (variantId: string, extraIds: string[]) => Promise<boolean | void>;
 }) {
-  const { t } = useI18n();
   return (
     <ul className="pizza-menu-list">
       {items.map((item) => (
-        <li key={item.id} className="pizza-menu-item">
-          <div className="pizza-menu-item__head">
-            <span className="pizza-menu-item__number">{item.number ?? "—"}</span>
-            <span className="pizza-menu-item__name">{item.name}</span>
-            {item.allergens ? (
-              <span className="pizza-menu-item__allergens">[{item.allergens}]</span>
-            ) : null}
-          </div>
-          {item.ingredients ? (
-            <p className="pizza-menu-item__ingredients">{item.ingredients}</p>
-          ) : null}
-          <div className="pizza-menu-item__variants">
-            {item.variants.map((variant) => (
-              <button
-                key={variant.id}
-                type="button"
-                className="secondary"
-                onClick={() => void onAdd(variant.id)}
-              >
-                {variant.sizeLabel ?? t("pizza.menu.standardSize")} · {formatEuro(variant.priceCents)}
-              </button>
-            ))}
-          </div>
-        </li>
+        <PizzaMenuEntry
+          key={item.id}
+          item={item}
+          extras={extrasForCategory(extras, item.categoryId)}
+          selected={selections[item.id] ?? []}
+          onSelect={(update) => onSelect(item.id, update)}
+          onAdd={onAdd}
+        />
       ))}
     </ul>
+  );
+}
+
+/**
+ * Ein Artikel im Bestellformular. Die Extras-Auswahl liegt im Bestellformular (je Artikel-ID)
+ * und übersteht daher jeden Live-Abgleich; erst das Hinzufügen setzt sie zurück.
+ */
+function PizzaMenuEntry({
+  item,
+  extras,
+  selected,
+  onSelect,
+  onAdd
+}: {
+  item: PizzaItem;
+  extras: PizzaExtra[];
+  selected: string[];
+  onSelect: (update: (current: string[]) => string[]) => void;
+  onAdd: (variantId: string, extraIds: string[]) => Promise<boolean | void>;
+}) {
+  const { t } = useI18n();
+  const setSelected = (next: string[] | ((current: string[]) => string[])) =>
+    onSelect(typeof next === "function" ? next : () => next);
+  // Inzwischen deaktivierte Extras fallen still aus der Auswahl.
+  const chosen = selected.filter((id) => extras.some((extra) => extra.id === id));
+  const surcharge = extras
+    .filter((extra) => chosen.includes(extra.id))
+    .reduce((sum, extra) => sum + extra.priceCents, 0);
+
+  function toggle(extraId: string, checked: boolean) {
+    setSelected((current) => (checked ? [...current, extraId] : current.filter((id) => id !== extraId)));
+  }
+
+  return (
+    <li className="pizza-menu-item" data-testid={`pizza-menu-entry-${item.id}`}>
+      <div className="pizza-menu-item__head">
+        <span className="pizza-menu-item__number">{item.number ?? "—"}</span>
+        <span className="pizza-menu-item__name">{item.name}</span>
+        {item.allergens ? <span className="pizza-menu-item__allergens">[{item.allergens}]</span> : null}
+      </div>
+      {item.ingredients ? <p className="pizza-menu-item__ingredients">{item.ingredients}</p> : null}
+      {extras.length > 0 ? (
+        <fieldset className="pizza-extras">
+          <legend>{t("pizza.extras.legend")}</legend>
+          {extras.map((extra) => (
+            <label key={extra.id} className="pizza-extras__option">
+              <input
+                type="checkbox"
+                checked={chosen.includes(extra.id)}
+                aria-label={t("pizza.extras.optionAria", { extra: extra.name, item: item.name })}
+                onChange={(event) => toggle(extra.id, event.target.checked)}
+              />
+              {extra.name} (+{formatEuro(extra.priceCents)})
+            </label>
+          ))}
+        </fieldset>
+      ) : null}
+      <div className="pizza-menu-item__variants">
+        {item.variants.map((variant) => (
+          <button
+            key={variant.id}
+            type="button"
+            className="secondary"
+            onClick={() =>
+              void onAdd(variant.id, chosen).then((ok) => {
+                if (ok !== false) setSelected([]);
+              })
+            }
+          >
+            {variant.sizeLabel ?? t("pizza.menu.standardSize")} · {formatEuro(variant.priceCents + surcharge)}
+          </button>
+        ))}
+      </div>
+    </li>
   );
 }
 
@@ -624,8 +800,9 @@ function MyShareView({
             <span>
               {line.qty}× {lineTitle(t, menu, line, false)}
               {line.customNote ? ` — ${line.customNote}` : ""}
+              <LineExtrasList line={line} />
             </span>
-            <span>{formatEuro(line.qty * line.priceCentsSnapshot)}</span>
+            <span>{formatEuro(lineTotalCents(line))}</span>
           </li>
         ))}
       </ul>
@@ -665,7 +842,7 @@ function MyShareView({
 interface OverviewProps {
   state: PizzaPanelState;
   isManager: boolean;
-  run: (action: () => Promise<unknown>) => Promise<void>;
+  run: (action: () => Promise<unknown>) => Promise<boolean | void>;
   currentUserId: string;
 }
 
@@ -707,6 +884,9 @@ function AllOrdersOverview({ state, isManager, run, currentUserId }: OverviewPro
                   <li key={line.id}>
                     {line.qty}× {lineTitle(t, state.menu, line, true)}
                     {line.customNote ? ` — ${line.customNote}` : ""}
+                    {" · "}
+                    {formatEuro(lineTotalCents(line))}
+                    <LineExtrasList line={line} />
                   </li>
                 ))}
               </ul>
@@ -743,7 +923,7 @@ function PaymentControls({
 }: {
   name: string;
   current: PizzaOrderWithUser["paymentStatus"];
-  onMark: (method: "paypal" | "cash" | "unpaid") => Promise<void>;
+  onMark: (method: "paypal" | "cash" | "unpaid") => Promise<unknown>;
 }) {
   const { t } = useI18n();
   return (

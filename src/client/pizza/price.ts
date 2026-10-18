@@ -18,3 +18,15 @@ export function parseEuroToCents(input: string): number | null {
   if (!Number.isFinite(cents) || cents < 0 || cents > 100_000) return null;
   return cents;
 }
+
+interface LineForTotal {
+  qty: number;
+  priceCentsSnapshot: number;
+  extras?: Array<{ priceCentsSnapshot: number }>;
+}
+
+/** Positionspreis = (Variantenpreis + Summe der Extras) × Menge, wie auf dem Server. */
+export function lineTotalCents(line: LineForTotal): number {
+  const extras = (line.extras ?? []).reduce((sum, extra) => sum + extra.priceCentsSnapshot, 0);
+  return line.qty * (line.priceCentsSnapshot + extras);
+}

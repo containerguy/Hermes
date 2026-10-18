@@ -1,6 +1,6 @@
 {
   "name": "hermes",
-  "version": "0.14.2",
+  "version": "0.15.0",
   "private": true,
   "type": "module",
   "scripts": {
@@ -35,6 +35,7 @@
     "react-markdown": "^10.1.0",
     "undici": "^7.30.1",
     "web-push": "^3.6.7",
+    "yaml": "^2.9.1",
     "zod": "^4.3.6"
   },
   "devDependencies": {
