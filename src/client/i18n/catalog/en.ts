@@ -783,5 +783,20 @@ export const enMessages: { [K in keyof typeof deMessages]: string } = {
   "pizza.categories.down": "Move down",
   "pizza.categories.delete": "Delete",
   "pizza.categories.notEmpty": "Still contains items – can only be deactivated.",
-  "pizza.categories.deleteConfirm": "Delete category “{name}”?"
+  "pizza.categories.deleteConfirm": "Delete category “{name}”?",
+  "pizza.extras.legend": "Extras (surcharge)",
+  "pizza.extras.optionAria": "{extra} for {item}",
+  "pizza.extras.change": "Change extras ({count} selected)",
+  "pizza.extras.title": "Extras ({count})",
+  "pizza.extras.help": "Extras have a fixed surcharge regardless of size and are only offered for the checked categories. Price changes only apply to new orders.",
+  "pizza.extras.empty": "No extras yet.",
+  "pizza.extras.name": "Extra",
+  "pizza.extras.namePlaceholder": "e.g. extra ham",
+  "pizza.extras.newName": "New extra",
+  "pizza.extras.newPrice": "Price in € for new extra",
+  "pizza.extras.newCategories": "Category for new extra",
+  "pizza.extras.categories": "Category for",
+  "pizza.extras.create": "Create extra",
+  "pizza.extras.deactivated": "Already ordered – deactivated instead of deleted.",
+  "pizza.extras.removeConfirm": "Remove extra “{name}”? Extras that were already ordered are only deactivated."
 };

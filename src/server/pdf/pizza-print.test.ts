@@ -102,3 +102,44 @@ describe("buildKassenlistePdf", () => {
     expect(buffer.length).toBeGreaterThan(200);
   });
 });
+
+describe("PDFs mit Extras", () => {
+  it("druckt Extras in Pizzeria-Liste und Kassenliste", async () => {
+    const pizzeria = await buildPizzeriaPdf({
+      eventTitle: "Extras",
+      printedAt: FIXED_DATE,
+      rows: [
+        { number: "01", name: "Margherita", sizeLabel: "30cm", extras: ["extra Schinken", "Knoblauch"], qty: 2, customNote: null }
+      ]
+    });
+    expect(pizzeria.subarray(0, 4).toString()).toBe("%PDF");
+    const kasse = await buildKassenlistePdf({
+      eventTitle: "Extras",
+      printedAt: FIXED_DATE,
+      paypalName: null,
+      paypalHandle: null,
+      cashRecipient: null,
+      guests: [
+        {
+          username: "gast",
+          displayName: "Gäst Ümlaut",
+          totalCents: 1700,
+          paymentStatus: "unpaid",
+          paymentMethod: "cash",
+          lines: [
+            {
+              number: "01",
+              name: "Margherita",
+              sizeLabel: "30cm",
+              qty: 2,
+              priceCentsSnapshot: 700,
+              extras: [{ name: "extra Schinken", priceCentsSnapshot: 150 }],
+              customNote: null
+            }
+          ]
+        }
+      ]
+    });
+    expect(kasse.subarray(0, 4).toString()).toBe("%PDF");
+  });
+});

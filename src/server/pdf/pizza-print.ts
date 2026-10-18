@@ -1,10 +1,12 @@
 import PDFDocument from "pdfkit";
-import { formatEuro } from "../domain/pizza/totals";
+import { formatEuro, lineTotalCents } from "../domain/pizza/totals";
 
 export interface PizzeriaLineRow {
   number: string | null;
   name: string;
   sizeLabel: string | null;
+  /** Namen der Extras (gleiche Variante mit anderen Extras = eigene Zeile). */
+  extras?: string[];
   qty: number;
   customNote: string | null;
 }
@@ -28,6 +30,8 @@ export interface KassenlisteGuestRow {
     sizeLabel: string | null;
     qty: number;
     priceCentsSnapshot: number;
+    /** Extras mit Aufpreis-Snapshot; der Positionspreis enthält sie. */
+    extras?: Array<{ name: string; priceCentsSnapshot: number }>;
     customNote: string | null;
   }>;
 }
@@ -79,6 +83,9 @@ export async function buildPizzeriaPdf(input: PizzeriaPrintInput): Promise<Buffe
     const size = row.sizeLabel ? ` (${row.sizeLabel})` : "";
     const line = `${number.padEnd(6)} ${String(row.qty).padStart(3)}×    ${row.name}${size}`;
     doc.fontSize(11).text(line);
+    for (const extra of row.extras ?? []) {
+      doc.fontSize(10).text(`               + ${extra}`);
+    }
     if (row.customNote) {
       doc.fontSize(9).fillColor("#444").text(`     Sonderwunsch: ${row.customNote}`);
       doc.fillColor("black");
@@ -131,8 +138,11 @@ export async function buildKassenlistePdf(input: KassenlistePrintInput): Promise
       doc
         .fontSize(10)
         .text(
-          `  ${number.padEnd(6)} ${String(line.qty).padStart(2)}×  ${line.name}${size}  ${formatEuro(line.qty * line.priceCentsSnapshot)}`
+          `  ${number.padEnd(6)} ${String(line.qty).padStart(2)}×  ${line.name}${size}  ${formatEuro(lineTotalCents(line))}`
         );
+      for (const extra of line.extras ?? []) {
+        doc.fontSize(9).text(`             + ${extra.name} (${formatEuro(extra.priceCentsSnapshot)})`);
+      }
       if (line.customNote) {
         doc.fontSize(9).fillColor("#666").text(`      Notiz: ${line.customNote}`);
         doc.fillColor("black");

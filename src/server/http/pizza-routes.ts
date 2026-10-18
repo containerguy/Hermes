@@ -19,6 +19,16 @@ import {
   upsertCategory
 } from "../domain/pizza/categories";
 import {
+  getExtraById,
+  listActiveExtras,
+  listExtras,
+  PIZZA_EXTRA_NAME_MAX_LEN,
+  PIZZA_MAX_EXTRAS_PER_LINE,
+  removeExtra,
+  setExtraActive,
+  upsertExtra
+} from "../domain/pizza/extras";
+import {
   getItemById,
   getVariantById,
   listActiveMenu,
@@ -50,7 +60,7 @@ import {
   listArchivedSessions,
   transitionSession
 } from "../domain/pizza/sessions";
-import { guestTotals } from "../domain/pizza/totals";
+import { guestTotals, lineTotalCents } from "../domain/pizza/totals";
 import { canManagePizza } from "../domain/users";
 import { buildKassenlistePdf, buildPizzeriaPdf } from "../pdf/pizza-print";
 import { sendPushToEnabledUsers } from "../push/push-service";
@@ -67,15 +77,28 @@ const transitionSchema = z.object({
   label: z.string().trim().max(120).optional()
 });
 
+const extraIdsSchema = z.array(z.string().min(1).max(64)).max(PIZZA_MAX_EXTRAS_PER_LINE);
+
 const addLineSchema = z.object({
   variantId: z.string().min(1),
   qty: z.number().int().min(1).max(3),
-  customNote: z.string().trim().max(200).nullable().optional()
+  customNote: z.string().trim().max(200).nullable().optional(),
+  extraIds: extraIdsSchema.optional()
 });
 
 const updateLineSchema = z.object({
   qty: z.number().int().min(1).max(3).optional(),
-  customNote: z.string().trim().max(200).nullable().optional()
+  customNote: z.string().trim().max(200).nullable().optional(),
+  extraIds: extraIdsSchema.optional()
+});
+
+const extraUpsertSchema = z.object({
+  id: z.string().min(1).max(64).optional(),
+  name: z.string().trim().min(1).max(PIZZA_EXTRA_NAME_MAX_LEN),
+  priceCents: z.number().int().min(0).max(100_000),
+  categoryIds: z.array(z.string().min(1).max(64)).max(100),
+  active: z.boolean().optional(),
+  sortOrder: z.number().int().min(0).max(100_000).optional()
 });
 
 const paymentSchema = z.object({
@@ -165,7 +188,13 @@ const menuImportSchema = z.object({
     .optional()
 });
 
-type LineLabel = { itemNumber: string | null; itemName: string; sizeLabel: string | null };
+type LineLabel = {
+  itemNumber: string | null;
+  itemName: string;
+  sizeLabel: string | null;
+  itemId: string | null;
+  categoryId: string | null;
+};
 
 /**
  * Bezeichnungen aller Varianten (auch deaktivierter), damit vergangene Bestellzeilen ihren
@@ -178,7 +207,9 @@ function buildLineLabels(menu: PizzaMenuItemRow[]) {
       labels.set(variant.id, {
         itemNumber: item.number,
         itemName: item.name,
-        sizeLabel: variant.sizeLabel
+        sizeLabel: variant.sizeLabel,
+        itemId: item.id,
+        categoryId: item.categoryId
       });
     }
   }
@@ -186,7 +217,9 @@ function buildLineLabels(menu: PizzaMenuItemRow[]) {
 }
 
 function labelFor(labels: Map<string, LineLabel>, variantId: string): LineLabel {
-  return labels.get(variantId) ?? { itemNumber: null, itemName: "[entfernt]", sizeLabel: null };
+  return (
+    labels.get(variantId) ?? { itemNumber: null, itemName: "[entfernt]", sizeLabel: null, itemId: null, categoryId: null }
+  );
 }
 
 type OrderWithLines = ReturnType<typeof listOrdersForSession>[number];
@@ -213,6 +246,8 @@ function loadSerializedState(context: DatabaseContext, currentUserId: string) {
   const settings = readSettings(context);
   const session = getActiveSession(context);
   const menu = listActiveMenu(context);
+  const categories = listActiveCategories(context);
+  const activeCategoryIds = new Set(categories.map((category) => category.id));
   const labels = buildLineLabels(listAllMenu(context));
   const myOrder = session ? getOrderForUser(context, session.id, currentUserId) : null;
   const allOrders = session ? listOrdersForSession(context, session.id) : [];
@@ -224,8 +259,12 @@ function loadSerializedState(context: DatabaseContext, currentUserId: string) {
   return {
     session: session ?? null,
     /** Aktive Kategorien in Sortierreihenfolge; inaktive sind für Gäste unsichtbar. */
-    categories: listActiveCategories(context).map(({ id, name, sortOrder }) => ({ id, name, sortOrder })),
+    categories: categories.map(({ id, name, sortOrder }) => ({ id, name, sortOrder })),
     menu,
+    /** Aktive Extras; je Artikel gelten nur die seiner Kategorie. */
+    extras: listActiveExtras(context)
+      .map((extra) => ({ ...extra, categoryIds: extra.categoryIds.filter((id) => activeCategoryIds.has(id)) }))
+      .filter((extra) => extra.categoryIds.length > 0),
     paymentMethods: offeredPaymentMethods(settings),
     /** Einstellung hinter `paymentMethods`; ab manager im Pizza-Panel änderbar. */
     paymentMode: settings.pizzaPaymentMethods,
@@ -239,7 +278,8 @@ function loadSerializedState(context: DatabaseContext, currentUserId: string) {
         userId: order.userId,
         lines: order.lines.map((line) => ({
           qty: line.qty,
-          priceCentsSnapshot: line.priceCentsSnapshot
+          priceCentsSnapshot: line.priceCentsSnapshot,
+          extras: line.extras
         }))
       }))
     )
@@ -427,6 +467,7 @@ export function createPizzaRouter(context: DatabaseContext) {
         variantId: parsed.data.variantId,
         qty: parsed.data.qty,
         customNote: parsed.data.customNote ?? null,
+        extraIds: parsed.data.extraIds ?? [],
         defaultPaymentMethod: defaultPaymentMethod(offeredPaymentMethods(readSettings(context)))
       });
       broadcastEventsChanged("pizza_line_added");
@@ -448,7 +489,8 @@ export function createPizzaRouter(context: DatabaseContext) {
         lineId: request.params.lineId,
         userId: actor.id,
         qty: parsed.data.qty,
-        customNote: parsed.data.customNote
+        customNote: parsed.data.customNote,
+        extraIds: parsed.data.extraIds
       });
       broadcastEventsChanged("pizza_line_updated");
       response.status(204).end();
@@ -526,7 +568,87 @@ export function createPizzaRouter(context: DatabaseContext) {
 
   router.get("/admin/menu", (request, response) => {
     if (!requirePizzaManager(context, request, response)) return;
-    response.json({ items: listAllMenu(context), categories: listCategories(context) });
+    response.json({ items: listAllMenu(context), categories: listCategories(context), extras: listExtras(context) });
+  });
+
+  // --- Extras (ab manager) -------------------------------------------------------------------
+
+  router.post("/admin/extras", (request, response) => {
+    const actor = requirePizzaManager(context, request, response);
+    if (!actor) return;
+    const parsed = extraUpsertSchema.safeParse(request.body);
+    if (!parsed.success) {
+      response.status(400).json({ error: "ungueltige_eingabe" });
+      return;
+    }
+    const previous = parsed.data.id ? getExtraById(context, parsed.data.id) : undefined;
+    try {
+      const id = upsertExtra(context, parsed.data);
+      tryWriteAuditLog(context, {
+        actor,
+        action: previous ? "pizza.menu.extra.update" : "pizza.menu.extra.create",
+        entityType: "pizza_menu_extra",
+        entityId: id,
+        summary: `Pizza-Extra ${previous ? "geändert" : "angelegt"}: ${parsed.data.name}`,
+        metadata: {
+          priceCents: parsed.data.priceCents,
+          previousPriceCents: previous?.priceCents ?? null,
+          categoryIds: parsed.data.categoryIds
+        }
+      });
+      broadcastEventsChanged("pizza_menu_changed");
+      response.json({ id });
+    } catch (error) {
+      respondDomainError(error, response, "pizza extra upsert failed");
+    }
+  });
+
+  router.post("/admin/extras/:id/active", (request, response) => {
+    const actor = requirePizzaManager(context, request, response);
+    if (!actor) return;
+    const parsed = activeSchema.safeParse(request.body);
+    if (!parsed.success) {
+      response.status(400).json({ error: "ungueltige_eingabe" });
+      return;
+    }
+    const extra = getExtraById(context, request.params.id);
+    if (!extra) {
+      response.status(404).json({ error: "pizza_extra_nicht_gefunden" });
+      return;
+    }
+    setExtraActive(context, extra.id, parsed.data.active);
+    tryWriteAuditLog(context, {
+      actor,
+      action: parsed.data.active ? "pizza.menu.extra.activate" : "pizza.menu.extra.deactivate",
+      entityType: "pizza_menu_extra",
+      entityId: extra.id,
+      summary: `Pizza-Extra ${parsed.data.active ? "aktiviert" : "deaktiviert"}: ${extra.name}`
+    });
+    broadcastEventsChanged("pizza_menu_changed");
+    response.status(204).end();
+  });
+
+  router.delete("/admin/extras/:id", (request, response) => {
+    const actor = requirePizzaManager(context, request, response);
+    if (!actor) return;
+    const extra = getExtraById(context, request.params.id);
+    const result = removeExtra(context, request.params.id);
+    if (!extra || !result) {
+      response.status(404).json({ error: "pizza_extra_nicht_gefunden" });
+      return;
+    }
+    tryWriteAuditLog(context, {
+      actor,
+      action: result === "deleted" ? "pizza.menu.extra.delete" : "pizza.menu.extra.deactivate",
+      entityType: "pizza_menu_extra",
+      entityId: extra.id,
+      summary:
+        result === "deleted"
+          ? `Pizza-Extra gelöscht: ${extra.name}`
+          : `Pizza-Extra deaktiviert (in Bestellungen verwendet): ${extra.name}`
+    });
+    broadcastEventsChanged("pizza_menu_changed");
+    response.json({ result });
   });
 
   // --- Kategorien (ab manager) ---------------------------------------------------------------
@@ -933,6 +1055,7 @@ export function createPizzaRouter(context: DatabaseContext) {
       number: string | null;
       name: string;
       sizeLabel: string | null;
+      extras: string[];
       qty: number;
       customNotes: string[];
       sortKey: string;
@@ -945,7 +1068,9 @@ export function createPizzaRouter(context: DatabaseContext) {
         if (!variant) continue;
         const item = itemsById.get(variant.itemId);
         if (!item) continue;
-        const key = `${item.id}:${variant.id}`;
+        // Gleiche Variante mit anderen Extras ist für die Pizzeria eine eigene Zeile.
+        const extraNames = line.extras.map((extra) => extra.name).sort((a, b) => a.localeCompare(b, "de"));
+        const key = `${item.id}:${variant.id}:${line.extras.map((extra) => extra.extraId).sort().join(",")}`;
         const existing = aggregateMap.get(key);
         const note = line.customNote;
         if (existing) {
@@ -956,9 +1081,10 @@ export function createPizzaRouter(context: DatabaseContext) {
             number: item.number,
             name: item.name,
             sizeLabel: variant.sizeLabel,
+            extras: extraNames,
             qty: line.qty,
             customNotes: note ? [`${line.qty}× ${note}`] : [],
-            sortKey: `${item.number ?? "zzz"}:${variant.sortOrder}`
+            sortKey: `${item.number ?? "zzz"}:${variant.sortOrder}:${extraNames.join(",")}`
           });
         }
       }
@@ -970,6 +1096,7 @@ export function createPizzaRouter(context: DatabaseContext) {
         number: row.number,
         name: row.name,
         sizeLabel: row.sizeLabel,
+        extras: row.extras,
         qty: row.qty,
         customNote: row.customNotes.length > 0 ? row.customNotes.join("; ") : null
       }));
@@ -1011,10 +1138,7 @@ export function createPizzaRouter(context: DatabaseContext) {
     const guests = orders
       .map((order) => {
         const user = usersById.get(order.userId);
-        const totalCents = order.lines.reduce(
-          (sum, line) => sum + line.qty * line.priceCentsSnapshot,
-          0
-        );
+        const totalCents = order.lines.reduce((sum, line) => sum + lineTotalCents(line), 0);
         return {
           username: user?.username ?? "[gelöschter user]",
           displayName: user?.displayName ?? null,
@@ -1029,6 +1153,7 @@ export function createPizzaRouter(context: DatabaseContext) {
               sizeLabel: label.sizeLabel,
               qty: line.qty,
               priceCentsSnapshot: line.priceCentsSnapshot,
+              extras: line.extras.map((extra) => ({ name: extra.name, priceCentsSnapshot: extra.priceCentsSnapshot })),
               customNote: line.customNote
             };
           })

@@ -14,8 +14,9 @@ import {
   type PizzaRemovalResult
 } from "./api";
 import { PizzaCategoryEditor } from "./PizzaCategoryEditor";
+import { PizzaExtrasEditor } from "./PizzaExtrasEditor";
 import { centsToInput, formatEuro, parseEuroToCents } from "./price";
-import type { PizzaCategory, PizzaItem, PizzaVariant } from "./types";
+import type { PizzaCategory, PizzaExtra, PizzaItem, PizzaVariant } from "./types";
 
 interface PizzaMenuEditorProps {
   /** Wird nach jeder Änderung aufgerufen, damit das Bestell-Panel das Menü neu lädt. */
@@ -29,6 +30,7 @@ export function PizzaMenuEditor({ onChanged }: PizzaMenuEditorProps) {
   const { t, locale } = useI18n();
   const [items, setItems] = useState<PizzaItem[] | null>(null);
   const [categories, setCategories] = useState<PizzaCategory[]>([]);
+  const [extras, setExtras] = useState<PizzaExtra[]>([]);
   const [query, setQuery] = useState("");
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [creating, setCreating] = useState(false);
@@ -38,6 +40,7 @@ export function PizzaMenuEditor({ onChanged }: PizzaMenuEditorProps) {
   function apply(menu: PizzaAdminMenu) {
     setItems(menu.items);
     setCategories(menu.categories);
+    setExtras(menu.extras);
   }
 
   async function load() {
@@ -117,6 +120,16 @@ export function PizzaMenuEditor({ onChanged }: PizzaMenuEditorProps) {
       <details className="pizza-menu-editor__section">
         <summary>{t("pizza.categories.title", { count: categories.length })}</summary>
         <PizzaCategoryEditor categories={categories} mutate={mutate} />
+      </details>
+
+      <details className="pizza-menu-editor__section">
+        <summary>{t("pizza.extras.title", { count: extras.length })}</summary>
+        <PizzaExtrasEditor
+          extras={extras}
+          categories={categories}
+          mutate={mutate}
+          onInvalid={(text) => setFeedback({ kind: "error", text })}
+        />
       </details>
 
       <div className="pizza-menu-editor__toolbar">

@@ -782,5 +782,20 @@ export const deMessages = {
   "pizza.categories.down": "Nach unten",
   "pizza.categories.delete": "Löschen",
   "pizza.categories.notEmpty": "Enthält noch Artikel – nur deaktivieren möglich.",
-  "pizza.categories.deleteConfirm": "Kategorie „{name}“ löschen?"
+  "pizza.categories.deleteConfirm": "Kategorie „{name}“ löschen?",
+  "pizza.extras.legend": "Extras (Aufpreis)",
+  "pizza.extras.optionAria": "{extra} für {item}",
+  "pizza.extras.change": "Extras ändern ({count} gewählt)",
+  "pizza.extras.title": "Extras ({count})",
+  "pizza.extras.help": "Extras haben einen festen Aufpreis, unabhängig von der Größe, und werden nur für die angehakten Kategorien angeboten. Preisänderungen gelten nur für neue Bestellungen.",
+  "pizza.extras.empty": "Noch keine Extras.",
+  "pizza.extras.name": "Extra",
+  "pizza.extras.namePlaceholder": "z. B. extra Schinken",
+  "pizza.extras.newName": "Neues Extra",
+  "pizza.extras.newPrice": "Preis in € für neues Extra",
+  "pizza.extras.newCategories": "Kategorie für neues Extra",
+  "pizza.extras.categories": "Kategorie für",
+  "pizza.extras.create": "Extra anlegen",
+  "pizza.extras.deactivated": "Wurde schon bestellt – deaktiviert statt gelöscht.",
+  "pizza.extras.removeConfirm": "Extra „{name}“ entfernen? Bereits bestellte Extras werden nur deaktiviert."
 } as const;

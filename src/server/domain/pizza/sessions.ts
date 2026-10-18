@@ -182,7 +182,9 @@ export function listArchivedSessions(
     `SELECT
        COUNT(DISTINCT CASE WHEN l.id IS NOT NULL THEN o.id END) AS orderCount,
        COUNT(DISTINCT CASE WHEN l.id IS NOT NULL AND o.payment_status = 'unpaid' THEN o.id END) AS unpaidCount,
-       COALESCE(SUM(l.qty * l.price_cents_snapshot), 0) AS totalCents
+       COALESCE(SUM(l.qty * (l.price_cents_snapshot + COALESCE(
+         (SELECT SUM(e.price_cents_snapshot) FROM pizza_order_line_extras e WHERE e.line_id = l.id), 0
+       ))), 0) AS totalCents
      FROM pizza_orders o
      LEFT JOIN pizza_order_lines l ON l.order_id = o.id
      WHERE o.session_id = ?`
