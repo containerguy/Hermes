@@ -1,6 +1,13 @@
 export type PizzaSessionState = "draft" | "open" | "locked" | "delivered";
 export type PizzaSessionTransition = "open" | "lock" | "deliver" | "reopen";
-export type PizzaCategory = "pizza" | "pasta";
+/** Frei pflegbare Menü-Kategorie (v0.15.0). `itemCount` liefert nur die Menüverwaltung. */
+export interface PizzaCategory {
+  id: string;
+  name: string;
+  sortOrder: number;
+  active?: boolean;
+  itemCount?: number;
+}
 export type PizzaPaymentStatus = "unpaid" | "paid_paypal" | "paid_cash";
 export type PizzaPaymentMethod = "cash" | "paypal";
 
@@ -19,7 +26,7 @@ export interface PizzaItem {
   name: string;
   ingredients: string | null;
   allergens: string | null;
-  category: PizzaCategory;
+  categoryId: string;
   active: boolean;
   sortOrder: number;
   variants: PizzaVariant[];
@@ -86,6 +93,8 @@ export type PizzaPaymentMode = "cash_and_paypal" | "cash_only" | "paypal_only";
 
 export interface PizzaPanelState {
   session: PizzaSession | null;
+  /** Aktive Kategorien in Sortierreihenfolge. */
+  categories?: PizzaCategory[];
   menu: PizzaItem[];
   /** Aktuell angebotene Bezahlarten (serverseitig aus Settings abgeleitet). */
   paymentMethods: PizzaPaymentMethod[];

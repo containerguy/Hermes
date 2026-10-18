@@ -18,6 +18,7 @@ import { PizzaArchive } from "./PizzaArchive";
 import { PizzaMenuEditor } from "./PizzaMenuEditor";
 import { formatEuro } from "./price";
 import type {
+  PizzaCategory,
   PizzaItem,
   PizzaOrder,
   PizzaOrderLine,
@@ -490,6 +491,7 @@ function PizzaOrderEditor({ state, showMenu, onToggleMenu, run }: OrderEditorPro
       {showMenu && remaining > 0 ? (
         <PizzaMenuBrowser
           menu={state.menu}
+          categories={state.categories}
           onAdd={(variantId) => run(() => addPizzaLine({ variantId, qty: 1 }))}
         />
       ) : null}
@@ -497,30 +499,52 @@ function PizzaOrderEditor({ state, showMenu, onToggleMenu, run }: OrderEditorPro
   );
 }
 
+interface MenuGroup {
+  id: string;
+  name: string;
+  items: PizzaItem[];
+}
+
+/** Gruppiert das bestellbare Menü nach Kategorie in deren Sortierreihenfolge. */
+export function groupMenuByCategory(menu: PizzaItem[], categories: PizzaCategory[] | undefined, fallbackName: string) {
+  const sorted = [...(categories ?? [])].sort((a, b) => a.sortOrder - b.sortOrder || a.name.localeCompare(b.name));
+  const groups: MenuGroup[] = sorted.map((category) => ({ id: category.id, name: category.name, items: [] }));
+  const byId = new Map(groups.map((group) => [group.id, group]));
+  let rest: MenuGroup | null = null;
+  for (const item of menu) {
+    const group = byId.get(item.categoryId);
+    if (group) {
+      group.items.push(item);
+    } else {
+      rest ??= { id: "__rest", name: fallbackName, items: [] };
+      rest.items.push(item);
+    }
+  }
+  return [...groups, ...(rest ? [rest] : [])].filter((group) => group.items.length > 0);
+}
+
 function PizzaMenuBrowser({
   menu,
+  categories,
   onAdd
 }: {
   menu: PizzaItem[];
+  categories: PizzaCategory[] | undefined;
   onAdd: (variantId: string) => Promise<void>;
 }) {
   const { t } = useI18n();
-  const pizzas = menu.filter((item) => item.category === "pizza");
-  const pasta = menu.filter((item) => item.category === "pasta");
+  const groups = groupMenuByCategory(menu, categories, t("pizza.menu.otherCategory"));
+  // Nur die beim Öffnen erste Kategorie startet aufgeklappt; spätere Live-Änderungen der
+  // Reihenfolge klappen nichts auf oder zu.
+  const [initiallyOpen] = useState(() => groups[0]?.id ?? null);
   return (
     <div className="pizza-menu-browser">
-      {pizzas.length > 0 ? (
-        <details open>
-          <summary>{t("pizza.menu.pizza", { count: pizzas.length })}</summary>
-          <PizzaMenuList items={pizzas} onAdd={onAdd} />
+      {groups.map((group) => (
+        <details key={group.id} open={group.id === initiallyOpen}>
+          <summary>{t("pizza.menu.categoryCount", { name: group.name, count: group.items.length })}</summary>
+          <PizzaMenuList items={group.items} onAdd={onAdd} />
         </details>
-      ) : null}
-      {pasta.length > 0 ? (
-        <details>
-          <summary>{t("pizza.menu.pasta", { count: pasta.length })}</summary>
-          <PizzaMenuList items={pasta} onAdd={onAdd} />
-        </details>
-      ) : null}
+      ))}
     </div>
   );
 }

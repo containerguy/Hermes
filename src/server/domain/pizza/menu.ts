@@ -2,6 +2,7 @@ import { and, asc, eq } from "drizzle-orm";
 import { randomUUID } from "node:crypto";
 import type { DatabaseContext } from "../../db/client";
 import { pizzaMenuItems, pizzaMenuVariants } from "../../db/schema";
+import { getCategoryById, listCategories } from "./categories";
 import { AppError } from "../../http/errors";
 
 export interface PizzaMenuVariantRow {
@@ -19,7 +20,7 @@ export interface PizzaMenuItemRow {
   name: string;
   ingredients: string | null;
   allergens: string | null;
-  category: "pizza" | "pasta";
+  categoryId: string;
   active: boolean;
   sortOrder: number;
   variants: PizzaMenuVariantRow[];
@@ -37,13 +38,37 @@ export class PizzaMenuError extends AppError {
 
 export type PizzaMenuRemovalResult = "deleted" | "deactivated";
 
+/** Artikel nach Kategorie-Reihenfolge, dann Artikel-Sortierung und Name. */
+function sortByCategory<T extends { categoryId: string; sortOrder: number; name: string }>(
+  context: DatabaseContext,
+  items: T[]
+) {
+  const categoryOrder = new Map(listCategories(context).map((category, index) => [category.id, index]));
+  return [...items].sort(
+    (a, b) =>
+      (categoryOrder.get(a.categoryId) ?? Number.MAX_SAFE_INTEGER) -
+        (categoryOrder.get(b.categoryId) ?? Number.MAX_SAFE_INTEGER) ||
+      a.sortOrder - b.sortOrder ||
+      a.name.localeCompare(b.name, "de")
+  );
+}
+
 export function listActiveMenu(context: DatabaseContext): PizzaMenuItemRow[] {
-  const items = context.db
-    .select()
-    .from(pizzaMenuItems)
-    .where(eq(pizzaMenuItems.active, true))
-    .orderBy(asc(pizzaMenuItems.sortOrder), asc(pizzaMenuItems.name))
-    .all();
+  const activeCategories = new Set(
+    listCategories(context)
+      .filter((category) => category.active)
+      .map((category) => category.id)
+  );
+  // Inaktive Kategorien sind für Gäste unsichtbar, samt ihren Artikeln.
+  const items = sortByCategory(
+    context,
+    context.db
+      .select()
+      .from(pizzaMenuItems)
+      .where(eq(pizzaMenuItems.active, true))
+      .all()
+      .filter((item) => activeCategories.has(item.categoryId))
+  );
 
   if (items.length === 0) return [];
 
@@ -70,11 +95,7 @@ export function listActiveMenu(context: DatabaseContext): PizzaMenuItemRow[] {
 }
 
 export function listAllMenu(context: DatabaseContext): PizzaMenuItemRow[] {
-  const items = context.db
-    .select()
-    .from(pizzaMenuItems)
-    .orderBy(asc(pizzaMenuItems.sortOrder), asc(pizzaMenuItems.name))
-    .all();
+  const items = sortByCategory(context, context.db.select().from(pizzaMenuItems).all());
 
   const variants = context.db
     .select()
@@ -112,6 +133,8 @@ export function getVariantWithItem(context: DatabaseContext, variantId: string) 
     .where(eq(pizzaMenuItems.id, variant.itemId))
     .get();
   if (!item || !item.active || !variant.active) return null;
+  const category = getCategoryById(context, item.categoryId);
+  if (!category || !category.active) return null;
   return { variant, item };
 }
 
@@ -130,12 +153,15 @@ export interface UpsertItemInput {
   name: string;
   ingredients?: string | null;
   allergens?: string | null;
-  category: "pizza" | "pasta";
+  categoryId: string;
   active?: boolean;
   sortOrder?: number;
 }
 
 export function upsertItem(context: DatabaseContext, input: UpsertItemInput) {
+  if (!getCategoryById(context, input.categoryId)) {
+    throw new PizzaMenuError("pizza_kategorie_nicht_gefunden", "Kategorie nicht gefunden", 404);
+  }
   const id = input.id ?? randomUUID();
   const existing = context.db
     .select()
@@ -151,7 +177,7 @@ export function upsertItem(context: DatabaseContext, input: UpsertItemInput) {
         name: input.name,
         ingredients: input.ingredients ?? null,
         allergens: input.allergens ?? null,
-        category: input.category,
+        categoryId: input.categoryId,
         active: input.active ?? existing.active,
         sortOrder: input.sortOrder ?? existing.sortOrder,
         updatedAt: nowIso()
@@ -167,7 +193,7 @@ export function upsertItem(context: DatabaseContext, input: UpsertItemInput) {
         name: input.name,
         ingredients: input.ingredients ?? null,
         allergens: input.allergens ?? null,
-        category: input.category,
+        categoryId: input.categoryId,
         active: input.active ?? true,
         sortOrder: input.sortOrder ?? 0,
         createdAt: nowIso(),

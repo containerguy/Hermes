@@ -90,9 +90,17 @@ export async function deleteArchivedPizzaSession(sessionId: string) {
   });
 }
 
-export async function fetchPizzaAdminMenu() {
-  const response = await requestJson<{ items: PizzaItem[] }>(`/api/pizza/admin/menu`);
-  return response.items;
+export interface PizzaAdminMenu {
+  items: PizzaItem[];
+  categories: PizzaCategory[];
+}
+
+export async function fetchPizzaAdminMenu(): Promise<PizzaAdminMenu> {
+  const response = await requestJson<Partial<PizzaAdminMenu>>(`/api/pizza/admin/menu`);
+  return {
+    items: response.items ?? [],
+    categories: response.categories ?? []
+  };
 }
 
 export interface PizzaItemInput {
@@ -101,8 +109,42 @@ export interface PizzaItemInput {
   name: string;
   ingredients: string | null;
   allergens: string | null;
-  category: PizzaCategory;
+  categoryId: string;
   sortOrder?: number;
+}
+
+export interface PizzaCategoryInput {
+  id?: string;
+  name: string;
+  sortOrder?: number;
+  active?: boolean;
+}
+
+export async function savePizzaCategory(input: PizzaCategoryInput) {
+  return requestJson<{ id: string }>(`/api/pizza/admin/categories`, {
+    method: "POST",
+    body: JSON.stringify(input)
+  });
+}
+
+export async function setPizzaCategoryActive(categoryId: string, active: boolean) {
+  await requestJson<void>(`/api/pizza/admin/categories/${encodeURIComponent(categoryId)}/active`, {
+    method: "POST",
+    body: JSON.stringify({ active })
+  });
+}
+
+export async function reorderPizzaCategories(ids: string[]) {
+  await requestJson<void>(`/api/pizza/admin/categories/order`, {
+    method: "POST",
+    body: JSON.stringify({ ids })
+  });
+}
+
+export async function deletePizzaCategory(categoryId: string) {
+  await requestJson<void>(`/api/pizza/admin/categories/${encodeURIComponent(categoryId)}`, {
+    method: "DELETE"
+  });
 }
 
 export async function savePizzaItem(input: PizzaItemInput) {

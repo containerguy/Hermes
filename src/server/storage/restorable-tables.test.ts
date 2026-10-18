@@ -43,7 +43,17 @@ describe("restorable tables", () => {
     const decided = new Set([...restorableTables, ...notRestored]);
     expect(tables.filter((table) => !decided.has(table))).toEqual([]);
     expect(restorableTables).toEqual(
-      expect.arrayContaining(["pizza_menu_items", "pizza_menu_variants", "pizza_sessions", "pizza_orders", "pizza_order_lines"])
+      expect.arrayContaining([
+        "pizza_menu_categories",
+        "pizza_menu_items",
+        "pizza_menu_variants",
+        "pizza_menu_extras",
+        "pizza_menu_extra_categories",
+        "pizza_sessions",
+        "pizza_orders",
+        "pizza_order_lines",
+        "pizza_order_line_extras"
+      ])
     );
   });
 });

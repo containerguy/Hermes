@@ -8,6 +8,17 @@ import { enforceApiTokenWriteAccess } from "../auth/hermes-auth";
 import type { DatabaseContext } from "../db/client";
 import { pizzaMenuItems, pizzaMenuVariants, users } from "../db/schema";
 import {
+  deleteCategory,
+  findCategoryByName,
+  getCategoryById,
+  listActiveCategories,
+  listCategories,
+  PIZZA_CATEGORY_NAME_MAX_LEN,
+  reorderCategories,
+  setCategoryActive,
+  upsertCategory
+} from "../domain/pizza/categories";
+import {
   getItemById,
   getVariantById,
   listActiveMenu,
@@ -81,9 +92,22 @@ const itemUpsertSchema = z.object({
   name: z.string().trim().min(1).max(120),
   ingredients: z.string().trim().max(500).nullable().optional(),
   allergens: z.string().trim().max(120).nullable().optional(),
-  category: z.enum(["pizza", "pasta"]),
+  categoryId: z.string().min(1).max(64),
   active: z.boolean().optional(),
   sortOrder: z.number().int().optional()
+});
+
+const categoryNameSchema = z.string().trim().min(1).max(PIZZA_CATEGORY_NAME_MAX_LEN);
+
+const categoryUpsertSchema = z.object({
+  id: z.string().min(1).max(64).optional(),
+  name: categoryNameSchema,
+  sortOrder: z.number().int().min(0).max(100_000).optional(),
+  active: z.boolean().optional()
+});
+
+const categoryOrderSchema = z.object({
+  ids: z.array(z.string().min(1).max(64)).min(1).max(200)
 });
 
 const variantUpsertSchema = z.object({
@@ -106,7 +130,9 @@ const menuImportSchema = z.object({
         name: z.string().trim().min(1).max(120),
         ingredients: z.string().trim().max(500).nullable().optional(),
         allergens: z.string().trim().max(120).nullable().optional(),
-        category: z.enum(["pizza", "pasta"]),
+        /** Bevorzugt; fehlt sie oder ist unbekannt, gilt `category` (Name, auch alte Exporte „pizza“/„pasta“). */
+        categoryId: z.string().max(64).optional(),
+        category: categoryNameSchema.optional(),
         active: z.boolean().optional(),
         sortOrder: z.number().int().optional(),
         variants: z
@@ -120,9 +146,23 @@ const menuImportSchema = z.object({
             })
           )
           .max(8)
+      }).refine((item) => Boolean(item.categoryId || item.category), {
+        message: "categoryId oder category erforderlich",
+        path: ["category"]
       })
     )
-    .max(500)
+    .max(500),
+  categories: z
+    .array(
+      z.object({
+        id: z.string().max(64).optional(),
+        name: categoryNameSchema,
+        sortOrder: z.number().int().min(0).max(100_000).optional(),
+        active: z.boolean().optional()
+      })
+    )
+    .max(100)
+    .optional()
 });
 
 type LineLabel = { itemNumber: string | null; itemName: string; sizeLabel: string | null };
@@ -183,6 +223,8 @@ function loadSerializedState(context: DatabaseContext, currentUserId: string) {
 
   return {
     session: session ?? null,
+    /** Aktive Kategorien in Sortierreihenfolge; inaktive sind für Gäste unsichtbar. */
+    categories: listActiveCategories(context).map(({ id, name, sortOrder }) => ({ id, name, sortOrder })),
     menu,
     paymentMethods: offeredPaymentMethods(settings),
     /** Einstellung hinter `paymentMethods`; ab manager im Pizza-Panel änderbar. */
@@ -484,7 +526,105 @@ export function createPizzaRouter(context: DatabaseContext) {
 
   router.get("/admin/menu", (request, response) => {
     if (!requirePizzaManager(context, request, response)) return;
-    response.json({ items: listAllMenu(context) });
+    response.json({ items: listAllMenu(context), categories: listCategories(context) });
+  });
+
+  // --- Kategorien (ab manager) ---------------------------------------------------------------
+
+  router.post("/admin/categories", (request, response) => {
+    const actor = requirePizzaManager(context, request, response);
+    if (!actor) return;
+    const parsed = categoryUpsertSchema.safeParse(request.body);
+    if (!parsed.success) {
+      response.status(400).json({ error: "ungueltige_eingabe" });
+      return;
+    }
+    const previous = parsed.data.id ? getCategoryById(context, parsed.data.id) : undefined;
+    try {
+      const id = upsertCategory(context, parsed.data);
+      tryWriteAuditLog(context, {
+        actor,
+        action: previous ? "pizza.menu.category.update" : "pizza.menu.category.create",
+        entityType: "pizza_menu_category",
+        entityId: id,
+        summary: previous
+          ? `Pizza-Kategorie geändert: ${previous.name}${previous.name !== parsed.data.name ? ` → ${parsed.data.name}` : ""}`
+          : `Pizza-Kategorie angelegt: ${parsed.data.name}`,
+        metadata: { name: parsed.data.name, previousName: previous?.name ?? null }
+      });
+      broadcastEventsChanged("pizza_menu_changed");
+      response.json({ id });
+    } catch (error) {
+      respondDomainError(error, response, "pizza category upsert failed");
+    }
+  });
+
+  router.post("/admin/categories/order", (request, response) => {
+    const actor = requirePizzaManager(context, request, response);
+    if (!actor) return;
+    const parsed = categoryOrderSchema.safeParse(request.body);
+    if (!parsed.success || new Set(parsed.data.ids).size !== parsed.data.ids.length) {
+      response.status(400).json({ error: "ungueltige_eingabe" });
+      return;
+    }
+    try {
+      reorderCategories(context, parsed.data.ids);
+      tryWriteAuditLog(context, {
+        actor,
+        action: "pizza.menu.category.reorder",
+        entityType: "pizza_menu_category",
+        summary: "Pizza-Kategorien neu sortiert",
+        metadata: { ids: parsed.data.ids }
+      });
+      broadcastEventsChanged("pizza_menu_changed");
+      response.status(204).end();
+    } catch (error) {
+      respondDomainError(error, response, "pizza category reorder failed");
+    }
+  });
+
+  router.post("/admin/categories/:id/active", (request, response) => {
+    const actor = requirePizzaManager(context, request, response);
+    if (!actor) return;
+    const parsed = activeSchema.safeParse(request.body);
+    if (!parsed.success) {
+      response.status(400).json({ error: "ungueltige_eingabe" });
+      return;
+    }
+    const category = getCategoryById(context, request.params.id);
+    if (!category) {
+      response.status(404).json({ error: "pizza_kategorie_nicht_gefunden" });
+      return;
+    }
+    setCategoryActive(context, category.id, parsed.data.active);
+    tryWriteAuditLog(context, {
+      actor,
+      action: parsed.data.active ? "pizza.menu.category.activate" : "pizza.menu.category.deactivate",
+      entityType: "pizza_menu_category",
+      entityId: category.id,
+      summary: `Pizza-Kategorie ${parsed.data.active ? "aktiviert" : "deaktiviert"}: ${category.name}`
+    });
+    broadcastEventsChanged("pizza_menu_changed");
+    response.status(204).end();
+  });
+
+  router.delete("/admin/categories/:id", (request, response) => {
+    const actor = requirePizzaManager(context, request, response);
+    if (!actor) return;
+    try {
+      const category = deleteCategory(context, request.params.id);
+      tryWriteAuditLog(context, {
+        actor,
+        action: "pizza.menu.category.delete",
+        entityType: "pizza_menu_category",
+        entityId: category.id,
+        summary: `Pizza-Kategorie gelöscht: ${category.name}`
+      });
+      broadcastEventsChanged("pizza_menu_changed");
+      response.status(204).end();
+    } catch (error) {
+      respondDomainError(error, response, "pizza category delete failed");
+    }
   });
 
   router.post("/admin/items", (request, response) => {
@@ -496,16 +636,21 @@ export function createPizzaRouter(context: DatabaseContext) {
       return;
     }
     const existed = parsed.data.id ? Boolean(getItemById(context, parsed.data.id)) : false;
-    const id = upsertItem(context, parsed.data);
-    tryWriteAuditLog(context, {
-      actor,
-      action: existed ? "pizza.menu.item.update" : "pizza.menu.item.create",
-      entityType: "pizza_menu_item",
-      entityId: id,
-      summary: `Pizza-Menüeintrag ${existed ? "geändert" : "angelegt"}: ${parsed.data.name}`
-    });
-    broadcastEventsChanged("pizza_menu_changed");
-    response.json({ id });
+    try {
+      const id = upsertItem(context, parsed.data);
+      tryWriteAuditLog(context, {
+        actor,
+        action: existed ? "pizza.menu.item.update" : "pizza.menu.item.create",
+        entityType: "pizza_menu_item",
+        entityId: id,
+        summary: `Pizza-Menüeintrag ${existed ? "geändert" : "angelegt"}: ${parsed.data.name}`,
+        metadata: { categoryId: parsed.data.categoryId }
+      });
+      broadcastEventsChanged("pizza_menu_changed");
+      response.json({ id });
+    } catch (error) {
+      respondDomainError(error, response, "pizza item upsert failed");
+    }
   });
 
   router.post("/admin/items/:id/active", (request, response) => {
@@ -638,13 +783,16 @@ export function createPizzaRouter(context: DatabaseContext) {
 
   router.get("/admin/menu/export", (request, response) => {
     if (!requirePizzaManager(context, request, response)) return;
+    const categories = listCategories(context);
+    const categoryNames = new Map(categories.map((category) => [category.id, category.name]));
     const items = listAllMenu(context).map((item) => ({
       id: item.id,
       number: item.number,
       name: item.name,
       ingredients: item.ingredients,
       allergens: item.allergens,
-      category: item.category,
+      categoryId: item.categoryId,
+      category: categoryNames.get(item.categoryId) ?? null,
       active: item.active,
       sortOrder: item.sortOrder,
       variants: item.variants.map((variant) => ({
@@ -655,7 +803,10 @@ export function createPizzaRouter(context: DatabaseContext) {
         active: variant.active
       }))
     }));
-    response.json({ items });
+    response.json({
+      categories: categories.map(({ id, name, sortOrder, active }) => ({ id, name, sortOrder, active })),
+      items
+    });
   });
 
   router.put("/admin/menu/import", (request, response) => {
@@ -678,6 +829,16 @@ export function createPizzaRouter(context: DatabaseContext) {
 
     try {
       const tx = context.sqlite.transaction(() => {
+        for (const categoryInput of parsed.data.categories ?? []) {
+          const byId = categoryInput.id ? getCategoryById(context, categoryInput.id) : undefined;
+          const target = byId ?? findCategoryByName(context, categoryInput.name);
+          upsertCategory(context, { ...categoryInput, id: target?.id });
+        }
+        const resolveCategoryId = (itemInput: { categoryId?: string; category?: string }) => {
+          if (itemInput.categoryId && getCategoryById(context, itemInput.categoryId)) return itemInput.categoryId;
+          const name = itemInput.category ?? "";
+          return findCategoryByName(context, name)?.id ?? upsertCategory(context, { name });
+        };
         for (const itemInput of parsed.data.items) {
           const itemId = upsertItem(context, {
             id: itemInput.id,
@@ -685,7 +846,7 @@ export function createPizzaRouter(context: DatabaseContext) {
             name: itemInput.name,
             ingredients: itemInput.ingredients ?? null,
             allergens: itemInput.allergens ?? null,
-            category: itemInput.category,
+            categoryId: resolveCategoryId(itemInput),
             active: itemInput.active ?? true,
             sortOrder: itemInput.sortOrder ?? 0
           });
@@ -748,6 +909,7 @@ export function createPizzaRouter(context: DatabaseContext) {
         variantsDeactivated: stats.variantsDeactivated
       });
     } catch (error) {
+      if (handleDomainError(error, response)) return;
       console.error("[Hermes] pizza menu import failed", error);
       response.status(500).json({ error: "import_fehler" });
     }

@@ -95,7 +95,7 @@ function item(id: string, number: string, name: string): PizzaItem {
     name,
     ingredients: null,
     allergens: null,
-    category: "pizza",
+    categoryId: "cat-pizza",
     active: true,
     sortOrder: Number(number),
     variants: [
@@ -260,6 +260,32 @@ describe("PizzaPanel – Live-Aktualisierung", () => {
     expect(nameInput.value).toBe("Hausspezial");
     expect(byAriaLabel<HTMLInputElement>(container, "Preis in €: Margherita 30cm")).toBe(price);
     expect(price.value).toBe("9,50");
+  });
+
+  it("behält eine angefangene Umbenennung und neue Kategorie im Kategorie-Editor", async () => {
+    let categories = [
+      { id: "cat-pizza", name: "Pizza", sortOrder: 1, active: true, itemCount: 2 },
+      { id: "cat-pasta", name: "Pasta", sortOrder: 2, active: true, itemCount: 0 }
+    ];
+    routes["GET /api/pizza/state"] = () => ({ ...openState([margherita]), session: null, myOrder: null, orders: [], guestTotals: [] });
+    routes["GET /api/pizza/admin/menu"] = () => ({ items: [margherita], categories });
+    const container = await render(<PizzaPanel {...props} currentUserRole="manager" />);
+
+    await click(buttonByText(container, "Menü verwalten"));
+    const rename = byAriaLabel<HTMLInputElement>(container, "Name der Kategorie: Pasta")!;
+    await type(rename, "Pasta & Aufläufe");
+    const fresh = byAriaLabel<HTMLInputElement>(container, "Neue Kategorie")!;
+    await type(fresh, "Salate");
+
+    categories = [...categories, { id: "cat-drinks", name: "Getränke", sortOrder: 3, active: true, itemCount: 0 }];
+    await liveSignal("pizza_menu_changed");
+
+    expect(count("GET", "/api/pizza/admin/menu")).toBe(2);
+    expect(container.querySelector('[data-testid="pizza-category-cat-drinks"]')).not.toBeNull();
+    expect(byAriaLabel<HTMLInputElement>(container, "Name der Kategorie: Pasta")).toBe(rename);
+    expect(rename.value).toBe("Pasta & Aufläufe");
+    expect(fresh.value).toBe("Salate");
+    expect(calls.some((call) => call.method !== "GET")).toBe(false);
   });
 
   it("legt Hintergrund-Fehler nicht als Alarm über das Panel und behält den Stand", async () => {

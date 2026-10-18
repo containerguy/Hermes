@@ -1,5 +1,5 @@
 import { relations, sql } from "drizzle-orm";
-import { index, integer, sqliteTable, text, uniqueIndex } from "drizzle-orm/sqlite-core";
+import { index, integer, primaryKey, sqliteTable, text, uniqueIndex } from "drizzle-orm/sqlite-core";
 
 export const users = sqliteTable(
   "users",
@@ -375,6 +375,20 @@ export const userApiTokens = sqliteTable(
   ]
 );
 
+/** 0024: Frei pflegbare Menü-Kategorien (vorher fest „pizza“/„pasta“). */
+export const pizzaMenuCategories = sqliteTable(
+  "pizza_menu_categories",
+  {
+    id: text("id").primaryKey(),
+    /** Eindeutig ohne Groß-/Kleinschreibung (Index mit COLLATE NOCASE, Domain prüft Unicode). */
+    name: text("name").notNull(),
+    sortOrder: integer("sort_order").notNull().default(0),
+    active: integer("active", { mode: "boolean" }).notNull().default(true),
+    createdAt: text("created_at").notNull(),
+    updatedAt: text("updated_at").notNull()
+  }
+);
+
 export const pizzaMenuItems = sqliteTable(
   "pizza_menu_items",
   {
@@ -383,13 +397,19 @@ export const pizzaMenuItems = sqliteTable(
     name: text("name").notNull(),
     ingredients: text("ingredients"),
     allergens: text("allergens"),
-    category: text("category", { enum: ["pizza", "pasta"] }).notNull().default("pizza"),
+    /** 0024: ersetzt das frühere Enum `category`. */
+    categoryId: text("category_id")
+      .notNull()
+      .references(() => pizzaMenuCategories.id, { onDelete: "restrict" }),
     active: integer("active", { mode: "boolean" }).notNull().default(true),
     sortOrder: integer("sort_order").notNull().default(0),
     createdAt: text("created_at").notNull(),
     updatedAt: text("updated_at").notNull()
   },
-  (table) => [index("pizza_menu_items_active_sort_idx").on(table.active, table.sortOrder)]
+  (table) => [
+    index("pizza_menu_items_active_sort_idx").on(table.active, table.sortOrder),
+    index("pizza_menu_items_category_idx").on(table.categoryId)
+  ]
 );
 
 export const pizzaMenuVariants = sqliteTable(
@@ -476,6 +496,58 @@ export const pizzaOrderLines = sqliteTable(
     createdAt: text("created_at").notNull()
   },
   (table) => [index("pizza_order_lines_order_idx").on(table.orderId)]
+);
+
+/**
+ * 0024: Extras mit festem Aufpreis je Extra. Ein späterer Preis pro Variante kommt als eigene
+ * Tabelle (z. B. `pizza_extra_variant_prices`) hinzu; die Preisauflösung steckt an einer Stelle
+ * (`resolveExtraPriceCents` in domain/pizza/extras.ts).
+ */
+export const pizzaMenuExtras = sqliteTable("pizza_menu_extras", {
+  id: text("id").primaryKey(),
+  name: text("name").notNull(),
+  priceCents: integer("price_cents").notNull(),
+  active: integer("active", { mode: "boolean" }).notNull().default(true),
+  sortOrder: integer("sort_order").notNull().default(0),
+  createdAt: text("created_at").notNull(),
+  updatedAt: text("updated_at").notNull()
+});
+
+/** 0024: Für welche Kategorien ein Extra angeboten wird (n:m). */
+export const pizzaMenuExtraCategories = sqliteTable(
+  "pizza_menu_extra_categories",
+  {
+    extraId: text("extra_id")
+      .notNull()
+      .references(() => pizzaMenuExtras.id, { onDelete: "cascade" }),
+    categoryId: text("category_id")
+      .notNull()
+      .references(() => pizzaMenuCategories.id, { onDelete: "cascade" })
+  },
+  (table) => [
+    primaryKey({ columns: [table.extraId, table.categoryId] }),
+    index("pizza_menu_extra_categories_category_idx").on(table.categoryId)
+  ]
+);
+
+/** 0024: Extras je Bestellposition mit Name- und Preis-Snapshot. */
+export const pizzaOrderLineExtras = sqliteTable(
+  "pizza_order_line_extras",
+  {
+    lineId: text("line_id")
+      .notNull()
+      .references(() => pizzaOrderLines.id, { onDelete: "cascade" }),
+    extraId: text("extra_id")
+      .notNull()
+      .references(() => pizzaMenuExtras.id, { onDelete: "restrict" }),
+    nameSnapshot: text("name_snapshot").notNull(),
+    priceCentsSnapshot: integer("price_cents_snapshot").notNull(),
+    createdAt: text("created_at").notNull()
+  },
+  (table) => [
+    primaryKey({ columns: [table.lineId, table.extraId] }),
+    index("pizza_order_line_extras_extra_idx").on(table.extraId)
+  ]
 );
 
 export const userRelations = relations(users, ({ many }) => ({

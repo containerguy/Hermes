@@ -9,7 +9,7 @@ import { PizzaPanel } from "./PizzaPanel";
 import { PizzaMenuEditor } from "./PizzaMenuEditor";
 import { PizzaArchive } from "./PizzaArchive";
 import { parseEuroToCents } from "./price";
-import type { PizzaItem, PizzaOrderWithUser, PizzaPanelState } from "./types";
+import type { PizzaCategory, PizzaItem, PizzaOrderWithUser, PizzaPanelState } from "./types";
 
 vi.mock("../api/request", () => ({ requestJson: vi.fn() }));
 
@@ -74,6 +74,11 @@ function byAriaLabel<T extends Element>(container: HTMLElement, label: string) {
   return container.querySelector<T>(`[aria-label="${label}"]`);
 }
 
+const categories: PizzaCategory[] = [
+  { id: "cat-pizza", name: "Pizza", sortOrder: 1, active: true, itemCount: 1 },
+  { id: "cat-pasta", name: "Pasta", sortOrder: 2, active: true, itemCount: 0 }
+];
+
 const menu: PizzaItem[] = [
   {
     id: "pi-001",
@@ -81,7 +86,7 @@ const menu: PizzaItem[] = [
     name: "Margherita",
     ingredients: null,
     allergens: null,
-    category: "pizza",
+    categoryId: "cat-pizza",
     active: true,
     sortOrder: 1,
     variants: [
@@ -286,7 +291,7 @@ describe("PizzaPanel – Manager", () => {
   it("öffnet die Menüverwaltung und das Archiv", async () => {
     mockApi({
       "GET /api/pizza/state": panelState({ session: null, myOrder: null, orders: [], guestTotals: [] }),
-      "GET /api/pizza/admin/menu": { items: menu },
+      "GET /api/pizza/admin/menu": { items: menu, categories },
       "GET /api/pizza/sessions/archived": { sessions: [] }
     });
     const container = await render(<PizzaPanel {...panelProps} currentUserRole="manager" />);
@@ -304,7 +309,7 @@ describe("PizzaPanel – Manager", () => {
 describe("PizzaMenuEditor", () => {
   it("ändert Preise und meldet Deaktivieren statt Löschen", async () => {
     mockApi({
-      "GET /api/pizza/admin/menu": { items: menu },
+      "GET /api/pizza/admin/menu": { items: menu, categories },
       "POST /api/pizza/admin/variants": { id: "v-001-30" },
       "DELETE /api/pizza/admin/variants/v-001-30": { result: "deactivated" }
     });
@@ -332,7 +337,7 @@ describe("PizzaMenuEditor", () => {
 
   it("lehnt ungültige Preise ab und legt neue Artikel an", async () => {
     mockApi({
-      "GET /api/pizza/admin/menu": { items: menu },
+      "GET /api/pizza/admin/menu": { items: menu, categories },
       "POST /api/pizza/admin/items": { id: "neu" }
     });
     const container = await render(<PizzaMenuEditor />);
@@ -364,9 +369,106 @@ describe("PizzaMenuEditor", () => {
       expect.objectContaining({
         url: "/api/pizza/admin/items",
         method: "POST",
-        body: expect.objectContaining({ name: "Hausspezial", category: "pizza" })
+        body: expect.objectContaining({ name: "Hausspezial", categoryId: "cat-pizza" })
       })
     );
+  });
+});
+
+describe("PizzaCategoryEditor (im Menü-Editor)", () => {
+  it("legt an, benennt um, sortiert, deaktiviert und löscht nur leere Kategorien", async () => {
+    mockApi({
+      "GET /api/pizza/admin/menu": { items: menu, categories },
+      "POST /api/pizza/admin/categories": { id: "cat-neu" },
+      "POST /api/pizza/admin/categories/order": undefined,
+      "POST /api/pizza/admin/categories/cat-pasta/active": undefined,
+      "DELETE /api/pizza/admin/categories/cat-pasta": undefined
+    });
+    const container = await render(<PizzaMenuEditor />);
+    expect(container.textContent).toContain("Kategorien (2)");
+
+    const newName = byAriaLabel<HTMLInputElement>(container, "Neue Kategorie")!;
+    await act(async () => {
+      setValue(newName, "Salate");
+      await flushMicrotasks();
+    });
+    await click(buttonByText(container, "Kategorie anlegen"));
+    expect(calls).toContainEqual({ url: "/api/pizza/admin/categories", method: "POST", body: { name: "Salate" } });
+
+    const rename = byAriaLabel<HTMLInputElement>(container, "Name der Kategorie: Pasta")!;
+    await act(async () => {
+      setValue(rename, "Pasta & Aufläufe");
+      await flushMicrotasks();
+    });
+    await click(byAriaLabel(container, "Speichern: Pasta"));
+    expect(calls).toContainEqual({
+      url: "/api/pizza/admin/categories",
+      method: "POST",
+      body: { id: "cat-pasta", name: "Pasta & Aufläufe" }
+    });
+
+    await click(byAriaLabel(container, "Nach oben: Pasta"));
+    expect(calls).toContainEqual({
+      url: "/api/pizza/admin/categories/order",
+      method: "POST",
+      body: { ids: ["cat-pasta", "cat-pizza"] }
+    });
+    expect(byAriaLabel<HTMLButtonElement>(container, "Nach oben: Pizza")!.disabled).toBe(true);
+
+    await click(byAriaLabel(container, "Deaktivieren: Pasta"));
+    expect(calls).toContainEqual({
+      url: "/api/pizza/admin/categories/cat-pasta/active",
+      method: "POST",
+      body: { active: false }
+    });
+
+    // Pizza enthält Artikel: Löschen gesperrt; Pasta ist leer
+    expect(byAriaLabel<HTMLButtonElement>(container, "Löschen: Pizza")!.disabled).toBe(true);
+    await click(byAriaLabel(container, "Löschen: Pasta"));
+    expect(window.confirm).toHaveBeenCalledWith(expect.stringContaining("Pasta"));
+    expect(calls).toContainEqual({ url: "/api/pizza/admin/categories/cat-pasta", method: "DELETE", body: undefined });
+  });
+
+  it("bietet im Artikel-Formular die Kategorien an", async () => {
+    mockApi({ "GET /api/pizza/admin/menu": { items: menu, categories } });
+    const container = await render(<PizzaMenuEditor />);
+    await click(buttonByText(container, "Neuer Artikel"));
+    const select = container.querySelector<HTMLSelectElement>(".pizza-menu-editor__form select")!;
+    expect(Array.from(select.options).map((option) => option.textContent)).toEqual(["Pizza", "Pasta"]);
+  });
+});
+
+describe("PizzaPanel – Kategorien für Gäste", () => {
+  it("gruppiert das Menü nach Kategorie in Sortierreihenfolge", async () => {
+    const pasta: PizzaItem = {
+      ...menu[0],
+      id: "pa-041",
+      number: "41",
+      name: "Amore",
+      categoryId: "cat-pasta",
+      variants: [{ id: "v-pa-041", itemId: "pa-041", sizeLabel: null, priceCents: 650, sortOrder: 1, active: true }]
+    };
+    const own = order({ lines: [] });
+    mockApi({
+      "GET /api/pizza/state": panelState({
+        session: { id: "s1", state: "open", label: null, openedAt: null, lockedAt: null, deliveredAt: null },
+        categories: [
+          { id: "cat-pasta", name: "Pasta", sortOrder: 1 },
+          { id: "cat-pizza", name: "Pizza", sortOrder: 2 }
+        ],
+        menu: [menu[0], pasta],
+        myOrder: own,
+        orders: []
+      })
+    });
+    const container = await render(<PizzaPanel {...panelProps} currentUserRole="user" />);
+    await click(buttonByText(container, "Menü öffnen (3 frei)"));
+    const summaries = Array.from(container.querySelectorAll(".pizza-menu-browser summary")).map(
+      (summary) => summary.textContent
+    );
+    expect(summaries).toEqual(["Pasta (1)", "Pizza (1)"]);
+    const details = Array.from(container.querySelectorAll<HTMLDetailsElement>(".pizza-menu-browser details"));
+    expect(details.map((detail) => detail.open)).toEqual([true, false]);
   });
 });
 
