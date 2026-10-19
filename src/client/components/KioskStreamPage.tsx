@@ -4,6 +4,7 @@ import { ApiError, getErrorMessage } from "../errors/errors";
 import { useI18n } from "../i18n/I18nContext";
 import { useBrandIconSrc } from "../lib/BrandingContext";
 import type { MessageKey } from "../i18n/catalog/index";
+import { pickAppDisplayName } from "../../shared/app-display-name";
 
 const KIOSK_PRIMARY_VIEW_MS = 8000;
 const KIOSK_OVERFLOW_VIEW_MS = 5000;
@@ -91,7 +92,7 @@ export function KioskStreamPage({
     [locale]
   );
 
-  const displayAppName = appSettings.appName.trim() || t("brand.displayName");
+  const displayAppName = pickAppDisplayName(appSettings.appName, t("brand.displayName"));
 
   const gameGroups = useMemo(() => groupEventsByGameTitle(events), [events]);
 

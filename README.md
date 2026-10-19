@@ -204,11 +204,13 @@ Das Compose-Setup nutzt:
 
 ## Mail
 
-Login-Codes werden per SMTP versendet. Für lokale Tests kann `HERMES_MAIL_MODE=console` genutzt werden.
+Login-Codes (Anmeldung, Registrierung) und Codes zur E-Mail-Änderung werden per SMTP versendet. Für lokale Tests kann `HERMES_MAIL_MODE=console` genutzt werden; dann landet nur der Code im Server-Log.
 
 ```env
 HERMES_MAIL_MODE=smtp
-HERMES_MAIL_FROM=Hermes <hermes@example.test>
+HERMES_MAIL_FROM=Mitspielzentrale <lanparty@example.test>
+# Optional: öffentliche Adresse der App für den Link in System-Mails
+HERMES_PUBLIC_URL=https://mitspielzentrale.example.test
 HERMES_SMTP_HOST=smtp.example.test
 HERMES_SMTP_PORT=587
 HERMES_SMTP_SECURE=false
@@ -216,6 +218,14 @@ HERMES_SMTP_SECURITY=starttls
 HERMES_SMTP_USER=
 HERMES_SMTP_PASSWORD=
 ```
+
+Aufbau der System-Mails:
+
+- **Absender:** Die Adresse kommt aus `HERMES_MAIL_FROM`, der Anzeigename aus den Einstellungen – derselbe Name, den die Oberfläche in Kopfzeile und Browser-Titel zeigt (`appName`, sonst der eingebaute Name wie „Mitspielzentrale“ bzw. „MatchDesk“). Änderungen im Adminbereich wirken ohne Neustart. Der Name aus `HERMES_MAIL_FROM` dient nur als Notnagel, wenn die Einstellungen nicht lesbar sind.
+- **Link:** Nur wenn `HERMES_PUBLIC_URL` gesetzt ist (http/https, ohne Zugangsdaten), enthält die Mail einen Link zur Anmeldung. Die Adresse wird bewusst nicht aus Host- oder `X-Forwarded-*`-Headern abgeleitet, weil diese vom Client stammen und sonst fremde Links in echte Login-Mails gelangen könnten.
+- **Sprache:** Wie in der Oberfläche: Profilsprache, sonst Browsersprache der auslösenden Anfrage, sonst `defaultLocale`.
+- **Format:** `multipart/alternative` mit Text- und HTML-Teil (UTF-8), Akzentfarbe aus `themePrimaryColor`, keine externen Bilder oder Tracking. Header `Auto-Submitted: auto-generated`, `X-Auto-Response-Suppress: All` und `Content-Language`; `Message-ID` und `Date` setzt nodemailer mit der Domain der Absenderadresse.
+- **Zustellbarkeit:** Die Absenderdomain braucht passende SPF-, DKIM- und DMARC-Einträge für den SMTP-Server; bei DMARC mit strenger Ausrichtung muss die From-Domain der DKIM-Domain entsprechen.
 
 Hinweis: Für Port `587` ist normalerweise STARTTLS korrekt (`HERMES_SMTP_SECURITY=starttls`). Für Port `465` ist implizites TLS korrekt (`HERMES_SMTP_SECURITY=tls`). Der Fehler `wrong version number` bedeutet fast immer, dass implizites TLS gegen einen STARTTLS-Port gesprochen wurde.
 
