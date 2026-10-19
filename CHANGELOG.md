@@ -4,6 +4,39 @@ Versions are annotated tags `vX.Y.Z` on `main`. Each entry mirrors the
 `chore(release): vX.Y.Z` commit that bumps `package.json`,
 `package-lock.json`, and `src/server/openapi/hermes-api.yaml`.
 
+## v0.15.1 — Branded system emails (2026-10-19)
+
+### Upgrade note
+
+- New optional env `HERMES_PUBLIC_URL` (e.g.
+  `https://mitspielzentrale.familie-keller.info`). When set, system emails
+  contain a link to the sign-in page. Without it, emails are sent without a
+  link; the URL is deliberately not derived from request headers.
+- The sender display name now follows the app name from the admin settings
+  (`appName`, otherwise the built-in name shown in the header, e.g.
+  "Mitspielzentrale"). The address still comes from `HERMES_MAIL_FROM`; its
+  display name is only used if the settings cannot be read.
+
+### Changed
+
+- Login, registration and email-change emails share one layout: personal
+  greeting, proper umlauts (UTF-8), highlighted code with 10-minute validity,
+  "didn't request this" hint, link (with `HERMES_PUBLIC_URL`) and a small
+  footer with app name and domain. Subjects no longer mention "Hermes" and
+  never contain the code.
+- Simple responsive HTML (table layout, inline styles, accent colour from
+  `themePrimaryColor`, no scripts, no external images or tracking) plus a
+  full plain-text alternative (`multipart/alternative`).
+- Headers `Auto-Submitted: auto-generated`, `X-Auto-Response-Suppress: All`
+  and `Content-Language`; `Message-ID` uses the sender domain. No
+  `List-Unsubscribe` (transactional mail).
+- Email language follows the UI: profile language, then the browser language
+  of the triggering request, then `defaultLocale` (German/English).
+- User and app names are HTML-escaped and stripped of control characters.
+- Console mail mode still logs the code; no "Hermes" in user-facing text.
+- Header and kiosk use the same shared app-name helper as the server
+  (`src/shared/app-display-name.ts`).
+
 ## v0.15.0 — Pizza: free categories, CSV/YAML menu import/export, extras with surcharge (2026-10-18)
 
 ### Upgrade note
