@@ -155,9 +155,18 @@ function issueLoginChallenge(context: DatabaseContext, user: typeof users.$infer
 async function sendIssuedLoginCode(
   context: DatabaseContext,
   user: typeof users.$inferSelect,
-  issued: { challengeId: string; code: string }
+  issued: { challengeId: string; code: string },
+  options: { acceptLanguage?: string | null; registration?: boolean } = {}
 ) {
-  await sendLoginCode({ to: user.email, username: user.username, code: issued.code });
+  await sendLoginCode(context, {
+    to: user.email,
+    username: user.username,
+    displayName: user.displayName,
+    locale: user.locale,
+    acceptLanguage: options.acceptLanguage ?? null,
+    registration: options.registration,
+    code: issued.code
+  });
 
   context.db
     .update(loginChallenges)
@@ -303,7 +312,7 @@ export function createAuthRouter(context: DatabaseContext) {
     })();
 
     try {
-      await sendIssuedLoginCode(context, user, issued);
+      await sendIssuedLoginCode(context, user, issued, { acceptLanguage: request.get("accept-language") });
     } catch (error) {
       console.error("[Hermes] Failed to send login code", error);
       response.status(502).json({ error: "mailversand_fehlgeschlagen" });
@@ -469,7 +478,10 @@ export function createAuthRouter(context: DatabaseContext) {
       const issued = issueLoginChallenge(context, created);
 
       try {
-        await sendIssuedLoginCode(context, created, issued);
+        await sendIssuedLoginCode(context, created, issued, {
+          acceptLanguage: request.get("accept-language"),
+          registration: true
+        });
       } catch (error) {
         console.error("[Hermes] Failed to send registration login code", error);
         response.status(502).json({ error: "mailversand_fehlgeschlagen" });
@@ -667,7 +679,9 @@ export function createAuthRouter(context: DatabaseContext) {
       response.status(400).json({ error: "ungueltige_email" });
       return;
     }
-    const result = await requestEmailChange(context, current, parsed.data);
+    const result = await requestEmailChange(context, current, parsed.data, {
+      acceptLanguage: request.get("accept-language")
+    });
     if (!result.ok) {
       response.status(result.status).json({ error: result.error });
       return;

@@ -73,7 +73,8 @@ export type EmailChangeRequestResult =
 export async function requestEmailChange(
   context: DatabaseContext,
   current: CurrentAuth,
-  input: EmailChangeInput
+  input: EmailChangeInput,
+  options: { acceptLanguage?: string | null } = {}
 ): Promise<EmailChangeRequestResult> {
   const newEmail = (input.newEmail ?? input.email ?? "").trim();
   const emailCheck = ensureActiveEmailAvailable(context, newEmail, {
@@ -125,7 +126,14 @@ export async function requestEmailChange(
   })();
 
   try {
-    await sendEmailChangeCode({ to: newEmail, username: current.user.username, code });
+    await sendEmailChangeCode(context, {
+      to: newEmail,
+      username: current.user.username,
+      displayName: current.user.displayName,
+      locale: current.user.locale,
+      acceptLanguage: options.acceptLanguage ?? null,
+      code
+    });
     context.db
       .update(emailChangeChallenges)
       .set({ sentAt: nowIso() })

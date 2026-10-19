@@ -15,6 +15,7 @@ import { I18nProvider, useI18n, type TFunction } from "./client/i18n/I18nContext
 import { BrandingProvider, useBrandIconSrc } from "./client/lib/BrandingContext";
 import { brandIconSrc } from "./client/lib/brand-icon";
 import { resolveEffectiveLocale } from "./client/lib/locale-display";
+import { pickAppDisplayName } from "./shared/app-display-name";
 
 type Route = {
   id: PageId;
@@ -342,7 +343,7 @@ function AppShell({
   const heroRoute = applyShellStartHero(displayRoute, appSettings);
 
   const displayAppName = useMemo(
-    () => appSettings.appName.trim() || t("brand.displayName"),
+    () => pickAppDisplayName(appSettings.appName, t("brand.displayName")),
     [appSettings.appName, t]
   );
 
