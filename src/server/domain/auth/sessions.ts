@@ -1,4 +1,4 @@
-import { and, desc, eq, gte, isNull } from "drizzle-orm";
+import { and, desc, eq, gte, isNull, ne } from "drizzle-orm";
 import { z } from "zod";
 import { tryWriteAuditLog } from "../../audit-log";
 import { validateDeviceName } from "../../auth/device-names";
@@ -152,4 +152,39 @@ export function revokeUserSession(
   });
 
   return { ok: true, revokedCurrent: target.id === current.session.id };
+}
+
+export type RevokeOtherUsersSessionsResult = { revokedSessions: number; affectedUsers: number };
+
+/**
+ * Admin action: signs out every user except the acting admin. All sessions of the admin
+ * stay active (other devices included); API tokens are not touched.
+ */
+export function revokeOtherUsersSessions(
+  context: DatabaseContext,
+  admin: UserRow
+): RevokeOtherUsersSessionsResult {
+  const timestamp = nowIso();
+  const openOthers = and(ne(sessions.userId, admin.id), isNull(sessions.revokedAt));
+
+  const result = context.sqlite.transaction(() => {
+    const affected = context.db
+      .selectDistinct({ userId: sessions.userId })
+      .from(sessions)
+      .where(openOthers)
+      .all();
+    const update = context.db.update(sessions).set({ revokedAt: timestamp }).where(openOthers).run();
+    return { revokedSessions: update.changes, affectedUsers: affected.length };
+  })();
+
+  tryWriteAuditLog(context, {
+    actor: admin,
+    action: "auth.sessions_revoke_others",
+    entityType: "session_batch",
+    entityId: null,
+    summary: `${admin.username} hat alle anderen Benutzer abgemeldet (${result.affectedUsers} Benutzer, ${result.revokedSessions} Sitzungen).`,
+    metadata: result
+  });
+
+  return result;
 }
