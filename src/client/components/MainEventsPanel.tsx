@@ -20,7 +20,7 @@ const statusClasses: Record<MainEvent["status"], string> = {
   ended: "archived"
 };
 
-const emptyDraft = { name: "", description: "", plannedStartAt: "", plannedEndAt: "" };
+const emptyDraft = { name: "", description: "", plannedStartAt: "", plannedEndAt: "", private: false };
 
 /** Events (LAN-Party, Turniertag) anlegen, starten, beenden — für Manager und Admins. */
 export function MainEventsPanel() {
@@ -34,11 +34,24 @@ export function MainEventsPanel() {
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
+  const [candidates, setCandidates] = useState<Array<{ id: string; username: string }>>([]);
+  const [inviteDrafts, setInviteDrafts] = useState<Record<string, string>>({});
 
   async function load() {
     const result = await requestJson<{ mainEvents: MainEvent[] }>("/api/main-events");
     setMainEvents(result?.mainEvents ?? []);
   }
+
+  const hasPrivate = mainEvents.some((entry) => entry.visibility === "private" && entry.status !== "ended");
+
+  useEffect(() => {
+    if (!hasPrivate || candidates.length > 0) {
+      return;
+    }
+    requestJson<{ users: Array<{ id: string; username: string }> }>("/api/main-events/invite-candidates")
+      .then((result) => setCandidates(result?.users ?? []))
+      .catch(() => undefined);
+  }, [hasPrivate]);
 
   useEffect(() => {
     load().catch(() => undefined);
@@ -74,6 +87,7 @@ export function MainEventsPanel() {
         body: JSON.stringify({
           name: draft.name,
           description: draft.description.trim() || null,
+          visibility: draft.private ? "private" : "public",
           plannedStartAt: draft.plannedStartAt ? fromDatetimeLocal(draft.plannedStartAt) : null,
           plannedEndAt: draft.plannedEndAt ? fromDatetimeLocal(draft.plannedEndAt) : null
         })
@@ -104,6 +118,43 @@ export function MainEventsPanel() {
     );
   }
 
+  async function invite(mainEvent: MainEvent) {
+    const userId = inviteDrafts[mainEvent.id];
+    if (!userId) {
+      return;
+    }
+    await run(async () => {
+      await requestJson<{ mainEvent: MainEvent }>(`/api/main-events/${mainEvent.id}/invites`, {
+        method: "POST",
+        body: JSON.stringify({ userIds: [userId] })
+      });
+      setInviteDrafts((drafts) => ({ ...drafts, [mainEvent.id]: "" }));
+    }, "mainEvents.msg.invited");
+  }
+
+  async function uninvite(mainEvent: MainEvent, userId: string) {
+    await run(
+      () => requestJson<{ mainEvent: MainEvent }>(`/api/main-events/${mainEvent.id}/invites/${userId}`, { method: "DELETE" }),
+      "mainEvents.msg.uninvited"
+    );
+  }
+
+  async function toggleVisibility(mainEvent: MainEvent) {
+    const next = mainEvent.visibility === "private" ? "public" : "private";
+    const confirmKey: MessageKey = next === "private" ? "mainEvents.confirm.makePrivate" : "mainEvents.confirm.makePublic";
+    if (!window.confirm(t(confirmKey, { name: mainEvent.name }))) {
+      return;
+    }
+    await run(
+      () =>
+        requestJson<{ mainEvent: MainEvent }>(`/api/main-events/${mainEvent.id}`, {
+          method: "PATCH",
+          body: JSON.stringify({ visibility: next })
+        }),
+      "mainEvents.msg.visibility"
+    );
+  }
+
   const running = mainEvents.find((entry) => entry.status === "running");
 
   return (
@@ -125,7 +176,12 @@ export function MainEventsPanel() {
           return (
             <li key={mainEvent.id} className={`main-event main-event-${mainEvent.status}`}>
               <div className="main-event-header">
-                <strong>{mainEvent.name}</strong>
+                <span className="main-event-title">
+                  <strong>{mainEvent.name}</strong>
+                  {mainEvent.visibility === "private" ? (
+                    <span className="status-pill status-cancelled">{t("mainEvents.private")}</span>
+                  ) : null}
+                </span>
                 <span className={`status-pill status-${statusClasses[mainEvent.status]}`}>
                   {t(statusLabels[mainEvent.status])}
                 </span>
@@ -147,6 +203,52 @@ export function MainEventsPanel() {
                   ? ` · ${t("mainEvents.endedAt", { at: formatDate(mainEvent.endedAt) })}`
                   : null}
               </p>
+              {mainEvent.visibility === "private" && mainEvent.status !== "ended" ? (
+                <div className="main-event-invites">
+                  <p className="muted">{t("mainEvents.invites.title")}</p>
+                  <ul>
+                    {(mainEvent.invites ?? []).map((entry) => (
+                      <li key={entry.userId}>
+                        {entry.username}
+                        <button
+                          type="button"
+                          className="secondary"
+                          disabled={busy}
+                          aria-label={t("mainEvents.invites.removeAria", { name: entry.username })}
+                          onClick={() => uninvite(mainEvent, entry.userId)}
+                        >
+                          ✕
+                        </button>
+                      </li>
+                    ))}
+                    {(mainEvent.invites ?? []).length === 0 ? <li className="muted">{t("mainEvents.invites.empty")}</li> : null}
+                  </ul>
+                  <div className="main-event-invite-form">
+                    <select
+                      aria-label={t("mainEvents.invites.pick")}
+                      value={inviteDrafts[mainEvent.id] ?? ""}
+                      onChange={(ev) => setInviteDrafts({ ...inviteDrafts, [mainEvent.id]: ev.target.value })}
+                    >
+                      <option value="">{t("mainEvents.invites.pick")}</option>
+                      {candidates
+                        .filter((candidate) => !(mainEvent.invites ?? []).some((entry) => entry.userId === candidate.id))
+                        .map((candidate) => (
+                          <option key={candidate.id} value={candidate.id}>
+                            {candidate.username}
+                          </option>
+                        ))}
+                    </select>
+                    <button
+                      type="button"
+                      className="secondary"
+                      disabled={busy || !inviteDrafts[mainEvent.id]}
+                      onClick={() => invite(mainEvent)}
+                    >
+                      {t("mainEvents.invites.add")}
+                    </button>
+                  </div>
+                </div>
+              ) : null}
               <div className="action-row">
                 {mainEvent.status === "planned" ? (
                   <>
@@ -166,6 +268,18 @@ export function MainEventsPanel() {
                       {t("mainEvents.action.delete")}
                     </button>
                   </>
+                ) : null}
+                {mainEvent.status !== "ended" ? (
+                  <button
+                    type="button"
+                    className="secondary"
+                    disabled={busy}
+                    onClick={() => toggleVisibility(mainEvent)}
+                  >
+                    {mainEvent.visibility === "private"
+                      ? t("mainEvents.action.makePublic")
+                      : t("mainEvents.action.makePrivate")}
+                  </button>
                 ) : null}
                 {mainEvent.status === "running" ? (
                   <button
@@ -211,6 +325,14 @@ export function MainEventsPanel() {
             />
           </label>
         </div>
+        <label className="checkbox-label">
+          <input
+            type="checkbox"
+            checked={draft.private}
+            onChange={(ev) => setDraft({ ...draft, private: ev.target.checked })}
+          />
+          {t("mainEvents.form.private")}
+        </label>
         <label>
           {t("mainEvents.form.description")}
           <textarea

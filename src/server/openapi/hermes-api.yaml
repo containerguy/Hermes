@@ -405,6 +405,59 @@ paths:
         "409":
           description: Event beendet (hauptevent_beendet)
 
+  /api/main-events/invite-candidates:
+    get:
+      tags: [main-events]
+      summary: Aktive Personen zum Einladen (Manager/Admin)
+      responses:
+        "200":
+          description: "`users`: Liste aus id und username"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+
+  /api/main-events/{id}/invites:
+    post:
+      tags: [main-events]
+      summary: Personen zu einem Event einladen (Manager/Admin); bei privaten Events bekommen sie einen Push
+      parameters:
+        - $ref: "#/components/parameters/EventId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [userIds]
+              properties:
+                userIds:
+                  type: array
+                  items:
+                    type: string
+      responses:
+        "200":
+          description: OK
+        "400":
+          description: Unbekannte Person (ungueltige_einladung)
+        "409":
+          description: Event beendet
+
+  /api/main-events/{id}/invites/{userId}:
+    delete:
+      tags: [main-events]
+      summary: Einladung zurücknehmen; bei privaten Events entfällt auch die Teilnahme
+      parameters:
+        - $ref: "#/components/parameters/EventId"
+        - name: userId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: OK
+        "404":
+          description: Einladung nicht gefunden
+
   /api/main-events/{id}/end:
     post:
       tags: [main-events]
@@ -674,6 +727,20 @@ components:
         status:
           type: string
           enum: [planned, running, ended]
+        visibility:
+          type: string
+          enum: [public, private]
+          description: Private Events (und ihre Runden) sehen nur Eingeladene sowie Manager und Admins.
+        invites:
+          type: array
+          description: Nur für Manager/Admins und nur bei privaten Events
+          items:
+            type: object
+            properties:
+              userId:
+                type: string
+              username:
+                type: string
         plannedStartAt:
           type: string
           nullable: true
@@ -704,6 +771,10 @@ components:
         description:
           type: string
           nullable: true
+        visibility:
+          type: string
+          enum: [public, private]
+          description: Standard public. Beim Wechsel auf private werden bisherige Teilnehmer eingeladen.
         plannedStartAt:
           type: string
           nullable: true

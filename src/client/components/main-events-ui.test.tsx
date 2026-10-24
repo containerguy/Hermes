@@ -81,6 +81,7 @@ function mainEvent(overrides: Partial<MainEvent>): MainEvent {
     name: "LAN Herbst",
     description: null,
     status: "running",
+    visibility: "public",
     plannedStartAt: null,
     plannedEndAt: null,
     startedAt: "2026-11-06T16:00:00.000Z",
@@ -265,5 +266,55 @@ describe("Events mit Start und Ende – Oberfläche", () => {
     const decided = await render(<MainEventPrompt currentUserId="u-mgr" />);
     expect(decided.container.textContent).toBe("");
     await decided.cleanup();
+  });
+
+  it("invites people to a private event and withdraws invitations", async () => {
+    vi.spyOn(window, "confirm").mockReturnValue(true);
+    const secret = mainEvent({
+      id: "m-3",
+      name: "Geheimturnier",
+      status: "planned",
+      visibility: "private",
+      invites: [{ userId: "u-1", username: "anna" }]
+    });
+    const calls: Array<{ url: string; method: string; body: unknown }> = [];
+    requestMock.mockImplementation(async (url: string, options?: RequestInit) => {
+      if (options?.method) {
+        calls.push({ url, method: options.method, body: options.body ? JSON.parse(String(options.body)) : null });
+        return { mainEvent: secret };
+      }
+      if (url === "/api/main-events/invite-candidates") {
+        return { users: [{ id: "u-1", username: "anna" }, { id: "u-2", username: "ben" }] };
+      }
+      return { mainEvents: [secret] };
+    });
+
+    const rendered = await render(<MainEventsPanel />);
+    await act(async () => {
+      await flush();
+    });
+    expect(rendered.container.textContent).toContain("privat");
+    expect(rendered.container.textContent).toContain("anna");
+
+    const select = rendered.container.querySelector(".main-event-invite-form select") as HTMLSelectElement;
+    expect(Array.from(select.options).map((option) => option.textContent)).toEqual(["Person auswählen…", "ben"]);
+    await act(async () => {
+      setInputValue(select, "u-2");
+      await flush();
+    });
+    const inviteButton = rendered.container.querySelector(".main-event-invite-form button") as HTMLButtonElement;
+    await act(async () => {
+      inviteButton.click();
+      await flush();
+    });
+    expect(calls.at(-1)).toEqual({ url: "/api/main-events/m-3/invites", method: "POST", body: { userIds: ["u-2"] } });
+
+    const remove = rendered.container.querySelector(".main-event-invites li button") as HTMLButtonElement;
+    await act(async () => {
+      remove.click();
+      await flush();
+    });
+    expect(calls.at(-1)).toEqual({ url: "/api/main-events/m-3/invites/u-1", method: "DELETE", body: null });
+    await rendered.cleanup();
   });
 });

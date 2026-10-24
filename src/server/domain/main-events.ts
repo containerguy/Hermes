@@ -5,12 +5,16 @@ export const mainEventStatusSchema = z.enum(["planned", "running", "ended"]);
 
 export type MainEventStatus = z.infer<typeof mainEventStatusSchema>;
 
+/** Öffentliche Events sieht jeder, private nur Eingeladene sowie Manager und Admins. */
+export const mainEventVisibilitySchema = z.enum(["public", "private"]);
+
 const optionalIso = z.string().datetime().nullable().optional();
 
 export const mainEventInputSchema = z
   .object({
     name: z.string().trim().min(1).max(120),
     description: z.string().trim().max(4000).nullable().optional(),
+    visibility: mainEventVisibilitySchema.optional(),
     plannedStartAt: optionalIso,
     plannedEndAt: optionalIso
   })
@@ -31,8 +35,13 @@ export const mainEventInputSchema = z
 export const mainEventUpdateSchema = z.object({
   name: z.string().trim().min(1).max(120).optional(),
   description: z.string().trim().max(4000).nullable().optional(),
+  visibility: mainEventVisibilitySchema.optional(),
   plannedStartAt: optionalIso,
   plannedEndAt: optionalIso
+});
+
+export const mainEventInviteSchema = z.object({
+  userIds: z.array(z.string().min(1).max(64)).min(1).max(500)
 });
 
 export type MainEventInput = z.infer<typeof mainEventInputSchema>;

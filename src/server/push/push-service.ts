@@ -136,7 +136,12 @@ export async function sendPushToEnabledUsers(context: DatabaseContext, payload: 
   await Promise.all(targets.map((target) => sendPushToUser(context, target.id, payload)));
 }
 
-export async function sendPushToOperators(context: DatabaseContext, payload: PushPayload) {
+export async function sendPushToOperators(
+  context: DatabaseContext,
+  payload: PushPayload,
+  /** 0026: optional nur an Operatoren, die das (private) Event sehen dürfen */
+  canSee?: (user: typeof users.$inferSelect) => boolean
+) {
   const targets = context.db
     .select()
     .from(users)
@@ -146,7 +151,8 @@ export async function sendPushToOperators(context: DatabaseContext, payload: Pus
         inArray(users.role, ["admin", "manager", "organizer"])
       )
     )
-    .all();
+    .all()
+    .filter((target) => !canSee || canSee(target));
 
   await Promise.all(targets.map((target) => sendPushToUser(context, target.id, payload)));
 }
@@ -201,3 +207,8 @@ export async function sendPushToMainEventParticipants(
   await Promise.all(targets.map((userId) => sendPushToUser(context, userId, payload)));
 }
 
+
+/** Bestimmte Personen benachrichtigen (z. B. Eingeladene eines privaten Events). */
+export async function sendPushToUserIds(context: DatabaseContext, userIds: string[], payload: PushPayload) {
+  await Promise.all(userIds.map((userId) => sendPushToUser(context, userId, payload)));
+}
