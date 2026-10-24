@@ -99,3 +99,8 @@ export function canManageServers(actor: { role: UserRole }) {
 export function canManagePizza(actor: { role: UserRole }) {
   return actor.role === "admin" || actor.role === "manager";
 }
+
+/** Events anlegen, bearbeiten, starten und beenden — ab manager. */
+export function canManageMainEvents(actor: { role: UserRole }) {
+  return actor.role === "admin" || actor.role === "manager";
+}

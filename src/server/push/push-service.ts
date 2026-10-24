@@ -1,7 +1,7 @@
 import { and, eq, inArray, isNull } from "drizzle-orm";
 import webpush from "web-push";
 import type { DatabaseContext } from "../db/client";
-import { participations, pushSubscriptions, users } from "../db/schema";
+import { mainEventParticipants, participations, pushSubscriptions, users } from "../db/schema";
 
 export type PushPayload = {
   title: string;
@@ -173,3 +173,31 @@ export async function sendPushToEventParticipants(
 
   await Promise.all(targets.map((target) => sendPushToUser(context, target.id, payload)));
 }
+
+/** Nur Teilnehmer („dabei") eines Events (LAN-Party, Turniertag) mit aktivierten Benachrichtigungen. */
+export function mainEventPushTargets(context: DatabaseContext, mainEventId: string) {
+  return context.db
+    .select({ id: users.id })
+    .from(mainEventParticipants)
+    .innerJoin(users, eq(mainEventParticipants.userId, users.id))
+    .where(
+      and(
+        eq(mainEventParticipants.mainEventId, mainEventId),
+        eq(mainEventParticipants.status, "joined"),
+        eq(users.notificationsEnabled, true),
+        isNull(users.deletedAt)
+      )
+    )
+    .all()
+    .map((target) => target.id);
+}
+
+export async function sendPushToMainEventParticipants(
+  context: DatabaseContext,
+  mainEventId: string,
+  payload: PushPayload
+) {
+  const targets = mainEventPushTargets(context, mainEventId);
+  await Promise.all(targets.map((userId) => sendPushToUser(context, userId, payload)));
+}
+

@@ -202,6 +202,7 @@ export function EventCard({
                   {event.startMode === "now"
                     ? t("events.mode.now")
                     : t("events.mode.scheduled")}
+                  {event.mainEventName ? ` · ${event.mainEventName}` : null}
                 </p>
                 <h2>{event.gameTitle}</h2>
               </div>
