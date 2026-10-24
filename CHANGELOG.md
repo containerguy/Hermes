@@ -4,6 +4,67 @@ Versions are annotated tags `vX.Y.Z` on `main`. Each entry mirrors the
 `chore(release): vX.Y.Z` commit that bumps `package.json`,
 `package-lock.json`, and `src/server/openapi/hermes-api.yaml`.
 
+## v0.16.0 — Events with start and end, participation, private events; log out all other users (2026-10-24)
+
+### Upgrade note
+
+- Migrations `0025_main_events` and `0026_private_main_events` run
+  automatically on start. They create `main_events`,
+  `main_event_participants` and `main_event_invites` and add
+  `game_events.main_event_id` (existing rounds stay without an event, so
+  their notifications go to everyone as before).
+- Take a backup before updating, as for every migration. Restores need a
+  snapshot with the same migration state; the new tables are part of the
+  restore.
+- Dependency security updates (`npm audit fix`): body-parser 2.4.0,
+  nodemailer 10.2.1, zod 4.6.7. After deploying, send one login code to
+  check mail delivery.
+
+### Events
+
+- Events (e.g. a LAN party or a tournament day) bundle rounds and their
+  notifications. Managers and admins create, edit, start and end them in a
+  collapsible section above the board; planned events can be deleted
+  (their rounds keep existing without an event). At most one event runs at
+  a time.
+- New rounds belong to the running event automatically; the round form can
+  pick another planned or running event or "no event". Ending an event
+  archives its open rounds; ended events accept no new rounds.
+- The board shows "Running now: …" and filters by event (default: the
+  running event). Expanded round cards show the event name.
+- Round texts in the board now say "round" instead of "event"
+  (e.g. "Runde anlegen").
+- API: `/api/main-events` (list, create, edit, delete, `start`, `end`,
+  `participation`, `invites`), `GET /api/events?mainEventId=<id>|none`.
+
+### Participation and notifications
+
+- Everyone says "in" or "not in" per event. Notifications about rounds of
+  an event (new, ready, cancelled, archived) go only to its participants;
+  their title names the event ("Neue Runde · LAN Herbst"). Rounds without
+  an event still notify everyone.
+- Starting an event notifies everyone ("… läuft jetzt. Bist du dabei?"),
+  ending it notifies the participants.
+- After login, the start page asks undecided users whether they join the
+  running event ("Later" hides the question for the session). Joining a
+  round of an event also joins the event if undecided.
+
+### Private events
+
+- Events can be private: only invited people plus managers and admins see
+  the event, its rounds and its notifications. The kiosk never shows rounds
+  of private events.
+- Managers invite and uninvite people; invited people get a notification.
+  Uninviting also removes the participation. Making an event private
+  invites everyone who already joined.
+
+### Admin
+
+- Admin → Security: "Log out all other users" ends every session of all
+  other users (including other admins); the acting admin stays signed in on
+  all of their devices. API tokens stay valid. Audit action
+  `auth.sessions_revoke_others`.
+
 ## v0.15.1 — Branded system emails (2026-10-19)
 
 ### Upgrade note
