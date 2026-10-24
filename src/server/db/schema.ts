@@ -202,6 +202,10 @@ export const mainEvents = sqliteTable(
     status: text("status", { enum: ["planned", "running", "ended"] })
       .notNull()
       .default("planned"),
+    /** 0026: private Events sehen nur Eingeladene sowie Manager und Admins. */
+    visibility: text("visibility", { enum: ["public", "private"] })
+      .notNull()
+      .default("public"),
     plannedStartAt: text("planned_start_at"),
     plannedEndAt: text("planned_end_at"),
     startedAt: text("started_at"),
@@ -214,6 +218,23 @@ export const mainEvents = sqliteTable(
     createdAt: text("created_at").notNull(),
     updatedAt: text("updated_at").notNull()
   }
+);
+
+/** 0026: Einladungen zu privaten Events. */
+export const mainEventInvites = sqliteTable(
+  "main_event_invites",
+  {
+    id: text("id").primaryKey(),
+    mainEventId: text("main_event_id")
+      .notNull()
+      .references(() => mainEvents.id, { onDelete: "cascade" }),
+    userId: text("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    invitedByUserId: text("invited_by_user_id").references(() => users.id, { onDelete: "set null" }),
+    createdAt: text("created_at").notNull()
+  },
+  (table) => [uniqueIndex("main_event_invites_event_user_unique").on(table.mainEventId, table.userId)]
 );
 
 /** 0025: Teilnahme am Event; „joined" bekommt die Benachrichtigungen zu dessen Runden. */

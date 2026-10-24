@@ -73,6 +73,7 @@ export const restorableTables = [
   // vor game_events: game_events.main_event_id verweist auf das Event
   "main_events",
   "main_event_participants",
+  "main_event_invites",
   "game_events",
   "participations",
   // Pizza in FK-Reihenfolge: Kategorien → Menü → Varianten, Extras → Zuordnung,

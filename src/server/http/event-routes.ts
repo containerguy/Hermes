@@ -10,7 +10,7 @@ import { appSettings, gameEvents, participations, users } from "../db/schema";
 import { deriveEventStatus, eventInputSchema, shouldAutoArchive } from "../domain/events";
 import { acceptsRounds, withMainEventLabel } from "../domain/main-events";
 import { findBindingForTitle, getBinding } from "../domain/gameservers/bindings";
-import { canCreateEvent, canManageEvent } from "../domain/users";
+import { canCreateEvent, canManageEvent, type UserRole } from "../domain/users";
 import {
   sendPushToEnabledUsers,
   sendPushToMainEventParticipants,
@@ -18,7 +18,13 @@ import {
   type PushPayload
 } from "../push/push-service";
 import { broadcastEventsChanged } from "../realtime/event-bus";
-import { getMainEvent, getRunningMainEvent, joinMainEventIfUndecided } from "./main-event-routes";
+import {
+  canSeeMainEvent,
+  getMainEvent,
+  getRunningMainEvent,
+  hiddenMainEventIds,
+  joinMainEventIfUndecided
+} from "./main-event-routes";
 
 const updateEventSchema = z.object({
   gameTitle: z.string().trim().min(1).max(120).optional(),
@@ -48,16 +54,44 @@ class EventCapacityError extends Error {
 
 type MainEventResolution = { ok: true; mainEventId: string | null } | { ok: false; status: 400 | 409; error: string };
 
+type Viewer = { id: string; role: UserRole };
+
+/** 0026: Runden privater Events, zu denen der Betrachter nicht eingeladen ist, gibt es für ihn nicht. */
+function isHiddenRound(context: DatabaseContext, viewer: Viewer, round: { mainEventId: string | null }) {
+  if (!round.mainEventId) {
+    return false;
+  }
+  const mainEvent = getMainEvent(context, round.mainEventId);
+  return Boolean(mainEvent && !canSeeMainEvent(context, viewer, mainEvent));
+}
+
+/** „Runde voll" an Operatoren; bei privaten Events nur an die, die das Event sehen dürfen. */
+function notifyOperatorsAboutRound(
+  context: DatabaseContext,
+  round: { mainEventId: string | null },
+  payload: PushPayload
+) {
+  const mainEvent = round.mainEventId ? getMainEvent(context, round.mainEventId) : undefined;
+  return mainEvent?.visibility === "private"
+    ? sendPushToOperators(context, payload, (user) => canSeeMainEvent(context, user, mainEvent))
+    : sendPushToOperators(context, payload);
+}
+
 /** 0025: Event einer Runde bestimmen — explizit (auch null) oder das gerade laufende Event. */
-function resolveMainEventId(context: DatabaseContext, requested: string | null | undefined): MainEventResolution {
+function resolveMainEventId(
+  context: DatabaseContext,
+  viewer: Viewer,
+  requested: string | null | undefined
+): MainEventResolution {
   if (requested === undefined) {
-    return { ok: true, mainEventId: getRunningMainEvent(context)?.id ?? null };
+    const running = getRunningMainEvent(context);
+    return { ok: true, mainEventId: running && canSeeMainEvent(context, viewer, running) ? running.id : null };
   }
   if (requested === null) {
     return { ok: true, mainEventId: null };
   }
   const mainEvent = getMainEvent(context, requested);
-  if (!mainEvent) {
+  if (!mainEvent || !canSeeMainEvent(context, viewer, mainEvent)) {
     return { ok: false, status: 400, error: "hauptevent_nicht_gefunden" };
   }
   if (!acceptsRounds(mainEvent.status)) {
@@ -256,8 +290,10 @@ export function createEventRouter(context: DatabaseContext) {
       )
       .orderBy(sql`datetime(${gameEvents.startsAt}) ASC`)
       .all();
+    const hidden = hiddenMainEventIds(context, actor ?? null);
+    const visible = events.filter((event) => !event.mainEventId || !hidden.has(event.mainEventId));
 
-    response.json({ events: events.map((event) => serializeEvent(context, event, actor?.id)) });
+    response.json({ events: visible.map((event) => serializeEvent(context, event, actor?.id)) });
   });
 
   router.post("/", (request, response) => {
@@ -286,7 +322,7 @@ export function createEventRouter(context: DatabaseContext) {
       serverBindingId = parsed.data.serverBindingId;
     }
 
-    const mainEvent = resolveMainEventId(context, parsed.data.mainEventId);
+    const mainEvent = resolveMainEventId(context, actor, parsed.data.mainEventId);
     if (!mainEvent.ok) {
       response.status(mainEvent.status).json({ error: mainEvent.error });
       return;
@@ -362,7 +398,7 @@ export function createEventRouter(context: DatabaseContext) {
       return;
     }
 
-    if (!event || event.deletedAt) {
+    if (!event || event.deletedAt || isHiddenRound(context, actor, event)) {
       response.status(404).json({ error: "event_nicht_gefunden" });
       return;
     }
@@ -411,7 +447,7 @@ export function createEventRouter(context: DatabaseContext) {
 
     let mainEventId = event.mainEventId ?? null;
     if (parsed.data.mainEventId !== undefined) {
-      const resolved = resolveMainEventId(context, parsed.data.mainEventId);
+      const resolved = resolveMainEventId(context, actor, parsed.data.mainEventId);
       if (!resolved.ok) {
         response.status(resolved.status).json({ error: resolved.error });
         return;
@@ -469,7 +505,7 @@ export function createEventRouter(context: DatabaseContext) {
       return;
     }
 
-    if (!event || event.deletedAt) {
+    if (!event || event.deletedAt || isHiddenRound(context, actor, event)) {
       response.status(404).json({ error: "event_nicht_gefunden" });
       return;
     }
@@ -563,7 +599,7 @@ export function createEventRouter(context: DatabaseContext) {
             maxPlayers: error.maxPlayers
           }
         });
-        void sendPushToOperators(context, {
+        void notifyOperatorsAboutRound(context, event, {
           title: withMainEventLabel("Runde voll", mainEventName(context, event.mainEventId)),
           body: `${event.gameTitle}: Beitritt abgelehnt (Spieler ${error.joinedCount + 1} von ${error.maxPlayers}).`,
           url: "/#events",
@@ -604,7 +640,7 @@ export function createEventRouter(context: DatabaseContext) {
                 maxPlayers: retryError.maxPlayers
               }
             });
-            void sendPushToOperators(context, {
+            void notifyOperatorsAboutRound(context, event, {
               title: withMainEventLabel("Runde voll", mainEventName(context, event.mainEventId)),
               body: `${event.gameTitle}: Beitritt abgelehnt (Spieler ${retryError.joinedCount + 1} von ${retryError.maxPlayers}).`,
               url: "/#events",
@@ -678,7 +714,7 @@ export function createEventRouter(context: DatabaseContext) {
       return;
     }
 
-    if (!event || event.deletedAt) {
+    if (!event || event.deletedAt || isHiddenRound(context, actor, event)) {
       response.status(404).json({ error: "event_nicht_gefunden" });
       return;
     }
@@ -726,7 +762,7 @@ export function createEventRouter(context: DatabaseContext) {
       return;
     }
 
-    if (!event || event.deletedAt) {
+    if (!event || event.deletedAt || isHiddenRound(context, actor, event)) {
       response.status(404).json({ error: "event_nicht_gefunden" });
       return;
     }

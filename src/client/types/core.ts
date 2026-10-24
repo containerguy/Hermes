@@ -289,6 +289,10 @@ export type MainEvent = {
   name: string;
   description: string | null;
   status: "planned" | "running" | "ended";
+  /** Private Events sehen nur Eingeladene sowie Manager und Admins. */
+  visibility: "public" | "private";
+  /** Gästeliste privater Events, nur für Manager und Admins. */
+  invites?: Array<{ userId: string; username: string }>;
   plannedStartAt: string | null;
   plannedEndAt: string | null;
   startedAt: string | null;

@@ -3,6 +3,7 @@ import { timingSafeEqual } from "node:crypto";
 import { Router } from "express";
 import type { DatabaseContext } from "../db/client";
 import { gameEvents, users } from "../db/schema";
+import { hiddenMainEventIds } from "./main-event-routes";
 import { getServerStatus } from "../integrations/amp/amp-status";
 import { readSettings } from "../settings";
 import { refreshEventStatuses } from "./event-routes";
@@ -102,8 +103,12 @@ export function createKioskRouter(context: DatabaseContext) {
       .orderBy(sql`datetime(${gameEvents.startsAt}) ASC`)
       .all();
 
+    // Die Kiosk-Anzeige ist ohne Login sichtbar: Runden privater Events bleiben draußen.
+    const hidden = hiddenMainEventIds(context, null);
     response.json({
-      events: events.map((event) => serializeKioskEvent(context, event))
+      events: events
+        .filter((event) => !event.mainEventId || !hidden.has(event.mainEventId))
+        .map((event) => serializeKioskEvent(context, event))
     });
   });
 

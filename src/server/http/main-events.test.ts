@@ -20,7 +20,8 @@ vi.mock("../push/push-service", async () => {
     ...actual,
     sendPushToOperators: vi.fn(actual.sendPushToOperators),
     sendPushToEnabledUsers: vi.fn(actual.sendPushToEnabledUsers),
-    sendPushToMainEventParticipants: vi.fn(actual.sendPushToMainEventParticipants)
+    sendPushToMainEventParticipants: vi.fn(actual.sendPushToMainEventParticipants),
+    sendPushToUserIds: vi.fn(actual.sendPushToUserIds)
   };
 });
 
@@ -28,10 +29,12 @@ import { createHermesApp } from "../app";
 import { bootstrapAdmin } from "../db/bootstrap-admin";
 import { createDb } from "../db/client";
 import { broadcastEventsChanged } from "../realtime/event-bus";
+import { hiddenMainEventIds } from "./main-event-routes";
 import {
   mainEventPushTargets,
   sendPushToEnabledUsers,
-  sendPushToMainEventParticipants
+  sendPushToMainEventParticipants,
+  sendPushToUserIds
 } from "../push/push-service";
 
 type StartedApp = Awaited<ReturnType<typeof createHermesApp>>;
@@ -365,5 +368,115 @@ describe("events with start and end (main events)", () => {
       .set(CSRF_HEADER, csrf)
       .send({ status: "declined" })
       .expect(409);
+  });
+
+  it("shows private events, their rounds and notifications only to invited people", async () => {
+    const { adminAgent, managerAgent } = await createManagerAndLogin();
+    const guestAgent = await createUser(adminAgent, "gast");
+    const outsiderAgent = await createUser(adminAgent, "draussen");
+    const guestId = (await guestAgent.get("/api/auth/me").expect(200)).body.user.id as string;
+
+    let csrf = await fetchCsrf(managerAgent);
+    const created = await managerAgent
+      .post("/api/main-events")
+      .set(CSRF_HEADER, csrf)
+      .send({ name: "Geheimturnier", visibility: "private" })
+      .expect(201);
+    const secret = created.body.mainEvent as { id: string; visibility: string; invites: unknown[] };
+    expect(secret).toMatchObject({ visibility: "private", invites: [] });
+
+    // Organisator-Rechte reichen nicht für Einladungen
+    const outsiderCsrf = await fetchCsrf(outsiderAgent);
+    await outsiderAgent
+      .post(`/api/main-events/${secret.id}/invites`)
+      .set(CSRF_HEADER, outsiderCsrf)
+      .send({ userIds: [guestId] })
+      .expect(403);
+
+    csrf = await fetchCsrf(managerAgent);
+    const invited = await managerAgent
+      .post(`/api/main-events/${secret.id}/invites`)
+      .set(CSRF_HEADER, csrf)
+      .send({ userIds: [guestId] })
+      .expect(200);
+    expect(invited.body.mainEvent.invites).toEqual([{ userId: guestId, username: "gast" }]);
+    expect(sendPushToUserIds).toHaveBeenCalledWith(
+      expect.anything(),
+      [guestId],
+      expect.objectContaining({ title: "Einladung" })
+    );
+
+    vi.mocked(sendPushToEnabledUsers).mockClear();
+    await action(managerAgent, secret.id, "start");
+    expect(sendPushToEnabledUsers).not.toHaveBeenCalled();
+    expect(sendPushToUserIds).toHaveBeenLastCalledWith(
+      expect.anything(),
+      [guestId],
+      expect.objectContaining({ title: "Event gestartet" })
+    );
+
+    const finale = await managerAgent.post("/api/events").send(round("Finale")).expect(201);
+    expect(finale.body.event.mainEventId).toBe(secret.id);
+
+    // Eingeladene sehen Event und Runde, ohne Gästeliste
+    const guestEvents = (await guestAgent.get("/api/main-events").expect(200)).body.mainEvents;
+    expect(guestEvents).toHaveLength(1);
+    expect(guestEvents[0]).not.toHaveProperty("invites");
+    expect((await guestAgent.get("/api/events").expect(200)).body.events).toHaveLength(1);
+
+    // Nicht Eingeladene sehen nichts und können nichts tun
+    expect((await outsiderAgent.get("/api/main-events").expect(200)).body.mainEvents).toEqual([]);
+    expect((await outsiderAgent.get("/api/events").expect(200)).body.events).toEqual([]);
+    await outsiderAgent
+      .post(`/api/events/${finale.body.event.id}/participation`)
+      .send({ status: "joined" })
+      .expect(404);
+    await outsiderAgent
+      .post(`/api/main-events/${secret.id}/participation`)
+      .set(CSRF_HEADER, outsiderCsrf)
+      .send({ status: "joined" })
+      .expect(404);
+
+    // Kiosk (ohne Login) blendet private Runden aus
+    const inspect = createDb(databasePath);
+    expect(hiddenMainEventIds(inspect, null).has(secret.id)).toBe(true);
+    inspect.sqlite.close();
+
+    // Einladung zurücknehmen entfernt auch die Teilnahme
+    const guestCsrf = await fetchCsrf(guestAgent);
+    await guestAgent
+      .post(`/api/main-events/${secret.id}/participation`)
+      .set(CSRF_HEADER, guestCsrf)
+      .send({ status: "joined" })
+      .expect(200);
+    csrf = await fetchCsrf(managerAgent);
+    const removed = await managerAgent
+      .delete(`/api/main-events/${secret.id}/invites/${guestId}`)
+      .set(CSRF_HEADER, csrf)
+      .expect(200);
+    expect(removed.body.mainEvent).toMatchObject({ invites: [], participantCount: 0 });
+    expect((await guestAgent.get("/api/main-events").expect(200)).body.mainEvents).toEqual([]);
+  });
+
+  it("keeps existing participants when a public event becomes private", async () => {
+    const { adminAgent, managerAgent } = await createManagerAndLogin();
+    const fanAgent = await createUser(adminAgent, "fan");
+    const fanId = (await fanAgent.get("/api/auth/me").expect(200)).body.user.id as string;
+    const lan = await createMainEvent(managerAgent, "LAN");
+    const fanCsrf = await fetchCsrf(fanAgent);
+    await fanAgent
+      .post(`/api/main-events/${lan.id}/participation`)
+      .set(CSRF_HEADER, fanCsrf)
+      .send({ status: "joined" })
+      .expect(200);
+
+    const csrf = await fetchCsrf(managerAgent);
+    const patched = await managerAgent
+      .patch(`/api/main-events/${lan.id}`)
+      .set(CSRF_HEADER, csrf)
+      .send({ visibility: "private" })
+      .expect(200);
+    expect(patched.body.mainEvent.invites).toEqual([{ userId: fanId, username: "fan" }]);
+    expect((await fanAgent.get("/api/main-events").expect(200)).body.mainEvents).toHaveLength(1);
   });
 });
