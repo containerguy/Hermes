@@ -2726,3 +2726,78 @@ dd {
   align-items: center;
   margin: 6px 0;
 }
+
+/* Events (LAN-Party, Turniertag): Verwaltung oberhalb des Boards, eingeklappt */
+.main-events-panel {
+  margin-top: 16px;
+  padding: 12px 14px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--paper);
+  display: grid;
+  gap: 12px;
+}
+.main-events-panel > summary {
+  cursor: pointer;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 8px;
+}
+.main-events-panel[open] > summary {
+  margin-bottom: 8px;
+}
+.main-events-summary {
+  font-weight: 700;
+}
+.main-events-list {
+  list-style: none;
+  margin: 0 0 12px;
+  padding: 0;
+  display: grid;
+  gap: 10px;
+}
+.main-event {
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 10px 12px;
+}
+.main-event-running {
+  border-color: var(--teal);
+}
+.main-event-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 8px;
+}
+.main-event .action-row {
+  margin-top: 8px;
+}
+.board-main-event {
+  font-weight: 700;
+}
+.board-filter {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.board-participation {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+.main-event-prompt {
+  margin-top: 16px;
+  padding: 16px 18px;
+  border: 1px solid var(--teal);
+  border-left-width: 6px;
+  border-radius: 8px;
+  background: var(--paper);
+  display: grid;
+  gap: 6px;
+}
+.main-event-prompt .action-row {
+  margin-top: 8px;
+}

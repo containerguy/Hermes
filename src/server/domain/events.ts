@@ -17,7 +17,9 @@ export const eventInputSchema = z
     maxPlayers: z.number().int().min(1).max(256),
     details: z.string().trim().max(4000).optional(),
     /** Phase 15: explizite Bindung (null = bewusst keine); fehlt der Key, wird per Titel zugeordnet. */
-    serverBindingId: z.string().min(1).max(64).nullable().optional()
+    serverBindingId: z.string().min(1).max(64).nullable().optional(),
+    /** 0025: Event der Runde (null = keinem Event); fehlt der Key, gilt das laufende Event. */
+    mainEventId: z.string().min(1).max(64).nullable().optional()
   })
   .superRefine((value, context) => {
     if (value.maxPlayers < value.minPlayers) {

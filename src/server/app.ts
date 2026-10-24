@@ -5,6 +5,7 @@ import path from "node:path";
 import { createAdminRouter } from "./http/admin-routes";
 import { createAuthRouter } from "./http/auth-routes";
 import { createEventRouter, refreshEventStatuses } from "./http/event-routes";
+import { createMainEventRouter } from "./http/main-event-routes";
 import { createPushRouter } from "./http/push-routes";
 import { createRealtimeRouter } from "./http/realtime-routes";
 import { createKioskRouter } from "./http/kiosk-routes";
@@ -103,6 +104,7 @@ export async function createHermesApp() {
   app.use("/api/auth", createAuthRouter(context));
   app.use("/api/admin", createAdminRouter(context));
   app.use("/api/events", createEventRouter(context));
+  app.use("/api/main-events", createMainEventRouter(context));
   app.use("/api/push", createPushRouter(context));
   app.use("/api/realtime", createRealtimeRouter(context));
   app.use("/api/kiosk", createKioskRouter(context));
