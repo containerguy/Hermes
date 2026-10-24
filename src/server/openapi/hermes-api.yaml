@@ -508,6 +508,31 @@ paths:
         "204":
           description: OK
 
+  /api/admin/sessions/revoke-others:
+    post:
+      tags: [admin]
+      summary: Alle anderen Benutzer abmelden
+      description: >-
+        Widerruft alle offenen Sitzungen aller Benutzer außer dem ausführenden Admin.
+        Die eigenen Sitzungen des Admins (auch auf anderen Geräten) und API-Tokens bleiben bestehen.
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [revokedSessions, affectedUsers]
+                properties:
+                  revokedSessions:
+                    type: integer
+                  affectedUsers:
+                    type: integer
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+
   /api/admin/invite-codes:
     get:
       tags: [admin]

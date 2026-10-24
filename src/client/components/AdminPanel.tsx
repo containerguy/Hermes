@@ -298,6 +298,31 @@ export function AdminPanel({
       );
   }
 
+  async function revokeOtherSessions() {
+    if (!window.confirm(t("admin.sessions.confirm"))) {
+      return;
+    }
+
+    setRateLimitBusy(true);
+    setError("");
+    setMessage("");
+
+    try {
+      const result = await requestJson<{ revokedSessions: number; affectedUsers: number }>(
+        "/api/admin/sessions/revoke-others",
+        { method: "POST" }
+      );
+      await loadAdminData();
+      setMessage(
+        t("admin.sessions.done", { users: result.affectedUsers, sessions: result.revokedSessions })
+      );
+    } catch (caught) {
+      setError(getErrorMessage(caught, locale));
+    } finally {
+      setRateLimitBusy(false);
+    }
+  }
+
   async function clearRateLimitEntry(entry: RateLimitEntry) {
     const confirmed = window.confirm("Rate-Limit wirklich löschen? (Block wird sofort aufgehoben)");
     if (!confirmed) {
@@ -783,6 +808,7 @@ export function AdminPanel({
           onDeleteAllowlistEntry={deleteAllowlistEntry}
           onClearRateLimitEntry={clearRateLimitEntry}
           onRefresh={() => loadAdminData()}
+          onRevokeOtherSessions={revokeOtherSessions}
         />
       ) : null}
 
