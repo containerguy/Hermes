@@ -39,6 +39,7 @@ import {
   updateUser,
   updateUserSchema
 } from "../domain/users/management";
+import { revokeOtherUsersSessions } from "../domain/auth/sessions";
 import { runBackup, runRestore } from "../domain/backup";
 import { broadcastEventsChanged } from "../realtime/event-bus";
 import {
@@ -406,6 +407,16 @@ export function createAdminRouter(context: DatabaseContext) {
       return;
     }
     response.status(204).send();
+  });
+
+  router.post("/sessions/revoke-others", (request, response) => {
+    const admin = requireAdmin(context, request);
+    if (!admin) {
+      response.status(403).json({ error: "admin_erforderlich" });
+      return;
+    }
+
+    response.json(revokeOtherUsersSessions(context, admin));
   });
 
   router.delete("/events/:id", (request, response) => {

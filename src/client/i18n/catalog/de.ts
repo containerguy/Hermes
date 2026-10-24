@@ -672,6 +672,13 @@ export const deMessages = {
   "admin.rate.title": "Sperren prüfen und aufheben.",
   "admin.rate.noneActive": "Keine aktiven Sperren.",
   "admin.rate.noneHint": "Wenn Rate-Limits aktiv sind, erscheinen sie hier.",
+  "admin.sessions.eyebrow": "Sitzungen",
+  "admin.sessions.title": "Alle anderen abmelden.",
+  "admin.sessions.intro":
+    "Meldet alle Benutzer auf allen Geräten ab. Nur du bleibst angemeldet, auch auf deinen anderen Geräten. API-Tokens bleiben gültig.",
+  "admin.sessions.revokeOthers": "Alle anderen abmelden",
+  "admin.sessions.confirm": "Wirklich alle anderen Benutzer abmelden? Sie müssen sich danach mit einem neuen Login-Code anmelden.",
+  "admin.sessions.done": "{users} Benutzer abgemeldet ({sessions} Sitzungen beendet).",
   "admin.invites.title": "LAN-Party Invite-Codes.",
   "admin.invites.help":
     "Wenn Felder leer bleiben, nutzt Hermes standardmäßig 300 Nutzungen und 30 Tage Laufzeit.",

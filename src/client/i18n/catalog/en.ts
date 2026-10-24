@@ -674,6 +674,13 @@ export const enMessages: { [K in keyof typeof deMessages]: string } = {
   "admin.rate.title": "Review and clear locks.",
   "admin.rate.noneActive": "No active locks.",
   "admin.rate.noneHint": "When rate limits are active they appear here.",
+  "admin.sessions.eyebrow": "Sessions",
+  "admin.sessions.title": "Sign out everyone else.",
+  "admin.sessions.intro":
+    "Signs out all users on all devices. Only you stay signed in, including on your other devices. API tokens remain valid.",
+  "admin.sessions.revokeOthers": "Sign out everyone else",
+  "admin.sessions.confirm": "Really sign out all other users? They will need a new login code to sign in again.",
+  "admin.sessions.done": "{users} users signed out ({sessions} sessions ended).",
   "admin.invites.title": "LAN party invite codes.",
   "admin.invites.help": "If fields stay empty, Hermes defaults to 300 uses and 30 days validity.",
   "admin.invites.sectionAria": "Invite codes",

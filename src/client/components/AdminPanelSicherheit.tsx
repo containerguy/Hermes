@@ -13,6 +13,7 @@ interface AdminPanelSicherheitProps {
   onDeleteAllowlistEntry: (entry: RateLimitAllowlistEntry) => void;
   onClearRateLimitEntry: (entry: RateLimitEntry) => void;
   onRefresh: () => void;
+  onRevokeOtherSessions: () => void;
 }
 
 export function AdminPanelSicherheit({
@@ -25,7 +26,8 @@ export function AdminPanelSicherheit({
   onAddAllowlistEntry,
   onDeleteAllowlistEntry,
   onClearRateLimitEntry,
-  onRefresh
+  onRefresh,
+  onRevokeOtherSessions
 }: AdminPanelSicherheitProps) {
   const { t } = useI18n();
 
@@ -142,6 +144,22 @@ export function AdminPanelSicherheit({
           </article>
         ) : null}
       </div>
+
+      <div className="section-title-row">
+        <div>
+          <p className="eyebrow">{t("admin.sessions.eyebrow")}</p>
+          <h2>{t("admin.sessions.title")}</h2>
+        </div>
+        <button
+          type="button"
+          className="secondary danger"
+          onClick={onRevokeOtherSessions}
+          disabled={rateLimitBusy}
+        >
+          {t("admin.sessions.revokeOthers")}
+        </button>
+      </div>
+      <p className="muted">{t("admin.sessions.intro")}</p>
     </section>
   );
 }
