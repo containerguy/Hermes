@@ -8,10 +8,12 @@ import { tryWriteAuditLog, writeAuditLog } from "../audit-log";
 import type { DatabaseContext } from "../db/client";
 import { appSettings, gameEvents, participations, users } from "../db/schema";
 import { deriveEventStatus, eventInputSchema, shouldAutoArchive } from "../domain/events";
+import { acceptsRounds, withMainEventLabel } from "../domain/main-events";
 import { findBindingForTitle, getBinding } from "../domain/gameservers/bindings";
 import { canCreateEvent, canManageEvent } from "../domain/users";
 import { sendPushToEnabledUsers, sendPushToOperators } from "../push/push-service";
 import { broadcastEventsChanged } from "../realtime/event-bus";
+import { getMainEvent, getRunningMainEvent } from "./main-event-routes";
 
 const updateEventSchema = z.object({
   gameTitle: z.string().trim().min(1).max(120).optional(),
@@ -20,7 +22,8 @@ const updateEventSchema = z.object({
   minPlayers: z.number().int().min(1).max(256).optional(),
   maxPlayers: z.number().int().min(1).max(256).optional(),
   details: z.string().trim().max(4000).nullable().optional(),
-  serverBindingId: z.string().min(1).max(64).nullable().optional()
+  serverBindingId: z.string().min(1).max(64).nullable().optional(),
+  mainEventId: z.string().min(1).max(64).nullable().optional()
 });
 
 function nowIso() {
@@ -36,6 +39,30 @@ class EventCapacityError extends Error {
     this.joinedCount = input.joinedCount;
     this.maxPlayers = input.maxPlayers;
   }
+}
+
+type MainEventResolution = { ok: true; mainEventId: string | null } | { ok: false; status: 400 | 409; error: string };
+
+/** 0025: Event einer Runde bestimmen — explizit (auch null) oder das gerade laufende Event. */
+function resolveMainEventId(context: DatabaseContext, requested: string | null | undefined): MainEventResolution {
+  if (requested === undefined) {
+    return { ok: true, mainEventId: getRunningMainEvent(context)?.id ?? null };
+  }
+  if (requested === null) {
+    return { ok: true, mainEventId: null };
+  }
+  const mainEvent = getMainEvent(context, requested);
+  if (!mainEvent) {
+    return { ok: false, status: 400, error: "hauptevent_nicht_gefunden" };
+  }
+  if (!acceptsRounds(mainEvent.status)) {
+    return { ok: false, status: 409, error: "hauptevent_beendet" };
+  }
+  return { ok: true, mainEventId: mainEvent.id };
+}
+
+function mainEventName(context: DatabaseContext, mainEventId: string | null | undefined) {
+  return mainEventId ? (getMainEvent(context, mainEventId)?.name ?? null) : null;
 }
 
 function isSqliteBusyOrLocked(error: unknown) {
@@ -153,6 +180,8 @@ function serializeEvent(
 
   return {
     id: event.id,
+    mainEventId: event.mainEventId ?? null,
+    mainEventName: mainEventName(context, event.mainEventId),
     gameTitle: event.gameTitle,
     startMode: event.startMode,
     startsAt: event.startsAt,
@@ -198,10 +227,21 @@ export function createEventRouter(context: DatabaseContext) {
   router.get("/", (_request, response) => {
     const actor = requireUser(context, _request);
     refreshEventStatuses(context);
+    // 0025: ?mainEventId=<id> zeigt nur Runden dieses Events, ?mainEventId=none nur Runden ohne Event.
+    const mainEventFilter = typeof _request.query.mainEventId === "string" ? _request.query.mainEventId : undefined;
     const events = context.db
       .select()
       .from(gameEvents)
-      .where(isNull(gameEvents.deletedAt))
+      .where(
+        and(
+          isNull(gameEvents.deletedAt),
+          mainEventFilter === undefined
+            ? undefined
+            : mainEventFilter === "none"
+              ? isNull(gameEvents.mainEventId)
+              : eq(gameEvents.mainEventId, mainEventFilter)
+        )
+      )
       .orderBy(sql`datetime(${gameEvents.startsAt}) ASC`)
       .all();
 
@@ -234,6 +274,12 @@ export function createEventRouter(context: DatabaseContext) {
       serverBindingId = parsed.data.serverBindingId;
     }
 
+    const mainEvent = resolveMainEventId(context, parsed.data.mainEventId);
+    if (!mainEvent.ok) {
+      response.status(mainEvent.status).json({ error: mainEvent.error });
+      return;
+    }
+
     const timestamp = nowIso();
     const startsAt =
       parsed.data.startMode === "now" ? timestamp : (parsed.data.startsAt as string);
@@ -243,6 +289,7 @@ export function createEventRouter(context: DatabaseContext) {
       .insert(gameEvents)
       .values({
         id,
+        mainEventId: mainEvent.mainEventId,
         gameTitle: parsed.data.gameTitle,
         startMode: parsed.data.startMode,
         startsAt,
@@ -277,12 +324,13 @@ export function createEventRouter(context: DatabaseContext) {
         gameTitle: parsed.data.gameTitle,
         startMode: parsed.data.startMode,
         minPlayers: parsed.data.minPlayers,
-        maxPlayers: parsed.data.maxPlayers
+        maxPlayers: parsed.data.maxPlayers,
+        mainEventId: mainEvent.mainEventId
       }
     });
     broadcastEventsChanged("event_created");
     void sendPushToEnabledUsers(context, {
-      title: "Neue Runde",
+      title: withMainEventLabel("Neue Runde", mainEventName(context, mainEvent.mainEventId)),
       body: `${actor.username}: ${parsed.data.gameTitle}`,
       url: "/#events",
       vibrate: [220, 80, 220],
@@ -349,9 +397,20 @@ export function createEventRouter(context: DatabaseContext) {
       serverBindingId = findBindingForTitle(context, parsed.data.gameTitle)?.id ?? null;
     }
 
+    let mainEventId = event.mainEventId ?? null;
+    if (parsed.data.mainEventId !== undefined) {
+      const resolved = resolveMainEventId(context, parsed.data.mainEventId);
+      if (!resolved.ok) {
+        response.status(resolved.status).json({ error: resolved.error });
+        return;
+      }
+      mainEventId = resolved.mainEventId;
+    }
+
     context.db
       .update(gameEvents)
       .set({
+        mainEventId,
         gameTitle: parsed.data.gameTitle ?? event.gameTitle,
         serverBindingId,
         startMode,
@@ -493,7 +552,7 @@ export function createEventRouter(context: DatabaseContext) {
           }
         });
         void sendPushToOperators(context, {
-          title: "Runde voll",
+          title: withMainEventLabel("Runde voll", mainEventName(context, event.mainEventId)),
           body: `${event.gameTitle}: Beitritt abgelehnt (Spieler ${error.joinedCount + 1} von ${error.maxPlayers}).`,
           url: "/#events",
           vibrate: [180, 80, 180]
@@ -534,7 +593,7 @@ export function createEventRouter(context: DatabaseContext) {
               }
             });
             void sendPushToOperators(context, {
-              title: "Runde voll",
+              title: withMainEventLabel("Runde voll", mainEventName(context, event.mainEventId)),
               body: `${event.gameTitle}: Beitritt abgelehnt (Spieler ${retryError.joinedCount + 1} von ${retryError.maxPlayers}).`,
               url: "/#events",
               vibrate: [180, 80, 180]
@@ -582,7 +641,7 @@ export function createEventRouter(context: DatabaseContext) {
     broadcastEventsChanged("participation_updated");
     if (previousStatus !== nextStatus && updated) {
       void sendPushToEnabledUsers(context, {
-        title: "Runde aktualisiert",
+        title: withMainEventLabel("Runde aktualisiert", mainEventName(context, updated.mainEventId)),
         body:
           nextStatus === "ready"
             ? `${updated.gameTitle} ist startbereit.`
@@ -634,7 +693,7 @@ export function createEventRouter(context: DatabaseContext) {
     });
     broadcastEventsChanged("event_cancelled");
     void sendPushToEnabledUsers(context, {
-      title: "Runde storniert",
+      title: withMainEventLabel("Runde storniert", mainEventName(context, event.mainEventId)),
       body: `${event.gameTitle} wurde storniert.`,
       url: "/#events",
       vibrate: [260, 90, 120]
@@ -682,7 +741,7 @@ export function createEventRouter(context: DatabaseContext) {
     });
     broadcastEventsChanged("event_archived");
     void sendPushToEnabledUsers(context, {
-      title: "Runde archiviert",
+      title: withMainEventLabel("Runde archiviert", mainEventName(context, event.mainEventId)),
       body: `${event.gameTitle} wurde archiviert.`,
       url: "/#events",
       vibrate: [120]

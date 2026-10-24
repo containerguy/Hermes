@@ -192,8 +192,34 @@ export const gameServerBindings = sqliteTable(
   (table) => [uniqueIndex("game_server_bindings_title_unique").on(table.gameTitleNorm)]
 );
 
+/** 0025: Event (z. B. LAN-Party, Turniertag), dem Runden und deren Benachrichtigungen zugeordnet sind. */
+export const mainEvents = sqliteTable(
+  "main_events",
+  {
+    id: text("id").primaryKey(),
+    name: text("name").notNull(),
+    description: text("description"),
+    status: text("status", { enum: ["planned", "running", "ended"] })
+      .notNull()
+      .default("planned"),
+    plannedStartAt: text("planned_start_at"),
+    plannedEndAt: text("planned_end_at"),
+    startedAt: text("started_at"),
+    startedByUserId: text("started_by_user_id").references(() => users.id, { onDelete: "set null" }),
+    endedAt: text("ended_at"),
+    endedByUserId: text("ended_by_user_id").references(() => users.id, { onDelete: "set null" }),
+    createdByUserId: text("created_by_user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "restrict" }),
+    createdAt: text("created_at").notNull(),
+    updatedAt: text("updated_at").notNull()
+  }
+);
+
 export const gameEvents = sqliteTable("game_events", {
   id: text("id").primaryKey(),
+  /** 0025: zugeordnetes Event (null = keinem Event zugeordnet). */
+  mainEventId: text("main_event_id").references(() => mainEvents.id, { onDelete: "set null" }),
   gameTitle: text("game_title").notNull(),
   serverBindingId: text("server_binding_id").references(() => gameServerBindings.id, {
     onDelete: "set null"

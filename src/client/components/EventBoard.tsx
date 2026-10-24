@@ -1,5 +1,5 @@
 import React, { FormEvent, useEffect, useState } from "react";
-import type { GameEvent, GameServerBinding, ServerStatus, User } from "../types/core";
+import type { GameEvent, GameServerBinding, MainEvent, ServerStatus, User } from "../types/core";
 import { requestJson } from "../api/request";
 import { ApiError, getErrorMessage } from "../errors/errors";
 import { useI18n } from "../i18n/I18nContext";
@@ -34,6 +34,11 @@ export function EventBoard({
   const resolvedEmptyTitle = emptyBoardTitle.trim() || t("events.empty.defaultTitle");
   const resolvedEmptyBody = emptyBoardBody.trim() || t("events.empty.defaultBody");
   const [events, setEvents] = useState<GameEvent[]>([]);
+  const [mainEvents, setMainEvents] = useState<MainEvent[]>([]);
+  /** "auto" = laufendes Event (sonst alle), "all", "none" (ohne Event) oder eine Event-ID */
+  const [mainEventFilter, setMainEventFilter] = useState<string>("auto");
+  /** Event für neue Runden: "auto" = laufendes Event, "" = keins, sonst eine Event-ID */
+  const [draftMainEventId, setDraftMainEventId] = useState<string>("auto");
   const [eventDraft, setEventDraft] = useState({
     gameTitle: "",
     startMode: "scheduled" as "now" | "scheduled",
@@ -98,8 +103,12 @@ export function EventBoard({
       return;
     }
 
-    const result = await requestJson<{ events: GameEvent[] }>("/api/events");
+    const [result, mainEventResult] = await Promise.all([
+      requestJson<{ events: GameEvent[] }>("/api/events"),
+      requestJson<{ mainEvents: MainEvent[] }>("/api/main-events").catch(() => ({ mainEvents: [] }))
+    ]);
     setEvents(result.events);
+    setMainEvents(mainEventResult?.mainEvents ?? []);
     setEditedStartsAt(
       Object.fromEntries(result.events.map((event) => [event.id, toDatetimeLocal(event.startsAt)]))
     );
@@ -236,7 +245,8 @@ export function EventBoard({
               ? fromDatetimeLocal(eventDraft.startsAt)
               : undefined,
           details: eventDraft.details.trim() || undefined,
-          serverBindingId: matchedBinding ? (linkServer ? matchedBinding.id : null) : undefined
+          serverBindingId: matchedBinding ? (linkServer ? matchedBinding.id : null) : undefined,
+          mainEventId: draftMainEventId === "auto" ? undefined : draftMainEventId || null
         })
       });
       setEventDraft({
@@ -416,6 +426,27 @@ export function EventBoard({
     return alreadyJoined || fullForOthers;
   }
 
+  const runningMainEvent = mainEvents.find((entry) => entry.status === "running");
+  const openMainEvents = mainEvents.filter((entry) => entry.status !== "ended");
+  const resolvedFilter =
+    mainEventFilter === "auto"
+      ? (runningMainEvent?.id ?? "all")
+      : mainEventFilter !== "all" && mainEventFilter !== "none" && !mainEvents.some((entry) => entry.id === mainEventFilter)
+        ? "all"
+        : mainEventFilter;
+  const visibleEvents =
+    resolvedFilter === "all"
+      ? events
+      : events.filter((event) =>
+          resolvedFilter === "none" ? event.mainEventId === null : event.mainEventId === resolvedFilter
+        );
+  const resolvedDraftMainEventId =
+    draftMainEventId === "auto"
+      ? (runningMainEvent?.id ?? "")
+      : openMainEvents.some((entry) => entry.id === draftMainEventId)
+        ? draftMainEventId
+        : "";
+
   if (!currentUser) {
     return (
       <div className="access-panel" aria-label={t("events.guest.aria")}>
@@ -563,6 +594,22 @@ export function EventBoard({
           </label>
         </div>
       ) : null}
+      {openMainEvents.length > 0 ? (
+        <label>
+          {t("events.form.mainEvent")}
+          <select
+            value={resolvedDraftMainEventId}
+            onChange={(ev) => setDraftMainEventId(ev.target.value)}
+          >
+            <option value="">{t("events.form.mainEventNone")}</option>
+            {openMainEvents.map((entry) => (
+              <option key={entry.id} value={entry.id}>
+                {entry.name} ({t(entry.status === "running" ? "mainEvents.status.running" : "mainEvents.status.planned")})
+              </option>
+            ))}
+          </select>
+        </label>
+      ) : null}
       <label>
         {t("events.form.details")}
         <textarea
@@ -579,11 +626,30 @@ export function EventBoard({
     <div className="board-toolbar">
       <div>
         <span className={`live-state live-${liveState}`}>{liveStateLabel}</span>
+        {runningMainEvent ? (
+          <span className="toolbar-hint board-main-event">
+            {t("mainEvents.running", { name: runningMainEvent.name })}
+          </span>
+        ) : null}
         <span className="toolbar-hint">
-          {events.length === 1
+          {visibleEvents.length === 1
             ? t("events.count.one")
-            : t("events.count.many", { n: events.length })}
+            : t("events.count.many", { n: visibleEvents.length })}
         </span>
+        {mainEvents.length > 0 ? (
+          <label className="toolbar-hint board-filter">
+            {t("events.filter.label")}
+            <select value={resolvedFilter} onChange={(ev) => setMainEventFilter(ev.target.value)}>
+              <option value="all">{t("events.filter.all")}</option>
+              {mainEvents.map((entry) => (
+                <option key={entry.id} value={entry.id}>
+                  {entry.name}
+                </option>
+              ))}
+              <option value="none">{t("events.filter.none")}</option>
+            </select>
+          </label>
+        ) : null}
       </div>
       <button type="button" className="secondary" onClick={() => loadEvents()}>
         {t("events.refresh")}
@@ -634,7 +700,7 @@ export function EventBoard({
           <div
             className={`event-list event-list--expandable${compactTouchShell ? " event-list--compact" : ""}`}
           >
-            {events.map((event) => (
+            {visibleEvents.map((event) => (
               <EventCard
                 key={event.id}
                 event={event}
@@ -661,7 +727,7 @@ export function EventBoard({
                 server={serverBindingFor(event)}
               />
             ))}
-            {events.length === 0 ? (
+            {visibleEvents.length === 0 ? (
               compactTouchShell ? (
                 <div className="event-compact-empty event-card">
                   <p className="eyebrow">{t("events.empty.eyebrow")}</p>

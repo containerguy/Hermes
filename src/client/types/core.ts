@@ -283,8 +283,26 @@ export type StorageInfo = {
   backupStatus: StorageBackupStatus | null;
 };
 
+/** Event (z. B. LAN-Party, Turniertag), das Runden und Benachrichtigungen klammert. */
+export type MainEvent = {
+  id: string;
+  name: string;
+  description: string | null;
+  status: "planned" | "running" | "ended";
+  plannedStartAt: string | null;
+  plannedEndAt: string | null;
+  startedAt: string | null;
+  endedAt: string | null;
+  createdByUserId: string;
+  createdByUsername: string;
+  roundCount: number;
+};
+
 export type GameEvent = {
   id: string;
+  /** Zugeordnetes Event (null = keinem Event zugeordnet). */
+  mainEventId: string | null;
+  mainEventName: string | null;
   gameTitle: string;
   startMode: "now" | "scheduled";
   startsAt: string;

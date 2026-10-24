@@ -141,7 +141,7 @@ test("admin creates users, manager creates an event, user joins", async ({ page 
   await eventForm.getByLabel("Startzeit").fill("2027-06-01T18:00");
   await eventForm.getByLabel("Min").fill("1");
   await eventForm.getByLabel("Max").fill("2");
-  await eventForm.getByRole("button", { name: "Event anlegen" }).click();
+  await eventForm.getByRole("button", { name: "Runde anlegen" }).click();
   await expect(page.getByText("Browser Game")).toBeVisible();
 
   await page.goto(`${baseUrl}/#login`);
@@ -221,7 +221,7 @@ test("gameserver: admin binds Minecraft, manager's event shows the server panel,
   await eventForm.getByLabel("Startzeit").fill("2027-06-01T20:00");
   await eventForm.getByLabel("Min").fill("2");
   await eventForm.getByLabel("Max").fill("8");
-  await eventForm.getByRole("button", { name: "Event anlegen" }).click();
+  await eventForm.getByRole("button", { name: "Runde anlegen" }).click();
 
   // Status holen (sofortiger Poll im Server); Minecraft01 steht in der Fixture auf Stopped
   await page.request.get(`${baseUrl}/api/integrations/amp/status?refresh=1`);

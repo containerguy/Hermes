@@ -30,6 +30,8 @@ tags:
     description: Login, Profil, Sitzungen, API-Tokens
   - name: events
     description: Spielrunden (Events)
+  - name: main-events
+    description: Events (z. B. LAN-Party, Turniertag) mit Start und Ende; klammern Runden und deren Benachrichtigungen
   - name: admin
     description: Admin — Benutzer, Invites, Einstellungen, Backup (nur Rolle admin)
   - name: push
@@ -210,6 +212,13 @@ paths:
     get:
       tags: [events]
       summary: Alle Events (nicht soft-deleted)
+      parameters:
+        - name: mainEventId
+          in: query
+          required: false
+          description: Nur Runden dieses Events; `none` = nur Runden ohne Event.
+          schema:
+            type: string
       responses:
         "200":
           content:
@@ -294,6 +303,95 @@ paths:
       responses:
         "204":
           description: OK
+
+  /api/main-events:
+    get:
+      tags: [main-events]
+      summary: Alle Events (laufend, geplant, beendet)
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  mainEvents:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/MainEvent"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+    post:
+      tags: [main-events]
+      summary: Event anlegen (Status planned)
+      description: Benötigt Manager- oder Admin-Rolle und CSRF-Token (außer API-Token mit Schreibrecht).
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/MainEventInput"
+      responses:
+        "201":
+          description: Angelegt
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+
+  /api/main-events/{id}:
+    patch:
+      tags: [main-events]
+      summary: Name, Beschreibung oder geplante Zeiten ändern (nicht bei beendeten Events)
+      parameters:
+        - $ref: "#/components/parameters/EventId"
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/MainEventInput"
+      responses:
+        "200":
+          description: OK
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "409":
+          description: Event beendet (hauptevent_beendet)
+    delete:
+      tags: [main-events]
+      summary: Geplantes Event löschen; zugeordnete Runden verlieren nur die Zuordnung
+      parameters:
+        - $ref: "#/components/parameters/EventId"
+      responses:
+        "204":
+          description: Gelöscht
+        "409":
+          description: Nur geplante Events sind löschbar (hauptevent_nicht_loeschbar)
+
+  /api/main-events/{id}/start:
+    post:
+      tags: [main-events]
+      summary: Event starten; neue Runden gehören danach automatisch dazu
+      description: Es läuft höchstens ein Event gleichzeitig. Sendet eine Push-Benachrichtigung.
+      parameters:
+        - $ref: "#/components/parameters/EventId"
+      responses:
+        "200":
+          description: OK
+        "409":
+          description: Nicht geplant (hauptevent_nicht_geplant) oder anderes Event läuft (anderes_hauptevent_laeuft)
+
+  /api/main-events/{id}/end:
+    post:
+      tags: [main-events]
+      summary: Event beenden; offene Runden des Events werden archiviert
+      parameters:
+        - $ref: "#/components/parameters/EventId"
+      responses:
+        "200":
+          description: OK, `archivedRounds` nennt die Zahl archivierter Runden
+        "409":
+          description: Event läuft nicht (hauptevent_laeuft_nicht)
 
   /api/admin/users:
     get:
@@ -514,11 +612,63 @@ components:
           type: string
           nullable: true
 
+    MainEvent:
+      type: object
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+        description:
+          type: string
+          nullable: true
+        status:
+          type: string
+          enum: [planned, running, ended]
+        plannedStartAt:
+          type: string
+          nullable: true
+        plannedEndAt:
+          type: string
+          nullable: true
+        startedAt:
+          type: string
+          nullable: true
+        endedAt:
+          type: string
+          nullable: true
+        roundCount:
+          type: integer
+
+    MainEventInput:
+      type: object
+      properties:
+        name:
+          type: string
+          description: Pflicht beim Anlegen, 1–120 Zeichen
+        description:
+          type: string
+          nullable: true
+        plannedStartAt:
+          type: string
+          nullable: true
+          description: ISO-8601
+        plannedEndAt:
+          type: string
+          nullable: true
+          description: ISO-8601, nicht vor plannedStartAt
+
     GameEvent:
       type: object
       properties:
         id:
           type: string
+        mainEventId:
+          type: string
+          nullable: true
+        mainEventName:
+          type: string
+          nullable: true
         gameTitle:
           type: string
         startMode:
@@ -554,6 +704,10 @@ components:
         startsAt:
           type: string
           description: ISO-8601, Pflicht wenn startMode scheduled
+        mainEventId:
+          type: string
+          nullable: true
+          description: Event der Runde; fehlt das Feld, gilt das laufende Event, null = keinem Event
         minPlayers:
           type: integer
         maxPlayers:

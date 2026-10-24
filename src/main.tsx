@@ -6,6 +6,7 @@ import type { AdminSection, AppReleaseInfo, AppSettings, PublicAppSettings, User
 import { requestJson } from "./client/api/request";
 import { clearCsrfToken, primeCsrfToken } from "./client/api/csrf";
 import { EventBoard } from "./client/components/EventBoard";
+import { MainEventsPanel } from "./client/components/MainEventsPanel";
 import { PizzaPanel } from "./client/pizza/PizzaPanel";
 import { InfosPage } from "./client/components/InfosPage";
 import { LoginPage } from "./client/components/LoginPage";
@@ -420,6 +421,7 @@ function AppShell({
             cashRecipient={appSettings.pizzaCashRecipient}
           />
         ) : null}
+        {currentUser?.role === "manager" || currentUser?.role === "admin" ? <MainEventsPanel /> : null}
         <EventBoard
           currentUser={currentUser}
           mode={eventBoardMode}
