@@ -2782,3 +2782,22 @@ dd {
   align-items: center;
   gap: 6px;
 }
+
+.board-participation {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+.main-event-prompt {
+  margin-top: 16px;
+  padding: 16px 18px;
+  border: 1px solid var(--teal);
+  border-left-width: 6px;
+  border-radius: 8px;
+  background: var(--paper);
+  display: grid;
+  gap: 6px;
+}
+.main-event-prompt .action-row {
+  margin-top: 8px;
+}

@@ -5,6 +5,7 @@ import { createRoot, type Root } from "react-dom/client";
 import { act } from "react-dom/test-utils";
 import { EventBoard } from "./EventBoard";
 import { MainEventsPanel } from "./MainEventsPanel";
+import { MainEventPrompt } from "./MainEventPrompt";
 import { I18nProvider } from "../i18n/I18nContext";
 import { requestJson } from "../api/request";
 import type { GameEvent, MainEvent, User } from "../types/core";
@@ -87,6 +88,8 @@ function mainEvent(overrides: Partial<MainEvent>): MainEvent {
     createdByUserId: "u-mgr",
     createdByUsername: "mgr",
     roundCount: 1,
+    participantCount: 0,
+    myParticipation: null,
     ...overrides
   };
 }
@@ -212,5 +215,55 @@ describe("Events mit Start und Ende – Oberfläche", () => {
     expect(blocked.disabled).toBe(true);
     expect(second.container.textContent).toContain("Beenden");
     await second.cleanup();
+  });
+
+  it("asks undecided users about the running event and hides after an answer", async () => {
+    window.sessionStorage.clear();
+    const posted = installRequests([mainEvent({})]);
+    requestMock.mockImplementation(async (url: string, options?: RequestInit) => {
+      if (options?.method === "POST") {
+        posted.push({ url, body: JSON.parse(String(options.body)) as Record<string, unknown> });
+        return { mainEvent: mainEvent({ myParticipation: "joined", participantCount: 1 }) };
+      }
+      return { mainEvents: [mainEvent({})] };
+    });
+    const rendered = await render(<MainEventPrompt currentUserId="u-mgr" />);
+    expect(rendered.container.textContent).toContain("Bist du bei LAN Herbst dabei?");
+
+    const join = Array.from(rendered.container.querySelectorAll("button")).find(
+      (button) => button.textContent === "Dabei"
+    ) as HTMLButtonElement;
+    await act(async () => {
+      join.click();
+      await flush();
+    });
+    expect(posted.at(-1)).toEqual({ url: "/api/main-events/m-1/participation", body: { status: "joined" } });
+    expect(rendered.container.textContent).toBe("");
+    await rendered.cleanup();
+  });
+
+  it("does not ask again after 'Später' or once the user has decided", async () => {
+    window.sessionStorage.clear();
+    installRequests([mainEvent({})]);
+    const first = await render(<MainEventPrompt currentUserId="u-mgr" />);
+    const later = Array.from(first.container.querySelectorAll("button")).find(
+      (button) => button.textContent === "Später"
+    ) as HTMLButtonElement;
+    await act(async () => {
+      later.click();
+      await flush();
+    });
+    expect(first.container.textContent).toBe("");
+    await first.cleanup();
+
+    const again = await render(<MainEventPrompt currentUserId="u-mgr" />);
+    expect(again.container.textContent).toBe("");
+    await again.cleanup();
+
+    window.sessionStorage.clear();
+    installRequests([mainEvent({ myParticipation: "declined" })]);
+    const decided = await render(<MainEventPrompt currentUserId="u-mgr" />);
+    expect(decided.container.textContent).toBe("");
+    await decided.cleanup();
   });
 });

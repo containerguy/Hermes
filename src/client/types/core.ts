@@ -296,6 +296,9 @@ export type MainEvent = {
   createdByUserId: string;
   createdByUsername: string;
   roundCount: number;
+  /** Zahl der Zusagen („dabei"). */
+  participantCount: number;
+  myParticipation: "joined" | "declined" | null;
 };
 
 export type GameEvent = {

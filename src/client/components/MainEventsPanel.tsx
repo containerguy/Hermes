@@ -135,6 +135,10 @@ export function MainEventsPanel() {
                 {mainEvent.roundCount === 1
                   ? t("mainEvents.rounds.one")
                   : t("mainEvents.rounds.many", { n: mainEvent.roundCount })}
+                {" · "}
+                {mainEvent.participantCount === 1
+                  ? t("mainEvents.participants.one")
+                  : t("mainEvents.participants.many", { n: mainEvent.participantCount })}
                 {mainEvent.status === "planned" && planned ? ` · ${t("mainEvents.planned", { range: planned })}` : null}
                 {mainEvent.status === "running" && mainEvent.startedAt
                   ? ` · ${t("mainEvents.startedAt", { at: formatDate(mainEvent.startedAt) })}`

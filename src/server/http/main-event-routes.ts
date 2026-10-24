@@ -1,15 +1,16 @@
 import { and, eq, inArray, isNull } from "drizzle-orm";
+import { z } from "zod";
 import { Router } from "express";
 import { randomUUID } from "node:crypto";
 import { requireUser } from "../auth/current-user";
 import { requireCsrf } from "../auth/csrf";
 import { enforceApiTokenWriteAccess } from "../auth/hermes-auth";
-import { writeAuditLog } from "../audit-log";
+import { tryWriteAuditLog, writeAuditLog } from "../audit-log";
 import type { DatabaseContext } from "../db/client";
-import { gameEvents, mainEvents, users } from "../db/schema";
+import { gameEvents, mainEventParticipants, mainEvents, users } from "../db/schema";
 import { mainEventInputSchema, mainEventUpdateSchema } from "../domain/main-events";
 import { canManageMainEvents } from "../domain/users";
-import { sendPushToEnabledUsers } from "../push/push-service";
+import { sendPushToEnabledUsers, sendPushToMainEventParticipants } from "../push/push-service";
 import { broadcastEventsChanged } from "../realtime/event-bus";
 
 type MainEventRow = typeof mainEvents.$inferSelect;
@@ -38,7 +39,49 @@ function countRounds(context: DatabaseContext, mainEventId: string) {
   return row.count;
 }
 
-function serializeMainEvent(context: DatabaseContext, event: MainEventRow) {
+function countParticipants(context: DatabaseContext, mainEventId: string) {
+  const row = context.sqlite
+    .prepare("SELECT COUNT(*) AS count FROM main_event_participants WHERE main_event_id = ? AND status = 'joined'")
+    .get(mainEventId) as { count: number };
+
+  return row.count;
+}
+
+function findParticipation(context: DatabaseContext, mainEventId: string, userId: string) {
+  return context.db
+    .select()
+    .from(mainEventParticipants)
+    .where(and(eq(mainEventParticipants.mainEventId, mainEventId), eq(mainEventParticipants.userId, userId)))
+    .get();
+}
+
+function setParticipation(
+  context: DatabaseContext,
+  mainEventId: string,
+  userId: string,
+  status: "joined" | "declined"
+) {
+  const timestamp = nowIso();
+  context.db
+    .insert(mainEventParticipants)
+    .values({ id: randomUUID(), mainEventId, userId, status, createdAt: timestamp, updatedAt: timestamp })
+    .onConflictDoUpdate({
+      target: [mainEventParticipants.mainEventId, mainEventParticipants.userId],
+      set: { status, updatedAt: timestamp }
+    })
+    .run();
+}
+
+/** Wer bei einer Runde des Events „dabei" sagt und sich zum Event noch nicht entschieden hat, nimmt teil. */
+export function joinMainEventIfUndecided(context: DatabaseContext, mainEventId: string, userId: string) {
+  if (findParticipation(context, mainEventId, userId)) {
+    return false;
+  }
+  setParticipation(context, mainEventId, userId, "joined");
+  return true;
+}
+
+function serializeMainEvent(context: DatabaseContext, event: MainEventRow, currentUserId?: string) {
   const creator = context.db.select().from(users).where(eq(users.id, event.createdByUserId)).get();
 
   return {
@@ -53,6 +96,8 @@ function serializeMainEvent(context: DatabaseContext, event: MainEventRow) {
     createdByUserId: event.createdByUserId,
     createdByUsername: creator?.username ?? "unbekannt",
     roundCount: countRounds(context, event.id),
+    participantCount: countParticipants(context, event.id),
+    myParticipation: currentUserId ? (findParticipation(context, event.id, currentUserId)?.status ?? null) : null,
     createdAt: event.createdAt,
     updatedAt: event.updatedAt
   };
@@ -87,7 +132,9 @@ export function createMainEventRouter(context: DatabaseContext) {
       if (!enforceApiTokenWriteAccess(request, response)) {
         return;
       }
-      if (!canManageMainEvents(user)) {
+      // Teilnahme zu- oder absagen darf jeder; alles andere ist Verwaltung.
+      const isParticipation = request.method === "POST" && /^\/[^/]+\/participation$/.test(request.path);
+      if (!isParticipation && !canManageMainEvents(user)) {
         response.status(403).json({ error: "hauptevent_manager_erforderlich" });
         return;
       }
@@ -99,9 +146,10 @@ export function createMainEventRouter(context: DatabaseContext) {
     next();
   });
 
-  router.get("/", (_request, response) => {
+  router.get("/", (request, response) => {
+    const actor = requireUser(context, request)!;
     const events = context.db.select().from(mainEvents).all();
-    response.json({ mainEvents: sortMainEvents(events).map((event) => serializeMainEvent(context, event)) });
+    response.json({ mainEvents: sortMainEvents(events).map((event) => serializeMainEvent(context, event, actor.id)) });
   });
 
   router.post("/", (request, response) => {
@@ -140,7 +188,7 @@ export function createMainEventRouter(context: DatabaseContext) {
       metadata: { plannedStartAt: created.plannedStartAt, plannedEndAt: created.plannedEndAt }
     });
     broadcastEventsChanged("main_event_created");
-    response.status(201).json({ mainEvent: serializeMainEvent(context, created) });
+    response.status(201).json({ mainEvent: serializeMainEvent(context, created, actor.id) });
   });
 
   router.patch("/:id", (request, response) => {
@@ -197,7 +245,7 @@ export function createMainEventRouter(context: DatabaseContext) {
       metadata: parsed.data
     });
     broadcastEventsChanged("main_event_updated");
-    response.json({ mainEvent: serializeMainEvent(context, updated) });
+    response.json({ mainEvent: serializeMainEvent(context, updated, actor.id) });
   });
 
   router.post("/:id/start", (request, response) => {
@@ -238,11 +286,11 @@ export function createMainEventRouter(context: DatabaseContext) {
     broadcastEventsChanged("main_event_started");
     void sendPushToEnabledUsers(context, {
       title: "Event gestartet",
-      body: `${event.name} läuft jetzt.`,
+      body: `${event.name} läuft jetzt. Bist du dabei?`,
       url: "/#events",
       vibrate: [220, 80, 220]
     });
-    response.json({ mainEvent: serializeMainEvent(context, updated) });
+    response.json({ mainEvent: serializeMainEvent(context, updated, actor.id) });
   });
 
   router.post("/:id/end", (request, response) => {
@@ -307,13 +355,50 @@ export function createMainEventRouter(context: DatabaseContext) {
       metadata: { archivedRounds }
     });
     broadcastEventsChanged("main_event_ended");
-    void sendPushToEnabledUsers(context, {
+    void sendPushToMainEventParticipants(context, event.id, {
       title: "Event beendet",
       body: `${event.name} ist vorbei. Danke fürs Mitspielen!`,
       url: "/#events",
       vibrate: [120]
     });
-    response.json({ mainEvent: serializeMainEvent(context, updated), archivedRounds });
+    response.json({ mainEvent: serializeMainEvent(context, updated, actor.id), archivedRounds });
+  });
+
+  router.post("/:id/participation", (request, response) => {
+    const actor = requireUser(context, request)!;
+    const event = getMainEvent(context, request.params.id);
+    const parsed = z.object({ status: z.enum(["joined", "declined"]) }).safeParse(request.body);
+
+    if (!event) {
+      response.status(404).json({ error: "hauptevent_nicht_gefunden" });
+      return;
+    }
+
+    if (!parsed.success) {
+      response.status(400).json({ error: "ungueltige_teilnahme" });
+      return;
+    }
+
+    if (event.status === "ended") {
+      response.status(409).json({ error: "hauptevent_beendet" });
+      return;
+    }
+
+    const previous = findParticipation(context, event.id, actor.id)?.status ?? null;
+    setParticipation(context, event.id, actor.id, parsed.data.status);
+    tryWriteAuditLog(context, {
+      actor,
+      action: "main_event.participation",
+      entityType: "main_event",
+      entityId: event.id,
+      summary:
+        parsed.data.status === "joined"
+          ? `${actor.username} ist beim Event ${event.name} dabei.`
+          : `${actor.username} ist beim Event ${event.name} nicht dabei.`,
+      metadata: { participation: parsed.data.status, previousParticipation: previous }
+    });
+    broadcastEventsChanged("main_event_participation_updated");
+    response.json({ mainEvent: serializeMainEvent(context, getMainEvent(context, event.id)!, actor.id) });
   });
 
   router.delete("/:id", (request, response) => {

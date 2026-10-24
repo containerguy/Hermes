@@ -216,6 +216,24 @@ export const mainEvents = sqliteTable(
   }
 );
 
+/** 0025: Teilnahme am Event; „joined" bekommt die Benachrichtigungen zu dessen Runden. */
+export const mainEventParticipants = sqliteTable(
+  "main_event_participants",
+  {
+    id: text("id").primaryKey(),
+    mainEventId: text("main_event_id")
+      .notNull()
+      .references(() => mainEvents.id, { onDelete: "cascade" }),
+    userId: text("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    status: text("status", { enum: ["joined", "declined"] }).notNull(),
+    createdAt: text("created_at").notNull(),
+    updatedAt: text("updated_at").notNull()
+  },
+  (table) => [uniqueIndex("main_event_participants_event_user_unique").on(table.mainEventId, table.userId)]
+);
+
 export const gameEvents = sqliteTable("game_events", {
   id: text("id").primaryKey(),
   /** 0025: zugeordnetes Event (null = keinem Event zugeordnet). */

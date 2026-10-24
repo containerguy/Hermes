@@ -11,9 +11,14 @@ import { deriveEventStatus, eventInputSchema, shouldAutoArchive } from "../domai
 import { acceptsRounds, withMainEventLabel } from "../domain/main-events";
 import { findBindingForTitle, getBinding } from "../domain/gameservers/bindings";
 import { canCreateEvent, canManageEvent } from "../domain/users";
-import { sendPushToEnabledUsers, sendPushToOperators } from "../push/push-service";
+import {
+  sendPushToEnabledUsers,
+  sendPushToMainEventParticipants,
+  sendPushToOperators,
+  type PushPayload
+} from "../push/push-service";
 import { broadcastEventsChanged } from "../realtime/event-bus";
-import { getMainEvent, getRunningMainEvent } from "./main-event-routes";
+import { getMainEvent, getRunningMainEvent, joinMainEventIfUndecided } from "./main-event-routes";
 
 const updateEventSchema = z.object({
   gameTitle: z.string().trim().min(1).max(120).optional(),
@@ -63,6 +68,13 @@ function resolveMainEventId(context: DatabaseContext, requested: string | null |
 
 function mainEventName(context: DatabaseContext, mainEventId: string | null | undefined) {
   return mainEventId ? (getMainEvent(context, mainEventId)?.name ?? null) : null;
+}
+
+/** Runden eines Events benachrichtigen nur dessen Teilnehmer, Runden ohne Event alle. */
+function sendPushForRound(context: DatabaseContext, mainEventId: string | null | undefined, payload: PushPayload) {
+  return mainEventId
+    ? sendPushToMainEventParticipants(context, mainEventId, payload)
+    : sendPushToEnabledUsers(context, payload);
 }
 
 function isSqliteBusyOrLocked(error: unknown) {
@@ -329,7 +341,7 @@ export function createEventRouter(context: DatabaseContext) {
       }
     });
     broadcastEventsChanged("event_created");
-    void sendPushToEnabledUsers(context, {
+    void sendPushForRound(context, mainEvent.mainEventId, {
       title: withMainEventLabel("Neue Runde", mainEventName(context, mainEvent.mainEventId)),
       body: `${actor.username}: ${parsed.data.gameTitle}`,
       url: "/#events",
@@ -624,6 +636,10 @@ export function createEventRouter(context: DatabaseContext) {
     }
 
     const { existingStatus, previousStatus, nextStatus, updated } = transactionResult;
+    // Zusage zu einer Runde gilt auch als Teilnahme am Event, wenn dazu noch nichts entschieden ist.
+    if (parsed.data.status === "joined" && event.mainEventId) {
+      joinMainEventIfUndecided(context, event.mainEventId, actor.id);
+    }
     tryWriteAuditLog(context, {
       actor,
       action: "participation.set",
@@ -640,7 +656,7 @@ export function createEventRouter(context: DatabaseContext) {
     });
     broadcastEventsChanged("participation_updated");
     if (previousStatus !== nextStatus && updated) {
-      void sendPushToEnabledUsers(context, {
+      void sendPushForRound(context, updated.mainEventId, {
         title: withMainEventLabel("Runde aktualisiert", mainEventName(context, updated.mainEventId)),
         body:
           nextStatus === "ready"
@@ -692,7 +708,7 @@ export function createEventRouter(context: DatabaseContext) {
       summary: `${actor.username} hat ${event.gameTitle} storniert.`
     });
     broadcastEventsChanged("event_cancelled");
-    void sendPushToEnabledUsers(context, {
+    void sendPushForRound(context, event.mainEventId, {
       title: withMainEventLabel("Runde storniert", mainEventName(context, event.mainEventId)),
       body: `${event.gameTitle} wurde storniert.`,
       url: "/#events",
@@ -740,7 +756,7 @@ export function createEventRouter(context: DatabaseContext) {
       summary: `${actor.username} hat ${event.gameTitle} archiviert.`
     });
     broadcastEventsChanged("event_archived");
-    void sendPushToEnabledUsers(context, {
+    void sendPushForRound(context, event.mainEventId, {
       title: withMainEventLabel("Runde archiviert", mainEventName(context, event.mainEventId)),
       body: `${event.gameTitle} wurde archiviert.`,
       url: "/#events",

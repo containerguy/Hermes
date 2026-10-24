@@ -19,14 +19,20 @@ vi.mock("../push/push-service", async () => {
   return {
     ...actual,
     sendPushToOperators: vi.fn(actual.sendPushToOperators),
-    sendPushToEnabledUsers: vi.fn(actual.sendPushToEnabledUsers)
+    sendPushToEnabledUsers: vi.fn(actual.sendPushToEnabledUsers),
+    sendPushToMainEventParticipants: vi.fn(actual.sendPushToMainEventParticipants)
   };
 });
 
 import { createHermesApp } from "../app";
 import { bootstrapAdmin } from "../db/bootstrap-admin";
+import { createDb } from "../db/client";
 import { broadcastEventsChanged } from "../realtime/event-bus";
-import { sendPushToEnabledUsers, sendPushToOperators } from "../push/push-service";
+import {
+  mainEventPushTargets,
+  sendPushToEnabledUsers,
+  sendPushToMainEventParticipants
+} from "../push/push-service";
 
 type StartedApp = Awaited<ReturnType<typeof createHermesApp>>;
 
@@ -163,7 +169,7 @@ describe("events with start and end (main events)", () => {
     expect(started.body.mainEvent.startedAt).toEqual(expect.any(String));
     expect(sendPushToEnabledUsers).toHaveBeenCalledWith(
       expect.anything(),
-      expect.objectContaining({ title: "Event gestartet", body: "LAN Herbst läuft jetzt." })
+      expect.objectContaining({ title: "Event gestartet", body: "LAN Herbst läuft jetzt. Bist du dabei?" })
     );
 
     // starten nur einmal
@@ -212,10 +218,12 @@ describe("events with start and end (main events)", () => {
 
     const linked = await managerAgent.post("/api/events").send(round("Quake")).expect(201);
     expect(linked.body.event).toMatchObject({ mainEventId: lan.id, mainEventName: "LAN Herbst" });
-    expect(sendPushToEnabledUsers).toHaveBeenCalledWith(
+    expect(sendPushToMainEventParticipants).toHaveBeenCalledWith(
       expect.anything(),
+      lan.id,
       expect.objectContaining({ title: "Neue Runde · LAN Herbst" })
     );
+    expect(sendPushToEnabledUsers).not.toHaveBeenCalled();
 
     // explizit ohne Event
     const loose = await managerAgent.post("/api/events").send(round("Solo", { mainEventId: null })).expect(201);
@@ -305,5 +313,57 @@ describe("events with start and end (main events)", () => {
     await action(managerAgent, lan.id, "end");
     csrf = await fetchCsrf(managerAgent);
     await managerAgent.patch(`/api/main-events/${lan.id}`).set(CSRF_HEADER, csrf).send({ name: "Neu" }).expect(409);
+  });
+
+  it("lets every user join or decline an event and notifies only participants about its rounds", async () => {
+    const { adminAgent, managerAgent } = await createManagerAndLogin();
+    const fanAgent = await createUser(adminAgent, "fan");
+    const restAgent = await createUser(adminAgent, "rest");
+    await createUser(adminAgent, "stumm");
+
+    const lan = await createMainEvent(managerAgent, "LAN Herbst");
+    await action(managerAgent, lan.id, "start");
+
+    let csrf = await fetchCsrf(fanAgent);
+    const joined = await fanAgent
+      .post(`/api/main-events/${lan.id}/participation`)
+      .set(CSRF_HEADER, csrf)
+      .send({ status: "joined" })
+      .expect(200);
+    expect(joined.body.mainEvent).toMatchObject({ myParticipation: "joined", participantCount: 1 });
+
+    csrf = await fetchCsrf(restAgent);
+    await restAgent
+      .post(`/api/main-events/${lan.id}/participation`)
+      .set(CSRF_HEADER, csrf)
+      .send({ status: "declined" })
+      .expect(200);
+    await restAgent.post(`/api/main-events/${lan.id}/participation`).send({ status: "joined" }).expect(403);
+
+    const list = (await restAgent.get("/api/main-events").expect(200)).body.mainEvents;
+    expect(list[0]).toMatchObject({ myParticipation: "declined", participantCount: 1 });
+
+    const inspect = createDb(databasePath);
+    const targets = mainEventPushTargets(inspect, lan.id);
+    inspect.sqlite.close();
+    const fanId = (await fanAgent.get("/api/auth/me").expect(200)).body.user.id;
+    expect(targets).toEqual([fanId]);
+
+    // „dabei" bei einer Runde gilt als Teilnahme am Event, wenn noch nichts entschieden ist
+    const quake = await managerAgent.post("/api/events").send(round("Quake")).expect(201);
+    const stummAgent = request.agent(started!.app);
+    await login(stummAgent, "stumm");
+    await stummAgent.post(`/api/events/${quake.body.event.id}/participation`).send({ status: "joined" }).expect(200);
+    await restAgent.post(`/api/events/${quake.body.event.id}/participation`).send({ status: "joined" }).expect(200);
+    const after = (await managerAgent.get("/api/main-events").expect(200)).body.mainEvents[0];
+    expect(after.participantCount).toBe(2);
+
+    await action(managerAgent, lan.id, "end");
+    csrf = await fetchCsrf(fanAgent);
+    await fanAgent
+      .post(`/api/main-events/${lan.id}/participation`)
+      .set(CSRF_HEADER, csrf)
+      .send({ status: "declined" })
+      .expect(409);
   });
 });

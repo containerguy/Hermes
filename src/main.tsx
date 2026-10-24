@@ -6,6 +6,7 @@ import type { AdminSection, AppReleaseInfo, AppSettings, PublicAppSettings, User
 import { requestJson } from "./client/api/request";
 import { clearCsrfToken, primeCsrfToken } from "./client/api/csrf";
 import { EventBoard } from "./client/components/EventBoard";
+import { MainEventPrompt } from "./client/components/MainEventPrompt";
 import { MainEventsPanel } from "./client/components/MainEventsPanel";
 import { PizzaPanel } from "./client/pizza/PizzaPanel";
 import { InfosPage } from "./client/components/InfosPage";
@@ -412,6 +413,7 @@ function AppShell({
 
     return (
       <>
+        {currentUser ? <MainEventPrompt currentUserId={currentUser.id} /> : null}
         {currentUser && appSettings.featuresPizzaEnabled ? (
           <PizzaPanel
             currentUserId={currentUser.id}

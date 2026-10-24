@@ -363,6 +363,20 @@ export function EventBoard({
     }
   }
 
+  async function setMainEventParticipation(mainEventId: string, status: "joined" | "declined") {
+    setError("");
+    setMessage("");
+    try {
+      await requestJson<{ mainEvent: MainEvent }>(`/api/main-events/${mainEventId}/participation`, {
+        method: "POST",
+        body: JSON.stringify({ status })
+      });
+      await loadEvents();
+    } catch (caught) {
+      setError(getErrorMessage(caught, locale));
+    }
+  }
+
   function canManage(event: GameEvent) {
     return (
       currentUser?.role === "admin" ||
@@ -629,6 +643,29 @@ export function EventBoard({
         {runningMainEvent ? (
           <span className="toolbar-hint board-main-event">
             {t("mainEvents.running", { name: runningMainEvent.name })}
+          </span>
+        ) : null}
+        {runningMainEvent ? (
+          <span className="toolbar-hint board-participation">
+            {runningMainEvent.myParticipation === "joined"
+              ? t("mainEvents.participation.joined")
+              : runningMainEvent.myParticipation === "declined"
+                ? t("mainEvents.participation.declined")
+                : null}
+            <button
+              type="button"
+              className="secondary"
+              onClick={() =>
+                setMainEventParticipation(
+                  runningMainEvent.id,
+                  runningMainEvent.myParticipation === "joined" ? "declined" : "joined"
+                )
+              }
+            >
+              {runningMainEvent.myParticipation === "joined"
+                ? t("mainEvents.participation.decline")
+                : t("mainEvents.participation.join")}
+            </button>
           </span>
         ) : null}
         <span className="toolbar-hint">

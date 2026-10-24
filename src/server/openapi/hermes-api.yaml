@@ -381,6 +381,30 @@ paths:
         "409":
           description: Nicht geplant (hauptevent_nicht_geplant) oder anderes Event läuft (anderes_hauptevent_laeuft)
 
+  /api/main-events/{id}/participation:
+    post:
+      tags: [main-events]
+      summary: Am Event teilnehmen oder absagen (jede angemeldete Person)
+      description: Teilnehmer („joined“) bekommen die Push-Benachrichtigungen zu den Runden des Events; Runden ohne Event gehen weiter an alle.
+      parameters:
+        - $ref: "#/components/parameters/EventId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [status]
+              properties:
+                status:
+                  type: string
+                  enum: [joined, declined]
+      responses:
+        "200":
+          description: OK
+        "409":
+          description: Event beendet (hauptevent_beendet)
+
   /api/main-events/{id}/end:
     post:
       tags: [main-events]
@@ -639,6 +663,12 @@ components:
           nullable: true
         roundCount:
           type: integer
+        participantCount:
+          type: integer
+        myParticipation:
+          type: string
+          nullable: true
+          enum: [joined, declined]
 
     MainEventInput:
       type: object
