@@ -163,6 +163,10 @@ test("responsive shell and profile guidance regions stay visible", async ({ page
   await login(page, "hauptadmin");
   await page.goto(`${baseUrl}/#login`);
   await expect(page.getByRole("region", { name: "Aktuelle Anmeldung" })).toBeVisible();
+  // Auf dem Handy führt die Tab-Leiste unten durch die Bereiche.
+  await expect(page.locator(".tab-bar")).toBeVisible();
+  await expect(page.locator(".nav-links")).toBeHidden();
+  await page.getByRole("navigation", { name: "Profil Unterseiten" }).getByRole("link", { name: "Benachrichtigungen" }).click();
   await expect(page.locator(".runtime-callout")).toBeVisible();
   await expect(page.locator(".install-hint-card")).toBeVisible();
 
@@ -170,6 +174,9 @@ test("responsive shell and profile guidance regions stay visible", async ({ page
   await page.goto(`${baseUrl}/#events`);
   await expect(page.locator(".page-hero")).toBeVisible();
   await expect(page.getByRole("region", { name: "Events" })).toBeVisible();
+  await expect(page.locator(".tab-bar")).toBeHidden();
+  await page.getByRole("navigation", { name: "Bereiche" }).getByRole("link", { name: "Events" }).click();
+  await expect(page.getByRole("region", { name: "Events verwalten" })).toBeVisible();
 });
 
 test("gameserver: admin binds Minecraft, manager's event shows the server panel, user cannot control it", async ({
@@ -216,7 +223,7 @@ test("gameserver: admin binds Minecraft, manager's event shows the server panel,
   const eventForm = page.locator("form.event-form");
   await eventForm.getByLabel("Spiel").fill("Minecraft");
   await expect(eventForm.getByText("Server für „Minecraft“")).toBeVisible();
-  await expect(eventForm.getByLabel("Server mit diesem Event verknüpfen")).toBeChecked();
+  await expect(eventForm.getByLabel("Server mit dieser Runde verknüpfen")).toBeChecked();
   await eventForm.locator("select").first().selectOption("scheduled");
   await eventForm.getByLabel("Startzeit").fill("2027-06-01T20:00");
   await eventForm.getByLabel("Min").fill("2");

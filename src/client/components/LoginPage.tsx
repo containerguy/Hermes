@@ -1,17 +1,19 @@
 import React from "react";
 import type { AppSettings, User } from "../types/core";
 import { brandIconSrc } from "../lib/brand-icon";
-import { LoginPanel } from "./LoginPanel";
+import { LoginPanel, type ProfileSectionId } from "./LoginPanel";
 
 export function LoginPage({
   currentUser,
   settings,
+  profileSection,
   onLoggedIn,
   onLoggedOut,
   onUserUpdated
 }: {
   currentUser: User | null;
   settings: AppSettings;
+  profileSection?: ProfileSectionId;
   onLoggedIn: (user: User) => void;
   onLoggedOut: () => void;
   onUserUpdated: (user: User) => void;
@@ -25,6 +27,7 @@ export function LoginPage({
       <LoginPanel
         currentUser={currentUser}
         settings={settings}
+        profileSection={profileSection}
         onLoggedIn={onLoggedIn}
         onLoggedOut={onLoggedOut}
         onUserUpdated={onUserUpdated}

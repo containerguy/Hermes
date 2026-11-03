@@ -22,8 +22,11 @@ const statusClasses: Record<MainEvent["status"], string> = {
 
 const emptyDraft = { name: "", description: "", plannedStartAt: "", plannedEndAt: "", private: false };
 
-/** Events (LAN-Party, Turniertag) anlegen, starten, beenden — für Manager und Admins. */
-export function MainEventsPanel() {
+/**
+ * Seite „Events“: alle sichtbaren Events mit eigener Teilnahme. Manager und Admins legen hier
+ * außerdem Events an, starten und beenden sie und verwalten Einladungen.
+ */
+export function MainEventsPanel({ canManage = true }: { canManage?: boolean }) {
   const { t, locale } = useI18n();
   const dateFormatter = new Intl.DateTimeFormat(locale === "en" ? "en-US" : "de-DE", {
     dateStyle: "medium",
@@ -45,7 +48,7 @@ export function MainEventsPanel() {
   const hasPrivate = mainEvents.some((entry) => entry.visibility === "private" && entry.status !== "ended");
 
   useEffect(() => {
-    if (!hasPrivate || candidates.length > 0) {
+    if (!canManage || !hasPrivate || candidates.length > 0) {
       return;
     }
     requestJson<{ users: Array<{ id: string; username: string }> }>("/api/main-events/invite-candidates")
@@ -155,21 +158,29 @@ export function MainEventsPanel() {
     );
   }
 
+  async function setParticipation(mainEvent: MainEvent, status: "joined" | "declined") {
+    await run(
+      () =>
+        requestJson<{ mainEvent: MainEvent }>(`/api/main-events/${mainEvent.id}/participation`, {
+          method: "POST",
+          body: JSON.stringify({ status })
+        }),
+      status === "joined" ? "mainEvents.participation.joined" : "mainEvents.participation.declined"
+    );
+  }
+
   const running = mainEvents.find((entry) => entry.status === "running");
+  // Laufendes zuerst, dann geplante, beendete zuletzt — innerhalb gleicher Reihenfolge wie vom Server.
+  const statusOrder: Record<MainEvent["status"], number> = { running: 0, planned: 1, ended: 2 };
+  const sorted = [...mainEvents].sort((a, b) => statusOrder[a.status] - statusOrder[b.status]);
 
   return (
-    <details className="main-events-panel" aria-label={t("mainEvents.aria")}>
-      <summary>
-        <span className="eyebrow">{t("mainEvents.eyebrow")}</span>
-        <span className="main-events-summary">
-          {running ? t("mainEvents.running", { name: running.name }) : t("mainEvents.title")}
-        </span>
-      </summary>
-      <p className="muted">{t("mainEvents.intro")}</p>
+    <section className="main-events-panel" aria-label={canManage ? t("mainEvents.aria") : t("mainEvents.ariaList")}>
+      {canManage ? <p className="muted">{t("mainEvents.intro")}</p> : null}
       {message ? <p className="notice">{message}</p> : null}
       {error ? <p className="error">{error}</p> : null}
       <ul className="main-events-list">
-        {mainEvents.map((mainEvent) => {
+        {sorted.map((mainEvent) => {
           const planned = [formatDate(mainEvent.plannedStartAt), formatDate(mainEvent.plannedEndAt)]
             .filter(Boolean)
             .join(" – ");
@@ -203,7 +214,33 @@ export function MainEventsPanel() {
                   ? ` · ${t("mainEvents.endedAt", { at: formatDate(mainEvent.endedAt) })}`
                   : null}
               </p>
-              {mainEvent.visibility === "private" && mainEvent.status !== "ended" ? (
+              {mainEvent.status !== "ended" ? (
+                <div className="action-row main-event-participation">
+                  <span className="toolbar-hint">
+                    {mainEvent.myParticipation === "joined"
+                      ? t("mainEvents.participation.joined")
+                      : mainEvent.myParticipation === "declined"
+                        ? t("mainEvents.participation.declined")
+                        : t("mainEvents.participation.open")}
+                  </span>
+                  {mainEvent.myParticipation !== "joined" ? (
+                    <button type="button" disabled={busy} onClick={() => setParticipation(mainEvent, "joined")}>
+                      {t("mainEvents.participation.join")}
+                    </button>
+                  ) : null}
+                  {mainEvent.myParticipation !== "declined" ? (
+                    <button
+                      type="button"
+                      className="secondary"
+                      disabled={busy}
+                      onClick={() => setParticipation(mainEvent, "declined")}
+                    >
+                      {t("mainEvents.participation.decline")}
+                    </button>
+                  ) : null}
+                </div>
+              ) : null}
+              {canManage && mainEvent.visibility === "private" && mainEvent.status !== "ended" ? (
                 <div className="main-event-invites">
                   <p className="muted">{t("mainEvents.invites.title")}</p>
                   <ul>
@@ -249,6 +286,7 @@ export function MainEventsPanel() {
                   </div>
                 </div>
               ) : null}
+              {canManage ? (
               <div className="action-row">
                 {mainEvent.status === "planned" ? (
                   <>
@@ -292,11 +330,15 @@ export function MainEventsPanel() {
                   </button>
                 ) : null}
               </div>
+              ) : null}
             </li>
           );
         })}
         {mainEvents.length === 0 ? <li className="muted">{t("mainEvents.empty")}</li> : null}
       </ul>
+      {canManage ? (
+      <details className="main-events-create">
+      <summary>{t("mainEvents.form.toggle")}</summary>
       <form onSubmit={createMainEvent} className="event-form" aria-label={t("mainEvents.form.aria")}>
         <label>
           {t("mainEvents.form.name")}
@@ -345,6 +387,8 @@ export function MainEventsPanel() {
           {t("mainEvents.form.submit")}
         </button>
       </form>
-    </details>
+      </details>
+      ) : null}
+    </section>
   );
 }

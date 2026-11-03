@@ -10,6 +10,7 @@ export const tableTennisEn: Partial<Record<MessageKey, string>> = {
   "kiosk.empty": "No active matches right now.",
   "kiosk.listAria": "Active matches",
 
+  "main.nav.rounds": "Schedule",
   "main.route.events.eyebrow": "Draw sheet at a glance",
   "main.route.events.title": "Entries, times, and notes in one place.",
   "main.route.events.description":
