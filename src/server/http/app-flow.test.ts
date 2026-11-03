@@ -645,7 +645,7 @@ describe("app flow", () => {
 
     const setCookie = verify.headers["set-cookie"];
     const cookieHeader = Array.isArray(setCookie) ? setCookie : setCookie ? [setCookie] : [];
-    const sessionCookie = cookieHeader.find((value) => value.startsWith("hermes_session="));
+    const sessionCookie = cookieHeader.find((value) => value.startsWith("matchdesk_session="));
     expect(sessionCookie).toBeTruthy();
 
     const rawCookieToken = (sessionCookie ?? "").split(";", 1)[0]?.split("=", 2)[1] ?? "";

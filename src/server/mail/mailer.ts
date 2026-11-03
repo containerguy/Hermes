@@ -5,6 +5,7 @@ import { readSettings, type HermesSettings } from "../settings";
 import { resolveAppDisplayName, fallbackAppDisplayName } from "../../shared/app-display-name";
 import { browserLanguageToLocale, type AppLocale } from "../../shared/locale";
 import { renderSystemMail, sanitizeInline, type SystemMailKind } from "./templates";
+import { readEnv } from "../env";
 
 export const MAIL_CODE_VALID_MINUTES = 10;
 
@@ -50,7 +51,7 @@ let warnedInvalidPublicUrl = false;
  * der Anfrage: die sind ohne `trust proxy` vom Client frei wählbar und würden Phishing-Links in echte
  * Login-Mails ermöglichen. Ohne Env enthält die Mail keinen Link.
  */
-export function resolvePublicUrl(raw: string | undefined | null = process.env.HERMES_PUBLIC_URL): string | null {
+export function resolvePublicUrl(raw: string | undefined | null = readEnv("PUBLIC_URL")): string | null {
   const value = (raw ?? "").trim();
   if (!value) {
     return null;
@@ -115,8 +116,8 @@ export function buildSystemMail(
   kind: SystemMailKind,
   input: SendCodeInput,
   env: { mailFrom?: string | null; publicUrl?: string | null } = {
-    mailFrom: process.env.HERMES_MAIL_FROM,
-    publicUrl: process.env.HERMES_PUBLIC_URL
+    mailFrom: readEnv("MAIL_FROM"),
+    publicUrl: readEnv("PUBLIC_URL")
   }
 ): Mail.Options {
   const settings = tryReadSettings(context);
@@ -151,8 +152,8 @@ function readBoolean(value: string | undefined) {
 }
 
 function resolveSmtpSecurity(port: number) {
-  const mode = process.env.HERMES_SMTP_SECURITY?.trim().toLowerCase();
-  const legacySecure = process.env.HERMES_SMTP_SECURE;
+  const mode = readEnv("SMTP_SECURITY")?.trim().toLowerCase();
+  const legacySecure = readEnv("SMTP_SECURE");
 
   if (mode === "tls") {
     return { secure: true, requireTLS: false };
@@ -183,15 +184,15 @@ function resolveSmtpSecurity(port: number) {
 }
 
 function createSmtpTransport() {
-  const host = process.env.HERMES_SMTP_HOST;
-  const port = Number(process.env.HERMES_SMTP_PORT ?? "587");
+  const host = readEnv("SMTP_HOST");
+  const port = Number(readEnv("SMTP_PORT") ?? "587");
 
   if (!host) {
     throw new Error("HERMES_SMTP_HOST is required when HERMES_MAIL_MODE=smtp");
   }
 
-  const user = process.env.HERMES_SMTP_USER;
-  const pass = process.env.HERMES_SMTP_PASSWORD;
+  const user = readEnv("SMTP_USER");
+  const pass = readEnv("SMTP_PASSWORD");
   const security = resolveSmtpSecurity(port);
   return nodemailer.createTransport({
     host,
@@ -209,7 +210,7 @@ const CONSOLE_LABEL: Record<SystemMailKind, string> = {
 };
 
 async function sendSystemMail(context: DatabaseContext | null, kind: SystemMailKind, input: SendCodeInput) {
-  const mode = process.env.HERMES_MAIL_MODE ?? "console";
+  const mode = readEnv("MAIL_MODE") ?? "console";
 
   if (mode === "console") {
     console.log(`[Hermes] ${CONSOLE_LABEL[kind]} for ${input.username} <${input.to}>: ${input.code}`);

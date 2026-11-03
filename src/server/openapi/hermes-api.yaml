@@ -8,7 +8,7 @@ info:
     - **Browser:** Session-Cookie `hermes_session` nach Login (wie die Web-UI).
     - **API-Client:** `Authorization: Bearer <token>` mit einem im Profil erzeugten API-Token.
 
-    **CSRF:** Schreibende Anfragen aus dem Browser senden den Header `x-hermes-csrf` (siehe `GET /api/auth/csrf`).
+    **CSRF:** Schreibende Anfragen aus dem Browser senden den Header `x-matchdesk-csrf` (bis v1.0 auch noch `x-hermes-csrf`) (siehe `GET /api/auth/csrf`).
     Bei reiner Bearer-Authentifizierung entfällt die CSRF-Pflicht.
 
     **API-Token-Scopes**
@@ -127,7 +127,7 @@ paths:
                     type: string
                   header:
                     type: string
-                    example: x-hermes-csrf
+                    example: x-matchdesk-csrf
         "401":
           $ref: "#/components/responses/Unauthorized"
 

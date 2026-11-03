@@ -48,6 +48,7 @@ import {
   readBackupStatus
 } from "../storage/s3-storage";
 import { readSettings, settingsPartialSchema, settingsSchema, writeSettings } from "../settings";
+import { readEnv } from "../env";
 
 const allowlistSchema = z.object({
   ipOrCidr: z.string().trim().min(1).max(80),
@@ -473,7 +474,7 @@ export function createAdminRouter(context: DatabaseContext) {
   router.get("/settings", (_request, response) => {
     const backend = getStorageBackend(context.sqlite);
     const location = getS3LocationDetails(context.sqlite);
-    const envS3Configured = process.env.HERMES_STORAGE_BACKEND === "s3";
+    const envS3Configured = readEnv("STORAGE_BACKEND") === "s3";
     let backupStatus = null;
     try {
       backupStatus = readBackupStatus(context.sqlite);

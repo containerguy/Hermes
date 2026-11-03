@@ -322,7 +322,7 @@ describe("LoginPanel device persistence", () => {
     const requestJsonMock = requestJson as unknown as ReturnType<typeof vi.fn>;
     requestJsonMock.mockResolvedValue({});
     window.localStorage.setItem(
-      "hermes_known_device_v1",
+      "matchdesk_known_device_v1",
       JSON.stringify({ username: "u", name: "Gaming-PC" })
     );
 
@@ -402,7 +402,7 @@ describe("LoginPanel device persistence", () => {
     const body = JSON.parse((redeemCalls[0][1] as RequestInit).body as string) as { token: string };
     expect(body.token).toBe("PAIR_TOKEN_TEST_VALUE_BBBBBBBBBBBB");
     expect(onLoggedIn).toHaveBeenCalledWith(redeemedUser);
-    expect(JSON.parse(window.localStorage.getItem("hermes_known_device_v1") ?? "{}")).toEqual({
+    expect(JSON.parse(window.localStorage.getItem("matchdesk_known_device_v1") ?? "{}")).toEqual({
       username: "u",
       name: "iPhone · Safari"
     });

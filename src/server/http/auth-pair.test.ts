@@ -127,7 +127,7 @@ describe("auth device pairing", () => {
     expect(redeem.body.user.id).toBe(admin.id);
     const setCookie = redeem.headers["set-cookie"];
     const cookieHeader = Array.isArray(setCookie) ? setCookie : setCookie ? [setCookie] : [];
-    expect(cookieHeader.some((value) => value.startsWith("hermes_session="))).toBe(true);
+    expect(cookieHeader.some((value) => value.startsWith("matchdesk_session="))).toBe(true);
     expect(redeem.headers["cache-control"] ?? "").toContain("no-store");
 
     const sqlite = openDb();

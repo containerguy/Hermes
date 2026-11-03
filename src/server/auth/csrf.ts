@@ -3,11 +3,14 @@ import type { Request, Response } from "express";
 import type { DatabaseContext } from "../db/client";
 import { getCurrentSession } from "./current-user";
 import { resolveHermesAuth } from "./hermes-auth";
+import { readEnv } from "../env";
 
-export const CSRF_HEADER = "x-hermes-csrf";
+export const CSRF_HEADER = "x-matchdesk-csrf";
+/** Header vor der Umbenennung; alte, noch geladene Clients senden ihn bis zum Neuladen. */
+export const LEGACY_CSRF_HEADER = "x-hermes-csrf";
 
 function csrfSecret() {
-  return process.env.HERMES_CSRF_SECRET ?? "hermes-dev-csrf-secret";
+  return readEnv("CSRF_SECRET") ?? "hermes-dev-csrf-secret";
 }
 
 export function createCsrfToken(sessionId: string) {
@@ -41,7 +44,7 @@ export function requireCsrf(context: DatabaseContext, request: Request, response
     return false;
   }
 
-  const token = request.get(CSRF_HEADER) ?? undefined;
+  const token = request.get(CSRF_HEADER) ?? request.get(LEGACY_CSRF_HEADER) ?? undefined;
 
   if (!verifyCsrfToken(current.session.id, token)) {
     response.status(403).json({ error: "csrf_token_ungueltig" });

@@ -51,6 +51,7 @@ import {
   updateProfile,
   verifyEmailChange
 } from "../domain/auth/profile";
+import { readEnv } from "../env";
 
 const requestCodeSchema = z.object({
   username: z.string().trim().min(1).max(80)
@@ -130,7 +131,7 @@ function isSqliteBusyOrLocked(error: unknown) {
 }
 
 function issueLoginChallenge(context: DatabaseContext, user: typeof users.$inferSelect) {
-  const code = process.env.HERMES_DEV_LOGIN_CODE ?? generateOtp();
+  const code = readEnv("DEV_LOGIN_CODE") ?? generateOtp();
   const timestamp = nowIso();
   const challengeId = randomUUID();
 

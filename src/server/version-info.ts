@@ -1,5 +1,6 @@
 import fs from "node:fs";
 import path from "node:path";
+import { readEnv } from "./env";
 
 export const DEFAULT_SOURCE_REPO_URL = "https://github.com/containerguy/Hermes";
 
@@ -36,7 +37,7 @@ export function getReleaseInfo(): AppReleaseInfo {
     // keep fallback
   }
 
-  const fromEnv = process.env.HERMES_SOURCE_REPO_URL?.trim();
+  const fromEnv = readEnv("SOURCE_REPO_URL")?.trim();
   const repoUrl = fromEnv && fromEnv.length > 0 ? fromEnv : DEFAULT_SOURCE_REPO_URL;
 
   cached = { version, repoUrl };

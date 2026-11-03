@@ -1,7 +1,10 @@
 import { createHermesApp } from "./app";
+import { readEnv, warnAboutLegacyEnv } from "./env";
 
-const port = Number(process.env.HERMES_PORT ?? "3000");
-const host = process.env.HERMES_HOST ?? "0.0.0.0";
+warnAboutLegacyEnv();
+
+const port = Number(readEnv("PORT") ?? "3000");
+const host = readEnv("HOST") ?? "0.0.0.0";
 const { app, close } = await createHermesApp();
 
 const server = app.listen(port, host, () => {

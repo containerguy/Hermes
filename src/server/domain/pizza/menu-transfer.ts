@@ -207,7 +207,7 @@ function yamlPrice(cents: number) {
 
 export function menuToYaml(doc: Required<MenuDocument>): string {
   const data = {
-    format: "hermes-pizza-menu",
+    format: "matchdesk-pizza-menu",
     version: 1,
     kategorien: doc.categories.map((category) => ({
       name: category.name,
@@ -233,7 +233,7 @@ export function menuToYaml(doc: Required<MenuDocument>): string {
     }))
   };
   const header =
-    "# Hermes Pizza-Menü (YAML). Preise in Euro, Komma oder Punkt.\n" +
+    "# Matchdesk Pizza-Menü (YAML). Preise in Euro, Komma oder Punkt.\n" +
     "# Zuordnung beim Import über Kategorie-/Artikelnamen bzw. Artikelnummer.\n";
   return header + stringify(data, { lineWidth: 0 });
 }
@@ -316,7 +316,8 @@ const yamlExtraSchema = z.strictObject({
 });
 
 const yamlDocumentSchema = z.strictObject({
-  format: z.literal("hermes-pizza-menu").optional(),
+  // "hermes-pizza-menu": Exporte vor der Umbenennung bleiben importierbar.
+  format: z.enum(["matchdesk-pizza-menu", "hermes-pizza-menu"]).optional(),
   version: z.literal(1).optional(),
   kategorien: z.array(yamlCategorySchema).max(MAX_CATEGORIES).optional(),
   extras: z.array(yamlExtraSchema).max(MAX_EXTRAS).optional()

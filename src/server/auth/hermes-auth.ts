@@ -4,9 +4,10 @@ import type { DatabaseContext } from "../db/client";
 import { sessions, userApiTokens, users } from "../db/schema";
 import {
   hashSessionToken,
+  hasOnlyLegacySessionCookie,
   isSessionIdleExpired,
   readDeviceCookie,
-  SESSION_COOKIE,
+  readSessionCookie,
   SESSION_RENEW_INTERVAL_MS,
   setDeviceCookie,
   setSessionCookie
@@ -84,7 +85,7 @@ function resolveApiToken(context: DatabaseContext, request: Request, rawToken: s
 }
 
 function resolveSessionCookie(context: DatabaseContext, request: Request) {
-  const token = request.cookies?.[SESSION_COOKIE] as string | undefined;
+  const token = readSessionCookie(request);
   if (!token) {
     return;
   }
@@ -145,13 +146,15 @@ function renewSessionCookieIfDue(context: DatabaseContext, request: Request, res
   if (auth?.kind !== "session") {
     return;
   }
-  const token = request.cookies?.[SESSION_COOKIE] as string | undefined;
+  const token = readSessionCookie(request);
   if (!token) {
     return;
   }
 
+  // Alte Cookie-Namen (hermes_*) sofort auf die neuen umziehen, nicht erst beim nächsten Intervall.
+  const migrateLegacy = hasOnlyLegacySessionCookie(request);
   const lastRenewal = Date.parse(auth.session.renewedAt ?? auth.session.createdAt);
-  if (!Number.isNaN(lastRenewal) && Date.now() - lastRenewal < SESSION_RENEW_INTERVAL_MS) {
+  if (!migrateLegacy && !Number.isNaN(lastRenewal) && Date.now() - lastRenewal < SESSION_RENEW_INTERVAL_MS) {
     return;
   }
 

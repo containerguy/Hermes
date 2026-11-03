@@ -1,10 +1,11 @@
 import { createHmac, randomBytes } from "node:crypto";
+import { readEnv } from "../env";
 
 export const PAIR_TOKEN_BYTES = 32;
 export const PAIR_TOKEN_TTL_MS = 10 * 60 * 1000;
 
 function pairTokenSecret() {
-  return process.env.HERMES_PAIR_TOKEN_SECRET ?? "hermes-dev-pair-token-secret";
+  return readEnv("PAIR_TOKEN_SECRET") ?? "hermes-dev-pair-token-secret";
 }
 
 export function createPairingToken(): string {

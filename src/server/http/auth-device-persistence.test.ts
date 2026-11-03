@@ -110,8 +110,8 @@ describe("persistent sessions and devices", () => {
     const agent = request.agent(started!.app);
     const response = await login(agent, { deviceName: "Gaming-PC", deviceKey: DEVICE_KEY_A });
 
-    const deviceCookie = findSetCookie(response, "hermes_device");
-    const sessionCookie = findSetCookie(response, "hermes_session");
+    const deviceCookie = findSetCookie(response, "matchdesk_device");
+    const sessionCookie = findSetCookie(response, "matchdesk_session");
     expect(deviceCookie).toContain("HttpOnly");
     expect(deviceCookie).toContain(`Max-Age=${400 * 24 * 60 * 60}`);
     expect(sessionCookie).toContain("HttpOnly");
@@ -164,13 +164,13 @@ describe("persistent sessions and devices", () => {
     const cookieless = request.agent(started!.app);
     const relogin = await login(cookieless, { deviceKey: DEVICE_KEY_A });
     expect(relogin.body.device).toEqual({ name: "Laptop", recognized: true });
-    expect(findSetCookie(relogin, "hermes_device")).toContain(`hermes_device=${DEVICE_KEY_A}`);
+    expect(findSetCookie(relogin, "matchdesk_device")).toContain(`matchdesk_device=${DEVICE_KEY_A}`);
   });
 
   it("assigns a server-generated device key when the client sends none", async () => {
     const agent = request.agent(started!.app);
     const first = await login(agent, { deviceName: "Ohne Key" });
-    expect(findSetCookie(first, "hermes_device")).toMatch(/^hermes_device=[A-Za-z0-9_-]{22,44};/);
+    expect(findSetCookie(first, "matchdesk_device")).toMatch(/^matchdesk_device=[A-Za-z0-9_-]{22,44};/);
 
     await logout(agent);
     const second = await login(agent);
@@ -222,8 +222,8 @@ describe("persistent sessions and devices", () => {
       .set(CSRF_HEADER, csrf)
       .expect(200);
     expect(forgotten.body).toEqual({ forgotten: true });
-    expect(findSetCookie(forgotten, "hermes_session")).toMatch(/Expires=Thu, 01 Jan 1970/);
-    expect(findSetCookie(forgotten, "hermes_device")).toMatch(/Expires=Thu, 01 Jan 1970/);
+    expect(findSetCookie(forgotten, "matchdesk_session")).toMatch(/Expires=Thu, 01 Jan 1970/);
+    expect(findSetCookie(forgotten, "matchdesk_device")).toMatch(/Expires=Thu, 01 Jan 1970/);
     await agent.get("/api/auth/me").expect(401);
 
     const devices = devicesFor("hauptadmin");
@@ -260,7 +260,7 @@ describe("persistent sessions and devices", () => {
     process.env.HERMES_SESSION_TTL_DAYS = "7";
     const agent = request.agent(started!.app);
     const response = await login(agent, { deviceKey: DEVICE_KEY_A });
-    expect(findSetCookie(response, "hermes_session")).toContain(`Max-Age=${7 * 24 * 60 * 60}`);
+    expect(findSetCookie(response, "matchdesk_session")).toContain(`Max-Age=${7 * 24 * 60 * 60}`);
 
     const sqlite = openDb();
     const stale = new Date(Date.now() - 8 * 24 * 60 * 60 * 1000).toISOString();
@@ -274,7 +274,7 @@ describe("persistent sessions and devices", () => {
     await login(agent, { deviceKey: DEVICE_KEY_A });
 
     const fresh = await agent.get("/api/auth/me").expect(200);
-    expect(cookieNames(fresh)).not.toContain("hermes_session");
+    expect(cookieNames(fresh)).not.toContain("matchdesk_session");
 
     const sqlite = openDb();
     const old = new Date(Date.now() - 2 * 24 * 60 * 60 * 1000).toISOString();
@@ -282,11 +282,34 @@ describe("persistent sessions and devices", () => {
     sqlite.close();
 
     const renewed = await agent.get("/api/auth/me").expect(200);
-    expect(findSetCookie(renewed, "hermes_session")).toContain(`Max-Age=${180 * 24 * 60 * 60}`);
-    expect(findSetCookie(renewed, "hermes_device")).toContain(`hermes_device=${DEVICE_KEY_A}`);
+    expect(findSetCookie(renewed, "matchdesk_session")).toContain(`Max-Age=${180 * 24 * 60 * 60}`);
+    expect(findSetCookie(renewed, "matchdesk_device")).toContain(`matchdesk_device=${DEVICE_KEY_A}`);
 
     const again = await agent.get("/api/auth/me").expect(200);
-    expect(cookieNames(again)).not.toContain("hermes_session");
+    expect(cookieNames(again)).not.toContain("matchdesk_session");
+  });
+
+  it("übernimmt Sessions und Geräte aus den alten hermes_*-Cookies", async () => {
+    const agent = request.agent(started!.app);
+    const loggedIn = await login(agent, { deviceKey: DEVICE_KEY_A });
+    const token = (findSetCookie(loggedIn, "matchdesk_session") ?? "").split(";", 1)[0]?.split("=", 2)[1] ?? "";
+    expect(token.length).toBeGreaterThan(10);
+    const csrf = await fetchCsrf(agent);
+    const legacyCookies = `hermes_session=${token}; hermes_device=${DEVICE_KEY_A}`;
+
+    const migrated = await request(started!.app).get("/api/auth/me").set("Cookie", legacyCookies).expect(200);
+    expect(findSetCookie(migrated, "matchdesk_session")).toContain(`matchdesk_session=${token}`);
+    expect(findSetCookie(migrated, "matchdesk_device")).toContain(`matchdesk_device=${DEVICE_KEY_A}`);
+    expect(findSetCookie(migrated, "hermes_session")).toMatch(/Expires=Thu, 01 Jan 1970/);
+    expect(findSetCookie(migrated, "hermes_device")).toMatch(/Expires=Thu, 01 Jan 1970/);
+
+    // Ein noch geladener alter Client sendet den alten CSRF-Header.
+    await request(started!.app)
+      .post("/api/auth/logout")
+      .set("Cookie", legacyCookies)
+      .set("x-hermes-csrf", csrf)
+      .expect(204);
+    await agent.get("/api/auth/me").expect(401);
   });
 
   it("soft-deleting a user removes their devices", async () => {
