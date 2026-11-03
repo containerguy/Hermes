@@ -221,6 +221,33 @@ describe("event registration: capacity, waitlist, deadline, overview", () => {
     expect(audit).toContain("main_event.waitlist_promoted");
   });
 
+  it("keeps the waitlist order when a seat frees up without a decline and keeps waitlisted people when going private", async () => {
+    const { adminAgent, managerAgent } = await createManagerAndLogin();
+    const anna = await createUser(adminAgent, "anna");
+    const bert = await createUser(adminAgent, "bert");
+    const carl = await createUser(adminAgent, "carl");
+    const event = await createEventWith(managerAgent, { name: "LAN Fair", maxParticipants: 1 });
+    expect((await participate(anna, event.id, "joined")).body.mainEvent.myParticipation).toBe("joined");
+    expect((await participate(bert, event.id, "joined")).body.mainEvent.myParticipation).toBe("waitlisted");
+
+    // Anna wird gelöscht: Ihr Platz zählt nicht mehr. Carl stellt sich trotzdem hinten an, Bert rückt nach.
+    const annaId = (await anna.get("/api/auth/me").expect(200)).body.user.id;
+    const csrf = await fetchCsrf(adminAgent);
+    await adminAgent.delete(`/api/admin/users/${annaId}`).set(CSRF_HEADER, csrf).expect(204);
+    expect((await participate(carl, event.id, "joined")).body.mainEvent).toMatchObject({
+      myParticipation: "waitlisted",
+      myWaitlistPosition: 1,
+      participantCount: 1
+    });
+    expect((await bert.get("/api/main-events").expect(200)).body.mainEvents[0].myParticipation).toBe("joined");
+
+    // Beim Wechsel auf privat behalten auch Nachrücker den Zugang.
+    expect((await patchEvent(managerAgent, event.id, { visibility: "private" })).status).toBe(200);
+    expect((await carl.get("/api/main-events").expect(200)).body.mainEvents).toEqual([
+      expect.objectContaining({ id: event.id, myParticipation: "waitlisted" })
+    ]);
+  });
+
   it("counts interested people separately and enforces the registration deadline only before the start", async () => {
     const { adminAgent, managerAgent } = await createManagerAndLogin();
     const anna = await createUser(adminAgent, "anna");

@@ -295,7 +295,8 @@ export function MainEventsPanel({ canManage = true }: { canManage?: boolean }) {
                       {t("mainEvents.participation.join")}
                     </button>
                   ) : null}
-                  {mainEvent.myParticipation !== "interested" && mainEvent.myParticipation !== "joined" ? (
+                  {/* Nachrücker behalten ihren Listenplatz: kein „Interessiert“, das sie stillschweigend von der Liste nimmt. */}
+                  {mainEvent.myParticipation === null || mainEvent.myParticipation === "declined" ? (
                     <button
                       type="button"
                       className="secondary"
