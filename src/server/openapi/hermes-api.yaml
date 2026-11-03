@@ -384,8 +384,12 @@ paths:
   /api/main-events/{id}/participation:
     post:
       tags: [main-events]
-      summary: Am Event teilnehmen oder absagen (jede angemeldete Person)
-      description: Teilnehmer („joined“) bekommen die Push-Benachrichtigungen zu den Runden des Events; Runden ohne Event gehen weiter an alle.
+      summary: Am Event teilnehmen, Interesse melden oder absagen (jede angemeldete Person)
+      description: >-
+        Teilnehmer („joined“) bekommen die Push-Benachrichtigungen zu den Runden des Events; Runden ohne Event gehen weiter an alle.
+        Ist das Event voll (maxParticipants), wird eine Zusage zu „waitlisted“ (Nachrücker); wird ein Platz frei,
+        rückt der erste Nachrücker automatisch nach und bekommt eine Push-Nachricht.
+        Nach dem Anmeldeschluss (nur solange das Event geplant ist) sind nur noch Absagen möglich.
       parameters:
         - $ref: "#/components/parameters/EventId"
       requestBody:
@@ -398,12 +402,39 @@ paths:
               properties:
                 status:
                   type: string
-                  enum: [joined, declined]
+                  enum: [joined, interested, declined]
       responses:
         "200":
           description: OK
         "409":
-          description: Event beendet (hauptevent_beendet)
+          description: Event beendet (hauptevent_beendet) oder Anmeldeschluss vorbei (anmeldeschluss_vorbei)
+
+  /api/main-events/{id}/participants:
+    get:
+      tags: [main-events]
+      summary: Anmeldeübersicht (Manager/Admin)
+      description: "`participants`: userId, username, displayName, status, updatedAt, waitlistPosition. `noResponse`: wer das Event sehen kann und noch nicht geantwortet hat."
+      parameters:
+        - $ref: "#/components/parameters/EventId"
+      responses:
+        "200":
+          description: OK
+        "403":
+          $ref: "#/components/responses/Forbidden"
+
+  /api/main-events/{id}/participants.csv:
+    get:
+      tags: [main-events]
+      summary: Anmeldeübersicht als CSV (Manager/Admin, Semikolon getrennt, UTF-8 mit BOM)
+      parameters:
+        - $ref: "#/components/parameters/EventId"
+      responses:
+        "200":
+          description: CSV-Datei
+          content:
+            text/csv: {}
+        "403":
+          $ref: "#/components/responses/Forbidden"
 
   /api/main-events/invite-candidates:
     get:
@@ -757,10 +788,28 @@ components:
           type: integer
         participantCount:
           type: integer
+          description: Zusagen („joined“)
+        interestedCount:
+          type: integer
+        waitlistCount:
+          type: integer
+        maxParticipants:
+          type: integer
+          nullable: true
+          description: null = unbegrenzt
+        registrationDeadline:
+          type: string
+          nullable: true
+        registrationClosed:
+          type: boolean
+          description: Anmeldeschluss vorbei (gilt nur für geplante Events)
         myParticipation:
           type: string
           nullable: true
-          enum: [joined, declined]
+          enum: [joined, interested, waitlisted, declined]
+        myWaitlistPosition:
+          type: integer
+          nullable: true
 
     MainEventInput:
       type: object
@@ -783,6 +832,14 @@ components:
           type: string
           nullable: true
           description: ISO-8601, nicht vor plannedStartAt
+        maxParticipants:
+          type: integer
+          nullable: true
+          description: Plätze, 1–10000; null = unbegrenzt. Mehr Plätze lassen Nachrücker aufrücken.
+        registrationDeadline:
+          type: string
+          nullable: true
+          description: ISO-8601, Anmeldeschluss
 
     GameEvent:
       type: object

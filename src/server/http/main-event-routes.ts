@@ -1,6 +1,5 @@
-import { and, eq, inArray, isNull } from "drizzle-orm";
-import { z } from "zod";
-import { Router } from "express";
+import { and, asc, eq, inArray, isNull } from "drizzle-orm";
+import { Router, type Request, type Response } from "express";
 import { randomUUID } from "node:crypto";
 import { requireUser } from "../auth/current-user";
 import { requireCsrf } from "../auth/csrf";
@@ -8,7 +7,17 @@ import { enforceApiTokenWriteAccess } from "../auth/hermes-auth";
 import { tryWriteAuditLog, writeAuditLog } from "../audit-log";
 import type { DatabaseContext } from "../db/client";
 import { gameEvents, mainEventInvites, mainEventParticipants, mainEvents, users } from "../db/schema";
-import { mainEventInputSchema, mainEventInviteSchema, mainEventUpdateSchema } from "../domain/main-events";
+import {
+  csvCell,
+  isRegistrationClosed,
+  mainEventInputSchema,
+  mainEventInviteSchema,
+  mainEventParticipationRequestSchema,
+  mainEventUpdateSchema,
+  resolveParticipationStatus,
+  type MainEventParticipationStatus,
+  type RequestedMainEventParticipation
+} from "../domain/main-events";
 import { canManageMainEvents, type UserRole } from "../domain/users";
 import {
   sendPushToEnabledUsers,
@@ -105,12 +114,32 @@ function countRounds(context: DatabaseContext, mainEventId: string) {
   return row.count;
 }
 
-function countParticipants(context: DatabaseContext, mainEventId: string) {
+function countByStatus(context: DatabaseContext, mainEventId: string, status: MainEventParticipationStatus) {
   const row = context.sqlite
-    .prepare("SELECT COUNT(*) AS count FROM main_event_participants WHERE main_event_id = ? AND status = 'joined'")
-    .get(mainEventId) as { count: number };
+    .prepare("SELECT COUNT(*) AS count FROM main_event_participants WHERE main_event_id = ? AND status = ?")
+    .get(mainEventId, status) as { count: number };
 
   return row.count;
+}
+
+function countParticipants(context: DatabaseContext, mainEventId: string) {
+  return countByStatus(context, mainEventId, "joined");
+}
+
+/** Nachrücker in Reihenfolge: wer zuerst auf der Liste stand, rückt zuerst nach. */
+function waitlist(context: DatabaseContext, mainEventId: string) {
+  return context.db
+    .select({ userId: mainEventParticipants.userId })
+    .from(mainEventParticipants)
+    .where(and(eq(mainEventParticipants.mainEventId, mainEventId), eq(mainEventParticipants.status, "waitlisted")))
+    .orderBy(asc(mainEventParticipants.updatedAt), asc(mainEventParticipants.id))
+    .all()
+    .map((row) => row.userId);
+}
+
+function waitlistPosition(context: DatabaseContext, mainEventId: string, userId: string) {
+  const index = waitlist(context, mainEventId).indexOf(userId);
+  return index === -1 ? null : index + 1;
 }
 
 function findParticipation(context: DatabaseContext, mainEventId: string, userId: string) {
@@ -125,7 +154,7 @@ function setParticipation(
   context: DatabaseContext,
   mainEventId: string,
   userId: string,
-  status: "joined" | "declined"
+  status: MainEventParticipationStatus
 ) {
   const timestamp = nowIso();
   context.db
@@ -138,13 +167,71 @@ function setParticipation(
     .run();
 }
 
+/**
+ * Freie Plätze an Nachrücker vergeben (z. B. nach einer Absage oder mehr Plätzen).
+ * Gibt die IDs der Nachgerückten zurück, damit sie benachrichtigt werden können.
+ */
+function promoteWaitlisted(context: DatabaseContext, mainEventId: string) {
+  const event = getMainEvent(context, mainEventId);
+  if (!event || event.status === "ended") {
+    return [];
+  }
+  const queue = waitlist(context, mainEventId);
+  const free =
+    event.maxParticipants === null ? queue.length : Math.max(0, event.maxParticipants - countParticipants(context, mainEventId));
+  const promoted = queue.slice(0, free);
+  for (const userId of promoted) {
+    setParticipation(context, mainEventId, userId, "joined");
+  }
+  return promoted;
+}
+
+function notifyPromoted(context: DatabaseContext, event: MainEventRow, userIds: string[]) {
+  if (userIds.length === 0) {
+    return;
+  }
+  void sendPushToUserIds(context, userIds, {
+    title: "Nachgerückt",
+    body: `Ein Platz bei ${event.name} ist frei geworden: Du bist jetzt dabei.`,
+    url: "/#main-events",
+    vibrate: [180, 80, 180]
+  });
+}
+
+/**
+ * Teilnahme setzen und Plätze beachten: Eine Zusage bei vollem Event landet auf der
+ * Nachrückerliste, eine frei gewordene Stelle geht an den ersten Nachrücker.
+ * Bleibt der Status gleich, wird nichts geändert (Nachrücker behalten ihren Platz in der Liste).
+ */
+function applyParticipation(
+  context: DatabaseContext,
+  event: MainEventRow,
+  userId: string,
+  requested: RequestedMainEventParticipation
+) {
+  return context.sqlite.transaction(() => {
+    const previous = findParticipation(context, event.id, userId)?.status ?? null;
+    const status = resolveParticipationStatus({
+      requested,
+      previous,
+      joinedCount: countParticipants(context, event.id),
+      maxParticipants: event.maxParticipants
+    });
+    if (status !== previous) {
+      setParticipation(context, event.id, userId, status);
+    }
+    const promoted = previous === "joined" && status !== "joined" ? promoteWaitlisted(context, event.id) : [];
+    return { previous, status, promoted };
+  })();
+}
+
 /** Wer bei einer Runde des Events „dabei" sagt und sich zum Event noch nicht entschieden hat, nimmt teil. */
 export function joinMainEventIfUndecided(context: DatabaseContext, mainEventId: string, userId: string) {
-  if (findParticipation(context, mainEventId, userId)) {
+  const event = getMainEvent(context, mainEventId);
+  if (!event || findParticipation(context, mainEventId, userId) || isRegistrationClosed(event)) {
     return false;
   }
-  setParticipation(context, mainEventId, userId, "joined");
-  return true;
+  return applyParticipation(context, event, userId, "joined").status === "joined";
 }
 
 function serializeMainEvent(context: DatabaseContext, event: MainEventRow, viewer: Viewer) {
@@ -173,7 +260,13 @@ function serializeMainEvent(context: DatabaseContext, event: MainEventRow, viewe
     createdByUsername: creator?.username ?? "unbekannt",
     roundCount: countRounds(context, event.id),
     participantCount: countParticipants(context, event.id),
+    interestedCount: countByStatus(context, event.id, "interested"),
+    waitlistCount: countByStatus(context, event.id, "waitlisted"),
+    maxParticipants: event.maxParticipants,
+    registrationDeadline: event.registrationDeadline,
+    registrationClosed: isRegistrationClosed(event),
     myParticipation: findParticipation(context, event.id, viewer.id)?.status ?? null,
+    myWaitlistPosition: waitlistPosition(context, event.id, viewer.id),
     createdAt: event.createdAt,
     updatedAt: event.updatedAt
   };
@@ -253,6 +346,8 @@ export function createMainEventRouter(context: DatabaseContext) {
         visibility: parsed.data.visibility ?? "public",
         plannedStartAt: parsed.data.plannedStartAt ?? null,
         plannedEndAt: parsed.data.plannedEndAt ?? null,
+        maxParticipants: parsed.data.maxParticipants ?? null,
+        registrationDeadline: parsed.data.registrationDeadline ?? null,
         createdByUserId: actor.id,
         createdAt: timestamp,
         updatedAt: timestamp
@@ -269,7 +364,9 @@ export function createMainEventRouter(context: DatabaseContext) {
       metadata: {
         visibility: created.visibility,
         plannedStartAt: created.plannedStartAt,
-        plannedEndAt: created.plannedEndAt
+        plannedEndAt: created.plannedEndAt,
+        maxParticipants: created.maxParticipants,
+        registrationDeadline: created.registrationDeadline
       }
     });
     broadcastEventsChanged("main_event_created");
@@ -328,12 +425,22 @@ export function createMainEventRouter(context: DatabaseContext) {
           parsed.data.description === undefined ? event.description : normalizeText(parsed.data.description),
         plannedStartAt,
         plannedEndAt,
+        maxParticipants:
+          parsed.data.maxParticipants === undefined ? event.maxParticipants : parsed.data.maxParticipants,
+        registrationDeadline:
+          parsed.data.registrationDeadline === undefined
+            ? event.registrationDeadline
+            : parsed.data.registrationDeadline,
         updatedAt: nowIso()
       })
       .where(eq(mainEvents.id, event.id))
       .run();
 
+    // Mehr Plätze (oder keine Grenze mehr): Nachrücker rücken auf. Weniger Plätze nehmen
+    // niemandem eine Zusage weg.
+    const promoted = context.sqlite.transaction(() => promoteWaitlisted(context, event.id))();
     const updated = getMainEvent(context, event.id)!;
+    notifyPromoted(context, updated, promoted);
     writeAuditLog(context, {
       actor,
       action: "main_event.update",
@@ -469,7 +576,7 @@ export function createMainEventRouter(context: DatabaseContext) {
   router.post("/:id/participation", (request, response) => {
     const actor = requireUser(context, request)!;
     const event = getMainEvent(context, request.params.id);
-    const parsed = z.object({ status: z.enum(["joined", "declined"]) }).safeParse(request.body);
+    const parsed = mainEventParticipationRequestSchema.safeParse(request.body);
 
     if (!event || !canSeeMainEvent(context, actor, event)) {
       response.status(404).json({ error: "hauptevent_nicht_gefunden" });
@@ -486,21 +593,142 @@ export function createMainEventRouter(context: DatabaseContext) {
       return;
     }
 
-    const previous = findParticipation(context, event.id, actor.id)?.status ?? null;
-    setParticipation(context, event.id, actor.id, parsed.data.status);
+    // Nach dem Anmeldeschluss sind nur noch Absagen möglich; wer schon angemeldet ist, bleibt es.
+    const current = findParticipation(context, event.id, actor.id)?.status ?? null;
+    const changesRegistration =
+      parsed.data.status !== "declined" &&
+      parsed.data.status !== current &&
+      !(parsed.data.status === "joined" && current === "waitlisted");
+    if (changesRegistration && isRegistrationClosed(event)) {
+      response.status(409).json({ error: "anmeldeschluss_vorbei" });
+      return;
+    }
+
+    const { previous, status, promoted } = applyParticipation(context, event, actor.id, parsed.data.status);
+    const summaries: Record<MainEventParticipationStatus, string> = {
+      joined: `${actor.username} ist beim Event ${event.name} dabei.`,
+      interested: `${actor.username} ist am Event ${event.name} interessiert.`,
+      waitlisted: `${actor.username} steht beim Event ${event.name} auf der Nachrückerliste.`,
+      declined: `${actor.username} ist beim Event ${event.name} nicht dabei.`
+    };
     tryWriteAuditLog(context, {
       actor,
       action: "main_event.participation",
       entityType: "main_event",
       entityId: event.id,
-      summary:
-        parsed.data.status === "joined"
-          ? `${actor.username} ist beim Event ${event.name} dabei.`
-          : `${actor.username} ist beim Event ${event.name} nicht dabei.`,
-      metadata: { participation: parsed.data.status, previousParticipation: previous }
+      summary: summaries[status],
+      metadata: { participation: status, requestedParticipation: parsed.data.status, previousParticipation: previous }
     });
+    for (const userId of promoted) {
+      tryWriteAuditLog(context, {
+        actor,
+        action: "main_event.waitlist_promoted",
+        entityType: "main_event",
+        entityId: event.id,
+        summary: `Ein Nachrücker ist beim Event ${event.name} nachgerückt.`,
+        metadata: { userId }
+      });
+    }
+    notifyPromoted(context, event, promoted);
     broadcastEventsChanged("main_event_participation_updated");
     response.json({ mainEvent: serializeMainEvent(context, getMainEvent(context, event.id)!, actor) });
+  });
+
+  /** Anmeldeübersicht für Manager: wer hat zugesagt, wer ist interessiert, wer hat noch nicht geantwortet. */
+  function participantOverview(event: MainEventRow) {
+    const rows = context.db
+      .select({
+        userId: mainEventParticipants.userId,
+        status: mainEventParticipants.status,
+        updatedAt: mainEventParticipants.updatedAt,
+        username: users.username,
+        displayName: users.displayName
+      })
+      .from(mainEventParticipants)
+      .innerJoin(users, eq(mainEventParticipants.userId, users.id))
+      .where(and(eq(mainEventParticipants.mainEventId, event.id), isNull(users.deletedAt)))
+      .all();
+    const queue = waitlist(context, event.id);
+    const statusOrderForList: Record<MainEventParticipationStatus, number> = {
+      joined: 0,
+      waitlisted: 1,
+      interested: 2,
+      declined: 3
+    };
+    const participants = rows
+      .map((row) => ({
+        ...row,
+        waitlistPosition: row.status === "waitlisted" ? queue.indexOf(row.userId) + 1 : null
+      }))
+      .sort(
+        (left, right) =>
+          statusOrderForList[left.status] - statusOrderForList[right.status] ||
+          (left.waitlistPosition ?? 0) - (right.waitlistPosition ?? 0) ||
+          left.username.localeCompare(right.username)
+      );
+
+    // Wer das Event sehen kann und sich noch nicht gemeldet hat.
+    const responded = new Set(rows.map((row) => row.userId));
+    const audience =
+      event.visibility === "private"
+        ? context.db
+            .select({ userId: users.id, username: users.username, displayName: users.displayName })
+            .from(mainEventInvites)
+            .innerJoin(users, eq(mainEventInvites.userId, users.id))
+            .where(and(eq(mainEventInvites.mainEventId, event.id), isNull(users.deletedAt)))
+            .all()
+        : context.db
+            .select({ userId: users.id, username: users.username, displayName: users.displayName })
+            .from(users)
+            .where(isNull(users.deletedAt))
+            .all();
+    const noResponse = audience
+      .filter((user) => !responded.has(user.userId))
+      .sort((left, right) => left.username.localeCompare(right.username));
+
+    return { participants, noResponse };
+  }
+
+  function requireManagedEvent(request: Request, response: Response) {
+    const actor = requireUser(context, request)!;
+    if (!canManageMainEvents(actor)) {
+      response.status(403).json({ error: "hauptevent_manager_erforderlich" });
+      return null;
+    }
+    const event = getMainEvent(context, String(request.params.id));
+    if (!event) {
+      response.status(404).json({ error: "hauptevent_nicht_gefunden" });
+      return null;
+    }
+    return event;
+  }
+
+  router.get("/:id/participants", (request, response) => {
+    const event = requireManagedEvent(request, response);
+    if (!event) {
+      return;
+    }
+    response.json(participantOverview(event));
+  });
+
+  router.get("/:id/participants.csv", (request, response) => {
+    const event = requireManagedEvent(request, response);
+    if (!event) {
+      return;
+    }
+    const { participants, noResponse } = participantOverview(event);
+    const lines = [
+      ["Benutzername", "Anzeigename", "Status", "Nachrücker-Platz", "Geändert"].map(csvCell).join(";"),
+      ...participants.map((row) =>
+        [row.username, row.displayName, row.status, row.waitlistPosition, row.updatedAt].map(csvCell).join(";")
+      ),
+      ...noResponse.map((row) => [row.username, row.displayName, "no_response", null, null].map(csvCell).join(";"))
+    ];
+    const fileName = `anmeldungen-${event.name.replace(/[^a-zA-Z0-9_-]+/g, "_").slice(0, 60) || "event"}.csv`;
+    response.setHeader("Content-Type", "text/csv; charset=utf-8");
+    response.setHeader("Content-Disposition", `attachment; filename="${fileName}"`);
+    // BOM, damit Excel Umlaute richtig liest.
+    response.send(`\uFEFF${lines.join("\r\n")}\r\n`);
   });
 
   router.get("/invite-candidates", (request, response) => {
@@ -587,8 +815,11 @@ export function createMainEventRouter(context: DatabaseContext) {
         .delete(mainEventInvites)
         .where(and(eq(mainEventInvites.mainEventId, event.id), eq(mainEventInvites.userId, request.params.userId)))
         .run();
-      // Ohne Einladung keine Teilnahme mehr an einem privaten Event.
+      // Ohne Einladung keine Teilnahme mehr an einem privaten Event; ein frei gewordener Platz
+      // geht an den ersten Nachrücker.
+      let promoted: string[] = [];
       if (event.visibility === "private") {
+        const wasJoined = findParticipation(context, event.id, request.params.userId)?.status === "joined";
         context.db
           .delete(mainEventParticipants)
           .where(
@@ -598,11 +829,14 @@ export function createMainEventRouter(context: DatabaseContext) {
             )
           )
           .run();
+        if (wasJoined) {
+          promoted = promoteWaitlisted(context, event.id);
+        }
       }
-      return result.changes;
+      return { changes: result.changes, promoted };
     })();
 
-    if (removed === 0) {
+    if (removed.changes === 0) {
       response.status(404).json({ error: "einladung_nicht_gefunden" });
       return;
     }
@@ -613,8 +847,9 @@ export function createMainEventRouter(context: DatabaseContext) {
       entityType: "main_event",
       entityId: event.id,
       summary: `${actor.username} hat eine Einladung zum Event ${event.name} zurückgenommen.`,
-      metadata: { userId: request.params.userId }
+      metadata: { userId: request.params.userId, promotedUserIds: removed.promoted }
     });
+    notifyPromoted(context, event, removed.promoted);
     broadcastEventsChanged("main_event_invites_updated");
     response.json({ mainEvent: serializeMainEvent(context, getMainEvent(context, event.id)!, actor) });
   });
