@@ -3,7 +3,7 @@ import { randomUUID } from "node:crypto";
 import { z } from "zod";
 import type { DatabaseContext } from "../../db/client";
 import { users } from "../../db/schema";
-import { ensureActiveIdentityAvailable, userRoleSchema } from "../users";
+import { ensureActiveIdentityAvailable, loginIdentityKey, userRoleSchema } from "../users";
 import { readSettings } from "../../settings";
 
 export const bulkImportFormatSchema = z.enum(["csv", "json"]);
@@ -298,7 +298,7 @@ export function analyzeBulkImport(
   }
 
   for (const rowResult of rowResults) {
-    const usernameConflictRow = usernameRows.get(rowResult.candidate.username);
+    const usernameConflictRow = usernameRows.get(loginIdentityKey(rowResult.candidate.username));
     if (usernameConflictRow !== undefined) {
       issues.push({
         row: rowResult.row,
@@ -309,10 +309,10 @@ export function analyzeBulkImport(
         conflictWithRow: usernameConflictRow
       });
     } else {
-      usernameRows.set(rowResult.candidate.username, rowResult.row);
+      usernameRows.set(loginIdentityKey(rowResult.candidate.username), rowResult.row);
     }
 
-    const emailConflictRow = emailRows.get(rowResult.candidate.email);
+    const emailConflictRow = emailRows.get(loginIdentityKey(rowResult.candidate.email));
     if (emailConflictRow !== undefined) {
       issues.push({
         row: rowResult.row,
@@ -323,7 +323,7 @@ export function analyzeBulkImport(
         conflictWithRow: emailConflictRow
       });
     } else {
-      emailRows.set(rowResult.candidate.email, rowResult.row);
+      emailRows.set(loginIdentityKey(rowResult.candidate.email), rowResult.row);
     }
   }
 

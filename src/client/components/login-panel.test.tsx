@@ -131,7 +131,10 @@ describe("LoginPanel pairing redemption", () => {
     );
 
     expect(rendered.container.textContent || "").toContain(
-      "Gib deinen Username ein. Hermes schickt den Einmalcode an die hinterlegte E-Mail-Adresse."
+      "Gib deinen Username oder deine E-Mail-Adresse ein, Groß-/Kleinschreibung ist egal."
+    );
+    expect(rendered.container.textContent || "").toContain(
+      "Weder Username noch E-Mail parat? Ein Admin kann beides in der Nutzerverwaltung nachsehen."
     );
 
     const loginForm = rendered.container.querySelector("form");
@@ -404,6 +407,7 @@ describe("LoginPanel device persistence", () => {
     expect(onLoggedIn).toHaveBeenCalledWith(redeemedUser);
     expect(JSON.parse(window.localStorage.getItem("matchdesk_known_device_v1") ?? "{}")).toEqual({
       username: "u",
+      email: "u@example.test",
       name: "iPhone · Safari"
     });
 

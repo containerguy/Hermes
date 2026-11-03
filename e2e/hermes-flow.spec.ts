@@ -15,7 +15,7 @@ let databasePath: string;
 
 async function login(page: Page, username: string) {
   await page.goto(`${baseUrl}/#login`);
-  await page.getByLabel("Username").fill(username);
+  await page.getByLabel("Username oder E-Mail").fill(username);
   await page.getByRole("button", { name: "Code senden" }).click();
   await expect(page.getByText("Code wurde per E-Mail versendet.")).toBeVisible();
   await page.getByLabel("Einmalcode").fill("123456");

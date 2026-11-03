@@ -51,14 +51,24 @@ export function LoginStep({
   return (
     <form onSubmit={step === "request" ? onRequest : onVerify}>
       <label>
-        {t("login.field.username")}
+        {t("login.field.loginIdentifier")}
         <input
           autoComplete="username"
+          autoCapitalize="none"
+          autoCorrect="off"
+          spellCheck={false}
+          maxLength={160}
           value={username}
+          aria-describedby={step === "request" ? "login-forgot-hint" : undefined}
           onChange={(event) => onUsernameChange(event.target.value)}
           required
         />
       </label>
+      {step === "request" ? (
+        <p className="muted field-hint" id="login-forgot-hint">
+          {t("login.forgotHint")}
+        </p>
+      ) : null}
       {step === "verify" ? (
         <>
           <label>

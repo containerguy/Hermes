@@ -26,7 +26,11 @@ import {
   userApiTokens,
   users
 } from "../db/schema";
-import { ensureActiveEmailAvailable } from "../domain/users";
+import {
+  ensureActiveEmailAvailable,
+  ensureActiveUsernameAvailable,
+  findActiveUserByLoginIdentifier
+} from "../domain/users";
 import { sendEmailChangeCode, sendLoginCode } from "../mail/mailer";
 import { readSettings } from "../settings";
 import { browserLanguageToLocale } from "../../shared/locale";
@@ -54,7 +58,8 @@ import {
 import { readEnv } from "../env";
 
 const requestCodeSchema = z.object({
-  username: z.string().trim().min(1).max(80)
+  /** Anmeldename oder Mailadresse; Groß-/Kleinschreibung ist egal. */
+  username: z.string().trim().min(1).max(160)
 });
 
 const verifyCodeSchema = requestCodeSchema.extend({
@@ -261,7 +266,8 @@ export function createAuthRouter(context: DatabaseContext) {
     }
 
     const usernameKey = normalizeUsername(parsed.data.username);
-    const requestKey = `username:${usernameKey}|ip:${request.ip ?? ""}`;
+    const user = findActiveUserByLoginIdentifier(context, parsed.data.username);
+    const requestKey = `username:${user ? normalizeUsername(user.username) : usernameKey}|ip:${request.ip ?? ""}`;
     const rateLimit = checkRateLimit(context, {
       scope: "login_request",
       key: requestKey,
@@ -278,18 +284,12 @@ export function createAuthRouter(context: DatabaseContext) {
 
     recordRateLimitFailure(context, { scope: "login_request", key: requestKey });
 
-    const user = context.db
-      .select()
-      .from(users)
-      .where(and(eq(users.username, parsed.data.username), isNull(users.deletedAt)))
-      .get();
-
     if (!user) {
       tryWriteAuditLog(context, {
         action: "auth.request_unknown",
         entityType: "user",
         entityId: null,
-        summary: `Unbekannter Login-Code-Request für ${usernameKey}.`,
+        summary: `Unbekannter Login-Code-Request für ${usernameKey.slice(0, 3)}***.`,
         metadata: { username: usernameKey.slice(0, 3) + "***" }
       });
       response.status(202).json({ ok: true });
@@ -377,6 +377,16 @@ export function createAuthRouter(context: DatabaseContext) {
     if (!invite || invite.revokedAt || (invite.expiresAt && invite.expiresAt < timestamp)) {
       recordRateLimitFailure(context, { scope: "invite_register", key: registerKey });
       response.status(403).json({ error: "invite_ungueltig" });
+      return;
+    }
+
+    // Anmeldenamen, die sich nur in der Groß-/Kleinschreibung unterscheiden, wären beim
+    // Login nicht mehr unterscheidbar. Fehlercode wie beim Unique-Index-Konflikt; erst nach
+    // gültigem Invite geprüft, damit sich Namen nicht mit erfundenen Codes abfragen lassen.
+    const usernameCheck = ensureActiveUsernameAvailable(context, parsed.data.username);
+    if (!usernameCheck.ok) {
+      recordRateLimitFailure(context, { scope: "invite_register", key: registerKey });
+      response.status(409).json({ error: "user_existiert_bereits" });
       return;
     }
 
@@ -553,7 +563,8 @@ export function createAuthRouter(context: DatabaseContext) {
     }
 
     const usernameKey = normalizeUsername(parsed.data.username);
-    const verifyKey = `username:${usernameKey}|ip:${request.ip ?? ""}`;
+    const user = findActiveUserByLoginIdentifier(context, parsed.data.username);
+    const verifyKey = `username:${user ? normalizeUsername(user.username) : usernameKey}|ip:${request.ip ?? ""}`;
     const verifyRateLimit = checkRateLimit(context, {
       scope: "login_verify",
       key: verifyKey,
@@ -567,13 +578,19 @@ export function createAuthRouter(context: DatabaseContext) {
       return;
     }
 
+    if (!user) {
+      recordRateLimitFailure(context, { scope: "login_verify", key: verifyKey });
+      response.status(401).json({ error: "code_abgelehnt" });
+      return;
+    }
+
     const timestamp = nowIso();
     const challenge = context.db
       .select()
       .from(loginChallenges)
       .where(
         and(
-          eq(loginChallenges.username, parsed.data.username),
+          eq(loginChallenges.username, user.username),
           isNull(loginChallenges.consumedAt),
           gt(loginChallenges.expiresAt, timestamp)
         )
@@ -582,18 +599,6 @@ export function createAuthRouter(context: DatabaseContext) {
       .get();
 
     if (!challenge || !verifyOtp(parsed.data.code, challenge.codeHash)) {
-      recordRateLimitFailure(context, { scope: "login_verify", key: verifyKey });
-      response.status(401).json({ error: "code_abgelehnt" });
-      return;
-    }
-
-    const user = context.db
-      .select()
-      .from(users)
-      .where(and(eq(users.username, parsed.data.username), isNull(users.deletedAt)))
-      .get();
-
-    if (!user) {
       recordRateLimitFailure(context, { scope: "login_verify", key: verifyKey });
       response.status(401).json({ error: "code_abgelehnt" });
       return;

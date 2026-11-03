@@ -81,23 +81,29 @@ function normalizeUsername(username: string) {
 /**
  * Remembers (display only) under which name the server knows this browser for a user,
  * so the login form can skip the device-name field. The server stays the source of truth.
+ * The email is stored too, because the login form accepts username or email.
  */
-export function rememberKnownDevice(username: string, deviceName: string): void {
+export function rememberKnownDevice(username: string, deviceName: string, email?: string | null): void {
   const user = normalizeUsername(username);
   const name = deviceName.trim();
   if (!user || !name) {
     return;
   }
+  const mail = email ? normalizeUsername(email) : "";
   try {
-    window.localStorage.setItem(KNOWN_DEVICE_STORAGE_KEY, JSON.stringify({ username: user, name }));
+    window.localStorage.setItem(
+      KNOWN_DEVICE_STORAGE_KEY,
+      JSON.stringify(mail ? { username: user, email: mail, name } : { username: user, name })
+    );
   } catch {
     // storage blocked: the login form simply shows the optional name field
   }
 }
 
-export function getKnownDeviceName(username: string): string | null {
-  const user = normalizeUsername(username);
-  if (!user) {
+/** Accepts the login identifier as typed: username or email, case-insensitive. */
+export function getKnownDeviceName(identifier: string): string | null {
+  const key = normalizeUsername(identifier);
+  if (!key) {
     return null;
   }
   try {
@@ -105,8 +111,9 @@ export function getKnownDeviceName(username: string): string | null {
     if (!raw) {
       return null;
     }
-    const parsed = JSON.parse(raw) as { username?: unknown; name?: unknown };
-    if (parsed.username === user && typeof parsed.name === "string" && parsed.name.trim()) {
+    const parsed = JSON.parse(raw) as { username?: unknown; email?: unknown; name?: unknown };
+    const matches = parsed.username === key || (typeof parsed.email === "string" && parsed.email === key);
+    if (matches && typeof parsed.name === "string" && parsed.name.trim()) {
       return parsed.name;
     }
   } catch {
