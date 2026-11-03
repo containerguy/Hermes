@@ -1,10 +1,11 @@
 import { createHmac } from "node:crypto";
+import { readEnv } from "../env";
 
 export const DEVICE_KEY_BYTES = 16;
 export const DEVICE_KEY_BASE64URL_MIN_LENGTH = 22;
 
 function deviceKeySecret() {
-  return process.env.HERMES_DEVICE_KEY_SECRET ?? "hermes-dev-device-key-secret";
+  return readEnv("DEVICE_KEY_SECRET") ?? "hermes-dev-device-key-secret";
 }
 
 export function hashDeviceKey(rawKey: string): string {

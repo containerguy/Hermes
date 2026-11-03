@@ -44,7 +44,7 @@ export function tryWriteAuditLog(context: DatabaseContext, input: AuditLogInput)
   try {
     writeAuditLog(context, input);
   } catch (error) {
-    console.error("[Hermes] audit log failed", error);
+    console.error("[Matchdesk] audit log failed", error);
   }
 }
 

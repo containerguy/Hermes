@@ -1,19 +1,19 @@
 import fs from "node:fs";
 import { Agent, fetch as undiciFetch, type Dispatcher } from "undici";
 import { getAmpCaFile, getAmpCredentials } from "../../env";
-import type { HermesSettings } from "../../settings";
+import type { MatchdeskSettings } from "../../settings";
 
 /**
- * Eine AMP-Session pro Hermes-Prozess (Phase 15, D-03/D-04).
+ * Eine AMP-Session pro Matchdesk-Prozess (Phase 15, D-03/D-04).
  *
  * - Login einmal mit `rememberMe: true`; die SESSIONID wird für alle Aufrufe wiederverwendet.
  * - Alle Aufrufe laufen seriell durch eine Warteschlange, damit das AMP-Login-Rate-Limit nie greift.
  * - Verliert AMP die Session, wird genau einmal neu angemeldet (zuerst mit dem rememberMe-Token,
  *   dann mit dem Passwort) und der Aufruf wiederholt.
- * - TLS wird gegen HERMES_AMP_CA_FILE verifiziert; es gibt bewusst keinen skipVerify-Pfad.
+ * - TLS wird gegen MATCHDESK_AMP_CA_FILE verifiziert; es gibt bewusst keinen skipVerify-Pfad.
  */
 
-const USER_AGENT = "Hermes-AMP-Integration/1.0";
+const USER_AGENT = "Matchdesk-AMP-Integration/1.0";
 const REQUEST_MS = 25_000;
 
 type FetchLike = typeof undiciFetch;
@@ -133,7 +133,7 @@ function storeRememberToken(file: string | undefined, token: string | null) {
   try {
     fs.writeFileSync(file, `${token}\n`, { mode: 0o600 });
   } catch (error) {
-    console.warn("[Hermes] AMP rememberMe-Token konnte nicht gespeichert werden:", error);
+    console.warn("[Matchdesk] AMP rememberMe-Token konnte nicht gespeichert werden:", error);
   }
 }
 
@@ -189,7 +189,7 @@ async function loginOnce(baseUrl: string, username: string, secret: string): Pro
   return (parsed ?? {}) as LoginResponse;
 }
 
-async function performLogin(settings: HermesSettings): Promise<AmpSession> {
+async function performLogin(settings: MatchdeskSettings): Promise<AmpSession> {
   const creds = getAmpCredentials();
   if (!creds) {
     throw new Error("amp_zugang_erforderlich");
@@ -219,7 +219,7 @@ async function performLogin(settings: HermesSettings): Promise<AmpSession> {
   return { sessionId: login.sessionID, obtainedAt: Date.now(), baseUrl };
 }
 
-export function getAmpSession(settings: HermesSettings): Promise<AmpSession> {
+export function getAmpSession(settings: MatchdeskSettings): Promise<AmpSession> {
   if (session) {
     return Promise.resolve(session);
   }
@@ -237,7 +237,7 @@ export function getAmpSession(settings: HermesSettings): Promise<AmpSession> {
 }
 
 async function callWithSession(
-  settings: HermesSettings,
+  settings: MatchdeskSettings,
   method: string,
   body: Record<string, unknown>,
   allowRetry: boolean
@@ -270,7 +270,7 @@ async function callWithSession(
  * Liefert die rohe JSON-Antwort; `unwrapAmpData()` holt bei Bedarf `result` heraus.
  */
 export function ampCall<T = unknown>(
-  settings: HermesSettings,
+  settings: MatchdeskSettings,
   method: string,
   body: Record<string, unknown> = {}
 ): Promise<T> {
@@ -288,7 +288,7 @@ function instancePath(instanceId: string, method: string) {
   return `ADSModule/Servers/${encodeURIComponent(instanceId)}/API/${method}`;
 }
 
-async function instanceLogin(settings: HermesSettings, instanceId: string): Promise<string> {
+async function instanceLogin(settings: MatchdeskSettings, instanceId: string): Promise<string> {
   const creds = getAmpCredentials();
   if (!creds) {
     throw new Error("amp_zugang_erforderlich");
@@ -307,7 +307,7 @@ async function instanceLogin(settings: HermesSettings, instanceId: string): Prom
 }
 
 async function callInstance(
-  settings: HermesSettings,
+  settings: MatchdeskSettings,
   instanceId: string,
   method: string,
   body: Record<string, unknown>,
@@ -345,7 +345,7 @@ async function callInstance(
 
 /** Serialisierter Aufruf einer Methode auf einer Instanz (eigene Instanz-Session, Re-Login bei Ablauf). */
 export function ampInstanceCall<T = unknown>(
-  settings: HermesSettings,
+  settings: MatchdeskSettings,
   instanceId: string,
   method: string,
   body: Record<string, unknown> = {}

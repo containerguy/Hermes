@@ -10,7 +10,7 @@ import {
   PutObjectCommand,
   S3Client
 } from "@aws-sdk/client-s3";
-import { getDatabasePath } from "../env";
+import { getDatabasePath, readEnv } from "../env";
 
 type S3Credentials = {
   accessKeyId: string;
@@ -95,7 +95,7 @@ export const restorableTables = [
 ];
 
 function envS3StorageEnabled() {
-  return process.env.HERMES_STORAGE_BACKEND === "s3";
+  return readEnv("STORAGE_BACKEND") === "s3";
 }
 
 /**
@@ -192,22 +192,21 @@ export function readCredentialFile(filePath: string): Partial<S3Credentials> {
 }
 
 function readS3Credentials(): S3Credentials {
-  const fromFile = process.env.HERMES_S3_CREDS_FILE
-    ? readCredentialFile(process.env.HERMES_S3_CREDS_FILE)
-    : {};
+  const credsFile = readEnv("S3_CREDS_FILE");
+  const fromFile = credsFile ? readCredentialFile(credsFile) : {};
   const accessKeyId =
-    process.env.HERMES_S3_ACCESS_KEY_ID ??
+    readEnv("S3_ACCESS_KEY_ID") ??
     process.env.AWS_ACCESS_KEY_ID ??
     fromFile.accessKeyId;
   const secretAccessKey =
-    process.env.HERMES_S3_SECRET_ACCESS_KEY ??
+    readEnv("S3_SECRET_ACCESS_KEY") ??
     process.env.AWS_SECRET_ACCESS_KEY ??
     fromFile.secretAccessKey;
 
   if (!accessKeyId || !secretAccessKey) {
-    const fileHint = process.env.HERMES_S3_CREDS_FILE
-      ? ` File configured: ${process.env.HERMES_S3_CREDS_FILE}.`
-      : " No HERMES_S3_CREDS_FILE configured.";
+    const fileHint = readEnv("S3_CREDS_FILE")
+      ? ` File configured: ${readEnv("S3_CREDS_FILE")}.`
+      : " No MATCHDESK_S3_CREDS_FILE configured.";
     throw new Error(
       `S3 storage is enabled, but S3 credentials are missing or not parseable.${fileHint} Supported keys include AWS_ACCESS_KEY_ID/AWS_SECRET_ACCESS_KEY, access-key/secret-key, access_key/secret_key, or two bare lines.`
     );
@@ -217,27 +216,27 @@ function readS3Credentials(): S3Credentials {
 }
 
 function readS3Config() {
-  const region = process.env.HERMES_S3_REGION ?? "eu-central-2";
-  const bucket = process.env.HERMES_S3_BUCKET ?? "hermes-storage";
+  const region = readEnv("S3_REGION") ?? "eu-central-2";
+  const bucket = readEnv("S3_BUCKET") ?? "hermes-storage";
 
   return {
     bucket,
-    key: process.env.HERMES_S3_DB_KEY ?? "hermes.sqlite",
+    key: readEnv("S3_DB_KEY") ?? "hermes.sqlite",
     region,
-    endpoint: process.env.HERMES_S3_ENDPOINT ?? `https://s3.${region}.wasabisys.com`,
+    endpoint: readEnv("S3_ENDPOINT") ?? `https://s3.${region}.wasabisys.com`,
     credentials: readS3Credentials()
   };
 }
 
 function readS3LocationConfig(): S3LocationDetails {
-  const region = process.env.HERMES_S3_REGION ?? "eu-central-2";
-  const bucket = process.env.HERMES_S3_BUCKET ?? "hermes-storage";
+  const region = readEnv("S3_REGION") ?? "eu-central-2";
+  const bucket = readEnv("S3_BUCKET") ?? "hermes-storage";
 
   return {
     bucket,
-    key: process.env.HERMES_S3_DB_KEY ?? "hermes.sqlite",
+    key: readEnv("S3_DB_KEY") ?? "hermes.sqlite",
     region,
-    endpoint: process.env.HERMES_S3_ENDPOINT ?? `https://s3.${region}.wasabisys.com`
+    endpoint: readEnv("S3_ENDPOINT") ?? `https://s3.${region}.wasabisys.com`
   };
 }
 
@@ -249,12 +248,12 @@ export function getS3LocationDetails(sqlite: Database.Database): S3LocationDetai
 }
 
 export function getS3CredentialSourcePresence() {
-  const credsFile = process.env.HERMES_S3_CREDS_FILE ?? null;
+  const credsFile = readEnv("S3_CREDS_FILE") ?? null;
   const envAccessKeyPresent = Boolean(
-    process.env.HERMES_S3_ACCESS_KEY_ID ?? process.env.AWS_ACCESS_KEY_ID
+    readEnv("S3_ACCESS_KEY_ID") ?? process.env.AWS_ACCESS_KEY_ID
   );
   const envSecretPresent = Boolean(
-    process.env.HERMES_S3_SECRET_ACCESS_KEY ?? process.env.AWS_SECRET_ACCESS_KEY
+    readEnv("S3_SECRET_ACCESS_KEY") ?? process.env.AWS_SECRET_ACCESS_KEY
   );
   const credsFileConfigured = Boolean(credsFile);
   const credsFileExists = credsFileConfigured ? fs.existsSync(credsFile as string) : false;
@@ -543,7 +542,7 @@ function tryWriteBackupStatus(sqlite: Database.Database, patch: BackupStatusPatc
   try {
     writeBackupStatus(sqlite, patch);
   } catch (error) {
-    console.error("[Hermes] Failed to persist backup status", error);
+    console.error("[Matchdesk] Failed to persist backup status", error);
   }
 }
 
@@ -710,7 +709,7 @@ async function cleanupOldRecoveries(client: S3Client, bucket: string, keep = 10)
       await client.send(new DeleteObjectCommand({ Bucket: bucket, Key: entry.key }));
     }
   } catch (error) {
-    console.error("[Hermes] Failed to cleanup old restore recoveries", error);
+    console.error("[Matchdesk] Failed to cleanup old restore recoveries", error);
   }
 }
 
@@ -746,7 +745,7 @@ async function createRecoverySnapshot(
       )
       .run(recoveryId, recoveryKey, bucket, region, endpoint, new Date().toISOString());
   } catch (error) {
-    console.error("[Hermes] Failed to persist recovery metadata", error);
+    console.error("[Matchdesk] Failed to persist recovery metadata", error);
   }
 
   return {
@@ -765,7 +764,7 @@ export async function restoreDatabaseFromStorageIfNeeded(databasePath = getDatab
     return;
   }
 
-  const restoreMode = process.env.HERMES_S3_RESTORE_MODE ?? "if-missing";
+  const restoreMode = readEnv("S3_RESTORE_MODE") ?? "if-missing";
 
   if (restoreMode === "never") {
     return;
@@ -780,12 +779,12 @@ export async function restoreDatabaseFromStorageIfNeeded(databasePath = getDatab
   try {
     fs.mkdirSync(path.dirname(databasePath), { recursive: true });
     await downloadSnapshotToFile(databasePath);
-    console.log(`[Hermes] Restored SQLite snapshot from s3://${bucket}/${key}`);
+    console.log(`[Matchdesk] Restored SQLite snapshot from s3://${bucket}/${key}`);
   } catch (error) {
     const name = error instanceof Error ? error.name : "";
 
     if (name === "NoSuchKey" || name === "NotFound") {
-      console.warn(`[Hermes] No S3 snapshot found at s3://${bucket}/${key}; starting locally.`);
+      console.warn(`[Matchdesk] No S3 snapshot found at s3://${bucket}/${key}; starting locally.`);
       return;
     }
 
@@ -801,7 +800,7 @@ export async function restoreDatabaseSnapshotIntoLive(sqlite: Database.Database)
     });
   }
 
-  const tempDirectory = fs.mkdtempSync(path.join(os.tmpdir(), "hermes-restore-"));
+  const tempDirectory = fs.mkdtempSync(path.join(os.tmpdir(), "matchdesk-restore-"));
   const tempPath = path.join(tempDirectory, "snapshot.sqlite");
   const snapshotLocation = readS3LocationConfig();
 
@@ -882,7 +881,7 @@ export async function restoreDatabaseSnapshotIntoLive(sqlite: Database.Database)
       }
 
       console.log(
-        `[Hermes] Restored live SQLite data from s3://${restoredFrom.bucket}/${restoredFrom.key}`
+        `[Matchdesk] Restored live SQLite data from s3://${restoredFrom.bucket}/${restoredFrom.key}`
       );
 
       return {
@@ -974,7 +973,7 @@ export function scheduleDatabaseSnapshot(sqlite: Database.Database) {
   snapshotTimer = setTimeout(() => {
     snapshotTimer = undefined;
     persistDatabaseSnapshot(sqlite).catch((error) => {
-      console.error("[Hermes] Failed to persist SQLite snapshot to S3", error);
+      console.error("[Matchdesk] Failed to persist SQLite snapshot to S3", error);
     });
   }, 1_000);
 }

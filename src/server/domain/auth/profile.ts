@@ -7,6 +7,7 @@ import type { DatabaseContext } from "../../db/client";
 import { emailChangeChallenges, sessions, users } from "../../db/schema";
 import { ensureActiveEmailAvailable } from "../users";
 import { sendEmailChangeCode } from "../../mail/mailer";
+import { readEnv } from "../../env";
 
 export type UserRow = typeof users.$inferSelect;
 export type SessionRow = typeof sessions.$inferSelect;
@@ -86,7 +87,7 @@ export async function requestEmailChange(
 
   const timestamp = nowIso();
   const challengeId = randomUUID();
-  const code = process.env.HERMES_DEV_LOGIN_CODE ?? generateOtp();
+  const code = readEnv("DEV_LOGIN_CODE") ?? generateOtp();
 
   context.sqlite.transaction(() => {
     context.db
@@ -140,7 +141,7 @@ export async function requestEmailChange(
       .where(eq(emailChangeChallenges.id, challengeId))
       .run();
   } catch (error) {
-    console.error("[Hermes] Failed to send email-change code", error);
+    console.error("[Matchdesk] Failed to send email-change code", error);
     return { ok: false, status: 502, error: "mailversand_fehlgeschlagen" };
   }
 

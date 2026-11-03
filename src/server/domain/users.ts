@@ -30,7 +30,7 @@ function listActiveUsers(context: DatabaseContext, options?: { excludeUserId?: s
  * Ein exakter Treffer gewinnt; gibt es nur mehrere Treffer, die sich bloß in der
  * Schreibweise unterscheiden (Altbestand), ist das Ergebnis mehrdeutig und null.
  *
- * Hermes ist auf rund 25 Teilnehmer ausgelegt, daher wird in JS verglichen statt per
+ * Matchdesk ist auf rund 25 Teilnehmer ausgelegt, daher wird in JS verglichen statt per
  * SQLite-lower(), das Umlaute nicht faltet.
  */
 function findActiveUserCaseInsensitive(

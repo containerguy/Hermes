@@ -58,7 +58,7 @@ export function runMigrations(
         const after = countForeignKeyViolations(sqlite);
         if (after > before) {
           throw new Error(
-            `[Hermes] Migration ${file} würde ${after - before} Fremdschlüssel-Verletzung(en) erzeugen und wurde zurückgerollt.`
+            `[Matchdesk] Migration ${file} würde ${after - before} Fremdschlüssel-Verletzung(en) erzeugen und wurde zurückgerollt.`
           );
         }
         insertMigration.run(file, new Date().toISOString());

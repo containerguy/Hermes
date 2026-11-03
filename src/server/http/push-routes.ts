@@ -3,7 +3,7 @@ import { Router } from "express";
 import { randomUUID } from "node:crypto";
 import { z } from "zod";
 import { getCurrentSession, publicUser, requireUser } from "../auth/current-user";
-import { enforceApiTokenWriteAccess } from "../auth/hermes-auth";
+import { enforceApiTokenWriteAccess } from "../auth/matchdesk-auth";
 import type { DatabaseContext } from "../db/client";
 import { pushSubscriptions, users } from "../db/schema";
 import { getVapidPublicKey } from "../push/push-service";

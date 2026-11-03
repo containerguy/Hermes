@@ -153,7 +153,7 @@ export async function runAutomationTick(deps: AutomationDeps, previous: Automati
       try {
         await deps.pushRunning(event.id, event.gameTitle);
       } catch (error) {
-        logError(`[Hermes] AMP-Automatik: Push für Event ${event.id} fehlgeschlagen`, error);
+        logError(`[Matchdesk] AMP-Automatik: Push für Event ${event.id} fehlgeschlagen`, error);
       }
     }
 
@@ -180,7 +180,7 @@ export async function runAutomationTick(deps: AutomationDeps, previous: Automati
     try {
       await deps.start(bindingId);
     } catch (error) {
-      logError(`[Hermes] AMP-Automatik: Start von ${status.ampInstanceName} fehlgeschlagen`, error);
+      logError(`[Matchdesk] AMP-Automatik: Start von ${status.ampInstanceName} fehlgeschlagen`, error);
     }
   }
 
@@ -196,7 +196,7 @@ export async function runAutomationTick(deps: AutomationDeps, previous: Automati
     if (nowMs - since > GAME_START_FOLLOW_UP_TIMEOUT_MS) {
       delete state.pendingGameStart[bindingId];
       logError(
-        `[Hermes] AMP-Automatik: ${status?.ampInstanceName ?? bindingId} ist nach StartInstance nicht gestartet`,
+        `[Matchdesk] AMP-Automatik: ${status?.ampInstanceName ?? bindingId} ist nach StartInstance nicht gestartet`,
         new Error("amp_nachstart_timeout")
       );
       continue;
@@ -209,7 +209,7 @@ export async function runAutomationTick(deps: AutomationDeps, previous: Automati
     try {
       await deps.start(bindingId, { followUp: true });
     } catch (error) {
-      logError(`[Hermes] AMP-Automatik: Nachstart von ${status.ampInstanceName} fehlgeschlagen`, error);
+      logError(`[Matchdesk] AMP-Automatik: Nachstart von ${status.ampInstanceName} fehlgeschlagen`, error);
     }
   }
 
@@ -245,7 +245,7 @@ export async function runAutomationTick(deps: AutomationDeps, previous: Automati
     try {
       await deps.stop(bindingId);
     } catch (error) {
-      logError(`[Hermes] AMP-Automatik: Stopp von ${status.ampInstanceName} fehlgeschlagen`, error);
+      logError(`[Matchdesk] AMP-Automatik: Stopp von ${status.ampInstanceName} fehlgeschlagen`, error);
     }
   }
 
@@ -342,7 +342,7 @@ export function runAutomationNow(context?: DatabaseContext): Promise<void> {
       try {
         automationState = await runAutomationTick(buildAutomationDeps(ctx), automationState);
       } catch (error) {
-        console.error("[Hermes] AMP-Automatik: Tick fehlgeschlagen", error);
+        console.error("[Matchdesk] AMP-Automatik: Tick fehlgeschlagen", error);
       }
     })().finally(() => {
       running = null;

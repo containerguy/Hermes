@@ -7,17 +7,17 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
 function resolveOpenApiSpecPath(): string {
   const candidates = [
-    path.join(process.cwd(), "dist-server/openapi/hermes-api.yaml"),
+    path.join(process.cwd(), "dist-server/openapi/matchdesk-api.yaml"),
     // Bundled server: index.js and openapi/ live under dist-server/
-    path.join(__dirname, "openapi/hermes-api.yaml"),
-    path.join(__dirname, "../openapi/hermes-api.yaml")
+    path.join(__dirname, "openapi/matchdesk-api.yaml"),
+    path.join(__dirname, "../openapi/matchdesk-api.yaml")
   ];
   for (const candidate of candidates) {
     if (fs.existsSync(candidate)) {
       return candidate;
     }
   }
-  throw new Error("[Hermes] OpenAPI spec not found (expected dist-server/openapi/hermes-api.yaml or src/server/openapi/hermes-api.yaml)");
+  throw new Error("[Matchdesk] OpenAPI spec not found (expected dist-server/openapi/matchdesk-api.yaml or src/server/openapi/matchdesk-api.yaml)");
 }
 
 const SWAGGER_UI_VERSION = "5.11.0";
@@ -43,7 +43,7 @@ export function mountApiDocs(app: Express) {
       response.type("application/yaml");
       response.send(fs.readFileSync(specPath, "utf8"));
     } catch (error) {
-      console.error("[Hermes] OpenAPI file error", error);
+      console.error("[Matchdesk] OpenAPI file error", error);
       response.status(500).type("text/plain").send("OpenAPI specification unavailable");
     }
   });
@@ -55,7 +55,7 @@ export function mountApiDocs(app: Express) {
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Hermes API docs</title>
+  <title>Matchdesk API docs</title>
   <link rel="stylesheet" href="https://unpkg.com/swagger-ui-dist@${SWAGGER_UI_VERSION}/swagger-ui.css" crossorigin="anonymous" />
 </head>
 <body>

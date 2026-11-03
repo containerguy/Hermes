@@ -1,18 +1,21 @@
-import { createHermesApp } from "./app";
+import { createMatchdeskApp } from "./app";
+import { readEnv, warnAboutLegacyEnv } from "./env";
 
-const port = Number(process.env.HERMES_PORT ?? "3000");
-const host = process.env.HERMES_HOST ?? "0.0.0.0";
-const { app, close } = await createHermesApp();
+warnAboutLegacyEnv();
+
+const port = Number(readEnv("PORT") ?? "3000");
+const host = readEnv("HOST") ?? "0.0.0.0";
+const { app, close } = await createMatchdeskApp();
 
 const server = app.listen(port, host, () => {
-  console.log(`Hermes listening on http://${host}:${port}`);
+  console.log(`Matchdesk listening on http://${host}:${port}`);
 });
 
 function shutdown() {
   server.close(() => {
     close()
       .catch((error) => {
-        console.error("[Hermes] Shutdown persistence failed", error);
+        console.error("[Matchdesk] Shutdown persistence failed", error);
       })
       .finally(() => {
         process.exit(0);

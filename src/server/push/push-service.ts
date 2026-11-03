@@ -2,6 +2,7 @@ import { and, eq, inArray, isNull } from "drizzle-orm";
 import webpush from "web-push";
 import type { DatabaseContext } from "../db/client";
 import { mainEventParticipants, participations, pushSubscriptions, users } from "../db/schema";
+import { readEnv } from "../env";
 
 export type PushPayload = {
   title: string;
@@ -14,7 +15,7 @@ export type PushPayload = {
 let configured = false;
 
 export function getVapidPublicKey() {
-  return process.env.HERMES_VAPID_PUBLIC_KEY?.trim() ?? "";
+  return readEnv("VAPID_PUBLIC_KEY")?.trim() ?? "";
 }
 
 function nowIso() {
@@ -27,8 +28,8 @@ function configureWebPush() {
   }
 
   const publicKey = getVapidPublicKey();
-  const privateKey = process.env.HERMES_VAPID_PRIVATE_KEY?.trim();
-  const subject = process.env.HERMES_VAPID_SUBJECT?.trim() ?? "mailto:admin@example.test";
+  const privateKey = readEnv("VAPID_PRIVATE_KEY")?.trim();
+  const subject = readEnv("VAPID_SUBJECT")?.trim() ?? "mailto:admin@example.test";
 
   if (!publicKey || !privateKey) {
     return false;
@@ -45,7 +46,7 @@ export async function sendPushToUser(
   payload: PushPayload
 ) {
   if (!configureWebPush()) {
-    console.warn("[Hermes] Push skipped: VAPID keys are missing.");
+    console.warn("[Matchdesk] Push skipped: VAPID keys are missing.");
     return;
   }
 
@@ -117,9 +118,9 @@ export async function sendPushToUser(
           .run();
 
         if (nextFailures < 3) {
-          console.error("[Hermes] Push delivery failed", error);
+          console.error("[Matchdesk] Push delivery failed", error);
         } else {
-          console.warn("[Hermes] Push subscription revoked after repeated failures.");
+          console.warn("[Matchdesk] Push subscription revoked after repeated failures.");
         }
       }
     })

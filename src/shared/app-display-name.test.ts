@@ -25,14 +25,14 @@ describe("app-display-name", () => {
   });
 
   it("appName gewinnt, Leerraum zählt als nicht gesetzt", () => {
-    expect(pickAppDisplayName("  Mitspielzentrale ", "MatchDesk")).toBe("Mitspielzentrale");
-    expect(pickAppDisplayName("   ", "MatchDesk")).toBe("MatchDesk");
-    expect(pickAppDisplayName(null, "MatchDesk")).toBe("MatchDesk");
+    expect(pickAppDisplayName("  Mitspielzentrale ", "Matchdesk")).toBe("Mitspielzentrale");
+    expect(pickAppDisplayName("   ", "Matchdesk")).toBe("Matchdesk");
+    expect(pickAppDisplayName(null, "Matchdesk")).toBe("Matchdesk");
   });
 
   it("serverseitige Auflösung", () => {
     expect(resolveAppDisplayName({ appName: "" }, "de")).toBe("Mitspielzentrale");
-    expect(resolveAppDisplayName({ appName: "" }, "en")).toBe("MatchDesk");
+    expect(resolveAppDisplayName({ appName: "" }, "en")).toBe("Matchdesk");
     expect(resolveAppDisplayName({ appName: "LAN", projectTemplate: "table_tennis" }, "en")).toBe("LAN");
     expect(builtinAppDisplayName(undefined, "de")).toBe("Mitspielzentrale");
   });
