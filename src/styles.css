@@ -1861,6 +1861,11 @@ dd {
     flex-direction: column;
   }
 
+  /* In der Spalte würde flex-basis 180px sonst zur Buttonhöhe. */
+  .action-row button {
+    flex: 0 0 auto;
+  }
+
   h1 {
     font-size: 2rem;
   }
@@ -2727,9 +2732,8 @@ dd {
   margin: 6px 0;
 }
 
-/* Events (LAN-Party, Turniertag): Verwaltung oberhalb des Boards, eingeklappt */
+/* Seite „Events“ (LAN-Party, Turniertag): Liste mit Teilnahme, darunter Anlegen für Manager */
 .main-events-panel {
-  margin-top: 16px;
   padding: 12px 14px;
   border: 1px solid var(--line);
   border-radius: 8px;
@@ -2737,18 +2741,21 @@ dd {
   display: grid;
   gap: 12px;
 }
-.main-events-panel > summary {
+.main-events-create {
+  border-top: 1px solid var(--line);
+  padding-top: 10px;
+}
+.main-events-create > summary {
   cursor: pointer;
-  display: flex;
-  flex-wrap: wrap;
-  align-items: baseline;
-  gap: 8px;
+  font-weight: 800;
 }
-.main-events-panel[open] > summary {
-  margin-bottom: 8px;
+.main-events-create[open] > summary {
+  margin-bottom: 10px;
 }
-.main-events-summary {
-  font-weight: 700;
+@media (min-width: 681px) {
+  .main-event-participation {
+    align-items: center;
+  }
 }
 .main-events-list {
   list-style: none;
@@ -2839,4 +2846,142 @@ dd {
 .main-event-invite-form select {
   flex: 1 1 200px;
   width: auto;
+}
+
+/*
+ * Menü-Navigation: Unterseiten (Admin, Profil) als Pillenleiste, auf schmalen Viewports
+ * und in der installierten PWA das Hauptmenü als feste Tab-Leiste unten.
+ */
+.sub-nav-bar .admin-top-subnav {
+  flex-wrap: nowrap;
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+.sub-nav-bar .admin-top-subnav a {
+  white-space: nowrap;
+}
+
+.tab-bar {
+  display: none;
+}
+
+@media (display-mode: standalone), (max-width: 768px) {
+  .app-shell--tabbar .nav-links {
+    display: none;
+  }
+
+  .app-shell--tabbar .topbar {
+    flex-wrap: nowrap;
+  }
+
+  .app-shell--tabbar .brand {
+    flex: 1 1 auto;
+    flex-direction: row;
+    justify-content: flex-start;
+    gap: 8px;
+    text-align: left;
+  }
+
+  .app-shell--tabbar .topbar-end {
+    flex: 0 0 auto;
+    justify-content: flex-end;
+  }
+
+  .app-shell--tabbar {
+    padding-bottom: calc(64px + env(safe-area-inset-bottom, 0px));
+  }
+
+  .tab-bar {
+    position: fixed;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    z-index: 20;
+    display: flex;
+    justify-content: space-around;
+    gap: 2px;
+    padding: 6px 6px calc(6px + env(safe-area-inset-bottom, 0px));
+    background: rgba(255, 255, 255, 0.97);
+    border-top: 1px solid var(--line);
+    backdrop-filter: blur(14px);
+  }
+
+  .tab-bar a {
+    flex: 1 1 0;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 2px;
+    padding: 4px 2px;
+    border-radius: 8px;
+    color: var(--muted);
+    font-size: 0.72rem;
+    font-weight: 800;
+    text-decoration: none;
+  }
+
+  .tab-bar a span {
+    max-width: 100%;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .tab-bar a.active {
+    color: var(--teal);
+    background: var(--surface);
+  }
+}
+
+/*
+ * Seitenkopf klebt unter der Kopfzeile und klappt beim Runterscrollen zu einer schmalen
+ * Zeile zusammen (Eyebrow + Titel, ohne Beschreibung und Status).
+ */
+.page-hero {
+  position: sticky;
+  top: var(--topbar-height, 0px);
+  z-index: 5;
+  transition: padding 160ms ease;
+}
+
+.page-hero--collapsed {
+  padding-top: 8px;
+  padding-bottom: 8px;
+  border-top-width: 4px;
+  align-items: center;
+}
+
+.page-hero--collapsed .hero-copy {
+  display: flex;
+  flex-direction: row;
+  align-items: baseline;
+  gap: 10px;
+  min-width: 0;
+}
+
+.page-hero--collapsed .hero-copy .eyebrow {
+  flex-shrink: 0;
+  margin: 0;
+}
+
+.page-hero.page-hero--collapsed h1 {
+  margin: 0;
+  font-size: 1rem;
+  line-height: 1.3;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  min-width: 0;
+}
+
+.page-hero--collapsed .hero-copy p:not(.eyebrow),
+.page-hero--collapsed .hero-status {
+  display: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .page-hero {
+    transition: none;
+  }
 }

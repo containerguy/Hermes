@@ -385,7 +385,7 @@ export function createMainEventRouter(context: DatabaseContext) {
     const startPush = {
       title: "Event gestartet",
       body: `${event.name} läuft jetzt. Bist du dabei?`,
-      url: "/#events",
+      url: "/#main-events",
       vibrate: [220, 80, 220]
     };
     // Private Events laden nur die Eingeladenen ein.
@@ -460,7 +460,7 @@ export function createMainEventRouter(context: DatabaseContext) {
     void sendPushToMainEventParticipants(context, event.id, {
       title: "Event beendet",
       body: `${event.name} ist vorbei. Danke fürs Mitspielen!`,
-      url: "/#events",
+      url: "/#main-events",
       vibrate: [120]
     });
     response.json({ mainEvent: serializeMainEvent(context, updated, actor), archivedRounds });
@@ -566,7 +566,7 @@ export function createMainEventRouter(context: DatabaseContext) {
           event.status === "running"
             ? `Du bist zu ${event.name} eingeladen. Das Event läuft schon, bist du dabei?`
             : `Du bist zu ${event.name} eingeladen.`,
-        url: "/#events",
+        url: "/#main-events",
         vibrate: [180, 80, 180]
       });
     }
