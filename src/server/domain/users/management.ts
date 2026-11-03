@@ -79,7 +79,7 @@ export function createUser(
       })
       .run();
   } catch (error) {
-    console.error("[Hermes] Failed to create user", error);
+    console.error("[Matchdesk] Failed to create user", error);
     return { ok: false, status: 409, error: "user_existiert_bereits" };
   }
 
@@ -152,7 +152,7 @@ export function updateUser(
       }
     })();
   } catch (error) {
-    console.error("[Hermes] Failed to update user", error);
+    console.error("[Matchdesk] Failed to update user", error);
     return { ok: false, status: 409, error: "user_update_konflikt" };
   }
 
@@ -209,7 +209,7 @@ export function softDeleteUser(
       .set({
         phoneNumber: `deleted:${existing.id}`,
         username: `deleted-${existing.id.slice(0, 8)}`,
-        email: `deleted-${existing.id}@deleted.hermes.local`,
+        email: `deleted-${existing.id}@deleted.matchdesk.local`,
         role: "user",
         notificationsEnabled: false,
         deletedAt: timestamp,

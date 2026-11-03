@@ -141,7 +141,7 @@ export async function requestEmailChange(
       .where(eq(emailChangeChallenges.id, challengeId))
       .run();
   } catch (error) {
-    console.error("[Hermes] Failed to send email-change code", error);
+    console.error("[Matchdesk] Failed to send email-change code", error);
     return { ok: false, status: 502, error: "mailversand_fehlgeschlagen" };
   }
 

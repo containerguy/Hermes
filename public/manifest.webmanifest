@@ -1,7 +1,7 @@
 {
-  "name": "Hermes",
-  "short_name": "Hermes",
-  "description": "LAN-Party Abstimmungen fuer Spielrunden",
+  "name": "Mitspielzentrale (Matchdesk)",
+  "short_name": "Mitspielzentrale",
+  "description": "Spielrunden auf der LAN-Party abstimmen und organisieren",
   "start_url": "/",
   "display": "standalone",
   "background_color": "#f4f7fb",

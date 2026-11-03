@@ -189,7 +189,7 @@ export function createAmpIntegrationRouter(context: DatabaseContext) {
       response.json({ instances });
     } catch (error) {
       const msg = error instanceof Error ? error.message : "amp_anfrage_fehlgeschlagen";
-      console.error("[Hermes] AMP instances:", msg);
+      console.error("[Matchdesk] AMP instances:", msg);
       response.status(502).json({ error: mapAmpErrorToCode(msg) });
     }
   });
@@ -224,7 +224,7 @@ export function createAmpIntegrationRouter(context: DatabaseContext) {
       });
     } catch (error) {
       const msg = error instanceof Error ? error.message : "amp_anfrage_fehlgeschlagen";
-      console.error("[Hermes] AMP suggestions:", msg);
+      console.error("[Matchdesk] AMP suggestions:", msg);
       response.status(502).json({ error: mapAmpErrorToCode(msg) });
     }
   });
@@ -429,12 +429,12 @@ export function createAmpIntegrationRouter(context: DatabaseContext) {
     } catch (error) {
       if (error instanceof AmpActionRejectedError) {
         // AMP hat geantwortet und abgelehnt: kein Netzwerkfehler, Grund steht im Log
-        console.error(`[Hermes] AMP ${action} ${guard.binding.ampInstanceName} abgelehnt:`, error.reason);
+        console.error(`[Matchdesk] AMP ${action} ${guard.binding.ampInstanceName} abgelehnt:`, error.reason);
         response.status(409).json({ error: "amp_aktion_abgelehnt" });
         return;
       }
       const msg = error instanceof Error ? error.message : "amp_anfrage_fehlgeschlagen";
-      console.error(`[Hermes] AMP ${action} ${guard.binding.ampInstanceName}:`, msg);
+      console.error(`[Matchdesk] AMP ${action} ${guard.binding.ampInstanceName}:`, msg);
       response.status(502).json({ error: mapAmpErrorToCode(msg) });
       return;
     }

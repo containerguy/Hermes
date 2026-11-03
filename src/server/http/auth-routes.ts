@@ -315,7 +315,7 @@ export function createAuthRouter(context: DatabaseContext) {
     try {
       await sendIssuedLoginCode(context, user, issued, { acceptLanguage: request.get("accept-language") });
     } catch (error) {
-      console.error("[Hermes] Failed to send login code", error);
+      console.error("[Matchdesk] Failed to send login code", error);
       response.status(502).json({ error: "mailversand_fehlgeschlagen" });
       return;
     }
@@ -467,7 +467,7 @@ export function createAuthRouter(context: DatabaseContext) {
             result = registerInvitedUser();
           } catch (retryError) {
             if (isSqliteBusyOrLocked(retryError)) {
-              console.error("[Hermes] Invite registration failed after retry (sqlite busy/locked)", retryError);
+              console.error("[Matchdesk] Invite registration failed after retry (sqlite busy/locked)", retryError);
               recordRateLimitFailure(context, { scope: "invite_register", key: registerKey });
               response.status(500).json({ error: "registrierung_fehlgeschlagen" });
               return;
@@ -494,7 +494,7 @@ export function createAuthRouter(context: DatabaseContext) {
           registration: true
         });
       } catch (error) {
-        console.error("[Hermes] Failed to send registration login code", error);
+        console.error("[Matchdesk] Failed to send registration login code", error);
         response.status(502).json({ error: "mailversand_fehlgeschlagen" });
         return;
       }
@@ -547,7 +547,7 @@ export function createAuthRouter(context: DatabaseContext) {
         return;
       }
 
-      console.error("[Hermes] Failed to register invited user", error);
+      console.error("[Matchdesk] Failed to register invited user", error);
       recordRateLimitFailure(context, { scope: "invite_register", key: registerKey });
       response.status(409).json({ error: "user_existiert_bereits" });
       return;

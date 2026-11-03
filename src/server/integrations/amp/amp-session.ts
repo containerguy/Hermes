@@ -10,10 +10,10 @@ import type { HermesSettings } from "../../settings";
  * - Alle Aufrufe laufen seriell durch eine Warteschlange, damit das AMP-Login-Rate-Limit nie greift.
  * - Verliert AMP die Session, wird genau einmal neu angemeldet (zuerst mit dem rememberMe-Token,
  *   dann mit dem Passwort) und der Aufruf wiederholt.
- * - TLS wird gegen HERMES_AMP_CA_FILE verifiziert; es gibt bewusst keinen skipVerify-Pfad.
+ * - TLS wird gegen MATCHDESK_AMP_CA_FILE verifiziert; es gibt bewusst keinen skipVerify-Pfad.
  */
 
-const USER_AGENT = "Hermes-AMP-Integration/1.0";
+const USER_AGENT = "Matchdesk-AMP-Integration/1.0";
 const REQUEST_MS = 25_000;
 
 type FetchLike = typeof undiciFetch;
@@ -133,7 +133,7 @@ function storeRememberToken(file: string | undefined, token: string | null) {
   try {
     fs.writeFileSync(file, `${token}\n`, { mode: 0o600 });
   } catch (error) {
-    console.warn("[Hermes] AMP rememberMe-Token konnte nicht gespeichert werden:", error);
+    console.warn("[Matchdesk] AMP rememberMe-Token konnte nicht gespeichert werden:", error);
   }
 }
 

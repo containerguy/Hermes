@@ -93,22 +93,6 @@ export function AdminPanelBetrieb({
         </label>
         <p className="muted">{t("admin.help.appName")}</p>
         <label>
-          {t("admin.label.brandMark")}
-          <select
-            value={settings.brandMark}
-            onChange={(event) =>
-              onSettingsChange({
-                ...settings,
-                brandMark: event.target.value as AppSettings["brandMark"]
-              })
-            }
-          >
-            <option value="mitspiel">{t("admin.brandMark.mitspiel")}</option>
-            <option value="hermes">{t("admin.brandMark.hermes")}</option>
-          </select>
-        </label>
-        <p className="muted">{t("admin.help.brandMark")}</p>
-        <label>
           {t("admin.label.archiveHours")}
           <input
             type="number"

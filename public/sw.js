@@ -7,7 +7,7 @@ self.addEventListener("activate", (event) => {
 });
 
 self.addEventListener("push", (event) => {
-  const fallback = { title: "Hermes", body: "Neue Benachrichtigung", url: "/" };
+  const fallback = { title: "Mitspielzentrale", body: "Neue Benachrichtigung", url: "/" };
   let parsed = null;
 
   if (event.data) {
@@ -25,11 +25,11 @@ self.addEventListener("push", (event) => {
   };
 
   event.waitUntil(
-    self.registration.showNotification(payload.title || "Hermes", {
+    self.registration.showNotification(payload.title || "Mitspielzentrale", {
       body: payload.body || "",
       icon: "/icon.svg",
       badge: "/icon.svg",
-      tag: payload.tag || "hermes-event",
+      tag: payload.tag || "matchdesk-event",
       renotify: Boolean(payload.renotify),
       requireInteraction: Boolean(payload.requireInteraction),
       vibrate: payload.vibrate || [180, 80, 180],

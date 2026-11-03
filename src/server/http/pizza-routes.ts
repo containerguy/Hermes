@@ -336,7 +336,7 @@ function requirePizzaManager(context: DatabaseContext, request: Request, respons
 
 function respondDomainError(error: unknown, response: Response, logLabel: string) {
   if (!handleDomainError(error, response)) {
-    console.error(`[Hermes] ${logLabel}`, error);
+    console.error(`[Matchdesk] ${logLabel}`, error);
     response.status(500).json({ error: "interner_fehler" });
   }
 }
@@ -1133,7 +1133,7 @@ export function createPizzaRouter(context: DatabaseContext) {
       });
     } catch (error) {
       if (handleDomainError(error, response)) return;
-      console.error("[Hermes] pizza menu import failed", error);
+      console.error("[Matchdesk] pizza menu import failed", error);
       response.status(500).json({ error: "import_fehler" });
     }
   });
@@ -1215,7 +1215,7 @@ export function createPizzaRouter(context: DatabaseContext) {
       );
       response.send(buffer);
     } catch (error) {
-      console.error("[Hermes] pizzeria pdf failed", error);
+      console.error("[Matchdesk] pizzeria pdf failed", error);
       response.status(500).json({ error: "pdf_fehler" });
     }
   });
@@ -1283,7 +1283,7 @@ export function createPizzaRouter(context: DatabaseContext) {
       );
       response.send(buffer);
     } catch (error) {
-      console.error("[Hermes] kassenliste pdf failed", error);
+      console.error("[Matchdesk] kassenliste pdf failed", error);
       response.status(500).json({ error: "pdf_fehler" });
     }
   });

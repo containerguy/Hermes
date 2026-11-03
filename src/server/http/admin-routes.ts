@@ -145,7 +145,7 @@ export function createAdminRouter(context: DatabaseContext) {
     });
 
     const stamp = payload.exportedAt.replace(/[:.]/g, "-");
-    response.setHeader("Content-Disposition", `attachment; filename="hermes-users-${stamp}.json"`);
+    response.setHeader("Content-Disposition", `attachment; filename="matchdesk-users-${stamp}.json"`);
     response.type("application/json");
     response.send(JSON.stringify(payload, null, 2));
   });
@@ -271,7 +271,7 @@ export function createAdminRouter(context: DatabaseContext) {
     try {
       insertedUsers = commitBulkImportAnalysis(context, admin, analysis);
     } catch (error) {
-      console.error("[Hermes] Failed to commit bulk user import", error);
+      console.error("[Matchdesk] Failed to commit bulk user import", error);
       response.status(409).json({ error: "import_konnte_nicht_gespeichert_werden" });
       return;
     }
@@ -329,7 +329,7 @@ export function createAdminRouter(context: DatabaseContext) {
     try {
       insertedUsers = commitBulkImportAnalysis(context, admin, analysis);
     } catch (error) {
-      console.error("[Hermes] Failed to commit user export import", error);
+      console.error("[Matchdesk] Failed to commit user export import", error);
       response.status(409).json({ error: "import_konnte_nicht_gespeichert_werden" });
       return;
     }
@@ -479,7 +479,7 @@ export function createAdminRouter(context: DatabaseContext) {
     try {
       backupStatus = readBackupStatus(context.sqlite);
     } catch (error) {
-      console.error("[Hermes] Failed to read backup status", error);
+      console.error("[Matchdesk] Failed to read backup status", error);
       backupStatus = null;
     }
 
@@ -634,7 +634,7 @@ export function createAdminRouter(context: DatabaseContext) {
     });
 
     const stamp = payload.exportedAt.replace(/[:.]/g, "-");
-    response.setHeader("Content-Disposition", `attachment; filename="hermes-settings-${stamp}.json"`);
+    response.setHeader("Content-Disposition", `attachment; filename="matchdesk-settings-${stamp}.json"`);
     response.type("application/json");
     response.send(JSON.stringify(payload, null, 2));
   });

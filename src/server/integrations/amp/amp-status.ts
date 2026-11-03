@@ -278,13 +278,13 @@ async function pollOnce(context: DatabaseContext): Promise<void> {
     const raw = await ampCall(settings, "ADSModule/GetInstances");
     changed = applyInstancesSnapshot(raw, bindings, null, ips);
     if (lastErrorLogged) {
-      console.info("[Hermes] AMP-Status wieder erreichbar");
+      console.info("[Matchdesk] AMP-Status wieder erreichbar");
       lastErrorLogged = null;
     }
   } catch (caught) {
     const code = caught instanceof Error ? caught.message : "amp_anfrage_fehlgeschlagen";
     if (lastErrorLogged !== code) {
-      console.warn("[Hermes] AMP-Status-Poll fehlgeschlagen:", code);
+      console.warn("[Matchdesk] AMP-Status-Poll fehlgeschlagen:", code);
       lastErrorLogged = code;
     }
     changed = applyInstancesSnapshot(null, bindings, code, ips);

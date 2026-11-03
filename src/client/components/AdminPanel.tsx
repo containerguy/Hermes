@@ -670,7 +670,7 @@ export function AdminPanel({
 
   async function runRestore() {
     const confirmed = window.confirm(
-      "Restore wirklich starten? Hermes validiert zuerst den Snapshot und erstellt vor dem Restore ein Recovery-Backup."
+      "Restore wirklich starten? Die Mitspielzentrale prüft zuerst den Snapshot und erstellt vor dem Restore ein Recovery-Backup."
     );
 
     if (!confirmed) {

@@ -17,7 +17,7 @@ export function clearReleaseInfoCache() {
 }
 
 /**
- * Version from `package.json` next to the process cwd; repo URL from `HERMES_SOURCE_REPO_URL` or default.
+ * Version from `package.json` next to the process cwd; repo URL from `MATCHDESK_SOURCE_REPO_URL` or default.
  * Cached for the lifetime of the process.
  */
 export function getReleaseInfo(): AppReleaseInfo {

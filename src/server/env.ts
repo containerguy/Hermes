@@ -154,7 +154,7 @@ export function getAmpCaFile() {
   }
   if (!fs.existsSync(file) && !warnedMissingCa) {
     warnedMissingCa = true;
-    console.warn(`[Hermes] HERMES_AMP_CA_FILE zeigt auf eine fehlende Datei: ${file}`);
+    console.warn(`[Matchdesk] MATCHDESK_AMP_CA_FILE zeigt auf eine fehlende Datei: ${file}`);
   }
   return file;
 }

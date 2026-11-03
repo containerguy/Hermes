@@ -206,7 +206,7 @@ function readS3Credentials(): S3Credentials {
   if (!accessKeyId || !secretAccessKey) {
     const fileHint = readEnv("S3_CREDS_FILE")
       ? ` File configured: ${readEnv("S3_CREDS_FILE")}.`
-      : " No HERMES_S3_CREDS_FILE configured.";
+      : " No MATCHDESK_S3_CREDS_FILE configured.";
     throw new Error(
       `S3 storage is enabled, but S3 credentials are missing or not parseable.${fileHint} Supported keys include AWS_ACCESS_KEY_ID/AWS_SECRET_ACCESS_KEY, access-key/secret-key, access_key/secret_key, or two bare lines.`
     );
@@ -542,7 +542,7 @@ function tryWriteBackupStatus(sqlite: Database.Database, patch: BackupStatusPatc
   try {
     writeBackupStatus(sqlite, patch);
   } catch (error) {
-    console.error("[Hermes] Failed to persist backup status", error);
+    console.error("[Matchdesk] Failed to persist backup status", error);
   }
 }
 
@@ -709,7 +709,7 @@ async function cleanupOldRecoveries(client: S3Client, bucket: string, keep = 10)
       await client.send(new DeleteObjectCommand({ Bucket: bucket, Key: entry.key }));
     }
   } catch (error) {
-    console.error("[Hermes] Failed to cleanup old restore recoveries", error);
+    console.error("[Matchdesk] Failed to cleanup old restore recoveries", error);
   }
 }
 
@@ -745,7 +745,7 @@ async function createRecoverySnapshot(
       )
       .run(recoveryId, recoveryKey, bucket, region, endpoint, new Date().toISOString());
   } catch (error) {
-    console.error("[Hermes] Failed to persist recovery metadata", error);
+    console.error("[Matchdesk] Failed to persist recovery metadata", error);
   }
 
   return {
@@ -779,12 +779,12 @@ export async function restoreDatabaseFromStorageIfNeeded(databasePath = getDatab
   try {
     fs.mkdirSync(path.dirname(databasePath), { recursive: true });
     await downloadSnapshotToFile(databasePath);
-    console.log(`[Hermes] Restored SQLite snapshot from s3://${bucket}/${key}`);
+    console.log(`[Matchdesk] Restored SQLite snapshot from s3://${bucket}/${key}`);
   } catch (error) {
     const name = error instanceof Error ? error.name : "";
 
     if (name === "NoSuchKey" || name === "NotFound") {
-      console.warn(`[Hermes] No S3 snapshot found at s3://${bucket}/${key}; starting locally.`);
+      console.warn(`[Matchdesk] No S3 snapshot found at s3://${bucket}/${key}; starting locally.`);
       return;
     }
 
@@ -881,7 +881,7 @@ export async function restoreDatabaseSnapshotIntoLive(sqlite: Database.Database)
       }
 
       console.log(
-        `[Hermes] Restored live SQLite data from s3://${restoredFrom.bucket}/${restoredFrom.key}`
+        `[Matchdesk] Restored live SQLite data from s3://${restoredFrom.bucket}/${restoredFrom.key}`
       );
 
       return {
@@ -973,7 +973,7 @@ export function scheduleDatabaseSnapshot(sqlite: Database.Database) {
   snapshotTimer = setTimeout(() => {
     snapshotTimer = undefined;
     persistDatabaseSnapshot(sqlite).catch((error) => {
-      console.error("[Hermes] Failed to persist SQLite snapshot to S3", error);
+      console.error("[Matchdesk] Failed to persist SQLite snapshot to S3", error);
     });
   }, 1_000);
 }

@@ -657,7 +657,7 @@ export function createEventRouter(context: DatabaseContext) {
 
           if (isSqliteBusyOrLocked(retryError)) {
             console.error(
-              "[Hermes] Participation update failed after retry (sqlite busy/locked)",
+              "[Matchdesk] Participation update failed after retry (sqlite busy/locked)",
               retryError
             );
             response.status(503).json({ error: "teilnahme_fehlgeschlagen" });

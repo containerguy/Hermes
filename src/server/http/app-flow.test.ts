@@ -249,7 +249,7 @@ describe("app flow", () => {
       const csrf = await fetchCsrf(adminAgent);
       await adminAgent.delete(`/api/admin/rate-limits/${id}`).set(CSRF_HEADER, csrf).expect(200);
 
-      expect(errorSpy).toHaveBeenCalledWith("[Hermes] audit log failed", expect.any(Error));
+      expect(errorSpy).toHaveBeenCalledWith("[Matchdesk] audit log failed", expect.any(Error));
     } finally {
       prepareSpy.mockRestore();
       errorSpy.mockRestore();

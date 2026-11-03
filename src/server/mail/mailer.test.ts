@@ -316,7 +316,7 @@ describe("Hilfsfunktionen", () => {
     });
     expect(parseMailFrom('"Keller, LAN" <a@b.test>')).toEqual({ name: "Keller, LAN", address: "a@b.test" });
     expect(parseMailFrom("a@b.test")).toEqual({ name: null, address: "a@b.test" });
-    expect(parseMailFrom(undefined).address).toBe("no-reply@hermes.local");
+    expect(parseMailFrom(undefined).address).toBe("no-reply@matchdesk.local");
   });
 
   it("resolvePublicUrl akzeptiert nur http(s) und normalisiert", () => {
@@ -362,8 +362,8 @@ describe("Console-Modus", () => {
     await sendLoginCode(null, recipient);
     await sendEmailChangeCode(null, { ...recipient, code: "111222" });
 
-    expect(log).toHaveBeenCalledWith("[Hermes] Login code for anna <anna@example.test>: 482913");
-    expect(log).toHaveBeenCalledWith("[Hermes] Email change code for anna <anna@example.test>: 111222");
+    expect(log).toHaveBeenCalledWith("[Matchdesk] Login code for anna <anna@example.test>: 482913");
+    expect(log).toHaveBeenCalledWith("[Matchdesk] Email change code for anna <anna@example.test>: 111222");
     expect(createTransport).not.toHaveBeenCalled();
   });
 });
