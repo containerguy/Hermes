@@ -167,6 +167,7 @@ describe("ui correctness structure contracts", () => {
       kioskStreamPath: "stream",
       kioskStreamSecret: "",
       featuresPizzaEnabled: false,
+      featuresGamePresenceEnabled: false,
       pizzaPaypalHandle: "",
       pizzaPaypalName: "",
       pizzaCashRecipient: "",

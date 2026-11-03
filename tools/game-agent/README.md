@@ -1,6 +1,6 @@
 # hermes-game-agent (Prototyp)
 
-Kleines Windows-Programm, das erkennt, welches Spiel auf dem PC gerade läuft. Stand: Recherche-Prototyp, noch nicht an Hermes angebunden (der Endpunkt `/api/presence/game` existiert noch nicht).
+Kleines Windows-Programm, das erkennt, welches Spiel auf dem PC gerade läuft. Meldet an Hermes (`POST /api/presence/game`), wenn dort im Adminbereich „Spielt gerade“ aktiviert ist. Getestet am 3.11.2026 auf einem Windows-PC mit Steam, Epic, Ubisoft, EA und Battle.net.
 
 ## Wie erkannt wird
 
@@ -17,7 +17,7 @@ Launcher, Overlays, Crash-Handler und Anti-Cheat-Dienste werden ignoriert. Proze
 
 ## Datenschutz
 
-Gemeldet werden nur erkannte Spiele, nie die Prozessliste. `-v` zeigt die gefundenen installierten Spiele nur lokal an.
+An Hermes gehen nur Titel, Launcher und ggf. Steam-App-ID der erkannten Spiele. Nie die Prozessliste, nie der Rechnername, nie die Liste installierter Spiele. `-v` zeigt die gefundenen installierten Spiele nur lokal an. Beim Beenden mit Strg+C löscht der Agent seinen Eintrag sofort, sonst verschwindet er nach zwei Minuten.
 
 ## Bauen und starten
 

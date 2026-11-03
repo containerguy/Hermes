@@ -48,3 +48,11 @@ export function broadcastEventsChanged(reason: string) {
     send(client, "events_changed", payload);
   }
 }
+
+/** „Spielt gerade“ hat sich geändert. Ohne Nutzlast: Clients laden GET /api/presence (nur angemeldet). */
+export function broadcastPresenceChanged() {
+  const payload = { at: new Date().toISOString() };
+  for (const client of clients.keys()) {
+    send(client, "presence_changed", payload);
+  }
+}

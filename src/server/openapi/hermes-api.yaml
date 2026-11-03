@@ -38,6 +38,8 @@ tags:
     description: Web-Push
   - name: realtime
     description: Server-Sent Events
+  - name: presence
+    description: „Spielt gerade“ (optional, Windows-Agent meldet laufende Spiele)
   - name: meta
     description: Health & Dokumentation
 
@@ -621,6 +623,66 @@ paths:
       responses:
         "200":
           description: Stream
+
+  /api/presence:
+    get:
+      tags: [presence]
+      summary: Wer spielt gerade was
+      description: >
+        Nur, wenn `featuresGamePresenceEnabled` aktiv ist (sonst 404). Daten liegen nur im Speicher;
+        ein Eintrag verschwindet zwei Minuten nach der letzten Meldung. Änderungen kündigt der
+        SSE-Stream mit `presence_changed` an (ohne Nutzlast).
+      responses:
+        "200":
+          description: "`{ players: [{ userId, username, displayName, games: [{ title, launcher, appId?, since }], updatedAt }] }`"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          description: Funktion ausgeschaltet
+
+  /api/presence/game:
+    post:
+      tags: [presence]
+      summary: Laufende Spiele des eigenen PCs melden (Windows-Agent)
+      description: >
+        Gilt für den angemeldeten Benutzer (API-Token mit Vollzugriff oder Sitzung + CSRF).
+        `playing: []` heißt: kein Spiel. Weitere Felder wie der Rechnername werden verworfen.
+        Der Agent meldet alle 30 Sekunden.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [playing]
+              properties:
+                playing:
+                  type: array
+                  maxItems: 20
+                  items:
+                    type: object
+                    required: [title]
+                    properties:
+                      title: { type: string, maxLength: 160 }
+                      launcher: { type: string, enum: [steam, epic, gog, ubisoft, ea, battlenet, other] }
+                      appId: { type: string, maxLength: 64 }
+      responses:
+        "204":
+          description: Übernommen
+        "400":
+          description: Ungültige Meldung
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          description: API-Token nur lesend oder CSRF fehlt
+        "404":
+          description: Funktion ausgeschaltet
+    delete:
+      tags: [presence]
+      summary: Eigenen Eintrag sofort entfernen
+      responses:
+        "204":
+          description: Entfernt
 
 components:
   securitySchemes:

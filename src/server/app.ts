@@ -11,11 +11,13 @@ import { createRealtimeRouter } from "./http/realtime-routes";
 import { createKioskRouter } from "./http/kiosk-routes";
 import { createPizzaRouter } from "./http/pizza-routes";
 import { createAmpIntegrationRouter } from "./http/amp-routes";
+import { createPresenceRouter } from "./http/presence-routes";
+import { createPresenceStore } from "./domain/presence/game-presence";
 import { startAmpStatusService, stopAmpStatusService } from "./integrations/amp/amp-status";
 import { startAmpAutomation, stopAmpAutomation } from "./integrations/amp/amp-automation";
 import { createDb } from "./db/client";
 import { runMigrations } from "./db/migrate";
-import { broadcastEventsChanged } from "./realtime/event-bus";
+import { broadcastEventsChanged, broadcastPresenceChanged } from "./realtime/event-bus";
 import { requireUser } from "./auth/current-user";
 import { hermesAuthMiddleware } from "./auth/hermes-auth";
 import { mountApiDocs } from "./http/api-docs";
@@ -110,10 +112,16 @@ export async function createHermesApp() {
   app.use("/api/kiosk", createKioskRouter(context));
   app.use("/api/pizza", createPizzaRouter(context));
   app.use("/api/integrations/amp", createAmpIntegrationRouter(context));
+  const presenceStore = createPresenceStore();
+  app.use("/api/presence", createPresenceRouter(context, presenceStore));
 
   const statusInterval = setInterval(() => {
     if (refreshEventStatuses(context)) {
       broadcastEventsChanged("status_refreshed");
+    }
+    // „Spielt gerade“: Agent meldet sich nicht mehr (PC aus, Agent beendet) → Eintrag verschwindet.
+    if (presenceStore.sweep()) {
+      broadcastPresenceChanged();
     }
   }, 30_000);
 

@@ -70,6 +70,11 @@ const settingsObjectSchema = z.object({
    * Admin muss das Feature explizit aktivieren.
    */
   featuresPizzaEnabled: z.boolean(),
+  /**
+   * „Spielt gerade“: Spieler-PCs melden über den Windows-Agenten (tools/game-agent), welches
+   * Spiel läuft. Standard `false`: Routen liefern 404, Menüpunkt bleibt verborgen.
+   */
+  featuresGamePresenceEnabled: z.boolean(),
   /** PayPal-Handle für Pizzabestellungs-Kassenliste (paypal.me/<handle>). Leer = kein Link. */
   pizzaPaypalHandle: z.string().trim().max(80),
   /** Anzeigename für PayPal-Empfänger in Kassenliste. Leer = kein Hinweis. */
@@ -163,6 +168,7 @@ export type PublicHermesSettings = Pick<
   | "kioskStreamEnabled"
   | "kioskStreamPath"
   | "featuresPizzaEnabled"
+  | "featuresGamePresenceEnabled"
   | "pizzaPaypalHandle"
   | "pizzaPaypalName"
   | "pizzaCashRecipient"
@@ -192,6 +198,7 @@ export function pickPublicSettings(full: HermesSettings): PublicHermesSettings {
     kioskStreamEnabled: full.kioskStreamEnabled,
     kioskStreamPath: full.kioskStreamPath,
     featuresPizzaEnabled: full.featuresPizzaEnabled,
+    featuresGamePresenceEnabled: full.featuresGamePresenceEnabled,
     pizzaPaypalHandle: full.pizzaPaypalHandle,
     pizzaPaypalName: full.pizzaPaypalName,
     pizzaCashRecipient: full.pizzaCashRecipient,
@@ -225,6 +232,7 @@ export const defaultSettings: HermesSettings = {
   kioskStreamPath: "stream",
   kioskStreamSecret: "",
   featuresPizzaEnabled: false,
+  featuresGamePresenceEnabled: false,
   pizzaPaypalHandle: "",
   pizzaPaypalName: "",
   pizzaCashRecipient: "",

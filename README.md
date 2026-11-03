@@ -152,6 +152,16 @@ Beide Schalter sind standardmäßig aus (Admin → Betrieb → CubeCoders AMP):
 
 Nach einem Neustart von Hermes übernimmt der erste Durchlauf nur den aktuellen Stand: Es gehen keine Pushes raus, und Server bereits bereiter Events werden nicht automatisch gestartet. Die Automatik prüft alle 30 Sekunden; Auto-Start und Auto-Stopp stehen im Audit-Log als `amp.auto_start` bzw. `amp.auto_stop` (ohne Benutzer).
 
+## Spielt gerade (Windows-Agent)
+
+Optionales Modul: Ein kleiner Windows-Agent auf den Spieler-PCs erkennt, welches Spiel läuft, und meldet es an Hermes. Unter dem Menüpunkt **Spielt gerade** sieht man dann, wer in welchem Spiel ist, nach Spiel gruppiert.
+
+- **Aktivieren:** Admin → Betrieb → „Spielt gerade“ aktivieren. Ausgeschaltet liefern die Routen 404 und der Menüpunkt fehlt.
+- **Agent:** Quellcode und Bauanleitung in [`tools/game-agent`](tools/game-agent/README.md). Erkennt Spiele aus Steam, Epic, GOG, Ubisoft Connect, EA app und Battle.net über die Installationsordner der Launcher und die Steam-Registry. Prozesse werden nur gelesen, kein Speicherzugriff, daher kein Konflikt mit Anti-Cheat.
+- **Mitmachen ist freiwillig:** Jede Person legt unter Profil → API-Tokens ein Token mit Vollzugriff an und startet `hermes-game-agent.exe -server https://… -token <Token> -interval 30s`.
+- **Datenschutz:** Der Agent schickt nur Titel, Launcher und ggf. Steam-App-ID der erkannten Spiele, nie die Prozessliste oder den Rechnernamen. Hermes hält die Daten nur im Speicher, ohne Verlauf; zwei Minuten nach der letzten Meldung (oder sofort beim Beenden mit Strg+C) ist der Eintrag weg.
+- **API:** `POST`/`DELETE /api/presence/game`, `GET /api/presence`, siehe `/api/docs`. Änderungen kündigt der SSE-Stream mit `presence_changed` an.
+
 ## Lokal Starten
 
 ```bash

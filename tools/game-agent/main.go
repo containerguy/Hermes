@@ -11,6 +11,9 @@ import (
 	"fmt"
 	"net/http"
 	"os"
+	"os/signal"
+	"strings"
+	"syscall"
 	"time"
 )
 
@@ -39,6 +42,19 @@ func main() {
 			fmt.Fprintln(os.Stderr, "known list:", err)
 			os.Exit(2)
 		}
+	}
+
+	if *server != "" && *interval > 0 {
+		// Ctrl+C or window closed: remove the entry in Hermes instead of waiting for it to expire.
+		stop := make(chan os.Signal, 1)
+		signal.Notify(stop, os.Interrupt, syscall.SIGTERM)
+		go func() {
+			<-stop
+			if err := clearPresence(*server, *token); err != nil {
+				fmt.Fprintln(os.Stderr, "clear:", err)
+			}
+			os.Exit(0)
+		}()
 	}
 
 	for {
@@ -78,9 +94,29 @@ func main() {
 	}
 }
 
+// post sends only the detected games to Hermes: no host name, no launcher
+// list, no exe names.
 func post(server, token string, r Report) error {
-	body, _ := json.Marshal(r)
-	req, err := http.NewRequest(http.MethodPost, server+"/api/presence/game", bytes.NewReader(body))
+	type game struct {
+		Title    string `json:"title"`
+		Launcher string `json:"launcher"`
+		AppID    string `json:"appId,omitempty"`
+	}
+	playing := make([]game, 0, len(r.Playing))
+	for _, d := range r.Playing {
+		playing = append(playing, game{Title: d.Title, Launcher: d.Launcher, AppID: d.AppID})
+	}
+	body, _ := json.Marshal(map[string]any{"playing": playing})
+	return send(server, token, http.MethodPost, body)
+}
+
+// clearPresence removes this user's entry right away (agent stops).
+func clearPresence(server, token string) error {
+	return send(server, token, http.MethodDelete, nil)
+}
+
+func send(server, token, method string, body []byte) error {
+	req, err := http.NewRequest(method, strings.TrimRight(server, "/")+"/api/presence/game", bytes.NewReader(body))
 	if err != nil {
 		return err
 	}
