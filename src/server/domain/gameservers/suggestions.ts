@@ -1,4 +1,4 @@
-import type { HermesAmpInstanceRow } from "../../integrations/amp/amp-client";
+import type { MatchdeskAmpInstanceRow } from "../../integrations/amp/amp-client";
 import { normalizeGameTitle } from "../../../shared/game-title";
 import type { GameServerBinding } from "./bindings";
 
@@ -60,7 +60,7 @@ function matchScore(a: string, b: string): number {
   return 0;
 }
 
-export function suggestScheme(row: Pick<HermesAmpInstanceRow, "module" | "moduleDisplayName" | "friendlyName">) {
+export function suggestScheme(row: Pick<MatchdeskAmpInstanceRow, "module" | "moduleDisplayName" | "friendlyName">) {
   if (row.module === "Minecraft") return "minecraft" as const;
   const text = `${row.moduleDisplayName} ${row.friendlyName}`.toLowerCase();
   // v0.14.0: eigene Links für UT2004 (ut2004://) und die Steam-Version von Factorio (steam://run)
@@ -73,7 +73,7 @@ export function suggestScheme(row: Pick<HermesAmpInstanceRow, "module" | "module
 }
 
 export function suggestBindings(
-  instances: HermesAmpInstanceRow[],
+  instances: MatchdeskAmpInstanceRow[],
   catalog: string[],
   existing: GameServerBinding[]
 ): BindingSuggestion[] {

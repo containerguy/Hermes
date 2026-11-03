@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import fixture from "../../integrations/amp/__fixtures__/get-instances.json";
-import { flattenAmpInstances, pickGamePort, type HermesAmpInstanceRow } from "../../integrations/amp/amp-client";
+import { flattenAmpInstances, pickGamePort, type MatchdeskAmpInstanceRow } from "../../integrations/amp/amp-client";
 import { suggestBindings, suggestScheme } from "./suggestions";
 
 /** Katalog der Produktion (Stand 2026-10-16). */
@@ -19,7 +19,7 @@ const CATALOG = [
   "UT2004"
 ];
 
-function rowsFromFixture(): HermesAmpInstanceRow[] {
+function rowsFromFixture(): MatchdeskAmpInstanceRow[] {
   return flattenAmpInstances(fixture).map(({ row, targetName, targetHost }) => ({
     id: String(row.InstanceID),
     friendlyName: String(row.FriendlyName),

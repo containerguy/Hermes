@@ -36,12 +36,12 @@ vi.mock("@aws-sdk/client-s3", async (importOriginal) => {
 
 const { CSRF_HEADER } = await import("../auth/csrf");
 const { bootstrapAdmin } = await import("../db/bootstrap-admin");
-const { createHermesApp } = await import("../app");
+const { createMatchdeskApp } = await import("../app");
 
 type Agent = ReturnType<typeof request.agent>;
 type Actor = { agent: Agent; csrf: string };
 
-let started: Awaited<ReturnType<typeof createHermesApp>> | undefined;
+let started: Awaited<ReturnType<typeof createMatchdeskApp>> | undefined;
 let databasePath: string;
 
 async function actorFor(username: string): Promise<Actor> {
@@ -59,36 +59,36 @@ function post(actor: Actor, url: string, body: unknown = {}) {
 describe("Admin-Restore aus S3", () => {
   beforeEach(async () => {
     bucketObjects.clear();
-    databasePath = path.join(os.tmpdir(), `hermes-test-${randomUUID()}.sqlite`);
-    process.env.HERMES_DB_PATH = databasePath;
-    process.env.HERMES_ADMIN_PHONE = "+491701234567";
-    process.env.HERMES_ADMIN_USERNAME = "hauptadmin";
-    process.env.HERMES_ADMIN_EMAIL = "hauptadmin@example.test";
-    process.env.HERMES_MAIL_MODE = "console";
-    process.env.HERMES_DEV_LOGIN_CODE = "123456";
-    process.env.HERMES_STORAGE_BACKEND = "s3";
-    process.env.HERMES_S3_BUCKET = "test-bucket";
-    process.env.HERMES_S3_DB_KEY = "hermes.sqlite";
-    process.env.HERMES_S3_ENDPOINT = "http://s3.invalid";
-    process.env.HERMES_S3_ACCESS_KEY_ID = "test-access";
-    process.env.HERMES_S3_SECRET_ACCESS_KEY = "test-secret";
-    delete process.env.HERMES_S3_CREDS_FILE;
-    delete process.env.HERMES_VAPID_PUBLIC_KEY;
-    delete process.env.HERMES_VAPID_PRIVATE_KEY;
+    databasePath = path.join(os.tmpdir(), `matchdesk-test-${randomUUID()}.sqlite`);
+    process.env.MATCHDESK_DB_PATH = databasePath;
+    process.env.MATCHDESK_ADMIN_PHONE = "+491701234567";
+    process.env.MATCHDESK_ADMIN_USERNAME = "hauptadmin";
+    process.env.MATCHDESK_ADMIN_EMAIL = "hauptadmin@example.test";
+    process.env.MATCHDESK_MAIL_MODE = "console";
+    process.env.MATCHDESK_DEV_LOGIN_CODE = "123456";
+    process.env.MATCHDESK_STORAGE_BACKEND = "s3";
+    process.env.MATCHDESK_S3_BUCKET = "test-bucket";
+    process.env.MATCHDESK_S3_DB_KEY = "hermes.sqlite";
+    process.env.MATCHDESK_S3_ENDPOINT = "http://s3.invalid";
+    process.env.MATCHDESK_S3_ACCESS_KEY_ID = "test-access";
+    process.env.MATCHDESK_S3_SECRET_ACCESS_KEY = "test-secret";
+    delete process.env.MATCHDESK_S3_CREDS_FILE;
+    delete process.env.MATCHDESK_VAPID_PUBLIC_KEY;
+    delete process.env.MATCHDESK_VAPID_PRIVATE_KEY;
     await bootstrapAdmin();
-    started = await createHermesApp();
+    started = await createMatchdeskApp();
   }, 60_000);
 
   afterEach(async () => {
     await started?.close();
     started = undefined;
     for (const name of [
-      "HERMES_STORAGE_BACKEND",
-      "HERMES_S3_BUCKET",
-      "HERMES_S3_DB_KEY",
-      "HERMES_S3_ENDPOINT",
-      "HERMES_S3_ACCESS_KEY_ID",
-      "HERMES_S3_SECRET_ACCESS_KEY"
+      "MATCHDESK_STORAGE_BACKEND",
+      "MATCHDESK_S3_BUCKET",
+      "MATCHDESK_S3_DB_KEY",
+      "MATCHDESK_S3_ENDPOINT",
+      "MATCHDESK_S3_ACCESS_KEY_ID",
+      "MATCHDESK_S3_SECRET_ACCESS_KEY"
     ]) {
       delete process.env[name];
     }

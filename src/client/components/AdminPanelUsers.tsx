@@ -72,7 +72,7 @@ export function AdminPanelUsers({
         <div className="action-row">
           <button
             type="button"
-            onClick={() => onDownloadJsonAttachment("/api/admin/users/export", "hermes-users.json")}
+            onClick={() => onDownloadJsonAttachment("/api/admin/users/export", "matchdesk-users.json")}
           >
             {t("admin.exportUsers.export")}
           </button>

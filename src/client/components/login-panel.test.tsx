@@ -391,7 +391,7 @@ describe("LoginPanel device persistence", () => {
     await act(async () => {
       setInputValue(
         pairForm.querySelector("input")!,
-        "https://hermes.lan/#login?pair=PAIR_TOKEN_TEST_VALUE_BBBBBBBBBBBB"
+        "https://matchdesk.lan/#login?pair=PAIR_TOKEN_TEST_VALUE_BBBBBBBBBBBB"
       );
       await flushMicrotasks();
     });

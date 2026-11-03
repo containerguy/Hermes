@@ -2,7 +2,7 @@ import nodemailer from "nodemailer";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { createDb, type DatabaseContext } from "../db/client";
 import { runMigrations } from "../db/migrate";
-import type { HermesSettings } from "../settings";
+import type { MatchdeskSettings } from "../settings";
 import {
   buildSystemMail,
   parseMailFrom,
@@ -24,7 +24,7 @@ function freshContext(): DatabaseContext {
   return context;
 }
 
-function putSettings(context: DatabaseContext, values: Partial<HermesSettings>) {
+function putSettings(context: DatabaseContext, values: Partial<MatchdeskSettings>) {
   const statement = context.sqlite.prepare(
     `INSERT INTO app_settings (key, value, updated_by_user_id, updated_at) VALUES (?, ?, NULL, ?)
      ON CONFLICT(key) DO UPDATE SET value = excluded.value, updated_at = excluded.updated_at`
@@ -73,7 +73,7 @@ describe("Absendername aus den Einstellungen", () => {
     context.sqlite.close();
   });
 
-  it("nutzt appName als Anzeigenamen, Adresse bleibt aus HERMES_MAIL_FROM", () => {
+  it("nutzt appName als Anzeigenamen, Adresse bleibt aus MATCHDESK_MAIL_FROM", () => {
     putSettings(context, { appName: "Mitspielzentrale" });
     const mail = buildSystemMail(context, "login_code", recipient, PROD_ENV);
     expect(mail.from).toEqual({ name: "Mitspielzentrale", address: "lanparty@familie-keller.info" });
@@ -215,7 +215,7 @@ describe("Mail-Inhalt", () => {
     expect(html).not.toContain("<b>Bold</b>");
   });
 
-  it("ohne HERMES_PUBLIC_URL: kein Link, Footer mit Domain der Absenderadresse", () => {
+  it("ohne MATCHDESK_PUBLIC_URL: kein Link, Footer mit Domain der Absenderadresse", () => {
     const mail = buildSystemMail(context, "login_code", recipient, { mailFrom: PROD_ENV.mailFrom });
     expect(String(mail.text)).not.toContain("http");
     expect(String(mail.html)).not.toContain("href=");
@@ -347,15 +347,15 @@ describe("Hilfsfunktionen", () => {
 });
 
 describe("Console-Modus", () => {
-  const previousMode = process.env.HERMES_MAIL_MODE;
+  const previousMode = process.env.MATCHDESK_MAIL_MODE;
 
   afterEach(() => {
-    process.env.HERMES_MAIL_MODE = previousMode;
+    process.env.MATCHDESK_MAIL_MODE = previousMode;
     vi.restoreAllMocks();
   });
 
   it("gibt weiterhin den Code aus und versendet nichts", async () => {
-    process.env.HERMES_MAIL_MODE = "console";
+    process.env.MATCHDESK_MAIL_MODE = "console";
     const log = vi.spyOn(console, "log").mockImplementation(() => {});
     const createTransport = vi.spyOn(nodemailer, "createTransport");
 

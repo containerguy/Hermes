@@ -800,7 +800,7 @@ export async function restoreDatabaseSnapshotIntoLive(sqlite: Database.Database)
     });
   }
 
-  const tempDirectory = fs.mkdtempSync(path.join(os.tmpdir(), "hermes-restore-"));
+  const tempDirectory = fs.mkdtempSync(path.join(os.tmpdir(), "matchdesk-restore-"));
   const tempPath = path.join(tempDirectory, "snapshot.sqlite");
   const snapshotLocation = readS3LocationConfig();
 

@@ -138,11 +138,11 @@ export const settingsSchema = settingsObjectSchema
 /** Für partielle Updates/Imports ohne `.partial()` auf ein Schema mit Refinement. */
 export const settingsPartialSchema = settingsObjectSchema.partial();
 
-export type HermesSettings = z.infer<typeof settingsSchema>;
+export type MatchdeskSettings = z.infer<typeof settingsSchema>;
 
 /** Öffentliche Teilmenge (kein defaultNotificationsEnabled, eventAutoArchiveHours, s3SnapshotEnabled). */
-export type PublicHermesSettings = Pick<
-  HermesSettings,
+export type PublicMatchdeskSettings = Pick<
+  MatchdeskSettings,
   | "appName"
   | "brandMark"
   | "projectTemplate"
@@ -170,7 +170,7 @@ export type PublicHermesSettings = Pick<
   | "ampIntegrationEnabled"
 >;
 
-export function pickPublicSettings(full: HermesSettings): PublicHermesSettings {
+export function pickPublicSettings(full: MatchdeskSettings): PublicMatchdeskSettings {
   return {
     appName: full.appName,
     brandMark: full.brandMark,
@@ -200,7 +200,7 @@ export function pickPublicSettings(full: HermesSettings): PublicHermesSettings {
   };
 }
 
-export const defaultSettings: HermesSettings = {
+export const defaultSettings: MatchdeskSettings = {
   appName: "",
   brandMark: "mitspiel",
   projectTemplate: "lan_party",
@@ -255,7 +255,7 @@ export function readSettings(context: DatabaseContext) {
 
 export function writeSettings(
   context: DatabaseContext,
-  settings: Partial<HermesSettings>,
+  settings: Partial<MatchdeskSettings>,
   updatedByUserId: string
 ) {
   const timestamp = nowIso();

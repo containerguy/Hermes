@@ -7,10 +7,10 @@ import request from "supertest";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { CSRF_HEADER } from "../auth/csrf";
 import { bootstrapAdmin } from "../db/bootstrap-admin";
-import { createHermesApp } from "../app";
+import { createMatchdeskApp } from "../app";
 import { pickPublicSettings } from "../settings";
 
-type StartedApp = Awaited<ReturnType<typeof createHermesApp>>;
+type StartedApp = Awaited<ReturnType<typeof createMatchdeskApp>>;
 
 let started: StartedApp | undefined;
 let databasePath: string;
@@ -33,18 +33,18 @@ async function fetchCsrf(agent: ReturnType<typeof request.agent>) {
 describe("app flow", () => {
   beforeEach(
     async () => {
-    databasePath = path.join(os.tmpdir(), `hermes-test-${randomUUID()}.sqlite`);
-    process.env.HERMES_DB_PATH = databasePath;
-    process.env.HERMES_ADMIN_PHONE = "+491701234567";
-    process.env.HERMES_ADMIN_USERNAME = "hauptadmin";
-    process.env.HERMES_ADMIN_EMAIL = "hauptadmin@example.test";
-    process.env.HERMES_MAIL_MODE = "console";
-    process.env.HERMES_DEV_LOGIN_CODE = "123456";
-    delete process.env.HERMES_STORAGE_BACKEND;
-    delete process.env.HERMES_VAPID_PUBLIC_KEY;
-    delete process.env.HERMES_VAPID_PRIVATE_KEY;
+    databasePath = path.join(os.tmpdir(), `matchdesk-test-${randomUUID()}.sqlite`);
+    process.env.MATCHDESK_DB_PATH = databasePath;
+    process.env.MATCHDESK_ADMIN_PHONE = "+491701234567";
+    process.env.MATCHDESK_ADMIN_USERNAME = "hauptadmin";
+    process.env.MATCHDESK_ADMIN_EMAIL = "hauptadmin@example.test";
+    process.env.MATCHDESK_MAIL_MODE = "console";
+    process.env.MATCHDESK_DEV_LOGIN_CODE = "123456";
+    delete process.env.MATCHDESK_STORAGE_BACKEND;
+    delete process.env.MATCHDESK_VAPID_PUBLIC_KEY;
+    delete process.env.MATCHDESK_VAPID_PRIVATE_KEY;
     await bootstrapAdmin();
-    started = await createHermesApp();
+    started = await createMatchdeskApp();
     },
     30_000
   );
@@ -374,7 +374,7 @@ describe("app flow", () => {
     await adminAgent
       .put("/api/admin/settings")
       .send({
-        appName: "Hermes Test",
+        appName: "Matchdesk Test",
         defaultNotificationsEnabled: true,
         eventAutoArchiveHours: 8,
         publicRegistrationEnabled: true,
@@ -415,7 +415,7 @@ describe("app flow", () => {
     await adminAgent
       .put("/api/admin/settings")
       .send({
-        appName: "Hermes Test",
+        appName: "Matchdesk Test",
         defaultNotificationsEnabled: true,
         eventAutoArchiveHours: 8,
         publicRegistrationEnabled: true,
@@ -479,7 +479,7 @@ describe("app flow", () => {
     await adminAgent
       .put("/api/admin/settings")
       .send({
-        appName: "Hermes Test",
+        appName: "Matchdesk Test",
         defaultNotificationsEnabled: true,
         eventAutoArchiveHours: 8,
         publicRegistrationEnabled: true,
@@ -536,7 +536,7 @@ describe("app flow", () => {
     await adminAgent
       .put("/api/admin/settings")
       .send({
-        appName: "Hermes Test",
+        appName: "Matchdesk Test",
         defaultNotificationsEnabled: true,
         eventAutoArchiveHours: 8,
         publicRegistrationEnabled: true,
@@ -870,7 +870,7 @@ describe("app flow", () => {
     await adminAgent
       .put("/api/admin/settings")
       .send({
-        appName: "Hermes Test",
+        appName: "Matchdesk Test",
         defaultNotificationsEnabled: true,
         eventAutoArchiveHours: 8,
         publicRegistrationEnabled: true,
@@ -1124,7 +1124,7 @@ describe("app flow", () => {
     await adminAgent
       .put("/api/admin/settings")
       .send({
-        appName: "Hermes Test",
+        appName: "Matchdesk Test",
         defaultNotificationsEnabled: true,
         eventAutoArchiveHours: 0,
         publicRegistrationEnabled: true,
@@ -1147,7 +1147,7 @@ describe("app flow", () => {
     const csrf = await fetchCsrf(adminAgent);
 
     const updatedSettings = {
-      appName: "Hermes HQ",
+      appName: "Matchdesk HQ",
       brandMark: "mitspiel" as const,
       projectTemplate: "lan_party" as const,
       defaultNotificationsEnabled: false,
@@ -1523,7 +1523,7 @@ describe("app flow", () => {
     await adminAgent
       .put("/api/admin/settings")
       .send({
-        appName: "Hermes Test",
+        appName: "Matchdesk Test",
         defaultNotificationsEnabled: true,
         eventAutoArchiveHours: 8,
         publicRegistrationEnabled: true,
@@ -1578,7 +1578,7 @@ describe("app flow", () => {
       .get("/api/settings/public")
       .expect(200)
       .expect((response) => {
-        expect(response.body.settings.appName).toBe("Hermes Test");
+        expect(response.body.settings.appName).toBe("Matchdesk Test");
         expect(response.body.settings.themeAdminColor).toBe("#2563eb");
         expect(response.body.release?.version).toMatch(/\d+\.\d+\.\d+/);
         expect(response.body.release?.repoUrl).toMatch(/^https?:\/\//);

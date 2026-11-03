@@ -5,7 +5,7 @@ import os from "node:os";
 import path from "node:path";
 import { expect, type Page, test } from "@playwright/test";
 import { bootstrapAdmin } from "../src/server/db/bootstrap-admin";
-import { createHermesApp } from "../src/server/app";
+import { createMatchdeskApp } from "../src/server/app";
 import { setAmpFetchForTests } from "../src/server/integrations/amp/amp-session";
 
 let server: http.Server;
@@ -69,25 +69,25 @@ async function createUserAsAdmin(page: Page, username: string, role: string) {
 }
 
 test.beforeAll(async () => {
-  databasePath = path.join(os.tmpdir(), `hermes-e2e-${randomUUID()}.sqlite`);
-  process.env.HERMES_DB_PATH = databasePath;
-  process.env.HERMES_ADMIN_PHONE = "+491701234567";
-  process.env.HERMES_ADMIN_USERNAME = "hauptadmin";
-  process.env.HERMES_ADMIN_EMAIL = "hauptadmin@example.test";
-  process.env.HERMES_MAIL_MODE = "console";
-  process.env.HERMES_DEV_LOGIN_CODE = "123456";
-  delete process.env.HERMES_STORAGE_BACKEND;
-  delete process.env.HERMES_VAPID_PUBLIC_KEY;
-  delete process.env.HERMES_VAPID_PRIVATE_KEY;
+  databasePath = path.join(os.tmpdir(), `matchdesk-e2e-${randomUUID()}.sqlite`);
+  process.env.MATCHDESK_DB_PATH = databasePath;
+  process.env.MATCHDESK_ADMIN_PHONE = "+491701234567";
+  process.env.MATCHDESK_ADMIN_USERNAME = "hauptadmin";
+  process.env.MATCHDESK_ADMIN_EMAIL = "hauptadmin@example.test";
+  process.env.MATCHDESK_MAIL_MODE = "console";
+  process.env.MATCHDESK_DEV_LOGIN_CODE = "123456";
+  delete process.env.MATCHDESK_STORAGE_BACKEND;
+  delete process.env.MATCHDESK_VAPID_PUBLIC_KEY;
+  delete process.env.MATCHDESK_VAPID_PRIVATE_KEY;
   // Gameserver-Modul: AMP wird serverseitig gemockt (kein echter Controller im Test).
-  process.env.HERMES_AMP_USERNAME = "hermes";
-  process.env.HERMES_AMP_PASSWORD = "e2e";
-  delete process.env.HERMES_AMP_CA_FILE;
-  delete process.env.HERMES_AMP_REMEMBER_TOKEN_FILE;
+  process.env.MATCHDESK_AMP_USERNAME = "hermes";
+  process.env.MATCHDESK_AMP_PASSWORD = "e2e";
+  delete process.env.MATCHDESK_AMP_CA_FILE;
+  delete process.env.MATCHDESK_AMP_REMEMBER_TOKEN_FILE;
   setAmpFetchForTests(mockAmpFetch as unknown as Parameters<typeof setAmpFetchForTests>[0]);
 
   await bootstrapAdmin();
-  const started = await createHermesApp();
+  const started = await createMatchdeskApp();
   closeApp = started.close;
   server = started.app.listen(0, "127.0.0.1");
   await new Promise<void>((resolve) => server.once("listening", resolve));
@@ -102,8 +102,8 @@ test.beforeAll(async () => {
 
 test.afterAll(async () => {
   setAmpFetchForTests(null);
-  delete process.env.HERMES_AMP_USERNAME;
-  delete process.env.HERMES_AMP_PASSWORD;
+  delete process.env.MATCHDESK_AMP_USERNAME;
+  delete process.env.MATCHDESK_AMP_PASSWORD;
   await new Promise<void>((resolve) => server.close(() => resolve()));
   await closeApp();
 

@@ -4,7 +4,7 @@ import { Router } from "express";
 import { randomUUID } from "node:crypto";
 import { requireUser } from "../auth/current-user";
 import { requireCsrf } from "../auth/csrf";
-import { enforceApiTokenWriteAccess } from "../auth/hermes-auth";
+import { enforceApiTokenWriteAccess } from "../auth/matchdesk-auth";
 import { tryWriteAuditLog, writeAuditLog } from "../audit-log";
 import type { DatabaseContext } from "../db/client";
 import { gameEvents, mainEventInvites, mainEventParticipants, mainEvents, users } from "../db/schema";

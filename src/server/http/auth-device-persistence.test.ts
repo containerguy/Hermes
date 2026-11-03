@@ -7,9 +7,9 @@ import request from "supertest";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { CSRF_HEADER } from "../auth/csrf";
 import { bootstrapAdmin } from "../db/bootstrap-admin";
-import { createHermesApp } from "../app";
+import { createMatchdeskApp } from "../app";
 
-type StartedApp = Awaited<ReturnType<typeof createHermesApp>>;
+type StartedApp = Awaited<ReturnType<typeof createMatchdeskApp>>;
 type Agent = ReturnType<typeof request.agent>;
 
 const DEVICE_KEY_A = "AAAAAAAAAAAAAAAAAAAAAA";
@@ -81,25 +81,25 @@ function currentSessionRow(username: string) {
 
 describe("persistent sessions and devices", () => {
   beforeEach(async () => {
-    databasePath = path.join(os.tmpdir(), `hermes-test-${randomUUID()}.sqlite`);
-    process.env.HERMES_DB_PATH = databasePath;
-    process.env.HERMES_ADMIN_PHONE = "+491701234567";
-    process.env.HERMES_ADMIN_USERNAME = "hauptadmin";
-    process.env.HERMES_ADMIN_EMAIL = "hauptadmin@example.test";
-    process.env.HERMES_MAIL_MODE = "console";
-    process.env.HERMES_DEV_LOGIN_CODE = "123456";
-    delete process.env.HERMES_STORAGE_BACKEND;
-    delete process.env.HERMES_VAPID_PUBLIC_KEY;
-    delete process.env.HERMES_VAPID_PRIVATE_KEY;
-    delete process.env.HERMES_SESSION_TTL_DAYS;
+    databasePath = path.join(os.tmpdir(), `matchdesk-test-${randomUUID()}.sqlite`);
+    process.env.MATCHDESK_DB_PATH = databasePath;
+    process.env.MATCHDESK_ADMIN_PHONE = "+491701234567";
+    process.env.MATCHDESK_ADMIN_USERNAME = "hauptadmin";
+    process.env.MATCHDESK_ADMIN_EMAIL = "hauptadmin@example.test";
+    process.env.MATCHDESK_MAIL_MODE = "console";
+    process.env.MATCHDESK_DEV_LOGIN_CODE = "123456";
+    delete process.env.MATCHDESK_STORAGE_BACKEND;
+    delete process.env.MATCHDESK_VAPID_PUBLIC_KEY;
+    delete process.env.MATCHDESK_VAPID_PRIVATE_KEY;
+    delete process.env.MATCHDESK_SESSION_TTL_DAYS;
     await bootstrapAdmin();
-    started = await createHermesApp();
+    started = await createMatchdeskApp();
   }, 30_000);
 
   afterEach(async () => {
     await started?.close();
     started = undefined;
-    delete process.env.HERMES_SESSION_TTL_DAYS;
+    delete process.env.MATCHDESK_SESSION_TTL_DAYS;
 
     for (const suffix of ["", "-wal", "-shm"]) {
       fs.rmSync(`${databasePath}${suffix}`, { force: true });
@@ -256,8 +256,8 @@ describe("persistent sessions and devices", () => {
     await agent.get("/api/auth/me").expect(401);
   });
 
-  it("honors HERMES_SESSION_TTL_DAYS", async () => {
-    process.env.HERMES_SESSION_TTL_DAYS = "7";
+  it("honors MATCHDESK_SESSION_TTL_DAYS", async () => {
+    process.env.MATCHDESK_SESSION_TTL_DAYS = "7";
     const agent = request.agent(started!.app);
     const response = await login(agent, { deviceKey: DEVICE_KEY_A });
     expect(findSetCookie(response, "matchdesk_session")).toContain(`Max-Age=${7 * 24 * 60 * 60}`);

@@ -302,7 +302,7 @@ export function AdminPanelBetrieb({
             <button
               type="button"
               onClick={() =>
-                onDownloadJsonAttachment("/api/admin/settings/export", "hermes-settings.json")
+                onDownloadJsonAttachment("/api/admin/settings/export", "matchdesk-settings.json")
               }
             >
               {t("admin.settings.export")}

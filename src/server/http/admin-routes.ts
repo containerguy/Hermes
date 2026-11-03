@@ -3,7 +3,7 @@ import { Router } from "express";
 import { z } from "zod";
 import { requireCsrf } from "../auth/csrf";
 import { publicUser, requireAdmin, requireUser } from "../auth/current-user";
-import { enforceApiTokenWriteAccess } from "../auth/hermes-auth";
+import { enforceApiTokenWriteAccess } from "../auth/matchdesk-auth";
 import { listAuditLogs, tryWriteAuditLog } from "../audit-log";
 import {
   addRateLimitAllowlist,

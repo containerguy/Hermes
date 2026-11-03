@@ -7,17 +7,17 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
 function resolveOpenApiSpecPath(): string {
   const candidates = [
-    path.join(process.cwd(), "dist-server/openapi/hermes-api.yaml"),
+    path.join(process.cwd(), "dist-server/openapi/matchdesk-api.yaml"),
     // Bundled server: index.js and openapi/ live under dist-server/
-    path.join(__dirname, "openapi/hermes-api.yaml"),
-    path.join(__dirname, "../openapi/hermes-api.yaml")
+    path.join(__dirname, "openapi/matchdesk-api.yaml"),
+    path.join(__dirname, "../openapi/matchdesk-api.yaml")
   ];
   for (const candidate of candidates) {
     if (fs.existsSync(candidate)) {
       return candidate;
     }
   }
-  throw new Error("[Matchdesk] OpenAPI spec not found (expected dist-server/openapi/hermes-api.yaml or src/server/openapi/hermes-api.yaml)");
+  throw new Error("[Matchdesk] OpenAPI spec not found (expected dist-server/openapi/matchdesk-api.yaml or src/server/openapi/matchdesk-api.yaml)");
 }
 
 const SWAGGER_UI_VERSION = "5.11.0";

@@ -3,7 +3,7 @@ import { z } from "zod";
 import { writeAuditLog } from "../audit-log";
 import { requireCsrf } from "../auth/csrf";
 import { requireUser } from "../auth/current-user";
-import { enforceApiTokenWriteAccess } from "../auth/hermes-auth";
+import { enforceApiTokenWriteAccess } from "../auth/matchdesk-auth";
 import type { DatabaseContext } from "../db/client";
 import {
   BindingTitleConflictError,
@@ -27,7 +27,7 @@ import {
   type ControlAction
 } from "../integrations/amp/amp-control";
 import { MAX_CONSOLE_PARTS, splitConsoleCommands } from "../integrations/amp/console-split";
-import { readSettings, type HermesSettings } from "../settings";
+import { readSettings, type MatchdeskSettings } from "../settings";
 import {
   BotRequestError,
   botCountQueries,
@@ -52,10 +52,10 @@ export function maskConsoleSecrets(text: string) {
 }
 
 /**
- * `Core/GetUpdates` liefert pro AMP-Session nur neue Zeilen. Weil Hermes genau eine Session hat,
+ * `Core/GetUpdates` liefert pro AMP-Session nur neue Zeilen. Weil Matchdesk genau eine Session hat,
  * werden die Zeilen serverseitig gepuffert und per Cursor (seq) an beliebig viele Betrachter verteilt.
  */
-async function fetchConsole(settings: HermesSettings, binding: GameServerBinding, since: number) {
+async function fetchConsole(settings: MatchdeskSettings, binding: GameServerBinding, since: number) {
   const raw = unwrapAmpData(await ampInstanceCall(settings, binding.ampInstanceId, "Core/GetUpdates"));
   const entries =
     raw && typeof raw === "object" && Array.isArray((raw as { ConsoleEntries?: unknown }).ConsoleEntries)
@@ -89,7 +89,7 @@ const consoleCommandSchema = z.object({
 });
 
 /** Befehle einzeln und in Reihenfolge senden; bricht beim ersten Fehler ab. */
-async function sendConsoleSequence(settings: HermesSettings, binding: GameServerBinding, commands: string[]) {
+async function sendConsoleSequence(settings: MatchdeskSettings, binding: GameServerBinding, commands: string[]) {
   let sent = 0;
   for (const message of commands) {
     try {
@@ -111,7 +111,7 @@ export function setBotCountPollForTests(value: { attempts: number; intervalMs: n
 
 /** Bots und Menschen über die Konsole lesen (`yb list`/`status`); null, wenn keine Antwort kommt. */
 async function readBotCounts(
-  settings: HermesSettings,
+  settings: MatchdeskSettings,
   binding: GameServerBinding,
   kind: BotKind
 ): Promise<BotCounts | null> {
@@ -515,7 +515,7 @@ export function createAmpIntegrationRouter(context: DatabaseContext) {
     response.json({ ok: true });
   });
 
-  /** Bot-Verwaltung (CS 1.6 mit YaPB, CS2): Hermes baut die Befehle, keine freie Eingabe. */
+  /** Bot-Verwaltung (CS 1.6 mit YaPB, CS2): Matchdesk baut die Befehle, keine freie Eingabe. */
   router.post("/instances/:bindingId/bots", async (request, response) => {
     const guard = requireServerManager(request, response);
     if (!guard) return;

@@ -223,7 +223,7 @@ export function createAuthRouter(context: DatabaseContext) {
       response.status(401).json({ error: "nicht_angemeldet" });
       return;
     }
-    if (request.hermesAuth?.kind === "api_token" && request.hermesAuth.scope === "read_only") {
+    if (request.matchdeskAuth?.kind === "api_token" && request.matchdeskAuth.scope === "read_only") {
       response.status(403).json({ error: "api_token_nur_lesen" });
       return;
     }
@@ -244,7 +244,7 @@ export function createAuthRouter(context: DatabaseContext) {
       response.status(401).json({ error: "nicht_angemeldet" });
       return;
     }
-    if (request.hermesAuth?.kind === "api_token" && request.hermesAuth.scope === "read_only") {
+    if (request.matchdeskAuth?.kind === "api_token" && request.matchdeskAuth.scope === "read_only") {
       response.status(403).json({ error: "api_token_nur_lesen" });
       return;
     }

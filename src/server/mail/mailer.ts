@@ -1,7 +1,7 @@
 import nodemailer from "nodemailer";
 import type Mail from "nodemailer/lib/mailer";
 import type { DatabaseContext } from "../db/client";
-import { readSettings, type HermesSettings } from "../settings";
+import { readSettings, type MatchdeskSettings } from "../settings";
 import { resolveAppDisplayName, fallbackAppDisplayName } from "../../shared/app-display-name";
 import { browserLanguageToLocale, type AppLocale } from "../../shared/locale";
 import { renderSystemMail, sanitizeInline, type SystemMailKind } from "./templates";
@@ -71,7 +71,7 @@ export function resolvePublicUrl(raw: string | undefined | null = readEnv("PUBLI
   }
 }
 
-function tryReadSettings(context: DatabaseContext | null): HermesSettings | null {
+function tryReadSettings(context: DatabaseContext | null): MatchdeskSettings | null {
   if (!context) {
     return null;
   }
@@ -86,7 +86,7 @@ function tryReadSettings(context: DatabaseContext | null): HermesSettings | null
 /** Mail-Sprache wie die Oberfläche: Nutzersprache → Browsersprache → Admin-Default → Deutsch. */
 export function resolveMailLocale(
   recipient: Pick<SystemMailRecipient, "locale" | "acceptLanguage">,
-  settings: Pick<HermesSettings, "defaultLocale"> | null
+  settings: Pick<MatchdeskSettings, "defaultLocale"> | null
 ): AppLocale {
   if (recipient.locale === "de" || recipient.locale === "en") {
     return recipient.locale;
@@ -100,7 +100,7 @@ export function resolveMailLocale(
  * `MATCHDESK_MAIL_FROM`, zuletzt „Mitspielzentrale“.
  */
 export function resolveSenderName(
-  settings: Pick<HermesSettings, "appName" | "projectTemplate"> | null,
+  settings: Pick<MatchdeskSettings, "appName" | "projectTemplate"> | null,
   locale: AppLocale,
   envFromName: string | null
 ): string {

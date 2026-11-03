@@ -1,11 +1,11 @@
-import { createHermesApp } from "./app";
+import { createMatchdeskApp } from "./app";
 import { readEnv, warnAboutLegacyEnv } from "./env";
 
 warnAboutLegacyEnv();
 
 const port = Number(readEnv("PORT") ?? "3000");
 const host = readEnv("HOST") ?? "0.0.0.0";
-const { app, close } = await createHermesApp();
+const { app, close } = await createMatchdeskApp();
 
 const server = app.listen(port, host, () => {
   console.log(`Matchdesk listening on http://${host}:${port}`);

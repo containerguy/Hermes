@@ -2,17 +2,17 @@ import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { createCsrfToken, verifyCsrfToken } from "./csrf";
 
 describe("csrf token mint + verify", () => {
-  const originalSecret = process.env.HERMES_CSRF_SECRET;
+  const originalSecret = process.env.MATCHDESK_CSRF_SECRET;
 
   beforeEach(() => {
-    process.env.HERMES_CSRF_SECRET = "test-csrf-secret-fixed";
+    process.env.MATCHDESK_CSRF_SECRET = "test-csrf-secret-fixed";
   });
 
   afterEach(() => {
     if (originalSecret === undefined) {
-      delete process.env.HERMES_CSRF_SECRET;
+      delete process.env.MATCHDESK_CSRF_SECRET;
     } else {
-      process.env.HERMES_CSRF_SECRET = originalSecret;
+      process.env.MATCHDESK_CSRF_SECRET = originalSecret;
     }
   });
 

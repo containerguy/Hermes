@@ -148,7 +148,7 @@ The current product is a brownfield TypeScript/React/Express app with SQLite as 
 
 ## Overview
 - Browser UI starts at `src/main.tsx` and imports global styling from `src/styles.css`.
-- Server startup is `src/server/index.ts`, which calls `createHermesApp()` from `src/server/app.ts`.
+- Server startup is `src/server/index.ts`, which calls `createMatchdeskApp()` from `src/server/app.ts`.
 - Database access is centralized through `src/server/db/client.ts` and schema definitions in `src/server/db/schema.ts`.
 - API behavior is split by concern under `src/server/http/*`.
 - Domain validation and authorization helpers live under `src/server/domain/*`.
@@ -233,7 +233,7 @@ The current product is a brownfield TypeScript/React/Express app with SQLite as 
 - Domain tests cover event validation/status rules in `src/server/domain/events.test.ts`.
 - Storage tests cover S3 credential parsing in `src/server/storage/s3-storage.test.ts`.
 - HTTP integration tests in `src/server/http/app-flow.test.ts` exercise login, admin role management, event creation, and capacity enforcement.
-- Playwright E2E in `e2e/hermes-flow.spec.ts` starts the real app on a temporary SQLite file, bootstraps an admin, logs in multiple users, and verifies the admin/manager/user flow in the browser.
+- Playwright E2E in `e2e/matchdesk-flow.spec.ts` starts the real app on a temporary SQLite file, bootstraps an admin, logs in multiple users, and verifies the admin/manager/user flow in the browser.
 ## Architectural Constraints And Planning Notes
 - `src/main.tsx` is large and owns many UI concerns. Feature work that expands client complexity may benefit from extracting API helpers or component files, but current behavior assumes local component state and explicit reloads after mutations.
 - API route modules currently combine validation, authorization, persistence, audit logging, notifications, and serialization. Future cross-route behavior should be factored only when repeated behavior is concrete.
