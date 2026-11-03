@@ -14,4 +14,4 @@ test-results
 .env.*
 !.env.example
 *.creds
-tools/game-agent/hermes-game-agent.exe
+tools/game-agent/matchdesk-game-agent.exe

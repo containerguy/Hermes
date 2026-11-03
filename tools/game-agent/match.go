@@ -155,7 +155,7 @@ var launcherRank = map[string]int{"steam": 0, "epic": 1, "gog": 2, "ubisoft": 3,
 func uniqueDirs(installed []InstalledGame) []InstalledGame {
 	best := map[string]InstalledGame{}
 	for _, g := range installed {
-		if strings.TrimSpace(g.Dir) == "" || notAGame[strings.ToLower(strings.TrimSpace(g.Title))] || (g.Launcher == "steam" && g.AppID == "228980") {
+		if strings.TrimSpace(g.Dir) == "" || isTooBroadDir(g.Dir) || notAGame[strings.ToLower(strings.TrimSpace(g.Title))] || (g.Launcher == "steam" && g.AppID == "228980") {
 			continue
 		}
 		d := normDir(g.Dir)
@@ -202,4 +202,26 @@ func isIgnored(exe string) bool {
 		}
 	}
 	return false
+}
+
+// Shared roots that some uninstall entries (EA, Battle.net) report as their
+// InstallLocation. Matching against them would turn every program in there
+// into "playing".
+var genericDirNames = map[string]bool{
+	"program files": true, "program files (x86)": true, "programdata": true, "windows": true, "users": true,
+	"electronic arts": true, "ea games": true, "origin games": true, "ea app": true, "ea desktop": true,
+	"battle.net": true, "blizzard entertainment": true, "games": true, "spiele": true,
+	"steam": true, "steamlibrary": true, "steamapps": true, "common": true,
+	"epic games": true, "epiclibrary": true, "ubisoft": true, "ubisoft game launcher": true, "gog galaxy": true,
+}
+
+func isTooBroadDir(dir string) bool {
+	parts := strings.Split(strings.Trim(strings.ToLower(strings.ReplaceAll(dir, "/", `\`)), `\`), `\`)
+	if len(parts) > 0 && strings.HasSuffix(parts[0], ":") {
+		parts = parts[1:]
+	}
+	if len(parts) == 0 || parts[0] == "" {
+		return true
+	}
+	return genericDirNames[parts[len(parts)-1]]
 }

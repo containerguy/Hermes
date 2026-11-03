@@ -6,17 +6,23 @@ import { groupByGame, LAUNCHER_LABELS, type PresencePlayer } from "./presence-mo
 /** Agent meldet alle 30 s; die Seite fragt etwas häufiger nach. */
 export const PRESENCE_REFRESH_MS = 20_000;
 
-/** Startdatei für Windows: liegt neben der .exe, startet den Agenten mit Server und Token. */
-export function buildStartFile(origin: string, token: string) {
+/**
+ * Startdatei für Windows: liegt neben der .exe und startet den Agenten. Der Schlüssel geht über
+ * eine Umgebungsvariable, nicht über die Befehlszeile (die andere Prozesse mitlesen können).
+ */
+export function buildStartFile(origin: string, key: string, title: string) {
   return [
     "@echo off",
-    "title Spielt gerade",
+    `title ${title}`,
     'cd /d "%~dp0"',
-    `hermes-game-agent.exe -server ${origin} -token ${token} -interval 30s`,
+    `set MATCHDESK_AGENT_KEY=${key}`,
+    `matchdesk-game-agent.exe -server ${origin} -interval 30s`,
     "pause",
     ""
   ].join("\r\n");
 }
+
+type AgentKeyInfo = { createdAt: string; lastUsedAt: string | null } | null;
 
 function downloadText(filename: string, text: string) {
   const url = URL.createObjectURL(new Blob([text], { type: "application/octet-stream" }));
@@ -41,14 +47,20 @@ export function PresencePanel() {
   const [players, setPlayers] = useState<PresencePlayer[] | null>(null);
   const [error, setError] = useState(false);
   const [agentAvailable, setAgentAvailable] = useState(false);
-  const [token, setToken] = useState<string | null>(null);
+  const [agentKey, setAgentKey] = useState<AgentKeyInfo>(null);
+  const [newKey, setNewKey] = useState<string | null>(null);
   const [setupState, setSetupState] = useState<"idle" | "busy" | "error">("idle");
 
   const load = useCallback(async () => {
     try {
-      const body = await requestJson<{ players: PresencePlayer[]; agentAvailable?: boolean }>("/api/presence");
+      const body = await requestJson<{
+        players: PresencePlayer[];
+        agentAvailable?: boolean;
+        agentKey?: AgentKeyInfo;
+      }>("/api/presence");
       setPlayers(body.players);
       setAgentAvailable(Boolean(body.agentAvailable));
+      setAgentKey(body.agentKey ?? null);
       setError(false);
     } catch {
       setError(true);
@@ -61,15 +73,28 @@ export function PresencePanel() {
     return () => window.clearInterval(timer);
   }, [load]);
 
-  async function createToken() {
+  async function createKey() {
     setSetupState("busy");
     try {
-      const created = await requestJson<{ token: string }>("/api/auth/api-tokens", {
-        method: "POST",
-        body: JSON.stringify({ scope: "full", label: "Spielt gerade (Agent)" })
+      const created = await requestJson<{ key: string; createdAt: string }>("/api/presence/agent-key", {
+        method: "POST"
       });
-      setToken(created.token);
+      setNewKey(created.key);
+      setAgentKey({ createdAt: created.createdAt, lastUsedAt: null });
       setSetupState("idle");
+    } catch {
+      setSetupState("error");
+    }
+  }
+
+  async function revokeKey() {
+    setSetupState("busy");
+    try {
+      await requestJson("/api/presence/agent-key", { method: "DELETE" });
+      setNewKey(null);
+      setAgentKey(null);
+      setSetupState("idle");
+      void load();
     } catch {
       setSetupState("error");
     }
@@ -117,21 +142,50 @@ export function PresencePanel() {
               <a className="button-link" href="/api/presence/agent/download" download>
                 {t("presence.setup.download")}
               </a>
-              {token ? (
+              {newKey ? (
                 <button
                   type="button"
-                  onClick={() => downloadText("spielt-gerade-starten.cmd", buildStartFile(origin, token))}
+                  onClick={() =>
+                    downloadText(
+                      t("presence.setup.startFileName"),
+                      buildStartFile(origin, newKey, t("main.nav.presence"))
+                    )
+                  }
                 >
                   {t("presence.setup.startFile")}
                 </button>
               ) : (
-                <button type="button" disabled={setupState === "busy"} onClick={() => void createToken()}>
-                  {setupState === "busy" ? t("presence.setup.creating") : t("presence.setup.create")}
+                <button type="button" disabled={setupState === "busy"} onClick={() => void createKey()}>
+                  {setupState === "busy"
+                    ? t("presence.setup.creating")
+                    : agentKey
+                      ? t("presence.setup.recreate")
+                      : t("presence.setup.create")}
                 </button>
               )}
+              {agentKey ? (
+                <button
+                  type="button"
+                  className="secondary"
+                  disabled={setupState === "busy"}
+                  onClick={() => void revokeKey()}
+                >
+                  {t("presence.setup.revoke")}
+                </button>
+              ) : null}
             </div>
             {setupState === "error" ? <p className="error">{t("presence.setup.createError")}</p> : null}
-            {token ? <p className="muted">{t("presence.setup.tokenNote")}</p> : null}
+            {agentKey && !newKey ? (
+              <p className="muted">
+                {t("presence.setup.keyStatus", {
+                  created: new Date(agentKey.createdAt).toLocaleDateString(locale),
+                  used: agentKey.lastUsedAt
+                    ? new Date(agentKey.lastUsedAt).toLocaleString(locale)
+                    : t("presence.setup.keyNeverUsed")
+                })}
+              </p>
+            ) : null}
+            {newKey ? <p className="muted">{t("presence.setup.tokenNote")}</p> : null}
             <p className="muted">{t("presence.setup.smartscreen")}</p>
           </>
         ) : (

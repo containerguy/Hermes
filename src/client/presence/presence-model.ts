@@ -1,3 +1,5 @@
+import { normalizeGameTitle } from "../../shared/game-title";
+
 export type PresenceLauncher = "steam" | "epic" | "gog" | "ubisoft" | "ea" | "battlenet" | "other";
 
 export type PresenceGame = {
@@ -30,15 +32,6 @@ export const LAUNCHER_LABELS: Record<PresenceLauncher, string> = {
   battlenet: "Battle.net",
   other: ""
 };
-
-/** Gleiches Spiel trotz ™/®/Satzzeichen zusammenfassen (Steam „Titanfall® 2“ = EA „Titanfall™ 2“). */
-export function normalizeGameTitle(title: string) {
-  return title
-    .toLowerCase()
-    .replace(/[™®©]/g, "")
-    .replace(/[^\p{L}\p{N}]+/gu, " ")
-    .trim();
-}
 
 /** Spieler nach Spiel gruppieren; größte Gruppe zuerst, dann alphabetisch. */
 export function groupByGame(players: PresencePlayer[]): PresenceGroup[] {

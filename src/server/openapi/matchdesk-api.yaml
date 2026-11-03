@@ -630,21 +630,41 @@ paths:
       summary: Wer spielt gerade was
       description: >
         Nur, wenn `featuresGamePresenceEnabled` aktiv ist (sonst 404). Daten liegen nur im Speicher;
-        ein Eintrag verschwindet zwei Minuten nach der letzten Meldung. Änderungen kündigt der
-        SSE-Stream mit `presence_changed` an (ohne Nutzlast).
+        ein Eintrag verschwindet zwei Minuten nach der letzten Meldung.
       responses:
         "200":
-          description: "`{ players: [{ userId, username, displayName, games: [{ title, launcher, appId?, since }], updatedAt }], agentAvailable }`"
+          description: "`{ players: [{ userId, username, displayName, games: [{ title, launcher, appId?, since }], updatedAt }], agentAvailable, agentKey: { createdAt, lastUsedAt } | null }`"
         "401":
           $ref: "#/components/responses/Unauthorized"
         "404":
           description: Funktion ausgeschaltet
 
+  /api/presence/agent-key:
+    post:
+      tags: [presence]
+      summary: Agent-Schlüssel (neu) anlegen
+      description: >
+        Ein Schlüssel pro Benutzer; ein neuer macht den alten ungültig. Der Schlüssel taugt nur für
+        `/api/presence/game` und wird nur in dieser Antwort im Klartext geliefert.
+      responses:
+        "201":
+          description: "`{ key, createdAt }`"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          description: Funktion ausgeschaltet
+    delete:
+      tags: [presence]
+      summary: Agent-Schlüssel widerrufen (entfernt auch den Eintrag)
+      responses:
+        "204":
+          description: Widerrufen
+
   /api/presence/agent/download:
     get:
       tags: [presence]
       summary: Windows-Agent herunterladen
-      description: Liefert die im Docker-Image mitgebaute `hermes-game-agent.exe` (nur angemeldet, Funktion aktiv).
+      description: Liefert die im Docker-Image mitgebaute `matchdesk-game-agent.exe` (nur angemeldet, Funktion aktiv).
       responses:
         "200":
           description: Die .exe als Download
@@ -658,7 +678,8 @@ paths:
       tags: [presence]
       summary: Laufende Spiele des eigenen PCs melden (Windows-Agent)
       description: >
-        Gilt für den angemeldeten Benutzer (API-Token mit Vollzugriff oder Sitzung + CSRF).
+        Gilt für den eigenen Benutzer. Anmeldung mit dem Agent-Schlüssel (`Bearer md_ga_…`,
+        siehe `/api/presence/agent-key`), einem API-Token mit Vollzugriff oder Sitzung + CSRF.
         `playing: []` heißt: kein Spiel. Weitere Felder wie der Rechnername werden verworfen.
         Der Agent meldet alle 30 Sekunden.
       requestBody:

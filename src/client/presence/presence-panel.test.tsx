@@ -74,10 +74,10 @@ describe("PresencePanel", () => {
 });
 
 describe("PresencePanel setup", () => {
-  it("offers the download and creates a token for the start file", async () => {
+  it("offers the download and creates an agent key for the start file", async () => {
     requestJsonMock.mockImplementation(async (url: string) => {
-      if (url === "/api/presence") return { players: [], agentAvailable: true };
-      if (url === "/api/auth/api-tokens") return { token: "hm_at_test" };
+      if (url === "/api/presence") return { players: [], agentAvailable: true, agentKey: null };
+      if (url === "/api/presence/agent-key") return { key: "md_ga_test", createdAt: "2026-11-03T19:00:00Z" };
       throw new Error(url);
     });
     const view = await render();
@@ -88,10 +88,22 @@ describe("PresencePanel setup", () => {
       await Promise.resolve();
     });
     expect(requestJsonMock).toHaveBeenCalledWith(
-      "/api/auth/api-tokens",
+      "/api/presence/agent-key",
       expect.objectContaining({ method: "POST" })
     );
     expect(view.textContent).toContain("Startdatei herunterladen");
+    expect(view.textContent).toContain("Agent abmelden");
+  });
+
+  it("shows the state of an existing agent key", async () => {
+    requestJsonMock.mockResolvedValue({
+      players: [],
+      agentAvailable: true,
+      agentKey: { createdAt: "2026-11-03T19:00:00Z", lastUsedAt: null }
+    });
+    const view = await render();
+    expect(view.textContent).toContain("Agent neu einrichten");
+    expect(view.textContent).toContain("zuletzt gemeldet: noch nie");
   });
 
   it("explains when no agent is bundled", async () => {
@@ -101,9 +113,9 @@ describe("PresencePanel setup", () => {
     expect(view.textContent).toContain("keinen fertigen Agenten");
   });
 
-  it("builds a Windows start file next to the exe", () => {
-    expect(buildStartFile("https://lan.example", "hm_at_x")).toBe(
-      '@echo off\r\ntitle Spielt gerade\r\ncd /d "%~dp0"\r\nhermes-game-agent.exe -server https://lan.example -token hm_at_x -interval 30s\r\npause\r\n'
+  it("builds a Windows start file that passes the key via the environment", () => {
+    expect(buildStartFile("https://lan.example", "md_ga_x", "Spielt gerade")).toBe(
+      '@echo off\r\ntitle Spielt gerade\r\ncd /d "%~dp0"\r\nset MATCHDESK_AGENT_KEY=md_ga_x\r\nmatchdesk-game-agent.exe -server https://lan.example -interval 30s\r\npause\r\n'
     );
   });
 });

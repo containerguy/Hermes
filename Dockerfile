@@ -1,4 +1,4 @@
-# Windows-Agent für „Spielt gerade“ (tools/game-agent); Hermes liefert ihn unter
+# Windows-Agent für „Spielt gerade“ (tools/game-agent); Matchdesk liefert ihn unter
 # GET /api/presence/agent/download aus, damit er auch im LAN ohne Internet zu haben ist.
 FROM golang:1.26-bookworm AS agent
 
@@ -6,7 +6,7 @@ WORKDIR /src
 COPY tools/game-agent/go.mod tools/game-agent/go.sum ./
 RUN go mod download
 COPY tools/game-agent/ ./
-RUN CGO_ENABLED=0 GOOS=windows GOARCH=amd64 go build -trimpath -ldflags="-s -w" -o /out/hermes-game-agent.exe .
+RUN CGO_ENABLED=0 GOOS=windows GOARCH=amd64 go build -trimpath -ldflags="-s -w" -o /out/matchdesk-game-agent.exe .
 
 FROM node:22-bookworm-slim AS build
 
@@ -32,7 +32,7 @@ COPY --from=build /app/package.json /app/package-lock.json ./
 COPY --from=build /app/node_modules ./node_modules
 COPY --from=build /app/dist ./dist
 COPY --from=build /app/dist-server ./dist-server
-COPY --from=agent /out/hermes-game-agent.exe ./agent/hermes-game-agent.exe
+COPY --from=agent /out/matchdesk-game-agent.exe ./agent/matchdesk-game-agent.exe
 
 RUN mkdir -p /data
 

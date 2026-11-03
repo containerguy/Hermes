@@ -17,7 +17,7 @@ import { startAmpStatusService, stopAmpStatusService } from "./integrations/amp/
 import { startAmpAutomation, stopAmpAutomation } from "./integrations/amp/amp-automation";
 import { createDb } from "./db/client";
 import { runMigrations } from "./db/migrate";
-import { broadcastEventsChanged, broadcastPresenceChanged } from "./realtime/event-bus";
+import { broadcastEventsChanged } from "./realtime/event-bus";
 import { requireUser } from "./auth/current-user";
 import { matchdeskAuthMiddleware } from "./auth/matchdesk-auth";
 import { mountApiDocs } from "./http/api-docs";
@@ -120,8 +120,11 @@ export async function createMatchdeskApp() {
       broadcastEventsChanged("status_refreshed");
     }
     // „Spielt gerade“: Agent meldet sich nicht mehr (PC aus, Agent beendet) → Eintrag verschwindet.
-    if (presenceStore.sweep()) {
-      broadcastPresenceChanged();
+    // Abgeschaltet: nichts aufheben, damit beim Wiedereinschalten keine alten Einträge auftauchen.
+    if (readSettings(context).featuresGamePresenceEnabled) {
+      presenceStore.sweep();
+    } else {
+      presenceStore.clearAll();
     }
   }, 30_000);
 

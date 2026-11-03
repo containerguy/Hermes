@@ -122,3 +122,30 @@ func TestDetectIgnoresAntiCheatHelpers(t *testing.T) {
 		t.Fatalf("unexpected: %+v", got)
 	}
 }
+
+func TestDetectIgnoresBroadInstallFolders(t *testing.T) {
+	installed := []InstalledGame{
+		{Title: "Some EA Game", Launcher: "ea", Dir: `C:\Program Files\EA Games\`},
+		{Title: "Root", Launcher: "ea", Dir: `D:\`},
+		{Title: "Battlefield™ 6", Launcher: "ea", Dir: `E:\Battlefield 6\`},
+	}
+	procs := []Process{
+		{Name: "notepad++.exe", Path: `C:\Program Files\EA Games\Tools\notepad++.exe`},
+		{Name: "anything.exe", Path: `D:\Tools\anything.exe`},
+		{Name: "bf6.exe", Path: `E:\Battlefield 6\bf6.exe`},
+	}
+	got := Detect(procs, installed, nil, "", nil)
+	if len(got) != 1 || got[0].Title != "Battlefield™ 6" {
+		t.Fatalf("unexpected: %+v", got)
+	}
+	for _, d := range []string{`C:\Program Files (x86)\`, `D:/SteamLibrary/steamapps/common`, `C:`} {
+		if !isTooBroadDir(d) {
+			t.Errorf("%s should be too broad", d)
+		}
+	}
+	for _, d := range []string{`D:/UplayLibrary/Anno 1800/`, `D:\Battle.net\Diablo III`} {
+		if isTooBroadDir(d) {
+			t.Errorf("%s should be fine", d)
+		}
+	}
+}

@@ -52,13 +52,20 @@ describe("game presence store", () => {
     expect(parsed).toEqual({ playing: [{ title: "Counter-Strike 2", launcher: "steam", appId: "730" }] });
   });
 
+  it("drops invalid games one by one instead of rejecting the report", () => {
+    const parsed = presenceReportSchema.parse({
+      playing: [{ title: "", launcher: "gog" }, { title: "x".repeat(200) }, "kaputt", { title: "Valheim", launcher: "steam" }]
+    });
+    expect(parsed.playing).toEqual([{ title: "Valheim", launcher: "steam" }]);
+  });
+
   it("treats an unknown launcher as other", () => {
     const parsed = presenceReportSchema.parse({ playing: [{ title: "X", launcher: "itch" }] });
     expect(parsed.playing[0].launcher).toBe("other");
   });
 
   it("normalizes titles for catalog matching", () => {
-    expect(normalizeGameTitle("Battlefield™ 2042")).toBe("battlefield 2042");
-    expect(normalizeGameTitle("Counter-Strike: Source")).toBe("counter strike source");
+    expect(normalizeGameTitle("Battlefield™ 2042")).toBe("battlefield2042");
+    expect(normalizeGameTitle("Titanfall® 2")).toBe(normalizeGameTitle("Titanfall™ 2"));
   });
 });

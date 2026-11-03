@@ -1,6 +1,6 @@
-# hermes-game-agent (Prototyp)
+# matchdesk-game-agent (Prototyp)
 
-Kleines Windows-Programm, das erkennt, welches Spiel auf dem PC gerade läuft. Meldet an Hermes (`POST /api/presence/game`), wenn dort im Adminbereich „Spielt gerade“ aktiviert ist. Getestet am 3.11.2026 auf einem Windows-PC mit Steam, Epic, Ubisoft, EA und Battle.net.
+Kleines Windows-Programm, das erkennt, welches Spiel auf dem PC gerade läuft. Meldet an Matchdesk (`POST /api/presence/game`), wenn dort im Adminbereich „Spielt gerade“ aktiviert ist. Getestet am 3.11.2026 auf einem Windows-PC mit Steam, Epic, Ubisoft, EA und Battle.net.
 
 ## Wie erkannt wird
 
@@ -11,17 +11,17 @@ Kleines Windows-Programm, das erkennt, welches Spiel auf dem PC gerade läuft. M
    - GOG: `HKLM\SOFTWARE\WOW6432Node\GOG.com\Games\<id>`
    - Ubisoft Connect: `HKLM\SOFTWARE\WOW6432Node\Ubisoft\Launcher\Installs\<id>`
    - EA app, Battle.net: Uninstall-Einträge in der Registry nach Publisher
-3. **Bekannte Exe-Namen** (`-known liste.json`), z. B. für portable Spiele oder den Hermes-Spielekatalog.
+3. **Bekannte Exe-Namen** (`-known liste.json`), z. B. für portable Spiele oder den Spielekatalog.
 
 Launcher, Overlays, Crash-Handler und Anti-Cheat-Dienste werden ignoriert. Prozesse werden nur mit `PROCESS_QUERY_LIMITED_INFORMATION` geöffnet (kein Speicherzugriff, keine Injection), das verträgt sich mit Anti-Cheat.
 
 ## Datenschutz
 
-An Hermes gehen nur Titel, Launcher und ggf. Steam-App-ID der erkannten Spiele. Nie die Prozessliste, nie der Rechnername, nie die Liste installierter Spiele. `-v` zeigt die gefundenen installierten Spiele nur lokal an. Beim Beenden mit Strg+C löscht der Agent seinen Eintrag sofort, sonst verschwindet er nach zwei Minuten.
+An Matchdesk gehen nur Titel, Launcher und ggf. Steam-App-ID der erkannten Spiele. Nie die Prozessliste, nie der Rechnername, nie die Liste installierter Spiele. `-v` zeigt die gefundenen installierten Spiele nur lokal an. Beim Beenden mit Strg+C löscht der Agent seinen Eintrag sofort, sonst verschwindet er nach zwei Minuten.
 
 ## Auslieferung
 
-Das Docker-Image von Hermes baut den Agenten mit (`Dockerfile`, Stufe `agent`) und liefert ihn unter `GET /api/presence/agent/download` aus. Symbol, Versionsangaben und Manifest kommen aus `rsrc_windows_amd64.syso`, erzeugt mit [go-winres](https://github.com/tc-hib/go-winres) aus `winres/`:
+Das Docker-Image von Matchdesk baut den Agenten mit (`Dockerfile`, Stufe `agent`) und liefert ihn unter `GET /api/presence/agent/download` aus. Symbol, Versionsangaben und Manifest kommen aus `rsrc_windows_amd64.syso`, erzeugt mit [go-winres](https://github.com/tc-hib/go-winres) aus `winres/`:
 
 ```sh
 go-winres make --in winres/winres.json --arch amd64
@@ -32,12 +32,13 @@ Ohne Argumente gestartet (Doppelklick) macht der Agent einen Testlauf, meldet ni
 ## Bauen und starten
 
 ```sh
-GOOS=windows GOARCH=amd64 go build -trimpath -ldflags="-s -w" -o hermes-game-agent.exe .
+GOOS=windows GOARCH=amd64 go build -trimpath -ldflags="-s -w" -o matchdesk-game-agent.exe .
 go test ./...        # Erkennungslogik, läuft auf jedem OS
 ```
 
 ```
-hermes-game-agent.exe -v                     # einmal erkennen, JSON ausgeben
-hermes-game-agent.exe -interval 30s          # alle 30 s
-hermes-game-agent.exe -server https://hermes.example -token <API-Token> -interval 30s
+matchdesk-game-agent.exe -v                     # einmal erkennen, JSON ausgeben
+matchdesk-game-agent.exe -interval 30s          # alle 30 s
+set MATCHDESK_AGENT_KEY=md_ga_…        (Schlüssel von der Seite „Spielt gerade“)
+matchdesk-game-agent.exe -server https://matchdesk.example -interval 30s
 ```

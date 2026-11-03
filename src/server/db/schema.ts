@@ -394,6 +394,20 @@ export const inviteCodeUses = sqliteTable(
   (table) => [uniqueIndex("invite_code_uses_user_unique").on(table.userId)]
 );
 
+/** 0027: „Spielt gerade“ – ein Agent-Schlüssel pro Benutzer, darf nur Spiele melden. */
+export const gameAgentKeys = sqliteTable(
+  "game_agent_keys",
+  {
+    userId: text("user_id")
+      .primaryKey()
+      .references(() => users.id, { onDelete: "cascade" }),
+    keyHash: text("key_hash").notNull(),
+    createdAt: text("created_at").notNull(),
+    lastUsedAt: text("last_used_at")
+  },
+  (table) => [uniqueIndex("game_agent_keys_key_hash_unique").on(table.keyHash)]
+);
+
 export const pairingTokens = sqliteTable(
   "pairing_tokens",
   {

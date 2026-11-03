@@ -1,5 +1,5 @@
-// hermes-game-agent: prototype that detects which game is running on a
-// Windows PC and (optionally) reports it to Hermes.
+// matchdesk-game-agent: prototype that detects which game is running on a
+// Windows PC and (optionally) reports it to Matchdesk ("Spielt gerade").
 //
 // Privacy: only matched games are reported, never the process list.
 package main
@@ -27,8 +27,8 @@ type Report struct {
 
 func main() {
 	interval := flag.Duration("interval", 0, "repeat every interval (e.g. 30s); 0 = run once")
-	server := flag.String("server", "", "Hermes base URL to POST reports to (prototype endpoint /api/presence/game)")
-	token := flag.String("token", os.Getenv("HERMES_TOKEN"), "Hermes API token (or env HERMES_TOKEN)")
+	server := flag.String("server", "", "Matchdesk base URL to report to (POST /api/presence/game)")
+	token := flag.String("token", os.Getenv("MATCHDESK_AGENT_KEY"), "agent key from the \"Spielt gerade\" page (default: env MATCHDESK_AGENT_KEY)")
 	knownFile := flag.String("known", "", "optional JSON file [{\"exe\":\"factorio.exe\",\"title\":\"Factorio\"}]")
 	verbose := flag.Bool("v", false, "also print installed games found per launcher (local only, never sent)")
 	flag.Parse()
@@ -47,17 +47,11 @@ func main() {
 		}
 	}
 
+	// Ctrl+C or window closed: the loop finishes a report that is in flight,
+	// then removes the entry in Matchdesk instead of waiting for it to expire.
+	stop := make(chan os.Signal, 1)
 	if *server != "" && *interval > 0 {
-		// Ctrl+C or window closed: remove the entry in Hermes instead of waiting for it to expire.
-		stop := make(chan os.Signal, 1)
 		signal.Notify(stop, os.Interrupt, syscall.SIGTERM)
-		go func() {
-			<-stop
-			if err := clearPresence(*server, *token); err != nil {
-				fmt.Fprintln(os.Stderr, "clear:", err)
-			}
-			os.Exit(0)
-		}()
 	}
 
 	for {
@@ -99,11 +93,18 @@ func main() {
 			}
 			return
 		}
-		time.Sleep(*interval)
+		select {
+		case <-stop:
+			if err := clearPresence(*server, *token); err != nil {
+				fmt.Fprintln(os.Stderr, "clear:", err)
+			}
+			return
+		case <-time.After(*interval):
+		}
 	}
 }
 
-// post sends only the detected games to Hermes: no host name, no launcher
+// post sends only the detected games to Matchdesk: no host name, no launcher
 // list, no exe names.
 func post(server, token string, r Report) error {
 	type game struct {

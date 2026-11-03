@@ -25,6 +25,8 @@ describe("restorable tables", () => {
     // user_api_tokens und rate_limit_allowlist fehlen schon länger im Restore (Stand PR #14).
     const notRestored = [
       "email_change_challenges",
+      // „Spielt gerade“: Agent-Schlüssel wie API-Tokens nicht im Restore; neu einrichten genügt.
+      "game_agent_keys",
       "pairing_tokens",
       "rate_limit_allowlist",
       "rate_limit_entries",

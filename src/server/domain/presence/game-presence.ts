@@ -1,8 +1,11 @@
 import { z } from "zod";
+import { normalizeGameTitle } from "../../../shared/game-title";
+
+export { normalizeGameTitle };
 
 /**
  * „Spielt gerade“: Der Windows-Agent (tools/game-agent) meldet regelmäßig, welche Spiele auf dem
- * PC laufen. Hermes hält das bewusst nur im Speicher: kein Verlauf, nach einem Neustart oder
+ * PC laufen. Matchdesk hält das bewusst nur im Speicher: kein Verlauf, nach einem Neustart oder
  * nach PRESENCE_TTL_MS ohne neue Meldung ist der Eintrag weg.
  */
 
@@ -20,10 +23,19 @@ const reportedGameSchema = z.object({
 
 /**
  * Bericht des Agenten. Weitere Felder (z. B. Rechnername) werden verworfen, nicht gespeichert.
- * `playing: []` heißt: gerade kein Spiel.
+ * `playing: []` heißt: gerade kein Spiel. Einzelne ungültige Einträge (z. B. leerer Titel aus
+ * einem kaputten Launcher-Manifest) fallen weg, statt den ganzen Bericht abzulehnen.
  */
 export const presenceReportSchema = z.object({
-  playing: z.array(reportedGameSchema).max(20)
+  playing: z
+    .array(z.unknown())
+    .max(20)
+    .transform((items) =>
+      items.flatMap((item) => {
+        const parsed = reportedGameSchema.safeParse(item);
+        return parsed.success ? [parsed.data] : [];
+      })
+    )
 });
 
 export type PresenceGame = {
@@ -44,15 +56,6 @@ export type PresenceStore = ReturnType<typeof createPresenceStore>;
 
 function gameKey(game: { title: string; launcher: string }) {
   return `${game.launcher}|${normalizeGameTitle(game.title)}`;
-}
-
-/** Für Vergleiche mit dem Spielekatalog: Kleinschreibung, ohne ™®©, Satzzeichen und Doppel-Leerzeichen. */
-export function normalizeGameTitle(title: string) {
-  return title
-    .toLowerCase()
-    .replace(/[™®©]/g, "")
-    .replace(/[^\p{L}\p{N}]+/gu, " ")
-    .trim();
 }
 
 export function createPresenceStore(options?: { ttlMs?: number; now?: () => number }) {
@@ -105,7 +108,7 @@ export function createPresenceStore(options?: { ttlMs?: number; now?: () => numb
       return Boolean(existing && isFresh(existing));
     },
 
-    /** Alle aktuellen Einträge; abgelaufene werden dabei entfernt. */
+    /** Alle aktuellen Einträge; abgelaufene werden übersprungen (entfernt erst `sweep()`). */
     list(): PresenceEntry[] {
       return Array.from(entries.values()).filter((entry) => isFresh(entry));
     },
