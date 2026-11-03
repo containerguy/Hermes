@@ -15,6 +15,8 @@ export type SystemMailContent = {
   /** Anrede: Anzeigename oder Benutzername. */
   recipientName: string;
   code: string;
+  /** Anmeldename, der als Erinnerung in Login-Mails steht (bei E-Mail-Änderung ignoriert). */
+  loginName?: string | null;
   /** Gültigkeit des Codes in Minuten. */
   validMinutes: number;
   /** Basis-URL der App ohne Slash am Ende, oder null (dann ohne Link). */
@@ -41,6 +43,8 @@ type Copy = {
   intro: (app: string) => string;
   codeLabel: string;
   instruction: (minutes: number) => string;
+  /** Erinnerung an den Anmeldenamen; fehlt bei Mails ohne Login-Bezug. */
+  loginNameHint?: (name: string) => string;
   linkLabel: string;
   linkTextPrefix: string;
   notRequested: string;
@@ -57,6 +61,7 @@ const COPY: Record<SystemMailKind, Record<AppLocale, Copy>> = {
       intro: (app) => `hier ist dein Code für die Anmeldung bei ${app}:`,
       codeLabel: "Dein Login-Code",
       instruction: (minutes) => `Gib ihn auf der Anmeldeseite ein. Der Code ist ${minutes} Minuten gültig.`,
+      loginNameHint: (name) => `Dein Anmeldename: ${name} (Groß-/Kleinschreibung ist egal, du kannst dich auch mit dieser Mailadresse anmelden).`,
       linkLabel: "Zur Anmeldung",
       linkTextPrefix: "Zur Anmeldung:",
       notRequested:
@@ -71,6 +76,7 @@ const COPY: Record<SystemMailKind, Record<AppLocale, Copy>> = {
       intro: (app) => `here is your code to sign in to ${app}:`,
       codeLabel: "Your sign-in code",
       instruction: (minutes) => `Enter it on the sign-in page. The code is valid for ${minutes} minutes.`,
+      loginNameHint: (name) => `Your username: ${name} (not case-sensitive; you can also sign in with this email address).`,
       linkLabel: "Go to sign-in",
       linkTextPrefix: "Sign in here:",
       notRequested:
@@ -87,6 +93,7 @@ const COPY: Record<SystemMailKind, Record<AppLocale, Copy>> = {
       intro: (app) => `schön, dass du bei ${app} dabei bist. Hier ist dein Code für die erste Anmeldung:`,
       codeLabel: "Dein Login-Code",
       instruction: (minutes) => `Gib ihn auf der Anmeldeseite ein. Der Code ist ${minutes} Minuten gültig.`,
+      loginNameHint: (name) => `Dein Anmeldename: ${name} (Groß-/Kleinschreibung ist egal, du kannst dich auch mit dieser Mailadresse anmelden).`,
       linkLabel: "Zur Anmeldung",
       linkTextPrefix: "Zur Anmeldung:",
       notRequested:
@@ -101,6 +108,7 @@ const COPY: Record<SystemMailKind, Record<AppLocale, Copy>> = {
       intro: (app) => `great to have you on ${app}. Here is your code for your first sign-in:`,
       codeLabel: "Your sign-in code",
       instruction: (minutes) => `Enter it on the sign-in page. The code is valid for ${minutes} minutes.`,
+      loginNameHint: (name) => `Your username: ${name} (not case-sensitive; you can also sign in with this email address).`,
       linkLabel: "Go to sign-in",
       linkTextPrefix: "Sign in here:",
       notRequested:
@@ -205,6 +213,8 @@ export function renderSystemMail(content: SystemMailContent): RenderedSystemMail
   const domain = footerDomain(content);
   const footerLine = domain ? `${appName} · ${domain}` : appName;
   const subject = copy.subject(appName);
+  const loginName = content.loginName ? sanitizeInline(content.loginName) : "";
+  const loginNameLine = loginName && copy.loginNameHint ? copy.loginNameHint(loginName) : null;
 
   const textLines = [
     copy.greeting(recipientName),
@@ -216,6 +226,9 @@ export function renderSystemMail(content: SystemMailContent): RenderedSystemMail
     copy.instruction(content.validMinutes),
     ""
   ];
+  if (loginNameLine) {
+    textLines.push(loginNameLine, "");
+  }
   if (link) {
     textLines.push(`${copy.linkTextPrefix} ${link}`, "");
   }
@@ -256,7 +269,7 @@ export function renderSystemMail(content: SystemMailContent): RenderedSystemMail
 </table>
 </td></tr>
 <tr><td style="padding:0 32px 8px 32px;font-size:15px;line-height:22px;">
-<p style="margin:0;">${e(copy.instruction(content.validMinutes))}</p>
+<p style="margin:0;">${e(copy.instruction(content.validMinutes))}</p>${loginNameLine ? `\n<p style="margin:12px 0 0 0;font-size:14px;line-height:21px;color:#3e4c59;">${e(loginNameLine)}</p>` : ""}
 </td></tr>
 ${buttonHtml}
 <tr><td style="padding:16px 32px 24px 32px;font-size:14px;line-height:21px;color:#3e4c59;">

@@ -108,7 +108,7 @@ export function LoginPanel({
     setSessions(result.sessions);
     const currentSession = result.sessions.find((session) => session.current);
     if (currentSession?.deviceName) {
-      rememberKnownDevice(currentUser.username, currentSession.deviceName);
+      rememberKnownDevice(currentUser.username, currentSession.deviceName, currentUser.email);
     }
     setSessionNames(
       Object.fromEntries(
@@ -201,7 +201,7 @@ export function LoginPanel({
         })
       });
       if (result.device?.name) {
-        rememberKnownDevice(result.user.username, result.device.name);
+        rememberKnownDevice(result.user.username, result.device.name, result.user.email);
       }
       onLoggedIn(result.user);
       primeCsrfToken();
@@ -312,7 +312,7 @@ export function LoginPanel({
         })
       });
       if (result.device?.name) {
-        rememberKnownDevice(result.user.username, result.device.name);
+        rememberKnownDevice(result.user.username, result.device.name, result.user.email);
       }
       onLoggedIn(result.user);
       primeCsrfToken();

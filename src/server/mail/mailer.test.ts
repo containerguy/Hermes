@@ -242,6 +242,18 @@ describe("Mail-Inhalt", () => {
     expect(mail.headers).toMatchObject({ "Content-Language": "en" });
   });
 
+  it("nennt den Anmeldenamen in Login- und Registrierungsmails, nicht bei E-Mail-Änderung", () => {
+    const login = buildSystemMail(context, "login_code", recipient, PROD_ENV);
+    expect(String(login.text)).toContain(`Dein Anmeldename: ${recipient.username}`);
+    expect(String(login.html)).toContain(`Dein Anmeldename: ${recipient.username}`);
+    const registration = buildSystemMail(context, "registration_code", recipient, PROD_ENV);
+    expect(String(registration.text)).toContain(`Dein Anmeldename: ${recipient.username}`);
+    const change = buildSystemMail(context, "email_change_code", recipient, PROD_ENV);
+    expect(String(change.text)).not.toContain("Anmeldename");
+    const english = buildSystemMail(context, "login_code", { ...recipient, locale: "en" }, PROD_ENV);
+    expect(String(english.text)).toContain(`Your username: ${recipient.username}`);
+  });
+
   it("HTML-Snapshot (Login, deutsch)", () => {
     const rendered = renderSystemMail({
       kind: "login_code",

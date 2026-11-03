@@ -129,6 +129,7 @@ export function buildSystemMail(
     appName,
     recipientName: input.displayName?.trim() || input.username,
     code: input.code,
+    loginName: input.username,
     validMinutes: MAIL_CODE_VALID_MINUTES,
     publicUrl: resolvePublicUrl(env.publicUrl),
     fallbackDomain: from.address.split("@").pop() ?? null,

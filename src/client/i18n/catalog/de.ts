@@ -71,11 +71,13 @@ export const deMessages = {
   "login.title.verify": "Code eingeben.",
   "login.help.register":
     "Lege dein Konto mit Invite-Code, Username und E-Mail an. Danach bekommst du direkt einen Einmalcode für den ersten Login.",
-  "login.help.request": "Gib deinen Username ein. Hermes schickt den Einmalcode an die hinterlegte E-Mail-Adresse.",
+  "login.help.request": "Gib deinen Username oder deine E-Mail-Adresse ein, Groß-/Kleinschreibung ist egal. Hermes schickt den Einmalcode an die hinterlegte E-Mail-Adresse.",
   "login.help.verify":
     "Trage den Code aus der Mail ein und gib diesem Gerät optional einen Namen für die Geräteübersicht.",
   "login.field.invite": "Invite-Code",
   "login.field.username": "Username",
+  "login.field.loginIdentifier": "Username oder E-Mail",
+  "login.forgotHint": "Weder Username noch E-Mail parat? Ein Admin kann beides in der Nutzerverwaltung nachsehen.",
   "login.field.email": "E-Mail",
   "login.field.code": "Einmalcode",
   "login.field.deviceName": "Gerätename",
