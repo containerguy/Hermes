@@ -1,4 +1,4 @@
-# Hermes Changelog
+# Matchdesk Changelog (formerly Hermes)
 
 Versions are annotated tags `vX.Y.Z` on `main`. Each entry mirrors the
 `chore(release): vX.Y.Z` commit that bumps `package.json`,

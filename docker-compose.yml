@@ -1,26 +1,30 @@
+# Matchdesk (Mitspielzentrale). Service- und Volume-Name bleiben bewusst "hermes":
+# ein neuer Service-Name startet einen zweiten Container neben dem alten (Port belegt),
+# ein neuer Volume-Name legt ein leeres Volume an.
 services:
   hermes:
     build:
       context: .
-    image: hermes:local
+    image: matchdesk:local
     env_file:
       - .env
     environment:
-      HERMES_HOST: 0.0.0.0
-      HERMES_PORT: 3000
-      HERMES_DB_PATH: /data/hermes.sqlite
-      HERMES_STORAGE_BACKEND: s3
-      HERMES_S3_BUCKET: hermes-storage
-      HERMES_S3_REGION: eu-central-2
-      HERMES_S3_ENDPOINT: https://s3.eu-central-2.wasabisys.com
-      HERMES_S3_CREDS_FILE: /run/secrets/s3.creds
-      HERMES_S3_DB_KEY: hermes.sqlite
-      HERMES_S3_RESTORE_MODE: if-missing
-      # Gameserver-Modul (CubeCoders AMP): HERMES_AMP_USERNAME/HERMES_AMP_PASSWORD kommen aus .env.
+      MATCHDESK_HOST: 0.0.0.0
+      MATCHDESK_PORT: 3000
+      MATCHDESK_DB_PATH: /data/matchdesk.sqlite
+      MATCHDESK_STORAGE_BACKEND: s3
+      # Bestehender Bucket und Snapshot-Name bleiben (Buckets lassen sich nicht umbenennen).
+      MATCHDESK_S3_BUCKET: hermes-storage
+      MATCHDESK_S3_REGION: eu-central-2
+      MATCHDESK_S3_ENDPOINT: https://s3.eu-central-2.wasabisys.com
+      MATCHDESK_S3_CREDS_FILE: /run/secrets/s3.creds
+      MATCHDESK_S3_DB_KEY: hermes.sqlite
+      MATCHDESK_S3_RESTORE_MODE: if-missing
+      # Gameserver-Modul (CubeCoders AMP): MATCHDESK_AMP_USERNAME/MATCHDESK_AMP_PASSWORD kommen aus .env.
       # Das rotierende rememberMe-Token liegt im Daten-Volume und überlebt Neustarts.
-      HERMES_AMP_REMEMBER_TOKEN_FILE: /data/amp-remember.token
+      MATCHDESK_AMP_REMEMBER_TOKEN_FILE: /data/amp-remember.token
       # CA des AMP-Controllers (eigene CA): Zeile einkommentieren und unten den Mount aktivieren.
-      # HERMES_AMP_CA_FILE: /run/secrets/amp-ca.pem
+      # MATCHDESK_AMP_CA_FILE: /run/secrets/amp-ca.pem
     ports:
       - "3000:3000"
     volumes:

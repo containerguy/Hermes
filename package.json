@@ -1,5 +1,5 @@
 {
-  "name": "hermes",
+  "name": "matchdesk",
   "version": "0.16.0",
   "private": true,
   "type": "module",
@@ -18,7 +18,7 @@
     "test:e2e": "npm run build && playwright test",
     "verify": "npm test && npm run build && npm audit --omit=dev",
     "verify:ci": "npm ci && npm test && npm run build && npm audit --omit=dev",
-    "docker:build": "docker build --platform linux/amd64 -t hermes:local .",
+    "docker:build": "docker build --platform linux/amd64 -t matchdesk:local .",
     "verify:push": "npm run verify:ci && npm run docker:build"
   },
   "dependencies": {

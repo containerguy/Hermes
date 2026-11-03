@@ -1,9 +1,9 @@
 <!-- GSD:project-start source:PROJECT.md -->
 ## Project
 
-**Hermes**
+**Matchdesk** (Mitspielzentrale, formerly Matchdesk)
 
-Hermes is a responsive LAN-party coordination WebApp for roughly 25 people. It lets players log in with username and email one-time code, see proposed game rounds, vote `dabei` or `nicht dabei`, find start/server details, and receive notifications across smartphone and PC.
+Matchdesk is a responsive LAN-party coordination WebApp for roughly 25 people. It lets players log in with username and email one-time code, see proposed game rounds, vote `dabei` or `nicht dabei`, find start/server details, and receive notifications across smartphone and PC.
 
 The current product is a brownfield TypeScript/React/Express app with SQLite as the active database and optional Wasabi/S3 snapshot storage. Admins manage users, managers, settings, invite codes, audit logs, backups, restore, and visual theme colors.
 
@@ -12,7 +12,7 @@ The current product is a brownfield TypeScript/React/Express app with SQLite as 
 ### Constraints
 
 - **Tech stack**: TypeScript, React/Vite, Express, SQLite, Drizzle, Web Push, Docker — already implemented and should be preserved unless a concrete risk demands change.
-- **Deployment**: Single Dockerized app is the target; SSL/TLS and reverse proxy remain out of scope for Hermes itself.
+- **Deployment**: Single Dockerized app is the target; SSL/TLS and reverse proxy remain out of scope for Matchdesk itself.
 - **Storage**: Local SQLite is the active database; Wasabi/S3 is snapshot backup/restore, not multi-writer storage.
 - **Scale**: Optimize for about 25 LAN-party participants, not public SaaS scale.
 - **Login cost**: Login codes are sent by email, not SMS.
@@ -40,7 +40,7 @@ The current product is a brownfield TypeScript/React/Express app with SQLite as 
 - Web Push client: `src/main.tsx` registers `/sw.js`, requests `Notification` permission, subscribes through `PushManager`, and posts subscriptions to `/api/push/subscriptions`.
 ## Backend
 - HTTP framework: Express 5 in `src/server/app.ts`.
-- Server entrypoint: `src/server/index.ts` reads `HERMES_HOST` and `HERMES_PORT`, starts the Express app, and flushes persistence on `SIGINT`/`SIGTERM`.
+- Server entrypoint: `src/server/index.ts` reads `MATCHDESK_HOST` and `MATCHDESK_PORT`, starts the Express app, and flushes persistence on `SIGINT`/`SIGTERM`.
 - App composition: `src/server/app.ts` wires JSON parsing, cookies, health checks, settings, auth, admin, events, push, realtime, static assets, and SPA fallback.
 - Cookie parsing: `cookie-parser` is installed in `package.json` and mounted in `src/server/app.ts`.
 - Request validation: Zod schemas are used in route/domain modules such as `src/server/http/auth-routes.ts`, `src/server/http/admin-routes.ts`, `src/server/http/event-routes.ts`, `src/server/http/push-routes.ts`, `src/server/domain/events.ts`, and `src/server/settings.ts`.
@@ -50,7 +50,7 @@ The current product is a brownfield TypeScript/React/Express app with SQLite as 
 ## Data Layer
 - Database: SQLite through `better-sqlite3`.
 - ORM/query layer: Drizzle ORM with `drizzle-orm/better-sqlite3` in `src/server/db/client.ts` and table definitions in `src/server/db/schema.ts`.
-- Database path: `getDatabasePath()` in `src/server/env.ts` reads `HERMES_DB_PATH` and defaults to `data/hermes.sqlite` under the process cwd.
+- Database path: `getDatabasePath()` in `src/server/env.ts` reads `MATCHDESK_DB_PATH` and defaults to `data/matchdesk.sqlite` under the process cwd (falls back to an existing `hermes.sqlite` next to it); `readEnv("X")` reads `MATCHDESK_X`, then the legacy `HERMES_X`.
 - SQLite pragmas: `src/server/db/client.ts` enables WAL mode and foreign keys.
 - Migrations: SQL files live in `src/server/db/migrations/`; `src/server/db/migrate.ts` applies sorted `.sql` files and records them in `schema_migrations`.
 - Main tables: users, login challenges, sessions, push subscriptions, game events, participations, app settings, audit logs, invite codes, invite uses, and schema migrations in `src/server/db/schema.ts`.
@@ -62,7 +62,7 @@ The current product is a brownfield TypeScript/React/Express app with SQLite as 
 - Runtime start: `npm start` runs `node dist-server/index.js`.
 - Development commands: `npm run dev` starts Vite on host `0.0.0.0`; `npm run server` runs the TypeScript server through `tsx`.
 - Docker build: `Dockerfile` uses a two-stage Node 22 build/runtime image, prunes dev dependencies, exposes port 3000, stores data under `/data`, and health-checks `/api/health`.
-- Docker Compose: `docker-compose.yml` builds `hermes:local`, maps port `3000:3000`, mounts `hermes-data:/data`, mounts `./s3.creds` read-only, and sets S3-oriented environment defaults.
+- Docker Compose: `docker-compose.yml` builds `matchdesk:local`, maps port `3000:3000`, mounts `hermes-data:/data`, mounts `./s3.creds` read-only, and sets S3-oriented environment defaults.
 ## Testing And Quality
 - Unit/integration test runner: Vitest 4 via `npm test`, scoped to `src`.
 - HTTP tests: Supertest is used in `src/server/http/app-flow.test.ts`.
@@ -73,13 +73,13 @@ The current product is a brownfield TypeScript/React/Express app with SQLite as 
 - Local env loading: `src/server/env.ts` reads `.env` manually if present and does not override already-set process env values.
 - Example config: `.env.example` documents database path, server port, cookie security, S3, admin bootstrap, SMTP, VAPID, and local dev login code variables.
 - Admin bootstrap: `src/server/db/bootstrap-admin.ts` requires admin phone, username, and email env variables, then creates or updates the primary admin.
-- Cookie security: `src/server/auth/sessions.ts` sets `httpOnly`, `sameSite: "lax"`, and `secure` based on `HERMES_COOKIE_SECURE`.
+- Cookie security: `src/server/auth/sessions.ts` sets `httpOnly`, `sameSite: "lax"`, and `secure` based on `MATCHDESK_COOKIE_SECURE`.
 - Production notes: `README.md` and `building.md` document local start, Docker start, S3 behavior, mail, push, backup/restore, and CI image publishing.
 ## Deployment Shape
 - Intended runtime: a single Node/Express instance with local SQLite as the active database.
 - Static serving: `src/server/app.ts` serves `dist/` if present and falls back to `index.html` for non-API paths.
 - Health endpoint: `/api/health` is implemented in `src/server/app.ts` and used by the Docker `HEALTHCHECK`.
-- Container registry: `.github/workflows/docker-image.yml` publishes `ghcr.io/containerguy/hermes` on pushes to `main`, version tags, and manual dispatch; pull requests build without pushing.
+- Container registry: `.github/workflows/docker-image.yml` publishes `ghcr.io/containerguy/matchdesk` (and, until v1.0, `ghcr.io/containerguy/hermes`) on pushes to `main`, version tags, and manual dispatch; pull requests build without pushing.
 - Operational caveat: `README.md` and `building.md` state S3 is snapshot storage, not a locking backend for multiple simultaneous writers.
 <!-- GSD:stack-end -->
 
@@ -87,7 +87,7 @@ The current product is a brownfield TypeScript/React/Express app with SQLite as 
 ## Conventions
 
 ## Project Shape
-- Hermes is a TypeScript ESM project: `package.json` sets `"type": "module"` and `tsconfig.json` uses `module: "ESNext"`, `moduleResolution: "Bundler"`, `target: "ES2022"`, `strict: true`, and `jsx: "react-jsx"`.
+- Matchdesk is a TypeScript ESM project: `package.json` sets `"type": "module"` and `tsconfig.json` uses `module: "ESNext"`, `moduleResolution: "Bundler"`, `target: "ES2022"`, `strict: true`, and `jsx: "react-jsx"`.
 - The codebase is split into a React/Vite frontend in `src/main.tsx` and `src/styles.css`, plus an Express/SQLite backend under `src/server/`.
 - Server modules are organized by concern:
 ## TypeScript Style
@@ -105,7 +105,7 @@ The current product is a brownfield TypeScript/React/Express app with SQLite as 
 - Validation failures generally return `400` with a German machine-readable error code, such as `ungueltiges_event`, `ungueltiger_user`, or `ungueltige_settings`.
 - Auth/permission failures use `401` for unauthenticated users and `403` for authenticated users without required role, with codes such as `nicht_angemeldet`, `admin_erforderlich`, `manager_erforderlich`, or `verboten`.
 - State conflicts use `409`, for example duplicate users, full events, and attempts to mutate completed events.
-- Integration or persistence failures are logged with `console.error("[Hermes] ...", error)` and returned as stable error codes, for example `mailversand_fehlgeschlagen`, `backup_fehlgeschlagen`, and `restore_fehlgeschlagen`.
+- Integration or persistence failures are logged with `console.error("[Matchdesk] ...", error)` and returned as stable error codes, for example `mailversand_fehlgeschlagen`, `backup_fehlgeschlagen`, and `restore_fehlgeschlagen`.
 - Response payloads wrap named resources: `{ user: ... }`, `{ users: ... }`, `{ event: ... }`, `{ events: ... }`, `{ settings: ... }`, `{ inviteCode: ... }`, `{ auditLogs: ... }`. Empty successful deletes usually use `204`.
 ## Database Patterns
 - SQLite is accessed through `better-sqlite3` plus Drizzle. `src/server/db/client.ts` enables WAL mode and foreign keys via pragmas.
@@ -178,7 +178,7 @@ The current product is a brownfield TypeScript/React/Express app with SQLite as 
 - `/api/push` is implemented by `src/server/http/push-routes.ts`.
 - `/api/realtime` is implemented by `src/server/http/realtime-routes.ts`.
 ## Authentication And Authorization
-- `src/server/auth/sessions.ts` creates base64url session tokens, sets/clears the `hermes_session` cookie, and honors `HERMES_COOKIE_SECURE`.
+- `src/server/auth/sessions.ts` creates base64url session tokens, sets/clears the `matchdesk_session` cookie (legacy `hermes_session` is read and migrated), and honors `MATCHDESK_COOKIE_SECURE`.
 - `src/server/auth/otp.ts` generates six-digit one-time codes and stores/verifies scrypt hashes.
 - `src/server/auth/current-user.ts` resolves the current session from the cookie, joins `sessions` to `users`, rejects revoked sessions/deleted users, updates `lastSeenAt`, and exposes `requireUser()`/`requireAdmin()`.
 - `src/server/http/auth-routes.ts` creates login challenges, sends email codes, verifies codes, creates sessions, lists sessions, revokes sessions, logs out, and supports invite-based registration when settings allow it.
@@ -197,7 +197,7 @@ The current product is a brownfield TypeScript/React/Express app with SQLite as 
 - `POST /api/events/:id/cancel` and `/archive` mark terminal states, audit them, broadcast, and notify.
 ## Persistence
 - `src/server/db/client.ts` creates the SQLite file directory, opens the database, enables WAL mode and foreign keys, and returns `{ sqlite, db }`.
-- The database path comes from `getDatabasePath()` in `src/server/env.ts`, defaulting to `data/hermes.sqlite`.
+- The database path comes from `getDatabasePath()` in `src/server/env.ts`, defaulting to `data/matchdesk.sqlite` (legacy `hermes.sqlite` is reused if present).
 - `src/server/db/schema.ts` defines tables for users, login challenges, sessions, push subscriptions, game events, participations, app settings, audit logs, invite codes, and invite code uses.
 - SQL migrations are stored in `src/server/db/migrations/*.sql`.
 - `src/server/db/migrate.ts` tracks applied migration filenames in `schema_migrations` and can run as a CLI entrypoint.
@@ -214,7 +214,7 @@ The current product is a brownfield TypeScript/React/Express app with SQLite as 
 - `src/server/http/realtime-routes.ts` exposes authenticated `/api/realtime/events`.
 - `src/main.tsx` listens via `EventSource` and reloads events on change, with polling as a fallback.
 ## Backup And Restore
-- Enabled when `HERMES_STORAGE_BACKEND=s3`.
+- Enabled when `MATCHDESK_STORAGE_BACKEND=s3`.
 - Restore can run at app start through `restoreDatabaseFromStorageIfNeeded()`.
 - Mutating API responses schedule a debounced snapshot upload via `scheduleDatabaseSnapshot()`.
 - Shutdown and migration paths flush/persist snapshots explicitly.
