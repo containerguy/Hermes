@@ -104,7 +104,7 @@ func Detect(procs []Process, installed []InstalledGame, known []KnownExe, steamR
 		if exe == "" {
 			exe = baseName(p.Path)
 		}
-		if ignoredExe[exe] {
+		if isIgnored(exe) {
 			continue
 		}
 		matched := false
@@ -181,4 +181,25 @@ func uniqueDirs(installed []InstalledGame) []InstalledGame {
 		return dirs[i].Title < dirs[j].Title
 	})
 	return dirs
+}
+
+// Helper processes that sit in game folders but are not the game itself.
+// Anti-cheat launchers can start before or outlive the game, so they must
+// not count; the real game exe in the same folder still matches.
+var ignoredPrefixes = []string{
+	"eaanticheat", "easyanticheat", "battleye", "beservice", "beclient",
+	"crashreport", "crashhandler", "unitycrashhandler", "crashpad", "bugreport",
+	"vc_redist", "vcredist", "dxsetup", "dotnet", "uninst", "unins0",
+}
+
+func isIgnored(exe string) bool {
+	if ignoredExe[exe] {
+		return true
+	}
+	for _, p := range ignoredPrefixes {
+		if strings.HasPrefix(exe, p) {
+			return true
+		}
+	}
+	return false
 }

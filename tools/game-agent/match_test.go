@@ -107,3 +107,18 @@ func TestDetectSharedAndCrossLauncherFolders(t *testing.T) {
 		t.Fatalf("unexpected: %+v", got)
 	}
 }
+
+// Seen on DESKTOP-M4PJL0I: Battlefield 2042 matched via its anti-cheat launcher.
+func TestDetectIgnoresAntiCheatHelpers(t *testing.T) {
+	installed := []InstalledGame{{Title: "Battlefield™ 2042", Launcher: "ea", Dir: `C:\Program Files\EA Games\Battlefield 2042\`}}
+	helper := Process{Name: "EAAntiCheat.GameServiceLauncher.exe", Path: `C:\Program Files\EA Games\Battlefield 2042\EAAntiCheat.GameServiceLauncher.exe`}
+	game := Process{Name: "BF2042.exe", Path: `C:\Program Files\EA Games\Battlefield 2042\BF2042.exe`}
+
+	if got := Detect([]Process{helper}, installed, nil, "", nil); len(got) != 0 {
+		t.Fatalf("helper alone must not count: %+v", got)
+	}
+	got := Detect([]Process{helper, game}, installed, nil, "", nil)
+	if len(got) != 1 || got[0].Exe != "bf2042.exe" {
+		t.Fatalf("unexpected: %+v", got)
+	}
+}
