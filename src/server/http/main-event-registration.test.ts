@@ -360,7 +360,7 @@ describe("event registration: capacity, waitlist, deadline, overview", () => {
     await adminAgent
       .put("/api/admin/settings")
       .send({
-        appName: "Hermes Test",
+        appName: "Matchdesk Test",
         defaultNotificationsEnabled: true,
         eventAutoArchiveHours: 8,
         publicRegistrationEnabled: true,
