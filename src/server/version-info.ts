@@ -2,7 +2,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { readEnv } from "./env";
 
-export const DEFAULT_SOURCE_REPO_URL = "https://github.com/containerguy/Hermes";
+export const DEFAULT_SOURCE_REPO_URL = "https://github.com/containerguy/Matchdesk";
 
 export type AppReleaseInfo = {
   version: string;
