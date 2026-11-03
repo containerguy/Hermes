@@ -72,23 +72,27 @@ func Detect(procs []Process, installed []InstalledGame, known []KnownExe, steamR
 		}
 	}
 
-	// 1) Steam tells us directly.
+	// One entry per install folder. Several games can share a folder
+	// (Half-Life, Counter-Strike, CS: Condition Zero) and one game can be
+	// listed by two launchers (Titanfall 2 in Steam and EA). Prefer Steam
+	// (it has an app ID), then the alphabetically first title, so the
+	// result is stable. Launcher and redistributable folders are dropped.
+	dirs := uniqueDirs(installed)
+
+	// 1) Steam tells us directly. Its folder is then already covered.
+	steamDir := ""
 	if steamRunningAppID != "" && steamRunningAppID != "0" {
 		title := steamNames[steamRunningAppID]
 		if title == "" {
 			title = "Steam App " + steamRunningAppID
 		}
 		add(Detection{Title: title, Launcher: "steam", AppID: steamRunningAppID, Source: "steam-registry"})
-	}
-
-	// Longest install dir first, so nested folders win.
-	dirs := make([]InstalledGame, 0, len(installed))
-	for _, g := range installed {
-		if strings.TrimSpace(g.Dir) != "" {
-			dirs = append(dirs, g)
+		for _, g := range installed {
+			if g.Launcher == "steam" && g.AppID == steamRunningAppID && g.Dir != "" {
+				steamDir = normDir(g.Dir)
+			}
 		}
 	}
-	sort.Slice(dirs, func(i, j int) bool { return len(dirs[i].Dir) > len(dirs[j].Dir) })
 
 	knownByExe := map[string]string{}
 	for _, k := range known {
@@ -109,6 +113,10 @@ func Detect(procs []Process, installed []InstalledGame, known []KnownExe, steamR
 			pp := strings.ToLower(strings.ReplaceAll(p.Path, "/", `\`))
 			for _, g := range dirs {
 				if strings.HasPrefix(pp, normDir(g.Dir)) {
+					matched = true
+					if normDir(g.Dir) == steamDir {
+						break
+					}
 					add(Detection{Title: g.Title, Launcher: g.Launcher, AppID: g.AppID, Exe: exe, Source: "install-dir"})
 					matched = true
 					break
@@ -129,4 +137,48 @@ func Detect(procs []Process, installed []InstalledGame, known []KnownExe, steamR
 	}
 	sort.Slice(res, func(i, j int) bool { return res[i].Title < res[j].Title })
 	return res
+}
+
+// Entries that are launchers or shared runtimes, not games.
+var notAGame = map[string]bool{
+	"battle.net":                         true,
+	"steamworks common redistributables": true,
+	"steamvr":                            true,
+	"ea app":                             true,
+	"origin":                             true,
+	"ubisoft connect":                    true,
+	"epic games launcher":                true,
+}
+
+var launcherRank = map[string]int{"steam": 0, "epic": 1, "gog": 2, "ubisoft": 3, "ea": 4, "battlenet": 5}
+
+func uniqueDirs(installed []InstalledGame) []InstalledGame {
+	best := map[string]InstalledGame{}
+	for _, g := range installed {
+		if strings.TrimSpace(g.Dir) == "" || notAGame[strings.ToLower(strings.TrimSpace(g.Title))] || (g.Launcher == "steam" && g.AppID == "228980") {
+			continue
+		}
+		d := normDir(g.Dir)
+		cur, ok := best[d]
+		if !ok {
+			best[d] = g
+			continue
+		}
+		ri, rc := launcherRank[g.Launcher], launcherRank[cur.Launcher]
+		if ri < rc || (ri == rc && g.Title < cur.Title) {
+			best[d] = g
+		}
+	}
+	dirs := make([]InstalledGame, 0, len(best))
+	for _, g := range best {
+		dirs = append(dirs, g)
+	}
+	// Longest install dir first, so nested folders win.
+	sort.Slice(dirs, func(i, j int) bool {
+		if len(dirs[i].Dir) != len(dirs[j].Dir) {
+			return len(dirs[i].Dir) > len(dirs[j].Dir)
+		}
+		return dirs[i].Title < dirs[j].Title
+	})
+	return dirs
 }

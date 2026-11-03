@@ -76,3 +76,34 @@ func TestSteamVDF(t *testing.T) {
 		t.Fatalf("manifest: %s %s %s", id, name, dir)
 	}
 }
+
+// Cases seen on a real PC (DESKTOP-M4PJL0I, 2026-11-03).
+func TestDetectSharedAndCrossLauncherFolders(t *testing.T) {
+	installed := []InstalledGame{
+		{Title: "Half-Life", Launcher: "steam", AppID: "70", Dir: `D:\SteamLibrary\steamapps\common\Half-Life`},
+		{Title: "Counter-Strike", Launcher: "steam", AppID: "10", Dir: `D:\SteamLibrary\steamapps\common\Half-Life`},
+		{Title: "Counter-Strike: Condition Zero", Launcher: "steam", AppID: "80", Dir: `D:\SteamLibrary\steamapps\common\Half-Life`},
+		{Title: "Titanfall® 2", Launcher: "steam", AppID: "1237970", Dir: `E:\SteamLibrary\steamapps\common\Titanfall2`},
+		{Title: "Titanfall™ 2", Launcher: "ea", Dir: `E:\SteamLibrary\steamapps\common\Titanfall2`},
+		{Title: "Battle.net", Launcher: "battlenet", Dir: `C:\Program Files (x86)\Battle.net`},
+		{Title: "Steamworks Common Redistributables", Launcher: "steam", AppID: "228980", Dir: `C:\Steam\steamapps\common\Steamworks Shared`},
+	}
+	procs := []Process{
+		{Name: "hl.exe", Path: `D:\SteamLibrary\steamapps\common\Half-Life\hl.exe`},
+		{Name: "Titanfall2.exe", Path: `E:\SteamLibrary\steamapps\common\Titanfall2\Titanfall2.exe`},
+		{Name: "Battle.net Update Helper.exe", Path: `C:\Program Files (x86)\Battle.net\Battle.net Update Helper.exe`},
+		{Name: "DXSETUP.exe", Path: `C:\Steam\steamapps\common\Steamworks Shared\_CommonRedist\DXSETUP.exe`},
+	}
+
+	// Without Steam registry: one detection per folder, Steam preferred.
+	got := Detect(procs, installed, nil, "0", nil)
+	if len(got) != 2 || got[0].Title != "Counter-Strike" || got[1].Title != "Titanfall® 2" || got[1].Launcher != "steam" {
+		t.Fatalf("unexpected: %+v", got)
+	}
+
+	// With Steam registry the running app ID decides which game in the shared folder it is.
+	got = Detect(procs[:1], installed, nil, "80", map[string]string{"80": "Counter-Strike: Condition Zero"})
+	if len(got) != 1 || got[0].Title != "Counter-Strike: Condition Zero" || got[0].Source != "steam-registry" {
+		t.Fatalf("unexpected: %+v", got)
+	}
+}
