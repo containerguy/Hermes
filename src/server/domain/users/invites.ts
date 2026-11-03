@@ -3,25 +3,37 @@ import { randomBytes, randomUUID } from "node:crypto";
 import { z } from "zod";
 import { maskInviteCode, tryWriteAuditLog } from "../../audit-log";
 import type { DatabaseContext } from "../../db/client";
-import { inviteCodes } from "../../db/schema";
+import { inviteCodes, mainEvents } from "../../db/schema";
 
 type Actor = { id: string; username: string };
 type InviteRow = typeof inviteCodes.$inferSelect;
-type SerializedInvite = InviteRow & { usedCount: number };
+type SerializedInvite = InviteRow & { usedCount: number; mainEventName: string | null };
 
 export const createInviteCodeSchema = z.object({
   code: z.string().trim().min(1).max(80).optional(),
   customCode: z.string().trim().min(1).max(80).optional(),
   label: z.string().trim().min(1).max(120),
   maxUses: z.number().int().min(1).max(500).nullable().optional(),
-  expiresAt: z.string().datetime().nullable().optional()
+  expiresAt: z.string().datetime().nullable().optional(),
+  /** Einladungscode pro Event (null = allgemeiner Code). */
+  mainEventId: z.string().min(1).max(64).nullable().optional()
 });
 
 export const updateInviteCodeSchema = z.object({
   label: z.string().trim().min(1).max(120).optional(),
   maxUses: z.number().int().min(1).max(500).nullable().optional(),
-  expiresAt: z.string().datetime().nullable().optional()
+  expiresAt: z.string().datetime().nullable().optional(),
+  mainEventId: z.string().min(1).max(64).nullable().optional()
 });
+
+/** Ein Code darf nur an ein bestehendes, nicht beendetes Event gebunden werden. */
+function checkInviteMainEvent(context: DatabaseContext, mainEventId: string | null | undefined) {
+  if (!mainEventId) {
+    return true;
+  }
+  const event = context.db.select().from(mainEvents).where(eq(mainEvents.id, mainEventId)).get();
+  return Boolean(event && event.status !== "ended");
+}
 
 type CreateInput = z.infer<typeof createInviteCodeSchema>;
 type UpdateInput = z.infer<typeof updateInviteCodeSchema>;
@@ -66,9 +78,14 @@ export function getInviteUsedCount(context: DatabaseContext, inviteCodeId: strin
 }
 
 export function serializeInviteCode(context: DatabaseContext, invite: InviteRow): SerializedInvite {
+  const mainEventName = invite.mainEventId
+    ? (context.db.select({ name: mainEvents.name }).from(mainEvents).where(eq(mainEvents.id, invite.mainEventId)).get()
+        ?.name ?? null)
+    : null;
   return {
     ...invite,
-    usedCount: getInviteUsedCount(context, invite.id)
+    usedCount: getInviteUsedCount(context, invite.id),
+    mainEventName
   };
 }
 
@@ -94,6 +111,10 @@ export function createInviteCodeService(
     return { ok: false, status: 400, error: "invite_code_custom_deaktiviert" };
   }
 
+  if (!checkInviteMainEvent(context, input.mainEventId)) {
+    return { ok: false, status: 400, error: "invite_event_ungueltig" };
+  }
+
   const timestamp = nowIso();
   const id = randomUUID();
   const code = normalizeInviteCode(generateInviteCode());
@@ -113,6 +134,7 @@ export function createInviteCodeService(
         maxUses,
         expiresAt,
         revokedAt: null,
+        mainEventId: input.mainEventId ?? null,
         createdByUserId: admin.id,
         createdAt: timestamp,
         updatedAt: timestamp
@@ -139,7 +161,8 @@ export function createInviteCodeService(
       inviteLabel: input.label,
       inviteMaskedCode: maskInviteCode(code),
       maxUses,
-      expiresAt
+      expiresAt,
+      mainEventId: input.mainEventId ?? null
     }
   });
 
@@ -148,7 +171,7 @@ export function createInviteCodeService(
 
 export type InviteUpdateResult =
   | { ok: true; invite: SerializedInvite }
-  | { ok: false; status: 404 | 409; error: string };
+  | { ok: false; status: 400 | 404 | 409; error: string };
 
 export function updateInviteCodeService(
   context: DatabaseContext,
@@ -156,6 +179,9 @@ export function updateInviteCodeService(
   inviteId: string,
   patch: UpdateInput
 ): InviteUpdateResult {
+  if (patch.mainEventId !== undefined && !checkInviteMainEvent(context, patch.mainEventId)) {
+    return { ok: false, status: 400, error: "invite_event_ungueltig" };
+  }
   const existing = context.db.select().from(inviteCodes).where(eq(inviteCodes.id, inviteId)).get();
   if (!existing) {
     return { ok: false, status: 404, error: "invite_code_nicht_gefunden" };

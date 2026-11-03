@@ -6,7 +6,7 @@ import { requireCsrf } from "../auth/csrf";
 import { enforceApiTokenWriteAccess } from "../auth/matchdesk-auth";
 import { tryWriteAuditLog, writeAuditLog } from "../audit-log";
 import type { DatabaseContext } from "../db/client";
-import { gameEvents, mainEventInvites, mainEventParticipants, mainEvents, users } from "../db/schema";
+import { gameEvents, inviteCodes, mainEventInvites, mainEventParticipants, mainEvents, users } from "../db/schema";
 import {
   csvCell,
   isRegistrationClosed,
@@ -912,7 +912,15 @@ export function createMainEventRouter(context: DatabaseContext) {
     }
 
     // Zugeordnete Runden bleiben bestehen und verlieren nur die Zuordnung (ON DELETE SET NULL).
-    context.db.delete(mainEvents).where(eq(mainEvents.id, event.id)).run();
+    // Einladungscodes des Events werden deaktiviert, sonst würden sie still zu allgemeinen Codes.
+    context.sqlite.transaction(() => {
+      context.db
+        .update(inviteCodes)
+        .set({ revokedAt: nowIso(), updatedAt: nowIso() })
+        .where(and(eq(inviteCodes.mainEventId, event.id), isNull(inviteCodes.revokedAt)))
+        .run();
+      context.db.delete(mainEvents).where(eq(mainEvents.id, event.id)).run();
+    })();
     writeAuditLog(context, {
       actor,
       action: "main_event.delete",

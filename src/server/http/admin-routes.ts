@@ -107,7 +107,16 @@ export function createAdminRouter(context: DatabaseContext) {
       .where(isNull(users.deletedAt))
       .orderBy(asc(users.username))
       .all();
-    response.json({ users: allUsers.map(publicUser) });
+    // Für Admins zusätzlich: über welches Event (Einladungscode pro Event) jemand registriert wurde.
+    response.json({
+      users: allUsers.map((row) => ({
+        ...publicUser(row),
+        registeredViaMainEventId: row.registeredViaMainEventId,
+        registeredViaMainEventName: row.registeredViaMainEventName,
+        registeredViaInviteCodeId: row.registeredViaInviteCodeId,
+        createdAt: row.createdAt
+      }))
+    });
   });
 
   router.get("/users/export", (request, response) => {

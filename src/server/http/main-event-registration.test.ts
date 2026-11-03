@@ -354,4 +354,109 @@ describe("event registration: capacity, waitlist, deadline, overview", () => {
     expect(lines[3]).toMatch(/^"evil";"'=HYPERLINK\(1\)";"interested"/);
     expect(lines.some((line) => line.startsWith('"carl";"carl";"no_response"'))).toBe(true);
   });
+
+  async function enableRegistration(adminAgent: ReturnType<typeof request.agent>) {
+    const csrf = await fetchCsrf(adminAgent);
+    await adminAgent
+      .put("/api/admin/settings")
+      .send({
+        appName: "Matchdesk Test",
+        defaultNotificationsEnabled: true,
+        eventAutoArchiveHours: 8,
+        publicRegistrationEnabled: true,
+        themePrimaryColor: "#0f766e",
+        themeLoginColor: "#be123c",
+        themeManagerColor: "#b7791f",
+        themeAdminColor: "#2563eb",
+        themeSurfaceColor: "#f6f8f4"
+      })
+      .set(CSRF_HEADER, csrf)
+      .expect(200);
+  }
+
+  async function createInvite(adminAgent: ReturnType<typeof request.agent>, body: Record<string, unknown>) {
+    const csrf = await fetchCsrf(adminAgent);
+    return adminAgent.post("/api/admin/invite-codes").send(body).set(CSRF_HEADER, csrf);
+  }
+
+  it("registers new people through an event invite code, marks the event on the user and signs them up as interested", async () => {
+    const { adminAgent, managerAgent } = await createManagerAndLogin();
+    await enableRegistration(adminAgent);
+    const event = await createEventWith(managerAgent, { name: "LAN Winter", visibility: "private" });
+
+    const invite = await createInvite(adminAgent, { label: "Winter-Gäste", mainEventId: event.id });
+    expect(invite.status).toBe(201);
+    expect(invite.body.inviteCode).toMatchObject({ mainEventId: event.id, mainEventName: "LAN Winter" });
+
+    await request(started!.app)
+      .post("/api/auth/register")
+      .send({ inviteCode: invite.body.inviteCode.code, username: "neuling", email: "neuling@example.test" })
+      .expect(201);
+
+    const adminUsers = (await adminAgent.get("/api/admin/users").expect(200)).body.users as Array<
+      Record<string, unknown>
+    >;
+    expect(adminUsers.find((user) => user.username === "neuling")).toMatchObject({
+      registeredViaMainEventId: event.id,
+      registeredViaMainEventName: "LAN Winter",
+      registeredViaInviteCodeId: invite.body.inviteCode.id
+    });
+    // Andere Benutzer haben keinen Event-Vermerk.
+    expect(adminUsers.find((user) => user.username === "manager")).toMatchObject({ registeredViaMainEventId: null });
+
+    // Der Neue sieht das private Event und steht als interessiert drin.
+    const neuling = request.agent(started!.app);
+    await login(neuling, "neuling");
+    const seen = (await neuling.get("/api/main-events").expect(200)).body.mainEvents;
+    expect(seen).toEqual([expect.objectContaining({ id: event.id, myParticipation: "interested", interestedCount: 1 })]);
+
+    // Der Vermerk bleibt lesbar, auch wenn das geplante Event gelöscht wird.
+    const csrf = await fetchCsrf(managerAgent);
+    await managerAgent.delete(`/api/main-events/${event.id}`).set(CSRF_HEADER, csrf).expect(204);
+    const after = (await adminAgent.get("/api/admin/users").expect(200)).body.users as Array<Record<string, unknown>>;
+    expect(after.find((user) => user.username === "neuling")).toMatchObject({
+      registeredViaMainEventId: null,
+      registeredViaMainEventName: "LAN Winter"
+    });
+    // Der Code des gelöschten Events wird deaktiviert statt zum allgemeinen Code.
+    const codes = (await adminAgent.get("/api/admin/invite-codes").expect(200)).body.inviteCodes;
+    expect(codes.find((code: { id: string }) => code.id === invite.body.inviteCode.id).revokedAt).toEqual(
+      expect.any(String)
+    );
+    await request(started!.app)
+      .post("/api/auth/register")
+      .send({ inviteCode: invite.body.inviteCode.code, username: "spaeter", email: "spaeter@example.test" })
+      .expect(403);
+  });
+
+  it("does not sign up people after the deadline and rejects codes for ended or unknown events", async () => {
+    const { adminAgent, managerAgent } = await createManagerAndLogin();
+    await enableRegistration(adminAgent);
+    const event = await createEventWith(managerAgent, {
+      name: "LAN Spät",
+      registrationDeadline: new Date(Date.now() - 60 * 1000).toISOString()
+    });
+    const invite = await createInvite(adminAgent, { label: "Spät", mainEventId: event.id });
+    await request(started!.app)
+      .post("/api/auth/register")
+      .send({ inviteCode: invite.body.inviteCode.code, username: "spaet", email: "spaet@example.test" })
+      .expect(201);
+    const spaet = request.agent(started!.app);
+    await login(spaet, "spaet");
+    expect((await spaet.get("/api/main-events").expect(200)).body.mainEvents[0].myParticipation).toBeNull();
+
+    expect((await createInvite(adminAgent, { label: "X", mainEventId: "gibt-es-nicht" })).status).toBe(400);
+    const csrf = await fetchCsrf(managerAgent);
+    await managerAgent.post(`/api/main-events/${event.id}/start`).set(CSRF_HEADER, csrf).expect(200);
+    await managerAgent.post(`/api/main-events/${event.id}/end`).set(CSRF_HEADER, csrf).expect(200);
+    // Nach dem Event lädt der Code niemanden mehr ein.
+    const afterEnd = await request(started!.app)
+      .post("/api/auth/register")
+      .send({ inviteCode: invite.body.inviteCode.code, username: "danach", email: "danach@example.test" });
+    expect(afterEnd.status).toBe(403);
+    expect(afterEnd.body.error).toBe("invite_ungueltig");
+    const ended = await createInvite(adminAgent, { label: "Y", mainEventId: event.id });
+    expect(ended.status).toBe(400);
+    expect(ended.body.error).toBe("invite_event_ungueltig");
+  });
 });

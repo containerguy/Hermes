@@ -574,9 +574,16 @@ paths:
     post:
       tags: [admin]
       summary: Invite-Code anlegen
+      description: >-
+        Optional `mainEventId`: Einladungscode pro Event (nur nicht beendete Events, sonst 400 invite_event_ungueltig).
+        Wer sich damit registriert, wird beim Event als „interested“ eingetragen (vor dem Anmeldeschluss),
+        bei privaten Events auch eingeladen. Am Benutzer werden Event (registeredViaMainEventId/-Name) und Code vermerkt;
+        die Admin-Userliste liefert diese Felder mit.
       responses:
         "201":
           description: OK
+        "400":
+          description: Ungültige Eingabe oder Event (invite_event_ungueltig)
 
   /api/admin/invite-codes/{id}/deactivate:
     post:

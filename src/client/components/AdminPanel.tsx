@@ -118,7 +118,8 @@ export function AdminPanel({
   const [newInvite, setNewInvite] = useState({
     label: "",
     maxUses: "",
-    expiresAt: ""
+    expiresAt: "",
+    mainEventId: ""
   });
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
@@ -502,9 +503,13 @@ export function AdminPanel({
     setMessage("");
 
     try {
-      const payload: { label: string; maxUses?: number | null; expiresAt?: string | null } = {
+      const payload: { label: string; maxUses?: number | null; expiresAt?: string | null; mainEventId?: string } = {
         label: newInvite.label
       };
+
+      if (newInvite.mainEventId !== "") {
+        payload.mainEventId = newInvite.mainEventId;
+      }
 
       if (newInvite.maxUses !== "") {
         payload.maxUses = Number(newInvite.maxUses);
@@ -518,7 +523,7 @@ export function AdminPanel({
         method: "POST",
         body: JSON.stringify(payload)
       });
-      setNewInvite({ label: "", maxUses: "", expiresAt: "" });
+      setNewInvite({ label: "", maxUses: "", expiresAt: "", mainEventId: "" });
       await loadAdminData();
       setMessage("Invite-Code erstellt.");
     } catch (caught) {

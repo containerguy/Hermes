@@ -21,6 +21,9 @@ import {
   inviteCodes,
   inviteCodeUses,
   loginChallenges,
+  mainEventInvites,
+  mainEventParticipants,
+  mainEvents,
   pairingTokens,
   sessions,
   userApiTokens,
@@ -33,6 +36,8 @@ import {
 } from "../domain/users";
 import { sendEmailChangeCode, sendLoginCode } from "../mail/mailer";
 import { readSettings } from "../settings";
+import { isRegistrationClosed } from "../domain/main-events";
+import { broadcastEventsChanged } from "../realtime/event-bus";
 import { browserLanguageToLocale } from "../../shared/locale";
 import {
   createApiToken,
@@ -421,6 +426,15 @@ export function createAuthRouter(context: DatabaseContext) {
             throw new InviteExhaustedError();
           }
 
+          // Einladungscode pro Event: Event am Benutzer vermerken und ihn dort eintragen.
+          const inviteEvent = freshInvite.mainEventId
+            ? context.db.select().from(mainEvents).where(eq(mainEvents.id, freshInvite.mainEventId)).get()
+            : undefined;
+          // Ein Code für ein beendetes Event lädt niemanden mehr ein.
+          if (inviteEvent?.status === "ended") {
+            throw new InviteInvalidError();
+          }
+
           context.db
             .insert(users)
             .values({
@@ -433,11 +447,43 @@ export function createAuthRouter(context: DatabaseContext) {
               notificationsEnabled: settings.defaultNotificationsEnabled,
               locale: registrationLocale,
               createdByUserId: freshInvite.createdByUserId,
+              registeredViaMainEventId: inviteEvent?.id ?? null,
+              registeredViaMainEventName: inviteEvent?.name ?? null,
+              registeredViaInviteCodeId: freshInvite.id,
               deletedAt: null,
               createdAt: transactionTimestamp,
               updatedAt: transactionTimestamp
             })
             .run();
+
+          if (inviteEvent) {
+            if (inviteEvent.visibility === "private") {
+              context.db
+                .insert(mainEventInvites)
+                .values({
+                  id: randomUUID(),
+                  mainEventId: inviteEvent.id,
+                  userId,
+                  invitedByUserId: freshInvite.createdByUserId,
+                  createdAt: transactionTimestamp
+                })
+                .run();
+            }
+            // Nach dem Anmeldeschluss nur Konto und Einladung, keine Anmeldung mehr.
+            if (!isRegistrationClosed(inviteEvent)) {
+              context.db
+                .insert(mainEventParticipants)
+                .values({
+                  id: randomUUID(),
+                  mainEventId: inviteEvent.id,
+                  userId,
+                  status: "interested",
+                  createdAt: transactionTimestamp,
+                  updatedAt: transactionTimestamp
+                })
+                .run();
+            }
+          }
 
           context.db
             .insert(inviteCodeUses)
@@ -504,9 +550,19 @@ export function createAuthRouter(context: DatabaseContext) {
         action: "auth.register",
         entityType: "user",
         entityId: created.id,
-        summary: `${created.username} hat sich mit Invite ${invite.label} registriert.`,
-        metadata: { inviteCodeId: invite.id, inviteLabel: invite.label }
+        summary: created.registeredViaMainEventName
+          ? `${created.username} hat sich mit Invite ${invite.label} für das Event ${created.registeredViaMainEventName} registriert.`
+          : `${created.username} hat sich mit Invite ${invite.label} registriert.`,
+        metadata: {
+          inviteCodeId: invite.id,
+          inviteLabel: invite.label,
+          mainEventId: created.registeredViaMainEventId
+        }
       });
+
+      if (created.registeredViaMainEventId) {
+        broadcastEventsChanged("main_event_participation_updated");
+      }
 
       const responseBody: Record<string, unknown> = {
         user: publicUser(created),
