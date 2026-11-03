@@ -73,11 +73,13 @@ export const enMessages: { [K in keyof typeof deMessages]: string } = {
   "login.title.verify": "Enter code.",
   "login.help.register":
     "Create your account with invite code, username, and email. You will receive a one-time code for first sign-in.",
-  "login.help.request": "Enter your username. Hermes sends the one-time code to the email on file.",
+  "login.help.request": "Enter your username or email address (not case-sensitive). Hermes sends the one-time code to the email on file.",
   "login.help.verify":
     "Enter the code from the email and optionally name this device for your device list.",
   "login.field.invite": "Invite code",
   "login.field.username": "Username",
+  "login.field.loginIdentifier": "Username or email",
+  "login.forgotHint": "Forgot both your username and email? An admin can look them up in user management.",
   "login.field.email": "Email",
   "login.field.code": "One-time code",
   "login.field.deviceName": "Device name",

@@ -120,8 +120,8 @@ export function updateUser(
     const identityCheck = ensureActiveIdentityAvailable(
       context,
       {
-        username: patch.username ?? existing.username,
-        email: patch.email ?? existing.email
+        username: patch.username !== undefined && patch.username !== existing.username ? patch.username : undefined,
+        email: patch.email !== undefined && patch.email !== existing.email ? patch.email : undefined
       },
       { excludeUserId: existing.id }
     );

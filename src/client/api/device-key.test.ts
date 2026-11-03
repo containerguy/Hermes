@@ -19,6 +19,13 @@ describe("known device memory", () => {
     expect(getKnownDeviceName("")).toBeNull();
   });
 
+  it("also matches the remembered email, since the login form accepts it", () => {
+    rememberKnownDevice("Spieler", "Gaming-PC", "Spieler@Example.test");
+    expect(getKnownDeviceName("spieler@example.test")).toBe("Gaming-PC");
+    expect(getKnownDeviceName("SPIELER")).toBe("Gaming-PC");
+    expect(getKnownDeviceName("other@example.test")).toBeNull();
+  });
+
   it("ignores empty names and malformed storage", () => {
     rememberKnownDevice("spieler", "   ");
     expect(getKnownDeviceName("spieler")).toBeNull();
