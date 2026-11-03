@@ -42,15 +42,22 @@ type BeforeInstallPromptChrome = Event & {
   userChoice: Promise<{ outcome: string }>;
 };
 
+/** Unterseiten des Profils (#login/<id>). */
+export const profileSectionIds = ["konto", "benachrichtigungen", "geraete", "tokens"] as const;
+export type ProfileSectionId = (typeof profileSectionIds)[number];
+
 export function LoginPanel({
   currentUser,
   settings,
+  profileSection,
   onLoggedIn,
   onLoggedOut,
   onUserUpdated
 }: {
   currentUser: User | null;
   settings: AppSettings;
+  /** Nur diesen Profilbereich zeigen; ohne Angabe alle untereinander. */
+  profileSection?: ProfileSectionId;
   onLoggedIn: (user: User) => void;
   onLoggedOut: () => void;
   onUserUpdated: (user: User) => void;
@@ -582,91 +589,109 @@ export function LoginPanel({
   }
 
   if (currentUser) {
+    const show = (section: ProfileSectionId) => !profileSection || profileSection === section;
     return (
       <section className="login-panel" id="login" aria-label={t("loginProfile.sectionAria")}>
-        <header className="login-panel-intro">
-          <p className="eyebrow">{t("loginProfile.introEyebrow")}</p>
-          <h2>{t("loginProfile.introTitle")}</h2>
-          <p className="muted">{t("loginProfile.introBody")}</p>
-        </header>
-
-        <ProfileSection
-          displayNameDraft={displayNameDraft}
-          localeDraft={localeDraft}
-          emailDraft={emailDraft}
-          emailVerifyCode={emailVerifyCode}
-          busy={busy}
-          onDisplayNameChange={setDisplayNameDraft}
-          onLocaleChange={setLocaleDraft}
-          onEmailChange={setEmailDraft}
-          onEmailVerifyCodeChange={setEmailVerifyCode}
-          onUpdateProfile={updateProfile}
-          onRequestEmailChange={requestEmailChange}
-          onVerifyEmailChange={verifyEmailChange}
-        />
-
-        <ApiTokensSection
-          apiTokens={apiTokens}
-          apiTokenLabel={apiTokenLabel}
-          apiTokenScope={apiTokenScope}
-          newApiTokenPlaintext={newApiTokenPlaintext}
-          busy={busy}
-          onLabelChange={setApiTokenLabel}
-          onScopeChange={setApiTokenScope}
-          onCreate={createApiToken}
-          onRevoke={(id) => void revokeApiToken(id)}
-        />
+        {profileSection ? null : (
+          <header className="login-panel-intro">
+            <p className="eyebrow">{t("loginProfile.introEyebrow")}</p>
+            <h2>{t("loginProfile.introTitle")}</h2>
+            <p className="muted">{t("loginProfile.introBody")}</p>
+          </header>
+        )}
 
         {message ? <p className="notice">{message}</p> : null}
         {error ? <p className="error">{error}</p> : null}
-        <PushNotificationsSection
-          deferredInstall={deferredInstall}
-          busy={busy}
-          onRunInstallPrompt={() => void runInstallPrompt()}
-          onEnable={() => void enableNotifications()}
-          onDisable={() => void disableNotifications()}
-        />
-        <SessionsSection
-          sessions={sessions}
-          sessionNames={sessionNames}
-          busy={busy}
-          onSessionNamesChange={setSessionNames}
-          onRefresh={() => void loadSessions()}
-          onRename={(id) => void renameSession(id)}
-          onRevoke={(id) => void revokeSession(id)}
-          onForgetDevice={() => void forgetDevice()}
-        />
-        <DevicePairingSection
-          pairingToken={pairingToken}
-          pairingExpiresAt={pairingExpiresAt}
-          redeemStatus={redeemStatus}
-          busy={busy}
-          showIosHomeScreenHint={iosBrowser}
-          onMint={() => void mintPairingToken()}
-          onClear={clearPairingToken}
-        />
-        <section className="device-panel account-summary-panel" aria-label={t("loginProfile.accountEyebrow")}>
-          <p className="eyebrow">{t("loginProfile.accountEyebrow")}</p>
-          <h3>
-            {t("loginProfile.accountTitle", {
-              name: currentUser.displayName || currentUser.username
-            })}
-          </h3>
-          <dl className="account-list">
-            <div>
-              <dt>{t("loginProfile.account.login")}</dt>
-              <dd>{currentUser.username}</dd>
-            </div>
-            <div>
-              <dt>{t("loginProfile.account.role")}</dt>
-              <dd>{t(`admin.role.${currentUser.role}` as MessageKey)}</dd>
-            </div>
-            <div>
-              <dt>{t("loginProfile.account.email")}</dt>
-              <dd>{currentUser.email}</dd>
-            </div>
-          </dl>
-        </section>
+        {show("konto") ? (
+          <>
+          <ProfileSection
+            displayNameDraft={displayNameDraft}
+            localeDraft={localeDraft}
+            emailDraft={emailDraft}
+            emailVerifyCode={emailVerifyCode}
+            busy={busy}
+            onDisplayNameChange={setDisplayNameDraft}
+            onLocaleChange={setLocaleDraft}
+            onEmailChange={setEmailDraft}
+            onEmailVerifyCodeChange={setEmailVerifyCode}
+            onUpdateProfile={updateProfile}
+            onRequestEmailChange={requestEmailChange}
+            onVerifyEmailChange={verifyEmailChange}
+          />
+
+          <section className="device-panel account-summary-panel" aria-label={t("loginProfile.accountEyebrow")}>
+            <p className="eyebrow">{t("loginProfile.accountEyebrow")}</p>
+            <h3>
+              {t("loginProfile.accountTitle", {
+                name: currentUser.displayName || currentUser.username
+              })}
+            </h3>
+            <dl className="account-list">
+              <div>
+                <dt>{t("loginProfile.account.login")}</dt>
+                <dd>{currentUser.username}</dd>
+              </div>
+              <div>
+                <dt>{t("loginProfile.account.role")}</dt>
+                <dd>{t(`admin.role.${currentUser.role}` as MessageKey)}</dd>
+              </div>
+              <div>
+                <dt>{t("loginProfile.account.email")}</dt>
+                <dd>{currentUser.email}</dd>
+              </div>
+            </dl>
+          </section>
+          </>
+        ) : null}
+        {show("benachrichtigungen") ? (
+          <>
+          <PushNotificationsSection
+            deferredInstall={deferredInstall}
+            busy={busy}
+            onRunInstallPrompt={() => void runInstallPrompt()}
+            onEnable={() => void enableNotifications()}
+            onDisable={() => void disableNotifications()}
+          />
+          </>
+        ) : null}
+        {show("geraete") ? (
+          <>
+          <SessionsSection
+            sessions={sessions}
+            sessionNames={sessionNames}
+            busy={busy}
+            onSessionNamesChange={setSessionNames}
+            onRefresh={() => void loadSessions()}
+            onRename={(id) => void renameSession(id)}
+            onRevoke={(id) => void revokeSession(id)}
+            onForgetDevice={() => void forgetDevice()}
+          />
+          <DevicePairingSection
+            pairingToken={pairingToken}
+            pairingExpiresAt={pairingExpiresAt}
+            redeemStatus={redeemStatus}
+            busy={busy}
+            showIosHomeScreenHint={iosBrowser}
+            onMint={() => void mintPairingToken()}
+            onClear={clearPairingToken}
+          />
+          </>
+        ) : null}
+        {show("tokens") ? (
+          <>
+          <ApiTokensSection
+            apiTokens={apiTokens}
+            apiTokenLabel={apiTokenLabel}
+            apiTokenScope={apiTokenScope}
+            newApiTokenPlaintext={newApiTokenPlaintext}
+            busy={busy}
+            onLabelChange={setApiTokenLabel}
+            onScopeChange={setApiTokenScope}
+            onCreate={createApiToken}
+            onRevoke={(id) => void revokeApiToken(id)}
+          />
+          </>
+        ) : null}
         <button type="button" className="secondary" onClick={logout} disabled={busy}>
           {t("loginProfile.logout")}
         </button>

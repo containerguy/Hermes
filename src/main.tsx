@@ -2,70 +2,17 @@ import React, { useEffect, useMemo, useState } from "react";
 import { createRoot } from "react-dom/client";
 import "./styles.css";
 
-import type { AdminSection, AppReleaseInfo, AppSettings, PublicAppSettings, User } from "./client/types/core";
+import type { AppReleaseInfo, AppSettings, PublicAppSettings, User } from "./client/types/core";
 import { requestJson } from "./client/api/request";
 import { clearCsrfToken, primeCsrfToken } from "./client/api/csrf";
-import { EventBoard } from "./client/components/EventBoard";
-import { MainEventPrompt } from "./client/components/MainEventPrompt";
-import { MainEventsPanel } from "./client/components/MainEventsPanel";
-import { PizzaPanel } from "./client/pizza/PizzaPanel";
-import { InfosPage } from "./client/components/InfosPage";
-import { LoginPage } from "./client/components/LoginPage";
-import { AdminPanel } from "./client/components/AdminPanel";
 import { KioskStreamPage } from "./client/components/KioskStreamPage";
-import { I18nProvider, useI18n, type TFunction } from "./client/i18n/I18nContext";
+import { appPages } from "./client/navigation/modules";
+import { menuPages, resolvePage, type NavContext, type NavPage, type PageHero } from "./client/navigation/registry";
+import { I18nProvider, useI18n } from "./client/i18n/I18nContext";
 import { BrandingProvider, useBrandIconSrc } from "./client/lib/BrandingContext";
 import { brandIconSrc } from "./client/lib/brand-icon";
 import { resolveEffectiveLocale } from "./client/lib/locale-display";
 import { pickAppDisplayName } from "./shared/app-display-name";
-
-type Route = {
-  id: PageId;
-  path: string;
-  label: string;
-  eyebrow: string;
-  title: string;
-  description: string;
-};
-
-type PageId = "events" | "infos" | "login" | "admin";
-
-function buildAppRoutes(t: TFunction): Route[] {
-  return [
-    {
-      id: "events",
-      path: "#events",
-      label: t("main.nav.start"),
-      eyebrow: t("main.route.events.eyebrow"),
-      title: t("main.route.events.title"),
-      description: t("main.route.events.description")
-    },
-    {
-      id: "infos",
-      path: "#infos",
-      label: t("main.nav.infos"),
-      eyebrow: t("main.route.infos.eyebrow"),
-      title: t("main.route.infos.title"),
-      description: ""
-    },
-    {
-      id: "login",
-      path: "#login",
-      label: t("main.nav.login"),
-      eyebrow: t("main.route.login.eyebrow"),
-      title: t("main.route.login.title"),
-      description: t("main.route.login.description")
-    },
-    {
-      id: "admin",
-      path: "#admin",
-      label: t("main.nav.admin"),
-      eyebrow: t("main.route.admin.eyebrow"),
-      title: t("main.route.admin.title"),
-      description: t("main.route.admin.description")
-    }
-  ];
-}
 
 const defaultSettings: AppSettings = {
   appName: "",
@@ -121,60 +68,10 @@ function profileInitials(user: User): string {
   return base.slice(0, 2).toUpperCase() || "?";
 }
 
-const adminSectionBySlug: Record<string, AdminSection> = {
-  "": "users",
-  users: "users",
-  betrieb: "betrieb",
-  design: "design",
-  infos: "infos",
-  sicherheit: "sicherheit",
-  invites: "invites",
-  audit: "audit"
-};
-
-const legacyAdminHashToSection: Record<string, AdminSection> = {
-  users: "users",
-  betrieb: "betrieb",
-  design: "design",
-  infos: "infos",
-  sicherheit: "sicherheit",
-  invites: "invites",
-  audit: "audit"
-};
-
-function parseHashRoute(): { page: PageId; adminSection: AdminSection } {
-  const rawHash = window.location.hash || "";
-  const queryStart = rawHash.indexOf("?");
-  const hashPath = queryStart >= 0 ? rawHash.slice(0, queryStart) : rawHash;
-
-  if (hashPath === "#manager") {
-    return { page: "events", adminSection: "users" };
-  }
-
-  const legacy = hashPath.match(/^#admin-([a-z]+)$/);
-  if (legacy) {
-    const section = legacyAdminHashToSection[legacy[1] ?? ""];
-    if (section) {
-      return { page: "admin", adminSection: section };
-    }
-  }
-
-  if (hashPath === "#admin" || hashPath.startsWith("#admin/")) {
-    const sub = hashPath === "#admin" ? "" : hashPath.slice("#admin/".length);
-    const slug = sub.split("/")[0] ?? "";
-    const section = adminSectionBySlug[slug] ?? "users";
-    return { page: "admin", adminSection: section };
-  }
-
-  if (hashPath === "#infos") {
-    return { page: "infos", adminSection: "users" };
-  }
-
-  if (hashPath === "#login") {
-    return { page: "login", adminSection: "users" };
-  }
-
-  return { page: "events", adminSection: "users" };
+/** Alte Admin-Hashes (#admin-design) auf das neue Schema (#admin/design) umbiegen. */
+function normalizeLegacyHash(rawHash: string): string {
+  const legacy = rawHash.match(/^#admin-([a-z]+)(.*)$/);
+  return legacy ? `#admin/${legacy[1]}${legacy[2]}` : rawHash;
 }
 
 function normalizeDocumentPath(path: string) {
@@ -182,37 +79,37 @@ function normalizeDocumentPath(path: string) {
   return trimmed === "" ? "/" : trimmed;
 }
 
-function applyShellStartHero(route: Route, settings: AppSettings): Route {
-  if (route.id !== "events") {
-    return route;
-  }
-  const title = settings.shellStartTitle.trim() || route.title;
-  const customDescription = settings.shellStartDescription.trim();
-  const description = customDescription.length > 0 ? customDescription : "";
-  return { ...route, title, description };
+function NavIcon({ path }: { path: string }) {
+  return (
+    <svg className="nav-icon" width="22" height="22" viewBox="0 0 24 24" aria-hidden="true">
+      <path d={path} fill="currentColor" />
+    </svg>
+  );
 }
 
 function PageHeader({
-  route,
+  pageId,
+  hero,
   currentUser,
   omitSessionAside
 }: {
-  route: Route;
+  pageId: string;
+  hero: PageHero;
   currentUser: User | null;
   omitSessionAside: boolean;
 }) {
   const { t } = useI18n();
   const markSrc = useBrandIconSrc();
-  const hasHeroDescription = Boolean(route.description.trim());
+  const hasHeroDescription = Boolean(hero.description.trim());
   return (
     <section
-      className={`page-hero hero-${route.id}${omitSessionAside ? " page-hero--single" : ""}${!hasHeroDescription ? " page-hero--no-description" : ""}`}
-      aria-labelledby={`${route.id}-title`}
+      className={`page-hero hero-${pageId}${omitSessionAside ? " page-hero--single" : ""}${!hasHeroDescription ? " page-hero--no-description" : ""}`}
+      aria-labelledby={`${pageId}-title`}
     >
       <div className="hero-copy">
-        <p className="eyebrow">{route.eyebrow}</p>
-        <h1 id={`${route.id}-title`}>{route.title}</h1>
-        {hasHeroDescription ? <p>{route.description}</p> : null}
+        <p className="eyebrow">{hero.eyebrow}</p>
+        <h1 id={`${pageId}-title`}>{hero.title}</h1>
+        {hasHeroDescription ? <p>{hero.description}</p> : null}
       </div>
       {omitSessionAside ? null : (
         <aside className="hero-status" aria-label={t("main.hero.statusAria")}>
@@ -244,11 +141,8 @@ function AppShell({
 }) {
   const { t } = useI18n();
   const shellIconSrc = useMemo(() => brandIconSrc(appSettings), [appSettings.brandMark]);
-  const routes = useMemo(() => buildAppRoutes(t), [t]);
 
-  const initialRoute = parseHashRoute();
-  const [activePage, setActivePage] = useState<PageId>(() => initialRoute.page);
-  const [adminSection, setAdminSection] = useState<AdminSection>(() => initialRoute.adminSection);
+  const [rawHash, setRawHash] = useState(() => normalizeLegacyHash(window.location.hash || ""));
   const [publicSettingsReady, setPublicSettingsReady] = useState(false);
   const [releaseInfo, setReleaseInfo] = useState<AppReleaseInfo | null>(null);
   const documentPath = useMemo(() => normalizeDocumentPath(window.location.pathname), []);
@@ -308,9 +202,7 @@ function AppShell({
 
   useEffect(() => {
     function syncHash() {
-      const next = parseHashRoute();
-      setActivePage(next.page);
-      setAdminSection(next.adminSection);
+      setRawHash(normalizeLegacyHash(window.location.hash || ""));
     }
 
     window.addEventListener("hashchange", syncHash);
@@ -318,31 +210,28 @@ function AppShell({
     return () => window.removeEventListener("hashchange", syncHash);
   }, []);
 
-  const activeRoute = routes.find((route) => route.id === activePage) ?? routes[0];
-  const displayRoute =
-    activePage === "login" && currentUser
-      ? {
-          ...activeRoute,
-          label: t("main.nav.profile"),
-          eyebrow: t("main.route.profileLogin.eyebrow"),
-          title: t("main.route.profileLogin.title"),
-          description: t("main.route.profileLogin.description")
-        }
-      : activeRoute;
-
-  const eventBoardMode =
-    currentUser?.role === "manager" ||
-    currentUser?.role === "organizer" ||
-    currentUser?.role === "admin"
-      ? "manager"
-      : "events";
-
-  const omitHeroSessionAside = Boolean(
-    currentUser &&
-      (displayRoute.id === "events" || displayRoute.id === "admin" || displayRoute.id === "infos")
+  const navContext: NavContext = useMemo(
+    () => ({ currentUser, settings: appSettings }),
+    [currentUser, appSettings]
   );
+  const { page: activePage, subPath } = resolvePage(appPages, navContext, rawHash);
+  const menu = menuPages(appPages, navContext);
+  const subnav = activePage.subnav?.(t, navContext) ?? [];
+  const activeSubSlug = subPath.split("/")[0] || subnav[0]?.slug || "";
 
-  const heroRoute = applyShellStartHero(displayRoute, appSettings);
+  // Beim Seitenwechsel nach oben springen statt mitten in der neuen Seite zu landen.
+  useEffect(() => {
+    if (typeof window.scrollTo === "function") {
+      try {
+        window.scrollTo({ top: 0 });
+      } catch {
+        /* jsdom */
+      }
+    }
+  }, [activePage.id, activeSubSlug]);
+
+  const omitHeroSessionAside = Boolean(currentUser) || activePage.id !== "login";
+  const hero = activePage.hero(t, navContext);
 
   const displayAppName = useMemo(
     () => pickAppDisplayName(appSettings.appName, t("brand.displayName")),
@@ -352,89 +241,6 @@ function AppShell({
   useEffect(() => {
     document.title = isKioskDocumentEntry ? `${displayAppName} · ${t("kiosk.pageTitle")}` : displayAppName;
   }, [displayAppName, isKioskDocumentEntry, t]);
-
-  const adminNav = useMemo(
-    () =>
-      [
-        ["users", t("main.admin.nav.users")],
-        ["betrieb", t("main.admin.nav.ops")],
-        ["design", t("main.admin.nav.design")],
-        ["infos", t("main.admin.nav.infos")],
-        ["sicherheit", t("main.admin.nav.security")],
-        ["invites", t("main.admin.nav.invites")],
-        ["audit", t("main.admin.nav.audit")]
-      ] as const,
-    [t]
-  );
-
-  function renderActivePage() {
-    if (activePage === "login") {
-      return (
-        <LoginPage
-          currentUser={currentUser}
-          settings={appSettings}
-          onLoggedIn={setCurrentUser}
-          onLoggedOut={() => setCurrentUser(null)}
-          onUserUpdated={setCurrentUser}
-        />
-      );
-    }
-
-    if (activePage === "infos") {
-      if (!currentUser) {
-        return (
-          <section className="access-panel" aria-label={t("main.route.infos.title")}>
-            <p className="eyebrow">{t("main.route.infos.eyebrow")}</p>
-            <h2>{t("main.infos.guest.title")}</h2>
-            <p className="muted">{t("main.infos.guest.body")}</p>
-            <a className="text-link" href="#login">
-              {t("main.infos.guest.login")}
-            </a>
-          </section>
-        );
-      }
-      return <InfosPage markdown={appSettings.infosMarkdown} enabled={appSettings.infosEnabled} />;
-    }
-
-    if (activePage === "admin") {
-      return (
-        <section className="admin-stage" aria-label={t("main.stage.admin")}>
-          <AdminPanel
-            currentUser={currentUser}
-            adminSection={adminSection}
-            onSettingsChanged={(settings) => {
-              setAppSettings(settings);
-              applyTheme(settings);
-            }}
-          />
-        </section>
-      );
-    }
-
-    return (
-      <>
-        {currentUser ? <MainEventPrompt currentUserId={currentUser.id} /> : null}
-        {currentUser && appSettings.featuresPizzaEnabled ? (
-          <PizzaPanel
-            currentUserId={currentUser.id}
-            currentUserRole={currentUser.role}
-            paypalHandle={appSettings.pizzaPaypalHandle}
-            paypalName={appSettings.pizzaPaypalName}
-            cashRecipient={appSettings.pizzaCashRecipient}
-          />
-        ) : null}
-        {currentUser?.role === "manager" || currentUser?.role === "admin" ? <MainEventsPanel /> : null}
-        <EventBoard
-          currentUser={currentUser}
-          mode={eventBoardMode}
-          emptyBoardTitle={appSettings.shellEventsEmptyTitle}
-          emptyBoardBody={appSettings.shellEventsEmptyBody}
-          gameCatalog={appSettings.gameCatalog}
-          ampIntegrationEnabled={appSettings.ampIntegrationEnabled}
-        />
-      </>
-    );
-  }
 
   if (!publicSettingsReady && documentPath !== "/") {
     return (
@@ -453,41 +259,35 @@ function AppShell({
     );
   }
 
+  function isActive(page: NavPage) {
+    return activePage.id === page.id;
+  }
+
   return (
     <BrandingProvider iconSrc={shellIconSrc}>
-    <main className={`app-shell page-${activePage}`}>
+    <main className={`app-shell page-${activePage.id}${menu.length > 1 ? " app-shell--tabbar" : ""}`}>
       <header className="topbar" aria-label={t("main.topbar.aria")}>
-        <a className="brand" href="#events" aria-label={t("main.brand.aria")}>
+        <a className="brand" href={`#${menu[0]?.hash ?? "events"}`} aria-label={t("main.brand.aria")}>
           <img className="brand-mark" src={shellIconSrc} alt="" />
           <span>{displayAppName}</span>
         </a>
         <div className="topbar-end">
           <nav className="nav-links" aria-label={t("main.nav.regions")}>
-            {routes
-              .filter((route) => {
-                if (route.id === "login") {
-                  return false;
-                }
-                if (route.id === "infos") {
-                  return Boolean(currentUser) && appSettings.infosEnabled;
-                }
-                return true;
-              })
-              .map((route) => (
-                <a
-                  href={route.path}
-                  key={route.path}
-                  className={activePage === route.id ? "active" : undefined}
-                  aria-current={activePage === route.id ? "page" : undefined}
-                >
-                  {route.label}
-                </a>
-              ))}
+            {menu.map((page) => (
+              <a
+                href={`#${page.hash}`}
+                key={page.id}
+                className={isActive(page) ? "active" : undefined}
+                aria-current={isActive(page) ? "page" : undefined}
+              >
+                {page.label(t)}
+              </a>
+            ))}
           </nav>
           <a
             href="#login"
-            className={`profile-nav-trigger${activePage === "login" ? " active" : ""}`}
-            aria-current={activePage === "login" ? "page" : undefined}
+            className={`profile-nav-trigger${activePage.id === "login" ? " active" : ""}`}
+            aria-current={activePage.id === "login" ? "page" : undefined}
             aria-label={
               currentUser
                 ? t("main.profileNav.aria", { name: currentUser.username })
@@ -514,17 +314,20 @@ function AppShell({
           </a>
         </div>
       </header>
-      {activePage === "admin" && currentUser?.role === "admin" ? (
-        <div className="admin-nav-bar">
-          <nav className="admin-top-subnav" aria-label={t("main.admin.subnav")}>
-            {adminNav.map(([slug, label]) => (
+      {subnav.length > 0 ? (
+        <div className="admin-nav-bar sub-nav-bar">
+          <nav
+            className="admin-top-subnav"
+            aria-label={activePage.subnavLabel ? activePage.subnavLabel(t) : activePage.label(t)}
+          >
+            {subnav.map((entry) => (
               <a
-                key={slug}
-                href={`#admin/${slug}`}
-                className={adminSection === slug ? "active" : undefined}
-                aria-current={adminSection === slug ? "page" : undefined}
+                key={entry.slug}
+                href={`#${activePage.hash}/${entry.slug}`}
+                className={activeSubSlug === entry.slug ? "active" : undefined}
+                aria-current={activeSubSlug === entry.slug ? "page" : undefined}
               >
-                {label}
+                {entry.label}
               </a>
             ))}
           </nav>
@@ -532,12 +335,36 @@ function AppShell({
       ) : null}
       <div className="page-shell">
         <PageHeader
-          route={heroRoute}
+          pageId={activePage.id}
+          hero={hero}
           currentUser={currentUser}
           omitSessionAside={omitHeroSessionAside}
         />
-        {renderActivePage()}
+        {activePage.render({
+          ...navContext,
+          subPath,
+          setCurrentUser,
+          applySettings: (settings) => {
+            setAppSettings(settings);
+            applyTheme(settings);
+          }
+        })}
       </div>
+      {menu.length > 1 ? (
+        <nav className="tab-bar" aria-label={t("main.nav.mobileAria")}>
+          {menu.map((page) => (
+            <a
+              href={`#${page.hash}`}
+              key={page.id}
+              className={isActive(page) ? "active" : undefined}
+              aria-current={isActive(page) ? "page" : undefined}
+            >
+              <NavIcon path={page.icon} />
+              <span>{page.label(t)}</span>
+            </a>
+          ))}
+        </nav>
+      ) : null}
       {releaseInfo ? (
         <footer className="app-footer" aria-label={t("main.footer.aria")}>
           <p className="app-footer__inner">

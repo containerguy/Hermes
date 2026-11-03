@@ -317,4 +317,36 @@ describe("Events mit Start und Ende – Oberfläche", () => {
     expect(calls.at(-1)).toEqual({ url: "/api/main-events/m-3/invites/u-1", method: "DELETE", body: null });
     await rendered.cleanup();
   });
+
+  it("shows the events page to regular users with participation but without management", async () => {
+    const posted = installRequests([
+      mainEvent({ id: "m-1", name: "LAN Herbst", status: "running" }),
+      mainEvent({ id: "m-2", name: "Tag 2", status: "planned", myParticipation: "joined" }),
+      mainEvent({ id: "m-0", name: "Frühjahr", status: "ended" })
+    ]);
+    const rendered = await render(<MainEventsPanel canManage={false} />);
+    const text = rendered.container.textContent ?? "";
+    expect(text).toContain("LAN Herbst");
+    expect(text).toContain("Du bist dabei");
+    expect(text).not.toContain("Starten");
+    expect(text).not.toContain("Neues Event anlegen");
+    expect(rendered.container.querySelector("form")).toBeNull();
+
+    // Laufendes Event zuerst, beendetes zuletzt
+    const titles = Array.from(rendered.container.querySelectorAll(".main-event-title strong")).map((el) => el.textContent);
+    expect(titles).toEqual(["LAN Herbst", "Tag 2", "Frühjahr"]);
+    // Beendete Events bieten keine Teilnahme mehr an
+    const ended = rendered.container.querySelectorAll(".main-event")[2] as HTMLElement;
+    expect(ended.querySelector(".main-event-participation")).toBeNull();
+
+    const join = Array.from(rendered.container.querySelectorAll(".main-event-participation button")).find(
+      (button) => button.textContent === "Dabei"
+    ) as HTMLButtonElement;
+    await act(async () => {
+      join.click();
+      await flush();
+    });
+    expect(posted).toEqual([{ url: "/api/main-events/m-1/participation", body: { status: "joined" } }]);
+    await rendered.cleanup();
+  });
 });
