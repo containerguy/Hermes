@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import { createRoot } from "react-dom/client";
 import "./styles.css";
 
@@ -91,19 +91,21 @@ function PageHeader({
   pageId,
   hero,
   currentUser,
-  omitSessionAside
+  omitSessionAside,
+  collapsed
 }: {
   pageId: string;
   hero: PageHero;
   currentUser: User | null;
   omitSessionAside: boolean;
+  collapsed: boolean;
 }) {
   const { t } = useI18n();
   const markSrc = useBrandIconSrc();
   const hasHeroDescription = Boolean(hero.description.trim());
   return (
     <section
-      className={`page-hero hero-${pageId}${omitSessionAside ? " page-hero--single" : ""}${!hasHeroDescription ? " page-hero--no-description" : ""}`}
+      className={`page-hero hero-${pageId}${omitSessionAside ? " page-hero--single" : ""}${!hasHeroDescription ? " page-hero--no-description" : ""}${collapsed ? " page-hero--collapsed" : ""}`}
       aria-labelledby={`${pageId}-title`}
     >
       <div className="hero-copy">
@@ -128,6 +130,55 @@ function PageHeader({
   );
 }
 
+/**
+ * Kopfbereich beim Runterscrollen zu einer schmalen Zeile zusammenklappen. Zwei Schwellen,
+ * damit das Zusammenklappen (Seite wird kürzer) nicht sofort wieder das Aufklappen auslöst.
+ */
+const HERO_COLLAPSE_AT = 96;
+const HERO_EXPAND_AT = 12;
+
+function useHeroCollapsed(): boolean {
+  const [collapsed, setCollapsed] = useState(false);
+  useEffect(() => {
+    let frame = 0;
+    function update() {
+      frame = 0;
+      const y = window.scrollY;
+      setCollapsed((current) => (current ? y > HERO_EXPAND_AT : y > HERO_COLLAPSE_AT));
+    }
+    function onScroll() {
+      if (!frame) {
+        frame = window.requestAnimationFrame(update);
+      }
+    }
+    window.addEventListener("scroll", onScroll, { passive: true });
+    update();
+    return () => {
+      window.removeEventListener("scroll", onScroll);
+      if (frame) {
+        window.cancelAnimationFrame(frame);
+      }
+    };
+  }, []);
+  return collapsed;
+}
+
+/** Höhe der klebenden Kopfzeile als CSS-Variable, damit der Seitenkopf direkt darunter klebt. */
+function useTopbarHeightVar(ref: React.RefObject<HTMLElement | null>) {
+  useEffect(() => {
+    const element = ref.current;
+    if (!element || typeof ResizeObserver === "undefined") {
+      return;
+    }
+    const apply = () =>
+      document.documentElement.style.setProperty("--topbar-height", `${element.getBoundingClientRect().height}px`);
+    apply();
+    const observer = new ResizeObserver(apply);
+    observer.observe(element);
+    return () => observer.disconnect();
+  });
+}
+
 function AppShell({
   currentUser,
   setCurrentUser,
@@ -142,6 +193,9 @@ function AppShell({
   const { t } = useI18n();
   const shellIconSrc = useMemo(() => brandIconSrc(appSettings), [appSettings.brandMark]);
 
+  const heroCollapsed = useHeroCollapsed();
+  const topbarRef = useRef<HTMLElement | null>(null);
+  useTopbarHeightVar(topbarRef);
   const [rawHash, setRawHash] = useState(() => normalizeLegacyHash(window.location.hash || ""));
   const [publicSettingsReady, setPublicSettingsReady] = useState(false);
   const [releaseInfo, setReleaseInfo] = useState<AppReleaseInfo | null>(null);
@@ -266,7 +320,7 @@ function AppShell({
   return (
     <BrandingProvider iconSrc={shellIconSrc}>
     <main className={`app-shell page-${activePage.id}${menu.length > 1 ? " app-shell--tabbar" : ""}`}>
-      <header className="topbar" aria-label={t("main.topbar.aria")}>
+      <header className="topbar" ref={topbarRef} aria-label={t("main.topbar.aria")}>
         <a className="brand" href={`#${menu[0]?.hash ?? "events"}`} aria-label={t("main.brand.aria")}>
           <img className="brand-mark" src={shellIconSrc} alt="" />
           <span>{displayAppName}</span>
@@ -339,6 +393,7 @@ function AppShell({
           hero={hero}
           currentUser={currentUser}
           omitSessionAside={omitHeroSessionAside}
+          collapsed={heroCollapsed}
         />
         {activePage.render({
           ...navContext,
