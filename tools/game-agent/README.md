@@ -19,6 +19,16 @@ Launcher, Overlays, Crash-Handler und Anti-Cheat-Dienste werden ignoriert. Proze
 
 An Hermes gehen nur Titel, Launcher und ggf. Steam-App-ID der erkannten Spiele. Nie die Prozessliste, nie der Rechnername, nie die Liste installierter Spiele. `-v` zeigt die gefundenen installierten Spiele nur lokal an. Beim Beenden mit Strg+C löscht der Agent seinen Eintrag sofort, sonst verschwindet er nach zwei Minuten.
 
+## Auslieferung
+
+Das Docker-Image von Hermes baut den Agenten mit (`Dockerfile`, Stufe `agent`) und liefert ihn unter `GET /api/presence/agent/download` aus. Symbol, Versionsangaben und Manifest kommen aus `rsrc_windows_amd64.syso`, erzeugt mit [go-winres](https://github.com/tc-hib/go-winres) aus `winres/`:
+
+```sh
+go-winres make --in winres/winres.json --arch amd64
+```
+
+Ohne Argumente gestartet (Doppelklick) macht der Agent einen Testlauf, meldet nichts und wartet auf Enter.
+
 ## Bauen und starten
 
 ```sh

@@ -5,7 +5,7 @@ import { createRoot, type Root } from "react-dom/client";
 import { act } from "react-dom/test-utils";
 import { requestJson } from "../api/request";
 import { I18nProvider } from "../i18n/I18nContext";
-import { PresencePanel } from "./PresencePanel";
+import { buildStartFile, PresencePanel } from "./PresencePanel";
 
 vi.mock("../api/request", () => ({ requestJson: vi.fn() }));
 const requestJsonMock = vi.mocked(requestJson);
@@ -70,5 +70,40 @@ describe("PresencePanel", () => {
     requestJsonMock.mockResolvedValue({ players: [] });
     const view = await render();
     expect(view.textContent).toContain("Gerade meldet niemand ein laufendes Spiel.");
+  });
+});
+
+describe("PresencePanel setup", () => {
+  it("offers the download and creates a token for the start file", async () => {
+    requestJsonMock.mockImplementation(async (url: string) => {
+      if (url === "/api/presence") return { players: [], agentAvailable: true };
+      if (url === "/api/auth/api-tokens") return { token: "hm_at_test" };
+      throw new Error(url);
+    });
+    const view = await render();
+    expect(view.querySelector('a[href="/api/presence/agent/download"]')).toBeTruthy();
+    const create = Array.from(view.querySelectorAll("button")).find((b) => b.textContent === "Agent einrichten");
+    await act(async () => {
+      create!.click();
+      await Promise.resolve();
+    });
+    expect(requestJsonMock).toHaveBeenCalledWith(
+      "/api/auth/api-tokens",
+      expect.objectContaining({ method: "POST" })
+    );
+    expect(view.textContent).toContain("Startdatei herunterladen");
+  });
+
+  it("explains when no agent is bundled", async () => {
+    requestJsonMock.mockResolvedValue({ players: [], agentAvailable: false });
+    const view = await render();
+    expect(view.querySelector('a[href="/api/presence/agent/download"]')).toBeNull();
+    expect(view.textContent).toContain("keinen fertigen Agenten");
+  });
+
+  it("builds a Windows start file next to the exe", () => {
+    expect(buildStartFile("https://lan.example", "hm_at_x")).toBe(
+      '@echo off\r\ntitle Spielt gerade\r\ncd /d "%~dp0"\r\nhermes-game-agent.exe -server https://lan.example -token hm_at_x -interval 30s\r\npause\r\n'
+    );
   });
 });

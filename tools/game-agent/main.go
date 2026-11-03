@@ -5,6 +5,7 @@
 package main
 
 import (
+	"bufio"
 	"bytes"
 	"encoding/json"
 	"flag"
@@ -31,6 +32,8 @@ func main() {
 	knownFile := flag.String("known", "", "optional JSON file [{\"exe\":\"factorio.exe\",\"title\":\"Factorio\"}]")
 	verbose := flag.Bool("v", false, "also print installed games found per launcher (local only, never sent)")
 	flag.Parse()
+	// Double-clicked without arguments: show one detection and keep the window open.
+	interactive := len(os.Args) == 1
 
 	var known []KnownExe
 	if *knownFile != "" {
@@ -88,6 +91,12 @@ func main() {
 			}
 		}
 		if *interval <= 0 {
+			if interactive {
+				fmt.Println("\nNur ein Testlauf, nichts wurde gemeldet. Zum Melden die Startdatei aus")
+				fmt.Println("der Mitspielzentrale (Seite \"Spielt gerade\" -> \"Agent einrichten\") verwenden.")
+				fmt.Print("\nEnter zum Beenden ...")
+				_, _ = bufio.NewReader(os.Stdin).ReadString('\n')
+			}
 			return
 		}
 		time.Sleep(*interval)

@@ -14,3 +14,4 @@ test-results
 .env.*
 !.env.example
 *.creds
+tools/game-agent/hermes-game-agent.exe

@@ -158,7 +158,8 @@ Optionales Modul: Ein kleiner Windows-Agent auf den Spieler-PCs erkennt, welches
 
 - **Aktivieren:** Admin → Betrieb → „Spielt gerade“ aktivieren. Ausgeschaltet liefern die Routen 404 und der Menüpunkt fehlt.
 - **Agent:** Quellcode und Bauanleitung in [`tools/game-agent`](tools/game-agent/README.md). Erkennt Spiele aus Steam, Epic, GOG, Ubisoft Connect, EA app und Battle.net über die Installationsordner der Launcher und die Steam-Registry. Prozesse werden nur gelesen, kein Speicherzugriff, daher kein Konflikt mit Anti-Cheat.
-- **Mitmachen ist freiwillig:** Jede Person legt unter Profil → API-Tokens ein Token mit Vollzugriff an und startet `hermes-game-agent.exe -server https://… -token <Token> -interval 30s`.
+- **Mitmachen ist freiwillig:** Auf der Seite „Spielt gerade“ unter „Selbst mitmachen“ den Agenten herunterladen (das Docker-Image baut ihn mit, er kommt also auch ohne Internet direkt von Hermes) und „Agent einrichten“ klicken. Das legt ein API-Token mit Vollzugriff an und bietet eine Startdatei `spielt-gerade-starten.cmd` an, die neben die .exe gehört und per Doppelklick startet.
+- **Windows-Warnung:** Der Agent ist nicht signiert, Windows SmartScreen warnt beim ersten Start („Weitere Informationen“ → „Trotzdem ausführen“). Ein Zertifikat würde daran wenig ändern, weil SmartScreen seit 2024 jeder neuen Datei erst über viele Downloads vertraut.
 - **Datenschutz:** Der Agent schickt nur Titel, Launcher und ggf. Steam-App-ID der erkannten Spiele, nie die Prozessliste oder den Rechnernamen. Hermes hält die Daten nur im Speicher, ohne Verlauf; zwei Minuten nach der letzten Meldung (oder sofort beim Beenden mit Strg+C) ist der Eintrag weg.
 - **API:** `POST`/`DELETE /api/presence/game`, `GET /api/presence`, siehe `/api/docs`. Änderungen kündigt der SSE-Stream mit `presence_changed` an.
 

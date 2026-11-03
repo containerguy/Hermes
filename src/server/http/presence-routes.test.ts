@@ -3,7 +3,7 @@ import os from "node:os";
 import path from "node:path";
 import { randomUUID } from "node:crypto";
 import request from "supertest";
-import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { CSRF_HEADER } from "../auth/csrf";
 import { bootstrapAdmin } from "../db/bootstrap-admin";
 import { createHermesApp } from "../app";
@@ -115,6 +115,9 @@ describe("Spielt gerade (presence)", () => {
     await request(started!.app).delete("/api/presence/game").set("Authorization", `Bearer ${token}`).expect(204);
     const after = await admin.get("/api/presence").expect(200);
     expect(after.body.players).toEqual([]);
+    // Im Testlauf gibt es kein mitgebautes agent/-Verzeichnis.
+    expect(after.body.agentAvailable).toBe(false);
+    await admin.get("/api/presence/agent/download").expect(404);
   });
 
   it("rejects read-only tokens and session writes without CSRF", async () => {
@@ -141,5 +144,43 @@ describe("Spielt gerade (presence)", () => {
 
     await admin.post("/api/presence/game").send({ playing: [] }).expect(403);
     await admin.post("/api/presence/game").set(CSRF_HEADER, csrf).send({ playing: [] }).expect(204);
+  });
+});
+
+describe("Spielt gerade: Agent-Download", () => {
+  it("serves the bundled agent to logged-in users only while enabled", async () => {
+    const express = (await import("express")).default;
+    const { createPresenceRouter } = await import("./presence-routes");
+    const { createPresenceStore } = await import("../domain/presence/game-presence");
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), "hermes-agent-"));
+    const agentPath = path.join(dir, "hermes-game-agent.exe");
+    fs.writeFileSync(agentPath, "MZ-test");
+
+    let enabled = true;
+    let loggedIn = true;
+    const fakeContext = {} as never;
+    const settingsModule = await import("../settings");
+    const authModule = await import("../auth/current-user");
+    const settingsSpy = vi
+      .spyOn(settingsModule, "readSettings")
+      .mockImplementation(() => ({ ...settingsModule.defaultSettings, featuresGamePresenceEnabled: enabled }));
+    const userSpy = vi
+      .spyOn(authModule, "requireUser")
+      .mockImplementation(() => (loggedIn ? ({ id: "u1" } as never) : undefined));
+
+    const app = express();
+    app.use("/api/presence", createPresenceRouter(fakeContext, createPresenceStore(), { agentPath }));
+
+    const ok = await request(app).get("/api/presence/agent/download").expect(200);
+    expect(ok.headers["content-disposition"]).toContain("hermes-game-agent.exe");
+    loggedIn = false;
+    await request(app).get("/api/presence/agent/download").expect(401);
+    loggedIn = true;
+    enabled = false;
+    await request(app).get("/api/presence/agent/download").expect(404);
+
+    settingsSpy.mockRestore();
+    userSpy.mockRestore();
+    fs.rmSync(dir, { recursive: true, force: true });
   });
 });

@@ -1,4 +1,6 @@
 import { inArray, isNull, and } from "drizzle-orm";
+import fs from "node:fs";
+import path from "node:path";
 import { Router, type Request, type Response } from "express";
 import { requireCsrf } from "../auth/csrf";
 import { requireUser } from "../auth/current-user";
@@ -16,9 +18,18 @@ import { readSettings } from "../settings";
  *                              oder Sitzung + CSRF. Gilt immer für den eigenen Benutzer.
  * - DELETE /api/presence/game  eigenen Eintrag sofort entfernen (Agent beendet).
  * - GET    /api/presence       wer spielt gerade was (nur angemeldet).
+ * - GET    /api/presence/agent/download  Windows-Agent (im Docker-Image unter agent/ mitgebaut).
  */
-export function createPresenceRouter(context: DatabaseContext, store: PresenceStore) {
+export const DEFAULT_AGENT_PATH = path.join(process.cwd(), "agent", "hermes-game-agent.exe");
+
+export function createPresenceRouter(
+  context: DatabaseContext,
+  store: PresenceStore,
+  options?: { agentPath?: string }
+) {
   const router = Router();
+  const agentPath = options?.agentPath ?? DEFAULT_AGENT_PATH;
+  const agentAvailable = () => fs.existsSync(agentPath);
 
   function guard(request: Request, response: Response) {
     if (!readSettings(context).featuresGamePresenceEnabled) {
@@ -63,7 +74,20 @@ export function createPresenceRouter(context: DatabaseContext, store: PresenceSt
       })
       .sort((a, b) => a.username.localeCompare(b.username));
 
-    response.json({ players });
+    response.json({ players, agentAvailable: agentAvailable() });
+  });
+
+  router.get("/agent/download", (request, response) => {
+    if (!guard(request, response)) {
+      return;
+    }
+    if (!agentAvailable()) {
+      response.status(404).json({ error: "agent_nicht_vorhanden" });
+      return;
+    }
+    response.download(agentPath, "hermes-game-agent.exe", {
+      headers: { "Content-Type": "application/vnd.microsoft.portable-executable" }
+    });
   });
 
   router.post("/game", (request, response) => {

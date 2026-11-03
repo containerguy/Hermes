@@ -634,11 +634,24 @@ paths:
         SSE-Stream mit `presence_changed` an (ohne Nutzlast).
       responses:
         "200":
-          description: "`{ players: [{ userId, username, displayName, games: [{ title, launcher, appId?, since }], updatedAt }] }`"
+          description: "`{ players: [{ userId, username, displayName, games: [{ title, launcher, appId?, since }], updatedAt }], agentAvailable }`"
         "401":
           $ref: "#/components/responses/Unauthorized"
         "404":
           description: Funktion ausgeschaltet
+
+  /api/presence/agent/download:
+    get:
+      tags: [presence]
+      summary: Windows-Agent herunterladen
+      description: Liefert die im Docker-Image mitgebaute `hermes-game-agent.exe` (nur angemeldet, Funktion aktiv).
+      responses:
+        "200":
+          description: Die .exe als Download
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          description: Funktion ausgeschaltet oder kein Agent mitgebaut
 
   /api/presence/game:
     post:
