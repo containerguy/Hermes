@@ -1,0 +1,33 @@
+# hermes-game-agent (Prototyp)
+
+Kleines Windows-Programm, das erkennt, welches Spiel auf dem PC gerade läuft. Stand: Recherche-Prototyp, noch nicht an Hermes angebunden (der Endpunkt `/api/presence/game` existiert noch nicht).
+
+## Wie erkannt wird
+
+1. **Steam:** `HKCU\Software\Valve\Steam\RunningAppID` (App-ID des laufenden Spiels, 0 = keins). Spielname aus `appmanifest_*.acf`.
+2. **Installationsordner der Launcher:** Läuft ein Prozess aus dem Ordner eines installierten Spiels, gilt das Spiel als gestartet.
+   - Steam: `libraryfolders.vdf` + `appmanifest_*.acf`
+   - Epic: `%ProgramData%\Epic\EpicGamesLauncher\Data\Manifests\*.item` (JSON)
+   - GOG: `HKLM\SOFTWARE\WOW6432Node\GOG.com\Games\<id>`
+   - Ubisoft Connect: `HKLM\SOFTWARE\WOW6432Node\Ubisoft\Launcher\Installs\<id>`
+   - EA app, Battle.net: Uninstall-Einträge in der Registry nach Publisher
+3. **Bekannte Exe-Namen** (`-known liste.json`), z. B. für portable Spiele oder den Hermes-Spielekatalog.
+
+Launcher, Overlays, Crash-Handler und Anti-Cheat-Dienste werden ignoriert. Prozesse werden nur mit `PROCESS_QUERY_LIMITED_INFORMATION` geöffnet (kein Speicherzugriff, keine Injection), das verträgt sich mit Anti-Cheat.
+
+## Datenschutz
+
+Gemeldet werden nur erkannte Spiele, nie die Prozessliste. `-v` zeigt die gefundenen installierten Spiele nur lokal an.
+
+## Bauen und starten
+
+```sh
+GOOS=windows GOARCH=amd64 go build -trimpath -ldflags="-s -w" -o hermes-game-agent.exe .
+go test ./...        # Erkennungslogik, läuft auf jedem OS
+```
+
+```
+hermes-game-agent.exe -v                     # einmal erkennen, JSON ausgeben
+hermes-game-agent.exe -interval 30s          # alle 30 s
+hermes-game-agent.exe -server https://hermes.example -token <API-Token> -interval 30s
+```
