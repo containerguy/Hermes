@@ -208,6 +208,10 @@ export const mainEvents = sqliteTable(
       .default("public"),
     plannedStartAt: text("planned_start_at"),
     plannedEndAt: text("planned_end_at"),
+    /** 0027: Plätze (null = unbegrenzt); ist das Event voll, wird man Nachrücker. */
+    maxParticipants: integer("max_participants"),
+    /** 0027: Anmeldeschluss (null = keiner); gilt nur, solange das Event geplant ist. */
+    registrationDeadline: text("registration_deadline"),
     startedAt: text("started_at"),
     startedByUserId: text("started_by_user_id").references(() => users.id, { onDelete: "set null" }),
     endedAt: text("ended_at"),
@@ -237,7 +241,10 @@ export const mainEventInvites = sqliteTable(
   (table) => [uniqueIndex("main_event_invites_event_user_unique").on(table.mainEventId, table.userId)]
 );
 
-/** 0025: Teilnahme am Event; „joined" bekommt die Benachrichtigungen zu dessen Runden. */
+/**
+ * 0025: Teilnahme am Event; „joined" bekommt die Benachrichtigungen zu dessen Runden.
+ * 0027: „interested" (Interessentenliste) und „waitlisted" (Nachrücker, Event voll).
+ */
 export const mainEventParticipants = sqliteTable(
   "main_event_participants",
   {
@@ -248,7 +255,7 @@ export const mainEventParticipants = sqliteTable(
     userId: text("user_id")
       .notNull()
       .references(() => users.id, { onDelete: "cascade" }),
-    status: text("status", { enum: ["joined", "declined"] }).notNull(),
+    status: text("status", { enum: ["joined", "interested", "waitlisted", "declined"] }).notNull(),
     createdAt: text("created_at").notNull(),
     updatedAt: text("updated_at").notNull()
   },
