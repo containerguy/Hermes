@@ -1,4 +1,4 @@
-import React, { FormEvent, RefObject } from "react";
+import React, { FormEvent, RefObject, useState } from "react";
 import type { BulkImportFormat, BulkImportResult, User } from "../types/core";
 import { useI18n } from "../i18n/I18nContext";
 
@@ -57,6 +57,14 @@ export function AdminPanelUsers({
   onCommitBulkImport
 }: AdminPanelUsersProps) {
   const { t } = useI18n();
+  // Filter nach dem Event, über das sich jemand registriert hat (Name, bleibt auch nach Löschen des Events).
+  const [eventFilter, setEventFilter] = useState("");
+  const registrationEvents = Array.from(
+    new Set(users.map((user) => user.registeredViaMainEventName).filter((name): name is string => Boolean(name)))
+  ).sort((left, right) => left.localeCompare(right));
+  const visibleUsers = eventFilter
+    ? users.filter((user) => user.registeredViaMainEventName === eventFilter)
+    : users;
 
   return (
     <>
@@ -246,12 +254,28 @@ export function AdminPanelUsers({
         ) : null}
       </section>
 
+      {registrationEvents.length > 0 ? (
+        <label className="admin-user-filter">
+          {t("admin.user.filterEvent")}
+          <select value={eventFilter} onChange={(event) => setEventFilter(event.target.value)}>
+            <option value="">{t("admin.user.filterAll")}</option>
+            {registrationEvents.map((name) => (
+              <option key={name} value={name}>
+                {name}
+              </option>
+            ))}
+          </select>
+        </label>
+      ) : null}
       <div className="admin-list" aria-label={t("admin.user.listAria")}>
-        {users.map((user) => (
+        {visibleUsers.map((user) => (
           <div className="admin-list-row" key={user.id}>
             <div>
               <strong>{user.username}</strong>
               <span>{user.email}</span>
+              {user.registeredViaMainEventName ? (
+                <span className="muted">{t("admin.user.registeredVia", { name: user.registeredViaMainEventName })}</span>
+              ) : null}
             </div>
             <select
               value={user.role}

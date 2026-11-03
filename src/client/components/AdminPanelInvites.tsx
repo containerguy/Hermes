@@ -1,6 +1,9 @@
-import React, { FormEvent } from "react";
-import type { InviteCode } from "../types/core";
+import React, { FormEvent, useEffect, useState } from "react";
+import type { InviteCode, MainEvent } from "../types/core";
+import { requestJson } from "../api/request";
 import { useI18n } from "../i18n/I18nContext";
+
+type NewInvite = { label: string; maxUses: string; expiresAt: string; mainEventId: string };
 
 type InviteDraft = { label: string; maxUses: string; expiresAt: string };
 type InviteDraftMap = Record<string, InviteDraft>;
@@ -13,10 +16,10 @@ function toDatetimeLocal(value: string) {
 
 interface AdminPanelInvitesProps {
   inviteCodes: InviteCode[];
-  newInvite: { label: string; maxUses: string; expiresAt: string };
+  newInvite: NewInvite;
   inviteDrafts: InviteDraftMap;
   dateTag: string;
-  onNewInviteChange: (next: { label: string; maxUses: string; expiresAt: string }) => void;
+  onNewInviteChange: (next: NewInvite) => void;
   onInviteDraftsChange: (next: InviteDraftMap) => void;
   onCreate: (event: FormEvent<HTMLFormElement>) => void;
   onUpdate: (invite: InviteCode) => void;
@@ -39,6 +42,13 @@ export function AdminPanelInvites({
   onDeleteUnused
 }: AdminPanelInvitesProps) {
   const { t } = useI18n();
+  // Offene Events für „Einladungscode pro Event“.
+  const [openEvents, setOpenEvents] = useState<MainEvent[]>([]);
+  useEffect(() => {
+    requestJson<{ mainEvents: MainEvent[] }>("/api/main-events")
+      .then((result) => setOpenEvents((result?.mainEvents ?? []).filter((entry) => entry.status !== "ended")))
+      .catch(() => undefined);
+  }, []);
 
   return (
     <section id="admin-invites" className="invite-panel" aria-label={t("admin.invites.sectionAria")}>
@@ -75,6 +85,20 @@ export function AdminPanelInvites({
             placeholder={t("admin.invites.placeholderExpires")}
           />
         </label>
+        <label>
+          {t("admin.invites.fieldEvent")}
+          <select
+            value={newInvite.mainEventId}
+            onChange={(event) => onNewInviteChange({ ...newInvite, mainEventId: event.target.value })}
+          >
+            <option value="">{t("admin.invites.noEvent")}</option>
+            {openEvents.map((entry) => (
+              <option key={entry.id} value={entry.id}>
+                {entry.name}
+              </option>
+            ))}
+          </select>
+        </label>
         <button type="submit">{t("admin.invites.create")}</button>
       </form>
       <div className="invite-list">
@@ -83,6 +107,9 @@ export function AdminPanelInvites({
             <div>
               <strong>{invite.label}</strong>
               <code>{invite.code}</code>
+              {invite.mainEventName ? (
+                <span className="invite-event">{t("admin.invites.forEvent", { name: invite.mainEventName })}</span>
+              ) : null}
               <span>
                 {t("admin.invites.used", {
                   used: invite.usedCount,

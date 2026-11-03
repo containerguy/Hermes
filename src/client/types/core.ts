@@ -16,6 +16,9 @@ export type User = {
   /** Explizite UI-Sprache; fehlt → Browser + Admin-Fallback */
   locale?: AppLocale | null;
   deletedAt?: string | null;
+  /** Nur in der Admin-Userliste: über welches Event (Einladungscode pro Event) registriert. */
+  registeredViaMainEventId?: string | null;
+  registeredViaMainEventName?: string | null;
 };
 
 export type AppSettings = {
@@ -389,6 +392,9 @@ export type InviteCode = {
   revokedAt: string | null;
   createdAt: string;
   usedCount: number;
+  /** Einladungscode pro Event (null = allgemeiner Code). */
+  mainEventId?: string | null;
+  mainEventName?: string | null;
 };
 
 export type RateLimitEntry = {

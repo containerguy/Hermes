@@ -16,6 +16,12 @@ export const users = sqliteTable(
     /** "de" | "en" | NULL — NULL: Browser + Admin-Fallback */
     locale: text("locale"),
     createdByUserId: text("created_by_user_id"),
+    /** 0028: über welches Event (Einladungscode pro Event) sich der Benutzer registriert hat. */
+    registeredViaMainEventId: text("registered_via_main_event_id"),
+    /** 0028: Eventname zum Zeitpunkt der Registrierung (bleibt, falls das Event gelöscht wird). */
+    registeredViaMainEventName: text("registered_via_main_event_name"),
+    /** 0028: verwendeter Einladungscode. */
+    registeredViaInviteCodeId: text("registered_via_invite_code_id"),
     deletedAt: text("deleted_at"),
     createdAt: text("created_at").notNull(),
     updatedAt: text("updated_at").notNull()
@@ -377,6 +383,8 @@ export const inviteCodes = sqliteTable(
     maxUses: integer("max_uses"),
     expiresAt: text("expires_at"),
     revokedAt: text("revoked_at"),
+    /** 0028: Code gehört zu einem Event; Registrierte werden dort als interessiert eingetragen. */
+    mainEventId: text("main_event_id").references(() => mainEvents.id, { onDelete: "set null" }),
     createdByUserId: text("created_by_user_id").references(() => users.id, {
       onDelete: "set null"
     }),
