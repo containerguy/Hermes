@@ -25,12 +25,12 @@ vi.mock("../push/push-service", async () => {
   };
 });
 
-import { createHermesApp } from "../app";
+import { createMatchdeskApp } from "../app";
 import { bootstrapAdmin } from "../db/bootstrap-admin";
 import { createDb } from "../db/client";
 import { mainEventPushTargets, sendPushToUserIds } from "../push/push-service";
 
-type StartedApp = Awaited<ReturnType<typeof createHermesApp>>;
+type StartedApp = Awaited<ReturnType<typeof createMatchdeskApp>>;
 
 let started: StartedApp | undefined;
 let databasePath: string;
@@ -56,17 +56,17 @@ describe("event registration: capacity, waitlist, deadline, overview", () => {
     async () => {
       vi.clearAllMocks();
       databasePath = path.join(os.tmpdir(), `hermes-test-${randomUUID()}.sqlite`);
-      process.env.HERMES_DB_PATH = databasePath;
-      process.env.HERMES_ADMIN_PHONE = "+491701234567";
-      process.env.HERMES_ADMIN_USERNAME = "hauptadmin";
-      process.env.HERMES_ADMIN_EMAIL = "hauptadmin@example.test";
-      process.env.HERMES_MAIL_MODE = "console";
-      process.env.HERMES_DEV_LOGIN_CODE = "123456";
-      delete process.env.HERMES_STORAGE_BACKEND;
-      delete process.env.HERMES_VAPID_PUBLIC_KEY;
-      delete process.env.HERMES_VAPID_PRIVATE_KEY;
+      process.env.MATCHDESK_DB_PATH = databasePath;
+      process.env.MATCHDESK_ADMIN_PHONE = "+491701234567";
+      process.env.MATCHDESK_ADMIN_USERNAME = "hauptadmin";
+      process.env.MATCHDESK_ADMIN_EMAIL = "hauptadmin@example.test";
+      process.env.MATCHDESK_MAIL_MODE = "console";
+      process.env.MATCHDESK_DEV_LOGIN_CODE = "123456";
+      delete process.env.MATCHDESK_STORAGE_BACKEND;
+      delete process.env.MATCHDESK_VAPID_PUBLIC_KEY;
+      delete process.env.MATCHDESK_VAPID_PRIVATE_KEY;
       await bootstrapAdmin();
-      started = await createHermesApp();
+      started = await createMatchdeskApp();
     },
     30_000
   );
