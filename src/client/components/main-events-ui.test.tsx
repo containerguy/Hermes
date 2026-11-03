@@ -374,16 +374,17 @@ describe("Events mit Start und Ende – Oberfläche", () => {
         status: "planned",
         registrationDeadline: "2026-11-01T12:00:00.000Z",
         registrationClosed: true
-      })
+      }),
+      mainEvent({ id: "m-3", name: "Tag 3", status: "planned" })
     ]);
     const rendered = await render(<MainEventsPanel canManage={false} />);
-    const [full, closed] = Array.from(rendered.container.querySelectorAll(".main-event")) as HTMLElement[];
+    const [full, closed, open] = Array.from(rendered.container.querySelectorAll(".main-event")) as HTMLElement[];
     expect(full.textContent).toContain("10 von 10 Plätzen belegt");
     expect(full.textContent).toContain("2 Nachrücker");
     expect(full.textContent).toContain("3 interessiert");
     expect(full.textContent).toContain("Du bist Nachrücker (Platz 2)");
     const fullButtons = Array.from(full.querySelectorAll(".main-event-participation button")).map((b) => b.textContent);
-    expect(fullButtons).toEqual(["Interessiert", "Nicht dabei"]);
+    expect(fullButtons).toEqual(["Nicht dabei"]);
 
     expect(closed.textContent).toContain("Anmeldeschluss vorbei");
     const closedButtons = Array.from(closed.querySelectorAll(".main-event-participation button")) as HTMLButtonElement[];
@@ -391,12 +392,12 @@ describe("Events mit Start und Ende – Oberfläche", () => {
     expect(closedButtons.find((b) => b.textContent === "Interessiert")!.disabled).toBe(true);
     expect(closedButtons.find((b) => b.textContent === "Nicht dabei")!.disabled).toBe(false);
 
-    const interest = Array.from(full.querySelectorAll("button")).find((b) => b.textContent === "Interessiert")!;
+    const interest = Array.from(open.querySelectorAll("button")).find((b) => b.textContent === "Interessiert")!;
     await act(async () => {
       (interest as HTMLButtonElement).click();
       await flush();
     });
-    expect(posted).toEqual([{ url: "/api/main-events/m-1/participation", body: { status: "interested" } }]);
+    expect(posted).toEqual([{ url: "/api/main-events/m-3/participation", body: { status: "interested" } }]);
     await rendered.cleanup();
   });
 

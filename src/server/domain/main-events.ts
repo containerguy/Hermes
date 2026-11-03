@@ -93,6 +93,8 @@ export function resolveParticipationStatus(input: {
   previous: MainEventParticipationStatus | null;
   joinedCount: number;
   maxParticipants: number | null;
+  /** Wartende Nachrücker: Neue stellen sich hinten an, statt einen Platz vorbei an der Liste zu nehmen. */
+  waitlistCount?: number;
 }): MainEventParticipationStatus {
   if (input.requested !== "joined") {
     return input.requested;
@@ -100,7 +102,13 @@ export function resolveParticipationStatus(input: {
   if (input.previous === "joined") {
     return "joined";
   }
-  if (input.maxParticipants !== null && input.joinedCount >= input.maxParticipants) {
+  if (input.maxParticipants === null) {
+    return "joined";
+  }
+  if (input.previous === "waitlisted") {
+    return "waitlisted";
+  }
+  if (input.joinedCount >= input.maxParticipants || (input.waitlistCount ?? 0) > 0) {
     return "waitlisted";
   }
   return "joined";

@@ -26,16 +26,16 @@ describe("push-service cleanup (PWA-03)", () => {
   let dbPath: string;
 
   beforeEach(() => {
-    dbPath = path.join(os.tmpdir(), `hermes-test-${randomUUID()}.sqlite`);
-    process.env.HERMES_DB_PATH = dbPath;
-    process.env.HERMES_VAPID_PUBLIC_KEY = "test-public";
-    process.env.HERMES_VAPID_PRIVATE_KEY = "test-private";
+    dbPath = path.join(os.tmpdir(), `matchdesk-test-${randomUUID()}.sqlite`);
+    process.env.MATCHDESK_DB_PATH = dbPath;
+    process.env.MATCHDESK_VAPID_PUBLIC_KEY = "test-public";
+    process.env.MATCHDESK_VAPID_PRIVATE_KEY = "test-private";
   });
 
   afterEach(() => {
-    delete process.env.HERMES_DB_PATH;
-    delete process.env.HERMES_VAPID_PUBLIC_KEY;
-    delete process.env.HERMES_VAPID_PRIVATE_KEY;
+    delete process.env.MATCHDESK_DB_PATH;
+    delete process.env.MATCHDESK_VAPID_PUBLIC_KEY;
+    delete process.env.MATCHDESK_VAPID_PRIVATE_KEY;
     vi.clearAllMocks();
 
     for (const suffix of ["", "-wal", "-shm"]) {

@@ -43,7 +43,7 @@ describe("commandSetForGame", () => {
     // ohne yb_quota 0 würde die Quote die eben gekickten Bots sofort wieder auffüllen
     expect(commands).toContain("yb_quota 0; yb kickall");
     expect(set?.hint?.de).toContain("YaPB");
-    // GoldSrc-RCON über AMP trennt ; nicht selbst → Hermes teilt auf
+    // GoldSrc-RCON über AMP trennt ; nicht selbst → Matchdesk teilt auf
     expect(set?.splitCommands).toBe(true);
   });
 

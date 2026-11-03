@@ -59,6 +59,7 @@ import {
   updateProfile,
   verifyEmailChange
 } from "../domain/auth/profile";
+import { readEnv } from "../env";
 
 const requestCodeSchema = z.object({
   /** Anmeldename oder Mailadresse; Groß-/Kleinschreibung ist egal. */
@@ -139,7 +140,7 @@ function isSqliteBusyOrLocked(error: unknown) {
 }
 
 function issueLoginChallenge(context: DatabaseContext, user: typeof users.$inferSelect) {
-  const code = process.env.HERMES_DEV_LOGIN_CODE ?? generateOtp();
+  const code = readEnv("DEV_LOGIN_CODE") ?? generateOtp();
   const timestamp = nowIso();
   const challengeId = randomUUID();
 
@@ -226,7 +227,7 @@ export function createAuthRouter(context: DatabaseContext) {
       response.status(401).json({ error: "nicht_angemeldet" });
       return;
     }
-    if (request.hermesAuth?.kind === "api_token" && request.hermesAuth.scope === "read_only") {
+    if (request.matchdeskAuth?.kind === "api_token" && request.matchdeskAuth.scope === "read_only") {
       response.status(403).json({ error: "api_token_nur_lesen" });
       return;
     }
@@ -247,7 +248,7 @@ export function createAuthRouter(context: DatabaseContext) {
       response.status(401).json({ error: "nicht_angemeldet" });
       return;
     }
-    if (request.hermesAuth?.kind === "api_token" && request.hermesAuth.scope === "read_only") {
+    if (request.matchdeskAuth?.kind === "api_token" && request.matchdeskAuth.scope === "read_only") {
       response.status(403).json({ error: "api_token_nur_lesen" });
       return;
     }
@@ -318,7 +319,7 @@ export function createAuthRouter(context: DatabaseContext) {
     try {
       await sendIssuedLoginCode(context, user, issued, { acceptLanguage: request.get("accept-language") });
     } catch (error) {
-      console.error("[Hermes] Failed to send login code", error);
+      console.error("[Matchdesk] Failed to send login code", error);
       response.status(502).json({ error: "mailversand_fehlgeschlagen" });
       return;
     }
@@ -507,7 +508,7 @@ export function createAuthRouter(context: DatabaseContext) {
             result = registerInvitedUser();
           } catch (retryError) {
             if (isSqliteBusyOrLocked(retryError)) {
-              console.error("[Hermes] Invite registration failed after retry (sqlite busy/locked)", retryError);
+              console.error("[Matchdesk] Invite registration failed after retry (sqlite busy/locked)", retryError);
               recordRateLimitFailure(context, { scope: "invite_register", key: registerKey });
               response.status(500).json({ error: "registrierung_fehlgeschlagen" });
               return;
@@ -534,7 +535,7 @@ export function createAuthRouter(context: DatabaseContext) {
           registration: true
         });
       } catch (error) {
-        console.error("[Hermes] Failed to send registration login code", error);
+        console.error("[Matchdesk] Failed to send registration login code", error);
         response.status(502).json({ error: "mailversand_fehlgeschlagen" });
         return;
       }
@@ -593,7 +594,7 @@ export function createAuthRouter(context: DatabaseContext) {
         return;
       }
 
-      console.error("[Hermes] Failed to register invited user", error);
+      console.error("[Matchdesk] Failed to register invited user", error);
       recordRateLimitFailure(context, { scope: "invite_register", key: registerKey });
       response.status(409).json({ error: "user_existiert_bereits" });
       return;

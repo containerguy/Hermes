@@ -25,12 +25,12 @@ vi.mock("../push/push-service", async () => {
   };
 });
 
-import { createHermesApp } from "../app";
+import { createMatchdeskApp } from "../app";
 import { bootstrapAdmin } from "../db/bootstrap-admin";
 import { createDb } from "../db/client";
 import { mainEventPushTargets, sendPushToUserIds } from "../push/push-service";
 
-type StartedApp = Awaited<ReturnType<typeof createHermesApp>>;
+type StartedApp = Awaited<ReturnType<typeof createMatchdeskApp>>;
 
 let started: StartedApp | undefined;
 let databasePath: string;
@@ -56,17 +56,17 @@ describe("event registration: capacity, waitlist, deadline, overview", () => {
     async () => {
       vi.clearAllMocks();
       databasePath = path.join(os.tmpdir(), `hermes-test-${randomUUID()}.sqlite`);
-      process.env.HERMES_DB_PATH = databasePath;
-      process.env.HERMES_ADMIN_PHONE = "+491701234567";
-      process.env.HERMES_ADMIN_USERNAME = "hauptadmin";
-      process.env.HERMES_ADMIN_EMAIL = "hauptadmin@example.test";
-      process.env.HERMES_MAIL_MODE = "console";
-      process.env.HERMES_DEV_LOGIN_CODE = "123456";
-      delete process.env.HERMES_STORAGE_BACKEND;
-      delete process.env.HERMES_VAPID_PUBLIC_KEY;
-      delete process.env.HERMES_VAPID_PRIVATE_KEY;
+      process.env.MATCHDESK_DB_PATH = databasePath;
+      process.env.MATCHDESK_ADMIN_PHONE = "+491701234567";
+      process.env.MATCHDESK_ADMIN_USERNAME = "hauptadmin";
+      process.env.MATCHDESK_ADMIN_EMAIL = "hauptadmin@example.test";
+      process.env.MATCHDESK_MAIL_MODE = "console";
+      process.env.MATCHDESK_DEV_LOGIN_CODE = "123456";
+      delete process.env.MATCHDESK_STORAGE_BACKEND;
+      delete process.env.MATCHDESK_VAPID_PUBLIC_KEY;
+      delete process.env.MATCHDESK_VAPID_PRIVATE_KEY;
       await bootstrapAdmin();
-      started = await createHermesApp();
+      started = await createMatchdeskApp();
     },
     30_000
   );
@@ -219,6 +219,33 @@ describe("event registration: capacity, waitlist, deadline, overview", () => {
       (entry: { action: string }) => entry.action
     );
     expect(audit).toContain("main_event.waitlist_promoted");
+  });
+
+  it("keeps the waitlist order when a seat frees up without a decline and keeps waitlisted people when going private", async () => {
+    const { adminAgent, managerAgent } = await createManagerAndLogin();
+    const anna = await createUser(adminAgent, "anna");
+    const bert = await createUser(adminAgent, "bert");
+    const carl = await createUser(adminAgent, "carl");
+    const event = await createEventWith(managerAgent, { name: "LAN Fair", maxParticipants: 1 });
+    expect((await participate(anna, event.id, "joined")).body.mainEvent.myParticipation).toBe("joined");
+    expect((await participate(bert, event.id, "joined")).body.mainEvent.myParticipation).toBe("waitlisted");
+
+    // Anna wird gelöscht: Ihr Platz zählt nicht mehr. Carl stellt sich trotzdem hinten an, Bert rückt nach.
+    const annaId = (await anna.get("/api/auth/me").expect(200)).body.user.id;
+    const csrf = await fetchCsrf(adminAgent);
+    await adminAgent.delete(`/api/admin/users/${annaId}`).set(CSRF_HEADER, csrf).expect(204);
+    expect((await participate(carl, event.id, "joined")).body.mainEvent).toMatchObject({
+      myParticipation: "waitlisted",
+      myWaitlistPosition: 1,
+      participantCount: 1
+    });
+    expect((await bert.get("/api/main-events").expect(200)).body.mainEvents[0].myParticipation).toBe("joined");
+
+    // Beim Wechsel auf privat behalten auch Nachrücker den Zugang.
+    expect((await patchEvent(managerAgent, event.id, { visibility: "private" })).status).toBe(200);
+    expect((await carl.get("/api/main-events").expect(200)).body.mainEvents).toEqual([
+      expect.objectContaining({ id: event.id, myParticipation: "waitlisted" })
+    ]);
   });
 
   it("counts interested people separately and enforces the registration deadline only before the start", async () => {

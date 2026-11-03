@@ -17,9 +17,9 @@ const kioskSecretSchema = z
   .regex(/^[a-zA-Z0-9_-]{12,128}$/, "kiosk_geheimnis_ungueltig");
 
 const settingsObjectSchema = z.object({
-  /** Leer = eingebauter Anzeigename je nach UI-Sprache (Mitspielzentrale / MatchDesk). */
+  /** Leer = eingebauter Anzeigename je nach UI-Sprache (Mitspielzentrale / Matchdesk). */
   appName: z.string().trim().max(80),
-  /** App-Logo in der UI: H (Hermes) oder M (Mitspiel / MatchDesk). */
+  /** App-Logo in der UI; seit der Umbenennung nur noch M (Altwert "hermes" wird zu "mitspiel"). */
   brandMark: brandMarkSchema,
   /**
    * Inhaltliches Projekt-Template: steuert eingebaute UI-Standardtexte (Client-i18n-Overlays).
@@ -46,7 +46,7 @@ const settingsObjectSchema = z.object({
   infosEnabled: z.boolean(),
   infosMarkdown: z.string().max(100_000),
   /**
-   * true (Default): S3-Snapshots aktiv, wenn HERMES_STORAGE_BACKEND=s3.
+   * true (Default): S3-Snapshots aktiv, wenn MATCHDESK_STORAGE_BACKEND=s3.
    * false: keine S3-Backups/Restores in der laufenden Instanz (Env kann trotzdem s3 sein).
    */
   s3SnapshotEnabled: z.boolean(),
@@ -83,7 +83,7 @@ const settingsObjectSchema = z.object({
   pizzaPaymentMethods: z.enum(["cash_and_paypal", "cash_only", "paypal_only"]),
   /**
    * CubeCoders AMP: Gameserver-Modul. Zugangsdaten und CA kommen ausschließlich aus der Umgebung
-   * (HERMES_AMP_USERNAME, HERMES_AMP_PASSWORD, HERMES_AMP_CA_FILE), nie aus app_settings.
+   * (MATCHDESK_AMP_USERNAME, MATCHDESK_AMP_PASSWORD, MATCHDESK_AMP_CA_FILE), nie aus app_settings.
    */
   ampIntegrationEnabled: z.boolean(),
   /** Basis-URL der AMP-Installation, z. B. http://192.168.1.10:8080/ (ohne /API) */
@@ -138,11 +138,11 @@ export const settingsSchema = settingsObjectSchema
 /** Für partielle Updates/Imports ohne `.partial()` auf ein Schema mit Refinement. */
 export const settingsPartialSchema = settingsObjectSchema.partial();
 
-export type HermesSettings = z.infer<typeof settingsSchema>;
+export type MatchdeskSettings = z.infer<typeof settingsSchema>;
 
 /** Öffentliche Teilmenge (kein defaultNotificationsEnabled, eventAutoArchiveHours, s3SnapshotEnabled). */
-export type PublicHermesSettings = Pick<
-  HermesSettings,
+export type PublicMatchdeskSettings = Pick<
+  MatchdeskSettings,
   | "appName"
   | "brandMark"
   | "projectTemplate"
@@ -170,7 +170,7 @@ export type PublicHermesSettings = Pick<
   | "ampIntegrationEnabled"
 >;
 
-export function pickPublicSettings(full: HermesSettings): PublicHermesSettings {
+export function pickPublicSettings(full: MatchdeskSettings): PublicMatchdeskSettings {
   return {
     appName: full.appName,
     brandMark: full.brandMark,
@@ -200,7 +200,7 @@ export function pickPublicSettings(full: HermesSettings): PublicHermesSettings {
   };
 }
 
-export const defaultSettings: HermesSettings = {
+export const defaultSettings: MatchdeskSettings = {
   appName: "",
   brandMark: "mitspiel",
   projectTemplate: "lan_party",
@@ -255,7 +255,7 @@ export function readSettings(context: DatabaseContext) {
 
 export function writeSettings(
   context: DatabaseContext,
-  settings: Partial<HermesSettings>,
+  settings: Partial<MatchdeskSettings>,
   updatedByUserId: string
 ) {
   const timestamp = nowIso();

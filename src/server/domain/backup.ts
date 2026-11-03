@@ -69,7 +69,7 @@ export async function runBackup(context: DatabaseContext, admin: Actor): Promise
     });
     return { ok: true };
   } catch (error) {
-    console.error("[Hermes] Failed to create admin backup", error);
+    console.error("[Matchdesk] Failed to create admin backup", error);
     tryWriteAuditLog(context, {
       actor: admin,
       action: "storage.backup_failed",
@@ -136,7 +136,7 @@ export async function runRestore(context: DatabaseContext, admin: Actor): Promis
       restoredFrom: result?.restoredFrom ?? null
     };
   } catch (error) {
-    console.error("[Hermes] Failed to restore admin backup", error);
+    console.error("[Matchdesk] Failed to restore admin backup", error);
     const diagnostics = toSafeRestoreDiagnostics(error);
     const kind = diagnostics.kind;
 

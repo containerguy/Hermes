@@ -3,7 +3,7 @@ import { Router, type Request, type Response } from "express";
 import { randomUUID } from "node:crypto";
 import { requireUser } from "../auth/current-user";
 import { requireCsrf } from "../auth/csrf";
-import { enforceApiTokenWriteAccess } from "../auth/hermes-auth";
+import { enforceApiTokenWriteAccess } from "../auth/matchdesk-auth";
 import { tryWriteAuditLog, writeAuditLog } from "../audit-log";
 import type { DatabaseContext } from "../db/client";
 import { gameEvents, mainEventInvites, mainEventParticipants, mainEvents, users } from "../db/schema";
@@ -114,9 +114,14 @@ function countRounds(context: DatabaseContext, mainEventId: string) {
   return row.count;
 }
 
+/** Gelöschte Benutzer zählen nicht mit (weder Plätze noch Nachrückerliste). */
 function countByStatus(context: DatabaseContext, mainEventId: string, status: MainEventParticipationStatus) {
   const row = context.sqlite
-    .prepare("SELECT COUNT(*) AS count FROM main_event_participants WHERE main_event_id = ? AND status = ?")
+    .prepare(
+      `SELECT COUNT(*) AS count FROM main_event_participants p
+         JOIN users u ON u.id = p.user_id
+       WHERE p.main_event_id = ? AND p.status = ? AND u.deleted_at IS NULL`
+    )
     .get(mainEventId, status) as { count: number };
 
   return row.count;
@@ -131,7 +136,14 @@ function waitlist(context: DatabaseContext, mainEventId: string) {
   return context.db
     .select({ userId: mainEventParticipants.userId })
     .from(mainEventParticipants)
-    .where(and(eq(mainEventParticipants.mainEventId, mainEventId), eq(mainEventParticipants.status, "waitlisted")))
+    .innerJoin(users, eq(mainEventParticipants.userId, users.id))
+    .where(
+      and(
+        eq(mainEventParticipants.mainEventId, mainEventId),
+        eq(mainEventParticipants.status, "waitlisted"),
+        isNull(users.deletedAt)
+      )
+    )
     .orderBy(asc(mainEventParticipants.updatedAt), asc(mainEventParticipants.id))
     .all()
     .map((row) => row.userId);
@@ -215,13 +227,16 @@ function applyParticipation(
       requested,
       previous,
       joinedCount: countParticipants(context, event.id),
-      maxParticipants: event.maxParticipants
+      maxParticipants: event.maxParticipants,
+      waitlistCount: countByStatus(context, event.id, "waitlisted")
     });
     if (status !== previous) {
       setParticipation(context, event.id, userId, status);
     }
-    const promoted = previous === "joined" && status !== "joined" ? promoteWaitlisted(context, event.id) : [];
-    return { previous, status, promoted };
+    // Ein freier Platz geht immer an den Ersten der Liste (auch wenn er z. B. durch Löschen frei wurde).
+    const promoted = promoteWaitlisted(context, event.id);
+    const finalStatus = promoted.includes(userId) ? "joined" : status;
+    return { previous, status: finalStatus, promoted: promoted.filter((id) => id !== userId) };
   })();
 }
 
@@ -229,6 +244,15 @@ function applyParticipation(
 export function joinMainEventIfUndecided(context: DatabaseContext, mainEventId: string, userId: string) {
   const event = getMainEvent(context, mainEventId);
   if (!event || findParticipation(context, mainEventId, userId) || isRegistrationClosed(event)) {
+    return false;
+  }
+  // Ist das Event voll (oder warten schon Nachrücker), bleibt man unentschieden: Dann fragt die
+  // Event-Abfrage selbst nach, statt jemanden still auf die Nachrückerliste zu setzen.
+  if (
+    event.maxParticipants !== null &&
+    (countParticipants(context, mainEventId) >= event.maxParticipants ||
+      countByStatus(context, mainEventId, "waitlisted") > 0)
+  ) {
     return false;
   }
   return applyParticipation(context, event, userId, "joined").status === "joined";
@@ -288,6 +312,23 @@ function sortMainEvents(events: MainEventRow[]) {
 
 export function createMainEventRouter(context: DatabaseContext) {
   const router = Router();
+
+  function auditPromotions(
+    actor: Parameters<typeof tryWriteAuditLog>[1]["actor"],
+    event: MainEventRow,
+    promoted: string[]
+  ) {
+    for (const userId of promoted) {
+      tryWriteAuditLog(context, {
+        actor,
+        action: "main_event.waitlist_promoted",
+        entityType: "main_event",
+        entityId: event.id,
+        summary: `Ein Nachrücker ist beim Event ${event.name} nachgerückt.`,
+        metadata: { userId }
+      });
+    }
+  }
 
   router.use((request, response, next) => {
     const user = requireUser(context, request);
@@ -406,40 +447,49 @@ export function createMainEventRouter(context: DatabaseContext) {
 
     const visibility = parsed.data.visibility ?? event.visibility;
     if (visibility === "private" && event.visibility === "public") {
-      // Wer schon zugesagt hat, behält beim Wechsel auf privat den Zugang.
-      const joined = context.db
+      // Wer schon zugesagt hat, interessiert ist oder nachrückt, behält beim Wechsel auf privat den Zugang
+      // (sonst könnte ein Nachrücker einen Platz in einem Event bekommen, das er nicht sieht).
+      const registered = context.db
         .select({ userId: mainEventParticipants.userId })
         .from(mainEventParticipants)
-        .where(and(eq(mainEventParticipants.mainEventId, event.id), eq(mainEventParticipants.status, "joined")))
+        .where(
+          and(
+            eq(mainEventParticipants.mainEventId, event.id),
+            inArray(mainEventParticipants.status, ["joined", "interested", "waitlisted"])
+          )
+        )
         .all()
         .map((row) => row.userId);
-      inviteUsers(context, event.id, joined, actor.id);
+      inviteUsers(context, event.id, registered, actor.id);
     }
 
-    context.db
-      .update(mainEvents)
-      .set({
-        name: parsed.data.name ?? event.name,
-        visibility,
-        description:
-          parsed.data.description === undefined ? event.description : normalizeText(parsed.data.description),
-        plannedStartAt,
-        plannedEndAt,
-        maxParticipants:
-          parsed.data.maxParticipants === undefined ? event.maxParticipants : parsed.data.maxParticipants,
-        registrationDeadline:
-          parsed.data.registrationDeadline === undefined
-            ? event.registrationDeadline
-            : parsed.data.registrationDeadline,
-        updatedAt: nowIso()
-      })
-      .where(eq(mainEvents.id, event.id))
-      .run();
+    const promoted = context.sqlite.transaction(() => {
+      context.db
+        .update(mainEvents)
+        .set({
+          name: parsed.data.name ?? event.name,
+          visibility,
+          description:
+            parsed.data.description === undefined ? event.description : normalizeText(parsed.data.description),
+          plannedStartAt,
+          plannedEndAt,
+          maxParticipants:
+            parsed.data.maxParticipants === undefined ? event.maxParticipants : parsed.data.maxParticipants,
+          registrationDeadline:
+            parsed.data.registrationDeadline === undefined
+              ? event.registrationDeadline
+              : parsed.data.registrationDeadline,
+          updatedAt: nowIso()
+        })
+        .where(eq(mainEvents.id, event.id))
+        .run();
 
-    // Mehr Plätze (oder keine Grenze mehr): Nachrücker rücken auf. Weniger Plätze nehmen
-    // niemandem eine Zusage weg.
-    const promoted = context.sqlite.transaction(() => promoteWaitlisted(context, event.id))();
+      // Mehr Plätze (oder keine Grenze mehr): Nachrücker rücken auf. Weniger Plätze nehmen
+      // niemandem eine Zusage weg.
+      return promoteWaitlisted(context, event.id);
+    })();
     const updated = getMainEvent(context, event.id)!;
+    auditPromotions(actor, updated, promoted);
     notifyPromoted(context, updated, promoted);
     writeAuditLog(context, {
       actor,
@@ -619,16 +669,7 @@ export function createMainEventRouter(context: DatabaseContext) {
       summary: summaries[status],
       metadata: { participation: status, requestedParticipation: parsed.data.status, previousParticipation: previous }
     });
-    for (const userId of promoted) {
-      tryWriteAuditLog(context, {
-        actor,
-        action: "main_event.waitlist_promoted",
-        entityType: "main_event",
-        entityId: event.id,
-        summary: `Ein Nachrücker ist beim Event ${event.name} nachgerückt.`,
-        metadata: { userId }
-      });
-    }
+    auditPromotions(actor, event, promoted);
     notifyPromoted(context, event, promoted);
     broadcastEventsChanged("main_event_participation_updated");
     response.json({ mainEvent: serializeMainEvent(context, getMainEvent(context, event.id)!, actor) });
@@ -849,6 +890,7 @@ export function createMainEventRouter(context: DatabaseContext) {
       summary: `${actor.username} hat eine Einladung zum Event ${event.name} zurückgenommen.`,
       metadata: { userId: request.params.userId, promotedUserIds: removed.promoted }
     });
+    auditPromotions(actor, event, removed.promoted);
     notifyPromoted(context, event, removed.promoted);
     broadcastEventsChanged("main_event_invites_updated");
     response.json({ mainEvent: serializeMainEvent(context, getMainEvent(context, event.id)!, actor) });

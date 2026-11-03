@@ -91,7 +91,7 @@ export const deMessages = {
   "login.title.verify": "Code eingeben.",
   "login.help.register":
     "Lege dein Konto mit Invite-Code, Username und E-Mail an. Danach bekommst du direkt einen Einmalcode für den ersten Login.",
-  "login.help.request": "Gib deinen Username oder deine E-Mail-Adresse ein, Groß-/Kleinschreibung ist egal. Hermes schickt den Einmalcode an die hinterlegte E-Mail-Adresse.",
+  "login.help.request": "Gib deinen Username oder deine E-Mail-Adresse ein, Groß-/Kleinschreibung ist egal. Die Mitspielzentrale schickt den Einmalcode an die hinterlegte E-Mail-Adresse.",
   "login.help.verify":
     "Trage den Code aus der Mail ein und gib diesem Gerät optional einen Namen für die Geräteübersicht.",
   "login.field.invite": "Invite-Code",
@@ -107,11 +107,11 @@ export const deMessages = {
   "login.deviceName.change": "Anderen Namen vergeben",
   "login.pairLink.summary": "Mit Pairing-Link anmelden",
   "login.pairLink.help": "Auf einem angemeldeten Gerät unter Profil → Pairing einen Link erzeugen, kopieren und hier einfügen. Ein Mailcode ist dann nicht nötig.",
-  "login.pairLink.helpIosPwa": "Die Home-Bildschirm-App hat auf iPhone/iPad einen eigenen Speicher und übernimmt die Anmeldung aus Safari nicht. Öffne Hermes in Safari, erzeuge unter Profil → Pairing einen Link, kopiere ihn und füge ihn hier ein.",
+  "login.pairLink.helpIosPwa": "Die Home-Bildschirm-App hat auf iPhone/iPad einen eigenen Speicher und übernimmt die Anmeldung aus Safari nicht. Öffne die Mitspielzentrale in Safari, erzeuge unter Profil → Pairing einen Link, kopiere ihn und füge ihn hier ein.",
   "login.pairLink.field": "Pairing-Link oder Code",
   "login.pairLink.submit": "Gerät verbinden",
   "login.pairLink.invalid": "Das sieht nicht nach einem gültigen Pairing-Link aus.",
-  "loginProfile.pair.iosHomeScreenHint": "Hermes auf dem Home-Bildschirm? Die App meldet sich auf iPhone/iPad nicht automatisch an. Erzeuge hier einen Link, tippe auf „Link kopieren“ und füge ihn in der App unter „Mit Pairing-Link anmelden“ ein.",
+  "loginProfile.pair.iosHomeScreenHint": "Mitspielzentrale auf dem Home-Bildschirm? Die App meldet sich auf iPhone/iPad nicht automatisch an. Erzeuge hier einen Link, tippe auf „Link kopieren“ und füge ihn in der App unter „Mit Pairing-Link anmelden“ ein.",
   "loginProfile.pair.copy": "Link kopieren",
   "loginProfile.pair.copied": "Kopiert",
   "login.backToLogin": "Zum Login",
@@ -186,21 +186,21 @@ export const deMessages = {
   "loginProfile.notificationsEyebrow": "Notifications",
   "loginProfile.notificationsTitle": "Push vor dem Match testen.",
   "loginProfile.installEyebrow": "Installation",
-  "loginProfile.installTitle": "Hermes wie eine App nutzen",
+  "loginProfile.installTitle": "Mitspielzentrale wie eine App nutzen",
   "loginProfile.installPwaBody":
     "Diese Ansicht läuft als installierte Web-App. Push und Schnellzugriff sind meist komfortabler als im normalen Browser-Tab.",
   "loginProfile.installDeferredBody":
     "Dein Browser erlaubt eine Installation — empfohlen für stabilere Benachrichtigungen und schnellen Zugriff vom Startbildschirm.",
   "loginProfile.installButton": "App installieren",
   "loginProfile.iosStep1": "Safari: Teilen (Quadrat mit Pfeil) öffnen.",
-  "loginProfile.iosStep2": "Zum Home-Bildschirm wählen — Hermes startet dann wie eine App.",
+  "loginProfile.iosStep2": "Zum Home-Bildschirm wählen — die Mitspielzentrale startet dann wie eine App.",
   "loginProfile.chromeStep1": "Chrome / Edge: Drei-Punkte-Menü oder Install-Symbol in der Adresszeile.",
   "loginProfile.chromeStep2":
-    "App installieren wählen. Fehlt der Eintrag, unterstützt der Browser die Installation nicht oder Hermes ist bereits installiert.",
+    "App installieren wählen. Fehlt der Eintrag, unterstützt der Browser die Installation nicht oder die Mitspielzentrale ist bereits installiert.",
   "loginProfile.pushExplain1":
-    "Hermes sendet Standard-Browser-Benachrichtigungen. Klingeltöne und garantiertes Audio kann Hermes nicht erzwingen.",
+    "Die Mitspielzentrale sendet Standard-Browser-Benachrichtigungen. Klingeltöne und garantiertes Audio kann sie nicht erzwingen.",
   "loginProfile.pushExplain2":
-    "Wenn einer der Checks unten fehlt, bleiben Einladungen und Statuswechsel in Hermes sichtbar, aber dieses Gerät bekommt keine Push-Hinweise.",
+    "Wenn einer der Checks unten fehlt, bleiben Einladungen und Statuswechsel in der Mitspielzentrale sichtbar, aber dieses Gerät bekommt keine Push-Hinweise.",
   "loginProfile.dt.secureContext": "Sicherer Kontext",
   "loginProfile.dt.browserApis": "Browser APIs",
   "loginProfile.dt.permission": "Permission",
@@ -229,7 +229,7 @@ export const deMessages = {
   "loginProfile.pair.sectionAria": "Gerät hinzufügen",
   "loginProfile.pair.titleConnect": "Weiteres Gerät verbinden.",
   "loginProfile.pair.helpConnect":
-    "Erzeuge einen kurzlebigen Pairing-Link, um Hermes auf Smartphone, Tablet oder Zweit-PC ohne erneutes Tippen des Einmalcodes zu öffnen.",
+    "Erzeuge einen kurzlebigen Pairing-Link, um die Mitspielzentrale auf Smartphone, Tablet oder Zweit-PC ohne erneutes Tippen des Einmalcodes zu öffnen.",
   "loginProfile.pair.close": "Schließen",
   "loginProfile.pair.qrLabel": "Pairing QR-Code",
   "loginProfile.pair.validUntil": "Gültig bis",
@@ -249,7 +249,7 @@ export const deMessages = {
 
   "secure.https.title": "Sichere Verbindung (HTTPS)",
   "secure.https.body":
-    "Diese Hermes-Instanz läuft über HTTPS. Web Push ist hier grundsätzlich möglich, sofern Browser und Gerät die APIs freigeben.",
+    "Diese Mitspielzentrale läuft über HTTPS. Web Push ist hier grundsätzlich möglich, sofern Browser und Gerät die APIs freigeben.",
   "secure.localhost.title": "Lokaler sicherer Kontext",
   "secure.localhost.body":
     "localhost gilt als sicherer Kontext — ideal zum Testen von Push ohne öffentliches Zertifikat.",
@@ -382,8 +382,8 @@ export const deMessages = {
   "events.server.bots.confirmRemoveAll": "Alle Bots vom Server entfernen?",
   "events.server.bots.sent": "Gesendet. Die Konsole zeigt die Antwort des Servers.",
   "events.server.bots.running": "Läuft … (bei CS2 einige Sekunden)",
-  "events.server.bots.hintYapb": "„Auffüllen“ hält die Spielerzahl, Bots gehen, sobald Menschen joinen. „Stufe für alle ändern“ gilt sofort. Mit festem Team hebt Hermes Teamlimit und Teamausgleich auf.",
-  "events.server.bots.hintCs2": "„Auffüllen“ hält die Spielerzahl; CS2 schickt die Bots erst, wenn ein Mensch joint. „Stufe für alle ändern“ setzt die Bots neu auf, weil CS2 die Stufe nur für neue Bots übernimmt. Mit festem Team hebt Hermes Teamlimit und Teamausgleich auf.",
+  "events.server.bots.hintYapb": "„Auffüllen“ hält die Spielerzahl, Bots gehen, sobald Menschen joinen. „Stufe für alle ändern“ gilt sofort. Mit festem Team hebt die Mitspielzentrale Teamlimit und Teamausgleich auf.",
+  "events.server.bots.hintCs2": "„Auffüllen“ hält die Spielerzahl; CS2 schickt die Bots erst, wenn ein Mensch joint. „Stufe für alle ändern“ setzt die Bots neu auf, weil CS2 die Stufe nur für neue Bots übernimmt. Mit festem Team hebt die Mitspielzentrale Teamlimit und Teamausgleich auf.",
   "events.server.consoleEmpty": "Noch keine Ausgabe.",
   "events.server.consolePlaceholder": "Befehl an den Server …",
   "events.server.consoleSend": "Senden",
@@ -531,7 +531,7 @@ export const deMessages = {
   "admin.bulk.eyebrow": "Bulk Import",
   "admin.bulk.title": "User aus CSV oder JSON importieren.",
   "admin.bulk.intro":
-    "Hermes prüft jede Zeile serverseitig gegen denselben Admin-Contract wie Einzel-User. Vorschau zeigt blockierende Konflikte, Commit bleibt gesperrt bis der letzte Preview-Lauf sauber ist.",
+    "Die Mitspielzentrale prüft jede Zeile serverseitig gegen denselben Admin-Contract wie Einzel-User. Vorschau zeigt blockierende Konflikte, Commit bleibt gesperrt bis der letzte Preview-Lauf sauber ist.",
   "admin.bulk.format": "Format",
   "admin.bulk.data": "Importdaten",
   "admin.bulk.preview": "Vorschau laden",
@@ -558,18 +558,13 @@ export const deMessages = {
   "admin.betrieb.title": "Einstellungen, Shell-Texte und Storage",
   "admin.label.appName": "Name in der Oberfläche",
   "admin.help.appName":
-    "Optional. Leer lassen für den eingebauten Namen „Mitspielzentrale“ (deutsche Oberfläche) bzw. „MatchDesk“ (englische Oberfläche). Eigener Text ersetzt das in Menü und Titelzeile.",
-  "admin.label.brandMark": "Logo in der Oberfläche",
-  "admin.brandMark.mitspiel": "M · Mitspielzentrale / MatchDesk (Standard)",
-  "admin.brandMark.hermes": "H · Hermes (klassisch)",
-  "admin.help.brandMark":
-    "Steuert das Kachel-Icon in Menü, Login und Event-Board. PWA-Installations-Icon bleibt „Hermes“.",
+    "Optional. Leer lassen für den eingebauten Namen „Mitspielzentrale“ (deutsche Oberfläche) bzw. „Matchdesk“ (englische Oberfläche). Eigener Text ersetzt das in Menü und Titelzeile.",
   "admin.label.archiveHours": "Auto-Archiv nach Stunden",
   "admin.label.notifyDefault": "Notifications standardmäßig aktiv",
   "admin.label.publicReg": "Öffentliche Registrierung per Invite-Code erlauben",
   "admin.label.s3snap": "S3-Snapshots und Restore in der laufenden Instanz erlauben (Standard: an, nur wirksam wenn die Umgebung S3 nutzt)",
   "admin.help.s3snap":
-    "Wenn deaktiviert, schreibt Hermes keine periodischen oder manuellen Snapshots nach S3 und blockiert Restore in der App – auch wenn HERMES_STORAGE_BACKEND=s3 gesetzt ist. Der erste Datenbank-Download auf ein leeres Volume beim Start richtet sich weiterhin nur nach der Umgebungsvariable, nicht nach dieser Option.",
+    "Wenn deaktiviert, schreibt die Mitspielzentrale keine periodischen oder manuellen Snapshots nach S3 und blockiert Restore in der App – auch wenn MATCHDESK_STORAGE_BACKEND=s3 gesetzt ist. Der erste Datenbank-Download auf ein leeres Volume beim Start richtet sich weiterhin nur nach der Umgebungsvariable, nicht nach dieser Option.",
   "admin.projectTemplate.label": "Projekt-Template",
   "admin.projectTemplate.help":
     "Bestimmt die eingebauten Standardtexte (Navigation, Board, Formulare, Kiosk). Ausgefüllte Shell-Texte weiter unten überschreiben die Überschriften am Start und im leeren Board. „Tischtennis“ nutzt turniernahe Formulierungen; Datenmodell und Abläufe bleiben gleich.",
@@ -600,10 +595,10 @@ export const deMessages = {
   "admin.features.pizza.cashRecipient": "Bargeld-Empfänger Hinweis",
   "admin.amp.title": "CubeCoders AMP",
   "admin.amp.help":
-    "Wenn aktiviert, zeigt Hermes zu Events mit gebundenem Spiel Serverstatus, Spielerzahl und Verbinden; ab Rolle Manager lassen sich die Server steuern. Basis-URL des AMP-Controllers ohne „/API“ (z. B. https://amp-ctl.lanparty.example). Zugangsdaten liegen nur in der Server-Umgebung.",
+    "Wenn aktiviert, zeigt die Mitspielzentrale zu Events mit gebundenem Spiel Serverstatus, Spielerzahl und Verbinden; ab Rolle Manager lassen sich die Server steuern. Basis-URL des AMP-Controllers ohne „/API“ (z. B. https://amp-ctl.lanparty.example). Zugangsdaten liegen nur in der Server-Umgebung.",
   "admin.amp.enabled": "AMP-Anbindung aktivieren",
   "admin.amp.baseUrl": "AMP-Basis-URL",
-  "admin.amp.envHint": "Zugangsdaten und CA werden auf dem Server per Umgebung gesetzt (HERMES_AMP_USERNAME, HERMES_AMP_PASSWORD, HERMES_AMP_CA_FILE).",
+  "admin.amp.envHint": "Zugangsdaten und CA werden auf dem Server per Umgebung gesetzt (MATCHDESK_AMP_USERNAME, MATCHDESK_AMP_PASSWORD, MATCHDESK_AMP_CA_FILE).",
   "admin.amp.saveFirst": "Einstellungen speichern, um danach Server-Bindungen anzulegen.",
   "admin.amp.autoStart": "Server automatisch starten, wenn ein Event bereit ist",
   "admin.amp.autoStopIdle": "Leerlauf-Stopp nach Minuten (0 = aus)",
@@ -674,7 +669,7 @@ export const deMessages = {
     "Nutze Restore nur bewusst zwischen Spielrunden und prüfe danach direkt Users, Events und die aktuelle Session.",
   "admin.storage.disabled.app":
     "S3 ist in der Umgebung aktiv, aber Snapshots sind in den App-Einstellungen abgeschaltet. Aktiviere die Option „S3-Snapshots …“ oben und speichere, um Backup und Restore zu nutzen.",
-  "admin.storage.disabled.env": "S3 Snapshot Storage ist in der Umgebung nicht aktiviert (HERMES_STORAGE_BACKEND ≠ s3).",
+  "admin.storage.disabled.env": "S3 Snapshot Storage ist in der Umgebung nicht aktiviert (MATCHDESK_STORAGE_BACKEND ≠ s3).",
   "admin.storage.backupStatus": "Backup Status",
   "admin.storage.lastOk": "Letzter Erfolg:",
   "admin.storage.lastErr": "Letzter Fehler:",
@@ -739,7 +734,7 @@ export const deMessages = {
   "admin.sessions.done": "{users} Benutzer abgemeldet ({sessions} Sitzungen beendet).",
   "admin.invites.title": "LAN-Party Invite-Codes.",
   "admin.invites.help":
-    "Wenn Felder leer bleiben, nutzt Hermes standardmäßig 300 Nutzungen und 30 Tage Laufzeit.",
+    "Wenn Felder leer bleiben, nutzt die Mitspielzentrale standardmäßig 300 Nutzungen und 30 Tage Laufzeit.",
   "admin.invites.sectionAria": "Invite-Codes",
   "admin.invites.fieldName": "Name",
   "admin.invites.fieldMaxUses": "Max. Nutzungen",
@@ -971,5 +966,5 @@ export const deMessages = {
   "pizza.transfer.confirmRemovals": "Ja, so übernehmen und diese Einträge entfernen bzw. deaktivieren",
   "pizza.transfer.staleRejected": "Das Menü wurde inzwischen geändert. Nichts übernommen – unten steht die neue Vorschau.",
   "pizza.transfer.error.unknown_field": "Unbekanntes Feld „{field}“ (Tippfehler?).",
-  "pizza.transfer.help": "YAML enthält das komplette Menü mit Extras, auch leere Kategorien. CSV (Trennzeichen ;, UTF-8 für Excel) gibt es für das Menü (eine Zeile pro Variante, getrennte Spalten artikel_aktiv und variante_aktiv) und getrennt für Extras (Kategorien mit | trennen). Preise mit Komma oder Punkt. Beim Import zählen Kategorie- und Artikelnamen bzw. Artikelnummern. Fehlende Artikel werden deaktiviert, fehlende Varianten und Extras entfernt oder – wenn schon bestellt – nur deaktiviert; fehlende Kategorien deaktiviert nur der YAML-Import. Bei vielen Entfernungen fragt Hermes nach. Alte Bestellungen behalten ihre Preise."
+  "pizza.transfer.help": "YAML enthält das komplette Menü mit Extras, auch leere Kategorien. CSV (Trennzeichen ;, UTF-8 für Excel) gibt es für das Menü (eine Zeile pro Variante, getrennte Spalten artikel_aktiv und variante_aktiv) und getrennt für Extras (Kategorien mit | trennen). Preise mit Komma oder Punkt. Beim Import zählen Kategorie- und Artikelnamen bzw. Artikelnummern. Fehlende Artikel werden deaktiviert, fehlende Varianten und Extras entfernt oder – wenn schon bestellt – nur deaktiviert; fehlende Kategorien deaktiviert nur der YAML-Import. Bei vielen Entfernungen fragt die Mitspielzentrale nach. Alte Bestellungen behalten ihre Preise."
 } as const;

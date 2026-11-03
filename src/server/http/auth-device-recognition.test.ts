@@ -6,9 +6,9 @@ import Database from "better-sqlite3";
 import request from "supertest";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { bootstrapAdmin } from "../db/bootstrap-admin";
-import { createHermesApp } from "../app";
+import { createMatchdeskApp } from "../app";
 
-type StartedApp = Awaited<ReturnType<typeof createHermesApp>>;
+type StartedApp = Awaited<ReturnType<typeof createMatchdeskApp>>;
 
 const DEVICE_KEY_A = "AAAAAAAAAAAAAAAAAAAAAA";
 const DEVICE_KEY_B = "BBBBBBBBBBBBBBBBBBBBBB";
@@ -41,18 +41,18 @@ function countActiveSessionsForAdmin() {
 
 describe("auth device recognition", () => {
   beforeEach(async () => {
-    databasePath = path.join(os.tmpdir(), `hermes-test-${randomUUID()}.sqlite`);
-    process.env.HERMES_DB_PATH = databasePath;
-    process.env.HERMES_ADMIN_PHONE = "+491701234567";
-    process.env.HERMES_ADMIN_USERNAME = "hauptadmin";
-    process.env.HERMES_ADMIN_EMAIL = "hauptadmin@example.test";
-    process.env.HERMES_MAIL_MODE = "console";
-    process.env.HERMES_DEV_LOGIN_CODE = "123456";
-    delete process.env.HERMES_STORAGE_BACKEND;
-    delete process.env.HERMES_VAPID_PUBLIC_KEY;
-    delete process.env.HERMES_VAPID_PRIVATE_KEY;
+    databasePath = path.join(os.tmpdir(), `matchdesk-test-${randomUUID()}.sqlite`);
+    process.env.MATCHDESK_DB_PATH = databasePath;
+    process.env.MATCHDESK_ADMIN_PHONE = "+491701234567";
+    process.env.MATCHDESK_ADMIN_USERNAME = "hauptadmin";
+    process.env.MATCHDESK_ADMIN_EMAIL = "hauptadmin@example.test";
+    process.env.MATCHDESK_MAIL_MODE = "console";
+    process.env.MATCHDESK_DEV_LOGIN_CODE = "123456";
+    delete process.env.MATCHDESK_STORAGE_BACKEND;
+    delete process.env.MATCHDESK_VAPID_PUBLIC_KEY;
+    delete process.env.MATCHDESK_VAPID_PRIVATE_KEY;
     await bootstrapAdmin();
-    started = await createHermesApp();
+    started = await createMatchdeskApp();
   }, 30_000);
 
   afterEach(async () => {

@@ -1,5 +1,6 @@
 import type { AppSettings } from "../types/core";
 
-export function brandIconSrc(settings: Pick<AppSettings, "brandMark">): string {
-  return settings.brandMark === "mitspiel" ? "/icon-mitspiel.svg" : "/icon.svg";
+/** App-Icon (M). `brandMark` kennt seit der Umbenennung nur noch einen Wert. */
+export function brandIconSrc(_settings?: Pick<AppSettings, "brandMark">): string {
+  return "/icon.svg";
 }

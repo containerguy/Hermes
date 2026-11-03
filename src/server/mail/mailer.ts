@@ -1,14 +1,15 @@
 import nodemailer from "nodemailer";
 import type Mail from "nodemailer/lib/mailer";
 import type { DatabaseContext } from "../db/client";
-import { readSettings, type HermesSettings } from "../settings";
+import { readSettings, type MatchdeskSettings } from "../settings";
 import { resolveAppDisplayName, fallbackAppDisplayName } from "../../shared/app-display-name";
 import { browserLanguageToLocale, type AppLocale } from "../../shared/locale";
 import { renderSystemMail, sanitizeInline, type SystemMailKind } from "./templates";
+import { readEnv } from "../env";
 
 export const MAIL_CODE_VALID_MINUTES = 10;
 
-const DEFAULT_MAIL_FROM_ADDRESS = "no-reply@hermes.local";
+const DEFAULT_MAIL_FROM_ADDRESS = "no-reply@matchdesk.local";
 
 /** Empfänger und Kontext einer System-Mail. */
 export type SystemMailRecipient = {
@@ -26,7 +27,7 @@ type SendCodeInput = SystemMailRecipient & { code: string };
 
 export type MailFrom = { name: string | null; address: string };
 
-/** `HERMES_MAIL_FROM` zerlegen: `Name <adresse>`, `"Name" <adresse>` oder nur `adresse`. */
+/** `MATCHDESK_MAIL_FROM` zerlegen: `Name <adresse>`, `"Name" <adresse>` oder nur `adresse`. */
 export function parseMailFrom(raw: string | undefined | null): MailFrom {
   const value = (raw ?? "").trim();
   if (!value) {
@@ -46,11 +47,11 @@ export function parseMailFrom(raw: string | undefined | null): MailFrom {
 let warnedInvalidPublicUrl = false;
 
 /**
- * Basis-URL für Links in Mails. Nur aus `HERMES_PUBLIC_URL` – bewusst nicht aus Host-/X-Forwarded-Headern
+ * Basis-URL für Links in Mails. Nur aus `MATCHDESK_PUBLIC_URL` – bewusst nicht aus Host-/X-Forwarded-Headern
  * der Anfrage: die sind ohne `trust proxy` vom Client frei wählbar und würden Phishing-Links in echte
  * Login-Mails ermöglichen. Ohne Env enthält die Mail keinen Link.
  */
-export function resolvePublicUrl(raw: string | undefined | null = process.env.HERMES_PUBLIC_URL): string | null {
+export function resolvePublicUrl(raw: string | undefined | null = readEnv("PUBLIC_URL")): string | null {
   const value = (raw ?? "").trim();
   if (!value) {
     return null;
@@ -64,20 +65,20 @@ export function resolvePublicUrl(raw: string | undefined | null = process.env.HE
   } catch {
     if (!warnedInvalidPublicUrl) {
       warnedInvalidPublicUrl = true;
-      console.warn("[Hermes] HERMES_PUBLIC_URL is not a valid http(s) URL – emails are sent without a link.");
+      console.warn("[Matchdesk] MATCHDESK_PUBLIC_URL is not a valid http(s) URL – emails are sent without a link.");
     }
     return null;
   }
 }
 
-function tryReadSettings(context: DatabaseContext | null): HermesSettings | null {
+function tryReadSettings(context: DatabaseContext | null): MatchdeskSettings | null {
   if (!context) {
     return null;
   }
   try {
     return readSettings(context);
   } catch (error) {
-    console.error("[Hermes] Could not read settings for email branding", error);
+    console.error("[Matchdesk] Could not read settings for email branding", error);
     return null;
   }
 }
@@ -85,7 +86,7 @@ function tryReadSettings(context: DatabaseContext | null): HermesSettings | null
 /** Mail-Sprache wie die Oberfläche: Nutzersprache → Browsersprache → Admin-Default → Deutsch. */
 export function resolveMailLocale(
   recipient: Pick<SystemMailRecipient, "locale" | "acceptLanguage">,
-  settings: Pick<HermesSettings, "defaultLocale"> | null
+  settings: Pick<MatchdeskSettings, "defaultLocale"> | null
 ): AppLocale {
   if (recipient.locale === "de" || recipient.locale === "en") {
     return recipient.locale;
@@ -96,10 +97,10 @@ export function resolveMailLocale(
 /**
  * Absender-Anzeigename = Name, den die App in Kopfzeile und Seitentitel zeigt (`appName`, sonst der
  * eingebaute Name je Template/Sprache). Nur wenn die Einstellungen nicht lesbar sind: Name aus
- * `HERMES_MAIL_FROM`, zuletzt „Mitspielzentrale“.
+ * `MATCHDESK_MAIL_FROM`, zuletzt „Mitspielzentrale“.
  */
 export function resolveSenderName(
-  settings: Pick<HermesSettings, "appName" | "projectTemplate"> | null,
+  settings: Pick<MatchdeskSettings, "appName" | "projectTemplate"> | null,
   locale: AppLocale,
   envFromName: string | null
 ): string {
@@ -115,8 +116,8 @@ export function buildSystemMail(
   kind: SystemMailKind,
   input: SendCodeInput,
   env: { mailFrom?: string | null; publicUrl?: string | null } = {
-    mailFrom: process.env.HERMES_MAIL_FROM,
-    publicUrl: process.env.HERMES_PUBLIC_URL
+    mailFrom: readEnv("MAIL_FROM"),
+    publicUrl: readEnv("PUBLIC_URL")
   }
 ): Mail.Options {
   const settings = tryReadSettings(context);
@@ -152,8 +153,8 @@ function readBoolean(value: string | undefined) {
 }
 
 function resolveSmtpSecurity(port: number) {
-  const mode = process.env.HERMES_SMTP_SECURITY?.trim().toLowerCase();
-  const legacySecure = process.env.HERMES_SMTP_SECURE;
+  const mode = readEnv("SMTP_SECURITY")?.trim().toLowerCase();
+  const legacySecure = readEnv("SMTP_SECURE");
 
   if (mode === "tls") {
     return { secure: true, requireTLS: false };
@@ -172,7 +173,7 @@ function resolveSmtpSecurity(port: number) {
 
     if (secure && port !== 465) {
       console.warn(
-        "[Hermes] HERMES_SMTP_SECURE=true on a non-465 port is interpreted as STARTTLS. Use HERMES_SMTP_SECURITY=tls for implicit TLS or HERMES_SMTP_SECURITY=starttls for port 587."
+        "[Matchdesk] MATCHDESK_SMTP_SECURE=true on a non-465 port is interpreted as STARTTLS. Use MATCHDESK_SMTP_SECURITY=tls for implicit TLS or MATCHDESK_SMTP_SECURITY=starttls for port 587."
       );
       return { secure: false, requireTLS: true };
     }
@@ -184,15 +185,15 @@ function resolveSmtpSecurity(port: number) {
 }
 
 function createSmtpTransport() {
-  const host = process.env.HERMES_SMTP_HOST;
-  const port = Number(process.env.HERMES_SMTP_PORT ?? "587");
+  const host = readEnv("SMTP_HOST");
+  const port = Number(readEnv("SMTP_PORT") ?? "587");
 
   if (!host) {
-    throw new Error("HERMES_SMTP_HOST is required when HERMES_MAIL_MODE=smtp");
+    throw new Error("MATCHDESK_SMTP_HOST is required when MATCHDESK_MAIL_MODE=smtp");
   }
 
-  const user = process.env.HERMES_SMTP_USER;
-  const pass = process.env.HERMES_SMTP_PASSWORD;
+  const user = readEnv("SMTP_USER");
+  const pass = readEnv("SMTP_PASSWORD");
   const security = resolveSmtpSecurity(port);
   return nodemailer.createTransport({
     host,
@@ -210,10 +211,10 @@ const CONSOLE_LABEL: Record<SystemMailKind, string> = {
 };
 
 async function sendSystemMail(context: DatabaseContext | null, kind: SystemMailKind, input: SendCodeInput) {
-  const mode = process.env.HERMES_MAIL_MODE ?? "console";
+  const mode = readEnv("MAIL_MODE") ?? "console";
 
   if (mode === "console") {
-    console.log(`[Hermes] ${CONSOLE_LABEL[kind]} for ${input.username} <${input.to}>: ${input.code}`);
+    console.log(`[Matchdesk] ${CONSOLE_LABEL[kind]} for ${input.username} <${input.to}>: ${input.code}`);
     return;
   }
 

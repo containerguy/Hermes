@@ -6,9 +6,9 @@ import request from "supertest";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { CSRF_HEADER } from "./csrf";
 import { bootstrapAdmin } from "../db/bootstrap-admin";
-import { createHermesApp } from "../app";
+import { createMatchdeskApp } from "../app";
 
-type StartedApp = Awaited<ReturnType<typeof createHermesApp>>;
+type StartedApp = Awaited<ReturnType<typeof createMatchdeskApp>>;
 
 let started: StartedApp | undefined;
 let databasePath: string;
@@ -27,21 +27,21 @@ async function fetchCsrf(agent: ReturnType<typeof request.agent>) {
   return response.body.token as string;
 }
 
-describe("hermes-auth", () => {
+describe("matchdesk-auth", () => {
   beforeEach(
     async () => {
-      databasePath = path.join(os.tmpdir(), `hermes-auth-test-${randomUUID()}.sqlite`);
-      process.env.HERMES_DB_PATH = databasePath;
-      process.env.HERMES_ADMIN_PHONE = "+491701234567";
-      process.env.HERMES_ADMIN_USERNAME = "hauptadmin";
-      process.env.HERMES_ADMIN_EMAIL = "hauptadmin@example.test";
-      process.env.HERMES_MAIL_MODE = "console";
-      process.env.HERMES_DEV_LOGIN_CODE = "123456";
-      delete process.env.HERMES_STORAGE_BACKEND;
-      delete process.env.HERMES_VAPID_PUBLIC_KEY;
-      delete process.env.HERMES_VAPID_PRIVATE_KEY;
+      databasePath = path.join(os.tmpdir(), `matchdesk-auth-test-${randomUUID()}.sqlite`);
+      process.env.MATCHDESK_DB_PATH = databasePath;
+      process.env.MATCHDESK_ADMIN_PHONE = "+491701234567";
+      process.env.MATCHDESK_ADMIN_USERNAME = "hauptadmin";
+      process.env.MATCHDESK_ADMIN_EMAIL = "hauptadmin@example.test";
+      process.env.MATCHDESK_MAIL_MODE = "console";
+      process.env.MATCHDESK_DEV_LOGIN_CODE = "123456";
+      delete process.env.MATCHDESK_STORAGE_BACKEND;
+      delete process.env.MATCHDESK_VAPID_PUBLIC_KEY;
+      delete process.env.MATCHDESK_VAPID_PRIVATE_KEY;
       await bootstrapAdmin();
-      started = await createHermesApp();
+      started = await createMatchdeskApp();
     },
     30_000
   );
@@ -80,7 +80,7 @@ describe("hermes-auth", () => {
     const created = await agent
       .post("/api/auth/api-tokens")
       .set(CSRF_HEADER, csrf)
-      .send({ scope: "full", label: "hermes-auth-test" })
+      .send({ scope: "full", label: "matchdesk-auth-test" })
       .expect(201);
 
     const fullToken = created.body.token as string;

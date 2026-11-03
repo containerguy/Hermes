@@ -48,7 +48,7 @@ export type AppSettings = {
   /** Markdown-Inhalt der Infos-Seite (Überschriften, Listen, Links) */
   infosMarkdown: string;
   /**
-   * true: S3-Snapshots wenn HERMES_STORAGE_BACKEND=s3.
+   * true: S3-Snapshots wenn MATCHDESK_STORAGE_BACKEND=s3.
    * false: S3-Backups/Restore in der App abgeschaltet (Default an).
    */
   s3SnapshotEnabled: boolean;
@@ -280,7 +280,7 @@ export type RestoreRecovery = { id: string; key: string };
 
 export type StorageInfo = {
   backend: "s3" | "disabled";
-  /** true wenn HERMES_STORAGE_BACKEND=s3 (unabhängig vom App-Schalter s3SnapshotEnabled). */
+  /** true wenn MATCHDESK_STORAGE_BACKEND=s3 (unabhängig vom App-Schalter s3SnapshotEnabled). */
   envS3Configured: boolean;
   location: StorageLocationDetails | null;
   backupStatus: StorageBackupStatus | null;

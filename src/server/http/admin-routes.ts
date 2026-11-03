@@ -3,7 +3,7 @@ import { Router } from "express";
 import { z } from "zod";
 import { requireCsrf } from "../auth/csrf";
 import { publicUser, requireAdmin, requireUser } from "../auth/current-user";
-import { enforceApiTokenWriteAccess } from "../auth/hermes-auth";
+import { enforceApiTokenWriteAccess } from "../auth/matchdesk-auth";
 import { listAuditLogs, tryWriteAuditLog } from "../audit-log";
 import {
   addRateLimitAllowlist,
@@ -48,6 +48,7 @@ import {
   readBackupStatus
 } from "../storage/s3-storage";
 import { readSettings, settingsPartialSchema, settingsSchema, writeSettings } from "../settings";
+import { readEnv } from "../env";
 
 const allowlistSchema = z.object({
   ipOrCidr: z.string().trim().min(1).max(80),
@@ -153,7 +154,7 @@ export function createAdminRouter(context: DatabaseContext) {
     });
 
     const stamp = payload.exportedAt.replace(/[:.]/g, "-");
-    response.setHeader("Content-Disposition", `attachment; filename="hermes-users-${stamp}.json"`);
+    response.setHeader("Content-Disposition", `attachment; filename="matchdesk-users-${stamp}.json"`);
     response.type("application/json");
     response.send(JSON.stringify(payload, null, 2));
   });
@@ -279,7 +280,7 @@ export function createAdminRouter(context: DatabaseContext) {
     try {
       insertedUsers = commitBulkImportAnalysis(context, admin, analysis);
     } catch (error) {
-      console.error("[Hermes] Failed to commit bulk user import", error);
+      console.error("[Matchdesk] Failed to commit bulk user import", error);
       response.status(409).json({ error: "import_konnte_nicht_gespeichert_werden" });
       return;
     }
@@ -337,7 +338,7 @@ export function createAdminRouter(context: DatabaseContext) {
     try {
       insertedUsers = commitBulkImportAnalysis(context, admin, analysis);
     } catch (error) {
-      console.error("[Hermes] Failed to commit user export import", error);
+      console.error("[Matchdesk] Failed to commit user export import", error);
       response.status(409).json({ error: "import_konnte_nicht_gespeichert_werden" });
       return;
     }
@@ -482,12 +483,12 @@ export function createAdminRouter(context: DatabaseContext) {
   router.get("/settings", (_request, response) => {
     const backend = getStorageBackend(context.sqlite);
     const location = getS3LocationDetails(context.sqlite);
-    const envS3Configured = process.env.HERMES_STORAGE_BACKEND === "s3";
+    const envS3Configured = readEnv("STORAGE_BACKEND") === "s3";
     let backupStatus = null;
     try {
       backupStatus = readBackupStatus(context.sqlite);
     } catch (error) {
-      console.error("[Hermes] Failed to read backup status", error);
+      console.error("[Matchdesk] Failed to read backup status", error);
       backupStatus = null;
     }
 
@@ -642,7 +643,7 @@ export function createAdminRouter(context: DatabaseContext) {
     });
 
     const stamp = payload.exportedAt.replace(/[:.]/g, "-");
-    response.setHeader("Content-Disposition", `attachment; filename="hermes-settings-${stamp}.json"`);
+    response.setHeader("Content-Disposition", `attachment; filename="matchdesk-settings-${stamp}.json"`);
     response.type("application/json");
     response.send(JSON.stringify(payload, null, 2));
   });

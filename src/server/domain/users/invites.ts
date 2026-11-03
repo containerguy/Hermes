@@ -141,7 +141,7 @@ export function createInviteCodeService(
       })
       .run();
   } catch (error) {
-    console.error("[Hermes] Failed to create invite code", error);
+    console.error("[Matchdesk] Failed to create invite code", error);
     return { ok: false, status: 409, error: "invite_code_existiert" };
   }
 

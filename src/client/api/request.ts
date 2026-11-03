@@ -5,7 +5,7 @@ export async function requestJson<T>(url: string, options?: RequestInit): Promis
   const csrfHeader: Record<string, string> = {};
   if (shouldAttachCsrf(url, options)) {
     const token = await getCsrfToken();
-    csrfHeader["X-Hermes-CSRF"] = token;
+    csrfHeader["X-Matchdesk-CSRF"] = token;
   }
 
   const response = await fetch(url, {

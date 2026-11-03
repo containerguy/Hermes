@@ -5,9 +5,9 @@ import path from "node:path";
 import request from "supertest";
 import { CSRF_HEADER } from "../auth/csrf";
 import { bootstrapAdmin } from "../db/bootstrap-admin";
-import { createHermesApp } from "../app";
+import { createMatchdeskApp } from "../app";
 
-type StartedApp = Awaited<ReturnType<typeof createHermesApp>>;
+type StartedApp = Awaited<ReturnType<typeof createMatchdeskApp>>;
 type Agent = ReturnType<typeof request.agent>;
 
 export type Actor = { agent: Agent; csrf: string; id: string };
@@ -35,18 +35,18 @@ async function login(app: StartedApp["app"], username: string): Promise<Actor> {
 
 /** Frische Test-DB mit Pizza-Modul an, Rollen admin/manager/organizer/user (wie pizza-management.test). */
 export async function startPizzaTestEnv(): Promise<PizzaTestEnv> {
-  const databasePath = path.join(os.tmpdir(), `hermes-test-${randomUUID()}.sqlite`);
-  process.env.HERMES_DB_PATH = databasePath;
-  process.env.HERMES_ADMIN_PHONE = "+491701234567";
-  process.env.HERMES_ADMIN_USERNAME = "hauptadmin";
-  process.env.HERMES_ADMIN_EMAIL = "hauptadmin@example.test";
-  process.env.HERMES_MAIL_MODE = "console";
-  process.env.HERMES_DEV_LOGIN_CODE = "123456";
-  delete process.env.HERMES_STORAGE_BACKEND;
-  delete process.env.HERMES_VAPID_PUBLIC_KEY;
-  delete process.env.HERMES_VAPID_PRIVATE_KEY;
+  const databasePath = path.join(os.tmpdir(), `matchdesk-test-${randomUUID()}.sqlite`);
+  process.env.MATCHDESK_DB_PATH = databasePath;
+  process.env.MATCHDESK_ADMIN_PHONE = "+491701234567";
+  process.env.MATCHDESK_ADMIN_USERNAME = "hauptadmin";
+  process.env.MATCHDESK_ADMIN_EMAIL = "hauptadmin@example.test";
+  process.env.MATCHDESK_MAIL_MODE = "console";
+  process.env.MATCHDESK_DEV_LOGIN_CODE = "123456";
+  delete process.env.MATCHDESK_STORAGE_BACKEND;
+  delete process.env.MATCHDESK_VAPID_PUBLIC_KEY;
+  delete process.env.MATCHDESK_VAPID_PRIVATE_KEY;
   await bootstrapAdmin();
-  const started = await createHermesApp();
+  const started = await createMatchdeskApp();
   const admin = await login(started.app, "hauptadmin");
   const current = await admin.agent.get("/api/admin/settings").expect(200);
   await admin.agent
