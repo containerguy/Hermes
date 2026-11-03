@@ -37,6 +37,7 @@ import {
 import { sendEmailChangeCode, sendLoginCode } from "../mail/mailer";
 import { readSettings } from "../settings";
 import { isRegistrationClosed } from "../domain/main-events";
+import { broadcastEventsChanged } from "../realtime/event-bus";
 import { browserLanguageToLocale } from "../../shared/locale";
 import {
   createApiToken,
@@ -429,6 +430,10 @@ export function createAuthRouter(context: DatabaseContext) {
           const inviteEvent = freshInvite.mainEventId
             ? context.db.select().from(mainEvents).where(eq(mainEvents.id, freshInvite.mainEventId)).get()
             : undefined;
+          // Ein Code für ein beendetes Event lädt niemanden mehr ein.
+          if (inviteEvent?.status === "ended") {
+            throw new InviteInvalidError();
+          }
 
           context.db
             .insert(users)
@@ -451,7 +456,7 @@ export function createAuthRouter(context: DatabaseContext) {
             })
             .run();
 
-          if (inviteEvent && inviteEvent.status !== "ended") {
+          if (inviteEvent) {
             if (inviteEvent.visibility === "private") {
               context.db
                 .insert(mainEventInvites)
@@ -554,6 +559,10 @@ export function createAuthRouter(context: DatabaseContext) {
           mainEventId: created.registeredViaMainEventId
         }
       });
+
+      if (created.registeredViaMainEventId) {
+        broadcastEventsChanged("main_event_participation_updated");
+      }
 
       const responseBody: Record<string, unknown> = {
         user: publicUser(created),

@@ -418,6 +418,15 @@ describe("event registration: capacity, waitlist, deadline, overview", () => {
       registeredViaMainEventId: null,
       registeredViaMainEventName: "LAN Winter"
     });
+    // Der Code des gelöschten Events wird deaktiviert statt zum allgemeinen Code.
+    const codes = (await adminAgent.get("/api/admin/invite-codes").expect(200)).body.inviteCodes;
+    expect(codes.find((code: { id: string }) => code.id === invite.body.inviteCode.id).revokedAt).toEqual(
+      expect.any(String)
+    );
+    await request(started!.app)
+      .post("/api/auth/register")
+      .send({ inviteCode: invite.body.inviteCode.code, username: "spaeter", email: "spaeter@example.test" })
+      .expect(403);
   });
 
   it("does not sign up people after the deadline and rejects codes for ended or unknown events", async () => {
@@ -440,6 +449,12 @@ describe("event registration: capacity, waitlist, deadline, overview", () => {
     const csrf = await fetchCsrf(managerAgent);
     await managerAgent.post(`/api/main-events/${event.id}/start`).set(CSRF_HEADER, csrf).expect(200);
     await managerAgent.post(`/api/main-events/${event.id}/end`).set(CSRF_HEADER, csrf).expect(200);
+    // Nach dem Event lädt der Code niemanden mehr ein.
+    const afterEnd = await request(started!.app)
+      .post("/api/auth/register")
+      .send({ inviteCode: invite.body.inviteCode.code, username: "danach", email: "danach@example.test" });
+    expect(afterEnd.status).toBe(403);
+    expect(afterEnd.body.error).toBe("invite_ungueltig");
     const ended = await createInvite(adminAgent, { label: "Y", mainEventId: event.id });
     expect(ended.status).toBe(400);
     expect(ended.body.error).toBe("invite_event_ungueltig");

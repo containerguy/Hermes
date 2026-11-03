@@ -1,5 +1,5 @@
 import { relations, sql } from "drizzle-orm";
-import { index, integer, primaryKey, sqliteTable, text, uniqueIndex } from "drizzle-orm/sqlite-core";
+import { index, integer, primaryKey, sqliteTable, text, uniqueIndex, type AnySQLiteColumn } from "drizzle-orm/sqlite-core";
 
 export const users = sqliteTable(
   "users",
@@ -17,11 +17,17 @@ export const users = sqliteTable(
     locale: text("locale"),
     createdByUserId: text("created_by_user_id"),
     /** 0028: über welches Event (Einladungscode pro Event) sich der Benutzer registriert hat. */
-    registeredViaMainEventId: text("registered_via_main_event_id"),
+    registeredViaMainEventId: text("registered_via_main_event_id").references(
+      (): AnySQLiteColumn => mainEvents.id,
+      { onDelete: "set null" }
+    ),
     /** 0028: Eventname zum Zeitpunkt der Registrierung (bleibt, falls das Event gelöscht wird). */
     registeredViaMainEventName: text("registered_via_main_event_name"),
     /** 0028: verwendeter Einladungscode. */
-    registeredViaInviteCodeId: text("registered_via_invite_code_id"),
+    registeredViaInviteCodeId: text("registered_via_invite_code_id").references(
+      (): AnySQLiteColumn => inviteCodes.id,
+      { onDelete: "set null" }
+    ),
     deletedAt: text("deleted_at"),
     createdAt: text("created_at").notNull(),
     updatedAt: text("updated_at").notNull()

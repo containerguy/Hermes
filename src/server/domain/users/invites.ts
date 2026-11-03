@@ -171,14 +171,14 @@ export function createInviteCodeService(
 
 export type InviteUpdateResult =
   | { ok: true; invite: SerializedInvite }
-  | { ok: false; status: 404 | 409; error: string };
+  | { ok: false; status: 400 | 404 | 409; error: string };
 
 export function updateInviteCodeService(
   context: DatabaseContext,
   admin: Actor,
   inviteId: string,
   patch: UpdateInput
-): InviteUpdateResult | { ok: false; status: 400; error: string } {
+): InviteUpdateResult {
   if (patch.mainEventId !== undefined && !checkInviteMainEvent(context, patch.mainEventId)) {
     return { ok: false, status: 400, error: "invite_event_ungueltig" };
   }

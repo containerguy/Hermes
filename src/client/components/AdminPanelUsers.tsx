@@ -62,6 +62,9 @@ export function AdminPanelUsers({
   const registrationEvents = Array.from(
     new Set(users.map((user) => user.registeredViaMainEventName).filter((name): name is string => Boolean(name)))
   ).sort((left, right) => left.localeCompare(right));
+  if (eventFilter && !registrationEvents.includes(eventFilter)) {
+    registrationEvents.push(eventFilter);
+  }
   const visibleUsers = eventFilter
     ? users.filter((user) => user.registeredViaMainEventName === eventFilter)
     : users;
@@ -254,7 +257,7 @@ export function AdminPanelUsers({
         ) : null}
       </section>
 
-      {registrationEvents.length > 0 ? (
+      {registrationEvents.length > 0 || eventFilter ? (
         <label className="admin-user-filter">
           {t("admin.user.filterEvent")}
           <select value={eventFilter} onChange={(event) => setEventFilter(event.target.value)}>
