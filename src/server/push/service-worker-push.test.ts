@@ -80,13 +80,13 @@ describe("service worker push handler", () => {
       }
     });
 
-    expect(rendered.title).toBe("Hermes");
+    expect(rendered.title).toBe("Mitspielzentrale");
     expect(rendered.options).toEqual(
       expect.objectContaining({
         body: "Neue Benachrichtigung",
         icon: "/icon.svg",
         badge: "/icon.svg",
-        tag: "hermes-event",
+        tag: "matchdesk-event",
         requireInteraction: false,
         vibrate: [180, 80, 180],
         data: { url: "/" }
@@ -99,7 +99,7 @@ describe("service worker push handler", () => {
 
     const rendered = await dispatch(undefined);
 
-    expect(rendered.title).toBe("Hermes");
+    expect(rendered.title).toBe("Mitspielzentrale");
     expect(rendered.options.body).toBe("Neue Benachrichtigung");
     expect(rendered.options.vibrate).toEqual([180, 80, 180]);
     expect(rendered.options.requireInteraction).toBe(false);

@@ -22,9 +22,9 @@ RUN npm prune --omit=dev
 FROM node:22-bookworm-slim AS runtime
 
 ENV NODE_ENV=production \
-    HERMES_HOST=0.0.0.0 \
-    HERMES_PORT=3000 \
-    HERMES_DB_PATH=/data/hermes.sqlite
+    MATCHDESK_HOST=0.0.0.0 \
+    MATCHDESK_PORT=3000 \
+    MATCHDESK_DB_PATH=/data/matchdesk.sqlite
 
 WORKDIR /app
 

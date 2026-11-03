@@ -1,5 +1,5 @@
 import type { GameServerBinding } from "../../domain/gameservers/bindings";
-import type { HermesSettings } from "../../settings";
+import type { MatchdeskSettings } from "../../settings";
 import { ampCall, ampInstanceCall, unwrapAmpData } from "./amp-session";
 import { getServerStatus } from "./amp-status";
 
@@ -60,7 +60,7 @@ export function controlBlockedReason(action: ControlAction, status: ReturnType<t
   return null;
 }
 
-export async function runControlAction(settings: HermesSettings, binding: GameServerBinding, action: ControlAction) {
+export async function runControlAction(settings: MatchdeskSettings, binding: GameServerBinding, action: ControlAction) {
   const status = getServerStatus(binding.id);
   switch (action) {
     case "start": {

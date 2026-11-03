@@ -13,7 +13,7 @@ import {
 const LEVELS: BotLevel[] = ["easy", "normal", "hard", "expert"];
 const TEAMS: BotTeam[] = ["auto", "t", "ct"];
 
-/** Bots per Bedienelement (nur manager+): Hermes baut die Konsolenbefehle serverseitig. */
+/** Bots per Bedienelement (nur manager+): Matchdesk baut die Konsolenbefehle serverseitig. */
 export function ServerBots({ bindingId, kind }: { bindingId: string; kind: BotKind }) {
   const { t, locale } = useI18n();
   const [count, setCount] = useState(5);

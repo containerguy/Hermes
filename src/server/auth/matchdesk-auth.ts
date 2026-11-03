@@ -4,15 +4,16 @@ import type { DatabaseContext } from "../db/client";
 import { sessions, userApiTokens, users } from "../db/schema";
 import {
   hashSessionToken,
+  hasOnlyLegacySessionCookie,
   isSessionIdleExpired,
   readDeviceCookie,
-  SESSION_COOKIE,
+  readSessionCookie,
   SESSION_RENEW_INTERVAL_MS,
   setDeviceCookie,
   setSessionCookie
 } from "./sessions";
 
-export type HermesRequestAuth =
+export type MatchdeskRequestAuth =
   | {
       kind: "session";
       session: typeof sessions.$inferSelect;
@@ -28,10 +29,10 @@ export type HermesRequestAuth =
 declare global {
   namespace Express {
     interface Request {
-      /** Set by `resolveHermesAuth` after first access in a request. */
-      hermesAuth?: HermesRequestAuth;
-      /** When true, `hermesAuth` (or anonymous) was resolved. */
-      hermesAuthLoaded?: boolean;
+      /** Set by `resolveMatchdeskAuth` after first access in a request. */
+      matchdeskAuth?: MatchdeskRequestAuth;
+      /** When true, `matchdeskAuth` (or anonymous) was resolved. */
+      matchdeskAuthLoaded?: boolean;
     }
   }
 }
@@ -75,7 +76,7 @@ function resolveApiToken(context: DatabaseContext, request: Request, rawToken: s
     .where(eq(userApiTokens.id, row.token.id))
     .run();
 
-  request.hermesAuth = {
+  request.matchdeskAuth = {
     kind: "api_token",
     tokenId: row.token.id,
     scope: row.token.scope,
@@ -84,7 +85,7 @@ function resolveApiToken(context: DatabaseContext, request: Request, rawToken: s
 }
 
 function resolveSessionCookie(context: DatabaseContext, request: Request) {
-  const token = request.cookies?.[SESSION_COOKIE] as string | undefined;
+  const token = readSessionCookie(request);
   if (!token) {
     return;
   }
@@ -111,7 +112,7 @@ function resolveSessionCookie(context: DatabaseContext, request: Request) {
     .where(eq(sessions.id, result.session.id))
     .run();
 
-  request.hermesAuth = {
+  request.matchdeskAuth = {
     kind: "session",
     session: result.session,
     user: result.user
@@ -121,11 +122,11 @@ function resolveSessionCookie(context: DatabaseContext, request: Request) {
 /**
  * Resolves cookie session or Bearer API token once per request.
  */
-export function resolveHermesAuth(context: DatabaseContext, request: Request) {
-  if (request.hermesAuthLoaded) {
+export function resolveMatchdeskAuth(context: DatabaseContext, request: Request) {
+  if (request.matchdeskAuthLoaded) {
     return;
   }
-  request.hermesAuthLoaded = true;
+  request.matchdeskAuthLoaded = true;
 
   const bearer = parseBearerToken(request);
   if (bearer) {
@@ -141,17 +142,19 @@ export function resolveHermesAuth(context: DatabaseContext, request: Request) {
  * per renew interval, so an actively used session never runs into the cookie max-age.
  */
 function renewSessionCookieIfDue(context: DatabaseContext, request: Request, response: Response) {
-  const auth = request.hermesAuth;
+  const auth = request.matchdeskAuth;
   if (auth?.kind !== "session") {
     return;
   }
-  const token = request.cookies?.[SESSION_COOKIE] as string | undefined;
+  const token = readSessionCookie(request);
   if (!token) {
     return;
   }
 
+  // Alte Cookie-Namen (hermes_*) sofort auf die neuen umziehen, nicht erst beim nächsten Intervall.
+  const migrateLegacy = hasOnlyLegacySessionCookie(request);
   const lastRenewal = Date.parse(auth.session.renewedAt ?? auth.session.createdAt);
-  if (!Number.isNaN(lastRenewal) && Date.now() - lastRenewal < SESSION_RENEW_INTERVAL_MS) {
+  if (!migrateLegacy && !Number.isNaN(lastRenewal) && Date.now() - lastRenewal < SESSION_RENEW_INTERVAL_MS) {
     return;
   }
 
@@ -168,16 +171,16 @@ function renewSessionCookieIfDue(context: DatabaseContext, request: Request, res
   }
 }
 
-export function hermesAuthMiddleware(context: DatabaseContext) {
+export function matchdeskAuthMiddleware(context: DatabaseContext) {
   return (request: Request, response: Response, next: () => void) => {
-    resolveHermesAuth(context, request);
+    resolveMatchdeskAuth(context, request);
     renewSessionCookieIfDue(context, request, response);
     next();
   };
 }
 
 export function isApiTokenReadOnly(request: Request): boolean {
-  return request.hermesAuth?.kind === "api_token" && request.hermesAuth.scope === "read_only";
+  return request.matchdeskAuth?.kind === "api_token" && request.matchdeskAuth.scope === "read_only";
 }
 
 export function enforceApiTokenWriteAccess(request: Request, response: import("express").Response) {

@@ -1,7 +1,7 @@
 import { deMessages } from "./de";
 
 export const enMessages: { [K in keyof typeof deMessages]: string } = {
-  "brand.displayName": "MatchDesk",
+  "brand.displayName": "Matchdesk",
 
   "kiosk.pageTitle": "Current rounds",
   "kiosk.bootLoading": "Loading…",
@@ -93,7 +93,7 @@ export const enMessages: { [K in keyof typeof deMessages]: string } = {
   "login.title.verify": "Enter code.",
   "login.help.register":
     "Create your account with invite code, username, and email. You will receive a one-time code for first sign-in.",
-  "login.help.request": "Enter your username or email address (not case-sensitive). Hermes sends the one-time code to the email on file.",
+  "login.help.request": "Enter your username or email address (not case-sensitive). Matchdesk sends the one-time code to the email on file.",
   "login.help.verify":
     "Enter the code from the email and optionally name this device for your device list.",
   "login.field.invite": "Invite code",
@@ -109,11 +109,11 @@ export const enMessages: { [K in keyof typeof deMessages]: string } = {
   "login.deviceName.change": "Use a different name",
   "login.pairLink.summary": "Sign in with a pairing link",
   "login.pairLink.help": "On a signed-in device, create a link under Profile → Pairing, copy it and paste it here. No email code needed.",
-  "login.pairLink.helpIosPwa": "On iPhone/iPad the home-screen app has its own storage and does not share the Safari sign-in. Open Hermes in Safari, create a link under Profile → Pairing, copy it and paste it here.",
+  "login.pairLink.helpIosPwa": "On iPhone/iPad the home-screen app has its own storage and does not share the Safari sign-in. Open Matchdesk in Safari, create a link under Profile → Pairing, copy it and paste it here.",
   "login.pairLink.field": "Pairing link or code",
   "login.pairLink.submit": "Connect device",
   "login.pairLink.invalid": "This does not look like a valid pairing link.",
-  "loginProfile.pair.iosHomeScreenHint": "Using Hermes from the home screen? On iPhone/iPad the app does not sign in automatically. Create a link here, tap “Copy link” and paste it in the app under “Sign in with a pairing link”.",
+  "loginProfile.pair.iosHomeScreenHint": "Using Matchdesk from the home screen? On iPhone/iPad the app does not sign in automatically. Create a link here, tap “Copy link” and paste it in the app under “Sign in with a pairing link”.",
   "loginProfile.pair.copy": "Copy link",
   "loginProfile.pair.copied": "Copied",
   "login.backToLogin": "Back to login",
@@ -187,21 +187,21 @@ export const enMessages: { [K in keyof typeof deMessages]: string } = {
   "loginProfile.notificationsEyebrow": "Notifications",
   "loginProfile.notificationsTitle": "Test push before the match.",
   "loginProfile.installEyebrow": "Installation",
-  "loginProfile.installTitle": "Use Hermes like an app",
+  "loginProfile.installTitle": "Use Matchdesk like an app",
   "loginProfile.installPwaBody":
     "This view runs as an installed web app. Push and quick access are usually more comfortable than a normal browser tab.",
   "loginProfile.installDeferredBody":
     "Your browser allows installation—recommended for more reliable notifications and home screen access.",
   "loginProfile.installButton": "Install app",
   "loginProfile.iosStep1": "Safari: open Share (square with arrow).",
-  "loginProfile.iosStep2": "Choose Add to Home Screen—Hermes then launches like an app.",
+  "loginProfile.iosStep2": "Choose Add to Home Screen—Matchdesk then launches like an app.",
   "loginProfile.chromeStep1": "Chrome / Edge: three-dot menu or install icon in the address bar.",
   "loginProfile.chromeStep2":
-    "Choose Install app. If missing, the browser may not support install or Hermes is already installed.",
+    "Choose Install app. If missing, the browser may not support install or Matchdesk is already installed.",
   "loginProfile.pushExplain1":
-    "Hermes sends standard browser notifications. Ringtones and guaranteed audio are not under Hermes’ control.",
+    "Matchdesk sends standard browser notifications. Ringtones and guaranteed audio are not under Matchdesk’s control.",
   "loginProfile.pushExplain2":
-    "If a check below fails, invites and status changes stay visible in Hermes, but this device gets no push hints.",
+    "If a check below fails, invites and status changes stay visible in Matchdesk, but this device gets no push hints.",
   "loginProfile.dt.secureContext": "Secure context",
   "loginProfile.dt.browserApis": "Browser APIs",
   "loginProfile.dt.permission": "Permission",
@@ -230,7 +230,7 @@ export const enMessages: { [K in keyof typeof deMessages]: string } = {
   "loginProfile.pair.sectionAria": "Add device",
   "loginProfile.pair.titleConnect": "Connect another device.",
   "loginProfile.pair.helpConnect":
-    "Create a short-lived pairing link to open Hermes on phone, tablet, or second PC without typing the one-time code again.",
+    "Create a short-lived pairing link to open Matchdesk on phone, tablet, or second PC without typing the one-time code again.",
   "loginProfile.pair.close": "Close",
   "loginProfile.pair.qrLabel": "Pairing QR code",
   "loginProfile.pair.validUntil": "Valid until",
@@ -250,7 +250,7 @@ export const enMessages: { [K in keyof typeof deMessages]: string } = {
 
   "secure.https.title": "Secure connection (HTTPS)",
   "secure.https.body":
-    "This Hermes instance runs over HTTPS. Web push is generally possible if the browser and device expose the APIs.",
+    "This Matchdesk instance runs over HTTPS. Web push is generally possible if the browser and device expose the APIs.",
   "secure.localhost.title": "Local secure context",
   "secure.localhost.body":
     "localhost counts as a secure context—ideal for testing push without a public certificate.",
@@ -383,8 +383,8 @@ export const enMessages: { [K in keyof typeof deMessages]: string } = {
   "events.server.bots.confirmRemoveAll": "Remove all bots from the server?",
   "events.server.bots.sent": "Sent. The console shows the server's answer.",
   "events.server.bots.running": "Running … (a few seconds on CS2)",
-  "events.server.bots.hintYapb": "“Fill” keeps the player count; bots leave as soon as humans join. “Change level for all” applies immediately. With a fixed team, Hermes lifts the team limit and auto balance.",
-  "events.server.bots.hintCs2": "“Fill” keeps the player count; CS2 only sends the bots once a human joins. “Change level for all” re-adds the bots, because CS2 only applies the level to new bots. With a fixed team, Hermes lifts the team limit and auto balance.",
+  "events.server.bots.hintYapb": "“Fill” keeps the player count; bots leave as soon as humans join. “Change level for all” applies immediately. With a fixed team, Matchdesk lifts the team limit and auto balance.",
+  "events.server.bots.hintCs2": "“Fill” keeps the player count; CS2 only sends the bots once a human joins. “Change level for all” re-adds the bots, because CS2 only applies the level to new bots. With a fixed team, Matchdesk lifts the team limit and auto balance.",
   "events.server.consoleEmpty": "No output yet.",
   "events.server.consolePlaceholder": "Command for the server …",
   "events.server.consoleSend": "Send",
@@ -510,7 +510,7 @@ export const enMessages: { [K in keyof typeof deMessages]: string } = {
   "admin.bulk.eyebrow": "Bulk import",
   "admin.bulk.title": "Import users from CSV or JSON.",
   "admin.bulk.intro":
-    "Hermes validates each row server-side with the same contract as single-user creation. Preview shows blocking conflicts; commit stays locked until the last preview is clean.",
+    "Matchdesk validates each row server-side with the same contract as single-user creation. Preview shows blocking conflicts; commit stays locked until the last preview is clean.",
   "admin.bulk.format": "Format",
   "admin.bulk.data": "Import data",
   "admin.bulk.preview": "Load preview",
@@ -537,19 +537,14 @@ export const enMessages: { [K in keyof typeof deMessages]: string } = {
   "admin.betrieb.title": "Settings, shell copy, and storage",
   "admin.label.appName": "Name shown in the UI",
   "admin.help.appName":
-    "Optional. Leave empty for the built-in name “Mitspielzentrale” (German UI) or “MatchDesk” (English UI). A custom value replaces it in the shell and document title.",
-  "admin.label.brandMark": "Logo in the UI",
-  "admin.brandMark.mitspiel": "M · Mitspielzentrale / MatchDesk (default)",
-  "admin.brandMark.hermes": "H · Hermes (classic)",
-  "admin.help.brandMark":
-    "Controls the tile icon in the menu, login aside, and event board. The PWA install icon stays “Hermes”.",
+    "Optional. Leave empty for the built-in name “Mitspielzentrale” (German UI) or “Matchdesk” (English UI). A custom value replaces it in the shell and document title.",
   "admin.label.archiveHours": "Auto-archive after hours",
   "admin.label.notifyDefault": "Notifications on by default",
   "admin.label.publicReg": "Allow public registration with invite code",
   "admin.label.s3snap":
     "Allow S3 snapshots and restore in this instance (default on; only if environment uses S3)",
   "admin.help.s3snap":
-    "If disabled, Hermes writes no periodic or manual snapshots to S3 and blocks in-app restore—even when HERMES_STORAGE_BACKEND=s3. The first database download to an empty volume at startup still follows the environment variable only, not this option.",
+    "If disabled, Matchdesk writes no periodic or manual snapshots to S3 and blocks in-app restore—even when MATCHDESK_STORAGE_BACKEND=s3. The first database download to an empty volume at startup still follows the environment variable only, not this option.",
   "admin.projectTemplate.label": "Project template",
   "admin.projectTemplate.help":
     "Controls built-in default copy (navigation, board, forms, kiosk). Filled-in shell texts below override the home headline and empty-board texts. “Table tennis” uses tournament-oriented wording; data model and flows stay the same.",
@@ -603,10 +598,10 @@ export const enMessages: { [K in keyof typeof deMessages]: string } = {
   "admin.features.pizza.cashRecipient": "Cash recipient note",
   "admin.amp.title": "CubeCoders AMP",
   "admin.amp.help":
-    "When enabled, Hermes shows server status, player count and a connect button for events with a bound game; managers and admins can control the servers. Base URL of the AMP controller without “/API” (e.g. https://amp-ctl.lanparty.example). Credentials live only in the server environment.",
+    "When enabled, Matchdesk shows server status, player count and a connect button for events with a bound game; managers and admins can control the servers. Base URL of the AMP controller without “/API” (e.g. https://amp-ctl.lanparty.example). Credentials live only in the server environment.",
   "admin.amp.enabled": "Enable AMP integration",
   "admin.amp.baseUrl": "AMP base URL",
-  "admin.amp.envHint": "Credentials and CA are configured on the server via environment (HERMES_AMP_USERNAME, HERMES_AMP_PASSWORD, HERMES_AMP_CA_FILE).",
+  "admin.amp.envHint": "Credentials and CA are configured on the server via environment (MATCHDESK_AMP_USERNAME, MATCHDESK_AMP_PASSWORD, MATCHDESK_AMP_CA_FILE).",
   "admin.amp.saveFirst": "Save the settings to create server bindings afterwards.",
   "admin.amp.autoStart": "Start the server automatically when an event is ready",
   "admin.amp.autoStopIdle": "Idle stop after minutes (0 = off)",
@@ -677,7 +672,7 @@ export const enMessages: { [K in keyof typeof deMessages]: string } = {
     "Use restore deliberately between rounds and then verify users, events, and your current session.",
   "admin.storage.disabled.app":
     "S3 is enabled in the environment but snapshots are turned off in app settings. Enable “S3 snapshots…” above and save to use backup and restore.",
-  "admin.storage.disabled.env": "S3 snapshot storage is not enabled in the environment (HERMES_STORAGE_BACKEND ≠ s3).",
+  "admin.storage.disabled.env": "S3 snapshot storage is not enabled in the environment (MATCHDESK_STORAGE_BACKEND ≠ s3).",
   "admin.storage.backupStatus": "Backup status",
   "admin.storage.lastOk": "Last success:",
   "admin.storage.lastErr": "Last error:",
@@ -741,7 +736,7 @@ export const enMessages: { [K in keyof typeof deMessages]: string } = {
   "admin.sessions.confirm": "Really sign out all other users? They will need a new login code to sign in again.",
   "admin.sessions.done": "{users} users signed out ({sessions} sessions ended).",
   "admin.invites.title": "LAN party invite codes.",
-  "admin.invites.help": "If fields stay empty, Hermes defaults to 300 uses and 30 days validity.",
+  "admin.invites.help": "If fields stay empty, Matchdesk defaults to 300 uses and 30 days validity.",
   "admin.invites.sectionAria": "Invite codes",
   "admin.invites.fieldName": "Name",
   "admin.invites.fieldMaxUses": "Max uses",
@@ -967,5 +962,5 @@ export const enMessages: { [K in keyof typeof deMessages]: string } = {
   "pizza.transfer.confirmRemovals": "Yes, apply and remove or deactivate these entries",
   "pizza.transfer.staleRejected": "The menu has changed in the meantime. Nothing was applied – see the new preview below.",
   "pizza.transfer.error.unknown_field": "Unknown field “{field}” (typo?).",
-  "pizza.transfer.help": "YAML contains the full menu including extras and empty categories. CSV (delimiter ;, UTF-8 for Excel) exists for the menu (one row per variant, separate columns artikel_aktiv and variante_aktiv) and separately for extras (separate categories with |). Prices with comma or dot. Imports match category and item names or item numbers. Missing items are deactivated, missing variants and extras are removed or – if already ordered – only deactivated; only the YAML import deactivates missing categories. Hermes asks before removing many entries. Past orders keep their prices."
+  "pizza.transfer.help": "YAML contains the full menu including extras and empty categories. CSV (delimiter ;, UTF-8 for Excel) exists for the menu (one row per variant, separate columns artikel_aktiv and variante_aktiv) and separately for extras (separate categories with |). Prices with comma or dot. Imports match category and item names or item numbers. Missing items are deactivated, missing variants and extras are removed or – if already ordered – only deactivated; only the YAML import deactivates missing categories. Matchdesk asks before removing many entries. Past orders keep their prices."
 };

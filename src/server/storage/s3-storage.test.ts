@@ -8,7 +8,7 @@ import { readCredentialFile } from "./s3-storage";
 let credentialFile: string | undefined;
 
 function writeCredentials(content: string) {
-  credentialFile = path.join(os.tmpdir(), `hermes-s3-creds-${randomUUID()}`);
+  credentialFile = path.join(os.tmpdir(), `matchdesk-s3-creds-${randomUUID()}`);
   fs.writeFileSync(credentialFile, content);
   return credentialFile;
 }

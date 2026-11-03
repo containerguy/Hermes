@@ -8,7 +8,7 @@ import { runMigrations } from "./migrate";
 let directory: string;
 
 beforeEach(() => {
-  directory = fs.mkdtempSync(path.join(os.tmpdir(), "hermes-migrations-"));
+  directory = fs.mkdtempSync(path.join(os.tmpdir(), "matchdesk-migrations-"));
   fs.writeFileSync(
     path.join(directory, "0001_tables.sql"),
     "CREATE TABLE parent (id TEXT PRIMARY KEY); CREATE TABLE child (id TEXT PRIMARY KEY, parent_id TEXT NOT NULL REFERENCES parent(id));" +

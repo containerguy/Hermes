@@ -1,4 +1,4 @@
-# Building Hermes
+# Building Matchdesk
 
 ## Voraussetzungen
 
@@ -20,25 +20,25 @@ npm install
 cp .env.example .env
 ```
 
-Hermes nutzt CSRF Tokens für mutierende, cookie-authentifizierte Requests. Für lokale Entwicklung gibt es einen Dev-Fallback; für produktive Deployments sollte ein eigenes Secret gesetzt werden:
+Matchdesk nutzt CSRF Tokens für mutierende, cookie-authentifizierte Requests. Für lokale Entwicklung gibt es einen Dev-Fallback; für produktive Deployments sollte ein eigenes Secret gesetzt werden:
 
 ```env
-HERMES_CSRF_SECRET=change-me
-HERMES_DEVICE_KEY_SECRET=change-me
+MATCHDESK_CSRF_SECRET=change-me
+MATCHDESK_DEVICE_KEY_SECRET=change-me
 ```
 
-`HERMES_DEVICE_KEY_SECRET` dient als HMAC-Secret für gespeicherte Geräteschlüssel. Einmal setzen und stabil halten – eine Änderung macht alle bekannten Geräte unbekannt. `HERMES_SESSION_TTL_DAYS` (Standard 180, max. 400) legt fest, nach wie vielen Tagen ohne Nutzung eine Session abläuft.
+`MATCHDESK_DEVICE_KEY_SECRET` dient als HMAC-Secret für gespeicherte Geräteschlüssel. Einmal setzen und stabil halten – eine Änderung macht alle bekannten Geräte unbekannt. `MATCHDESK_SESSION_TTL_DAYS` (Standard 180, max. 400) legt fest, nach wie vielen Tagen ohne Nutzung eine Session abläuft.
 
 S3/Wasabi ist in `.env.example` bereits auf diese Werte vorbereitet:
 
 ```env
-HERMES_STORAGE_BACKEND=s3
-HERMES_S3_BUCKET=hermes-storage
-HERMES_S3_REGION=eu-central-2
-HERMES_S3_ENDPOINT=https://s3.eu-central-2.wasabisys.com
-HERMES_S3_CREDS_FILE=./s3.creds
-HERMES_S3_DB_KEY=hermes.sqlite
-HERMES_S3_RESTORE_MODE=if-missing
+MATCHDESK_STORAGE_BACKEND=s3
+MATCHDESK_S3_BUCKET=hermes-storage
+MATCHDESK_S3_REGION=eu-central-2
+MATCHDESK_S3_ENDPOINT=https://s3.eu-central-2.wasabisys.com
+MATCHDESK_S3_CREDS_FILE=./s3.creds
+MATCHDESK_S3_DB_KEY=hermes.sqlite
+MATCHDESK_S3_RESTORE_MODE=if-missing
 ```
 
 `s3.creds` bleibt lokal und wird nicht committed.
@@ -80,7 +80,7 @@ Die WebApp nutzt Hash-Seiten, die im gebauten Bundle direkt erreichbar sind:
 
 ## Realtime (SSE) Hinweise
 
-Hermes nutzt SSE (Server-Sent Events) für Live-Updates. In produktiven Deployments sollten Reverse-Proxies/Load-Balancer SSE-Verbindungen nicht zu aggressiv wegen Idle-Timeouts trennen. Hermes sendet Heartbeats und verbindet sich im Client automatisch neu; zusätzlich läuft ein Polling-Fallback.
+Matchdesk nutzt SSE (Server-Sent Events) für Live-Updates. In produktiven Deployments sollten Reverse-Proxies/Load-Balancer SSE-Verbindungen nicht zu aggressiv wegen Idle-Timeouts trennen. Matchdesk sendet Heartbeats und verbindet sich im Client automatisch neu; zusätzlich läuft ein Polling-Fallback.
 
 Bei UI-Änderungen sollte mindestens `npm run build` ausgeführt werden, damit TypeScript und Vite die React-Seiten prüfen.
 
@@ -110,7 +110,7 @@ Das benötigt auf vielen Systemen sudo-Rechte.
 ## Docker Image Bauen
 
 ```bash
-docker build -t hermes:local .
+docker build -t matchdesk:local .
 ```
 
 ## GitHub Actions Image Pipeline
@@ -138,7 +138,7 @@ Sie führt bei Push auf `main`, Tags `v*` und manuellem Start aus:
 Image:
 
 ```text
-ghcr.io/containerguy/hermes
+ghcr.io/containerguy/matchdesk
 ```
 
 Tags:
@@ -179,23 +179,23 @@ hermes-data:/data
 
 ```bash
 npm run build
-HERMES_DB_PATH=./data/hermes.sqlite npm start
+MATCHDESK_DB_PATH=./data/matchdesk.sqlite npm start
 ```
 
 ## S3-Verhalten
 
 Beim Start:
 
-- Wenn `HERMES_STORAGE_BACKEND=s3` und `HERMES_S3_RESTORE_MODE=if-missing` gesetzt ist, wird `HERMES_DB_PATH` aus `s3://hermes-storage/hermes.sqlite` wiederhergestellt, falls lokal keine Datenbank existiert.
+- Wenn `MATCHDESK_STORAGE_BACKEND=s3` und `MATCHDESK_S3_RESTORE_MODE=if-missing` gesetzt ist, wird `MATCHDESK_DB_PATH` aus `s3://hermes-storage/hermes.sqlite` wiederhergestellt, falls lokal keine Datenbank existiert.
 
 Nach Schreiboperationen:
 
-- Hermes erstellt einen SQLite-WAL-Checkpoint.
+- Matchdesk erstellt einen SQLite-WAL-Checkpoint.
 - Danach wird die SQLite-Datei als Snapshot nach S3 hochgeladen.
 
 Beim Shutdown:
 
-- Hermes versucht erneut, den aktuellen Snapshot nach S3 zu schreiben.
+- Matchdesk versucht erneut, den aktuellen Snapshot nach S3 zu schreiben.
 
 Admin-Aktionen:
 
@@ -212,18 +212,18 @@ Profil-Aktionen:
 - `PATCH /api/auth/sessions/:id` benennt ein Gerät um (der Name bleibt am Gerät, auch über Logout hinweg).
 - `DELETE /api/auth/sessions/:id` meldet ein Gerät ab (das Gerät bleibt bekannt).
 - `POST /api/auth/device/forget` vergisst das aktuelle Gerät: Sessions des Geräts werden widerrufen, Session- und Geräte-Cookie gelöscht.
-- `POST /api/auth/verify-code` und `POST /api/auth/pair-redeem` liefern zusätzlich `device: { name, recognized }` und setzen das Geräte-Cookie `hermes_device`.
+- `POST /api/auth/verify-code` und `POST /api/auth/pair-redeem` liefern zusätzlich `device: { name, recognized }` und setzen das Geräte-Cookie `matchdesk_device`.
 - `POST /api/auth/register` registriert neue User mit aktivem Invite-Code, sofern öffentliche Registrierung in den Settings aktiviert ist.
 
-Wichtig: S3 ist Snapshot-Storage, kein Locking-Backend für mehrere gleichzeitig schreibende Hermes-Instanzen.
+Wichtig: S3 ist Snapshot-Storage, kein Locking-Backend für mehrere gleichzeitig schreibende Matchdesk-Instanzen.
 
 ## Operator Runbook: Backup & Restore
 
-**Single-Writer Warnung:** Hermes ist für **eine** schreibende Instanz gedacht (SQLite + S3 Snapshots). Mehrere Writer können zu inkonsistenten Snapshots führen.
+**Single-Writer Warnung:** Matchdesk ist für **eine** schreibende Instanz gedacht (SQLite + S3 Snapshots). Mehrere Writer können zu inkonsistenten Snapshots führen.
 
 ### Backup prüfen
 
-Im Adminbereich (`/#admin`) zeigt Hermes im Storage-Panel:
+Im Adminbereich (`/#admin`) zeigt Matchdesk im Storage-Panel:
 
 - letzte erfolgreiche Backup-Zeit
 - letzte Backup-Fehlerzeit inkl. Fehlercode + kurzer Hinweis (ohne Secrets)
@@ -232,13 +232,13 @@ Im Adminbereich (`/#admin`) zeigt Hermes im Storage-Panel:
 ### Restore Safety
 
 - Restore ist **validation-first** (Tabellen, Migrationen, Spalten, Foreign Keys) und ist bei Fehlern **hard-blocked**.
-- Vor dem Restore erstellt Hermes ein **Recovery-Snapshot** unter `recoveries/<timestamp>-<id>.sqlite`.
+- Vor dem Restore erstellt Matchdesk ein **Recovery-Snapshot** unter `recoveries/<timestamp>-<id>.sqlite`.
 - Restore ist **all-or-nothing** in einer Transaktion.
-- Retention: Hermes behält die letzten **10** Recoveries (Cleanup ist best-effort).
+- Retention: Matchdesk behält die letzten **10** Recoveries (Cleanup ist best-effort).
 
 ### Rollback mit Recovery-Key
 
-Nach einem Restore liefert Hermes `recovery.id` und `recovery.key`.
+Nach einem Restore liefert Matchdesk `recovery.id` und `recovery.key`.
 
 Recovery herunterladen:
 
@@ -248,12 +248,12 @@ aws s3 cp "s3://<bucket>/<recovery.key>" ./recovery.sqlite
 
 Rollback:
 
-- Recovery als Live-Key hochladen (z.B. `HERMES_S3_DB_KEY=hermes.sqlite`) und Restore erneut ausführen:
+- Recovery als Live-Key hochladen (z.B. `MATCHDESK_S3_DB_KEY=hermes.sqlite`) und Restore erneut ausführen:
 
 ```bash
-aws s3 cp ./recovery.sqlite "s3://<bucket>/<HERMES_S3_DB_KEY>"
+aws s3 cp ./recovery.sqlite "s3://<bucket>/<MATCHDESK_S3_DB_KEY>"
 ```
 
-- Oder temporär `HERMES_S3_DB_KEY` auf den Recovery-Key setzen und Restore erneut starten.
+- Oder temporär `MATCHDESK_S3_DB_KEY` auf den Recovery-Key setzen und Restore erneut starten.
 
-Hermes validiert den Snapshot immer vor dem Überschreiben.
+Matchdesk validiert den Snapshot immer vor dem Überschreiben.

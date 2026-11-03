@@ -1,8 +1,18 @@
-# Hermes / Matchdesk / Mitspielzentrale
+# Matchdesk (Mitspielzentrale)
 
-Codename Hermes ist eine responsive WebApp für die Organisation von Spielrunden. Gestartet für LAN-Parties, können nun auch Turniere für verschiedene Sportarten darüber verwaltet werden. Die Auswahl findet anhand von Projekttemplates statt. User melden sich mit Username und E-Mail-Einmalcode an, Manager / Organisatoren legen Events an, und Teilnehmer stimmen mit `dabei` oder `nicht dabei` ab.
+Matchdesk (deutsch: Mitspielzentrale, früher „Hermes“) ist eine responsive WebApp für die Organisation von Spielrunden. Gestartet für LAN-Parties, können nun auch Turniere für verschiedene Sportarten darüber verwaltet werden. Die Auswahl findet anhand von Projekttemplates statt. User melden sich mit Username und E-Mail-Einmalcode an, Manager / Organisatoren legen Events an, und Teilnehmer stimmen mit `dabei` oder `nicht dabei` ab.
 
 Build- und Release-Hinweise liegen in [`building.md`](building.md).
+
+## Umbenennung von Matchdesk
+
+Bis v1.0 funktionieren die alten Namen weiter, ein Update braucht also keine Änderung:
+
+- Umgebungsvariablen heißen `MATCHDESK_*`; alte `HERMES_*` werden weiter gelesen. Der Server nennt beim Start im Log, welche alten Variablen noch gesetzt sind. Beim Umstellen **dieselben Werte** übernehmen, vor allem `MATCHDESK_DEVICE_KEY_SECRET`, `MATCHDESK_CSRF_SECRET` und `MATCHDESK_PAIR_TOKEN_SECRET`. Sind beide Namen gesetzt, gilt `MATCHDESK_*`.
+- Die Datenbank heißt standardmäßig `matchdesk.sqlite`. Liegt im selben Ordner noch eine `hermes.sqlite` und keine `matchdesk.sqlite`, wird die alte Datei weiter benutzt.
+- Cookies (`hermes_session`, `hermes_device`), der CSRF-Header `x-hermes-csrf` und die Geräteschlüssel im Browser werden übernommen; niemand wird abgemeldet.
+- Das Image heißt `ghcr.io/containerguy/matchdesk`; bis v1.0 wird es zusätzlich als `ghcr.io/containerguy/hermes` veröffentlicht.
+- S3-Bucket, Snapshot-Name und Docker-Volume bleiben, wie sie konfiguriert sind.
 
 
 ## Oberfläche
@@ -22,7 +32,7 @@ Admins sehen im Bereich `#admin` außerdem ein Audit-Log. Dort werden Login/Logo
 
 Admins können die öffentliche Registrierung aktivieren und Invite-Codes für LAN-Partys erstellen. Neue User registrieren sich dann mit Invite-Code, Username und E-Mail-Adresse; danach wird der Login-Code per E-Mail verschickt.
 
-Invite-Codes sind dabei **credential-like**: Sie werden von Hermes generiert, sind für Admins sichtbar und sollten wie Zugangsdaten behandelt werden. Audit-Logs enthalten bewusst nur eine maskierte Variante (kein vollständiger Invite-Code in den Metadaten).
+Invite-Codes sind dabei **credential-like**: Sie werden von Matchdesk generiert, sind für Admins sichtbar und sollten wie Zugangsdaten behandelt werden. Audit-Logs enthalten bewusst nur eine maskierte Variante (kein vollständiger Invite-Code in den Metadaten).
 
 ## Kiosk Modus
 Falls aktiviert, kann über eine entsprechend generierte URL eine Übersicht der anstehenden Spiele angezeigt werden. Die Funktion ist primär für die Darstellung auf Fernsehern und Co. vorgesehen.
@@ -30,36 +40,38 @@ Falls aktiviert, kann über eine entsprechend generierte URL eine Übersicht der
 
 ## Wo Werden Einstellungen Gespeichert?
 
-Hermes speichert Einstellungen in SQLite in der Tabelle `app_settings`.
+Matchdesk speichert Einstellungen in SQLite in der Tabelle `app_settings`.
 
 Die SQLite-Datei liegt lokal unter:
 
 ```text
-HERMES_DB_PATH
+MATCHDESK_DB_PATH
 ```
 
 Im Docker-Setup ist das:
 
 ```text
-/data/hermes.sqlite
+/data/matchdesk.sqlite
 ```
+
+(Bestehende Volumes mit `/data/hermes.sqlite` laufen ohne Umbenennen weiter.)
 
 Mit S3-Backend bleibt SQLite die lokale Arbeitsdatenbank. S3 wird als persistentes Snapshot-Backend verwendet: Beim Start wird die Datenbank aus S3 wiederhergestellt, falls lokal keine Datenbank existiert, und nach Schreiboperationen wird ein Snapshot nach S3 hochgeladen.
 
-Das ist absichtlich kein verteiltes Live-Dateisystem. Hermes ist für eine einzelne laufende Instanz gedacht.
+Das ist absichtlich kein verteiltes Live-Dateisystem. Matchdesk ist für eine einzelne laufende Instanz gedacht.
 
 ## Wasabi S3
 
 Die Vorgabe ist eingetragen:
 
 ```env
-HERMES_STORAGE_BACKEND=s3
-HERMES_S3_BUCKET=hermes-storage
-HERMES_S3_REGION=eu-central-2
-HERMES_S3_ENDPOINT=https://s3.eu-central-2.wasabisys.com
-HERMES_S3_CREDS_FILE=./s3.creds
-HERMES_S3_DB_KEY=hermes.sqlite
-HERMES_S3_RESTORE_MODE=if-missing
+MATCHDESK_STORAGE_BACKEND=s3
+MATCHDESK_S3_BUCKET=matchdesk-storage
+MATCHDESK_S3_REGION=eu-central-2
+MATCHDESK_S3_ENDPOINT=https://s3.eu-central-2.wasabisys.com
+MATCHDESK_S3_CREDS_FILE=./s3.creds
+MATCHDESK_S3_DB_KEY=matchdesk.sqlite
+MATCHDESK_S3_RESTORE_MODE=if-missing
 ```
 
 `s3.creds` wird nicht versioniert. Unter Docker wird die Datei readonly nach `/run/secrets/s3.creds` gemountet.
@@ -94,39 +106,39 @@ SECRET_KEY
 
 ## Gameserver (CubeCoders AMP)
 
-Optionales Modul: Hermes zeigt zu jedem Event den Status des passenden Gameservers, einen Verbinden-Knopf und – ab Rolle `manager` – Start, Stopp, Neustart, Update und Konsole. Ausgeführt wird alles in [CubeCoders AMP](https://cubecoders.com/AMP); Hermes spricht direkt mit dem AMP-Controller.
+Optionales Modul: Matchdesk zeigt zu jedem Event den Status des passenden Gameservers, einen Verbinden-Knopf und – ab Rolle `manager` – Start, Stopp, Neustart, Update und Konsole. Ausgeführt wird alles in [CubeCoders AMP](https://cubecoders.com/AMP); Matchdesk spricht direkt mit dem AMP-Controller.
 
 ### Voraussetzungen
 
-- Ein **AMP-Dienstkonto** (z. B. `hermes`) mit eigener, **minimaler Rolle**: Instanzen sehen, Start/Stop/Restart/Update und Konsole lesen/schreiben auf den Spiele-Instanzen. Nicht die Rolle `*` (Super Admin) verwenden. Ohne 2FA, weil Hermes sich unbeaufsichtigt anmeldet.
+- Ein **AMP-Dienstkonto** (z. B. `matchdesk`) mit eigener, **minimaler Rolle**: Instanzen sehen, Start/Stop/Restart/Update und Konsole lesen/schreiben auf den Spiele-Instanzen. Nicht die Rolle `*` (Super Admin) verwenden. Ohne 2FA, weil Matchdesk sich unbeaufsichtigt anmeldet.
 - Die **CA-Datei** (PEM), die das Zertifikat des AMP-Controllers ausgestellt hat, falls dieser kein öffentlich vertrauenswürdiges Zertifikat nutzt. TLS wird immer geprüft; es gibt keinen „Zertifikat ignorieren"-Schalter.
-- Jedes Spiel muss in AMP **mindestens einmal erfolgreich aktualisiert** worden sein. Ohne erfolgreiches erstes Update (`App.HasSuccessfullyUpdatedAtLeastOnce`) startet AMP das Spiel nicht – und meldet dabei keinen Fehler. Erstes Update daher im AMP-Panel oder über „Mehr … → Update" in Hermes auslösen.
+- Jedes Spiel muss in AMP **mindestens einmal erfolgreich aktualisiert** worden sein. Ohne erfolgreiches erstes Update (`App.HasSuccessfullyUpdatedAtLeastOnce`) startet AMP das Spiel nicht – und meldet dabei keinen Fehler. Erstes Update daher im AMP-Panel oder über „Mehr … → Update" in Matchdesk auslösen.
 
 ### Umgebung
 
 Zugangsdaten liegen **nur** in der Umgebung, nie in `app_settings` oder Backups:
 
 ```env
-HERMES_AMP_USERNAME=hermes
-HERMES_AMP_PASSWORD=...
+MATCHDESK_AMP_USERNAME=matchdesk
+MATCHDESK_AMP_PASSWORD=...
 # Optional: Datei für das rotierende rememberMe-Token (spart den Passwort-Login nach Neustarts)
-HERMES_AMP_REMEMBER_TOKEN_FILE=/data/amp-remember.token
+MATCHDESK_AMP_REMEMBER_TOKEN_FILE=/data/amp-remember.token
 # Optional: CA des AMP-Controllers (leer = System-Trust-Store)
-HERMES_AMP_CA_FILE=/run/secrets/amp-ca.pem
+MATCHDESK_AMP_CA_FILE=/run/secrets/amp-ca.pem
 ```
 
 Unter Docker wird die CA wie `s3.creds` readonly gemountet (siehe `docker-compose.yml`):
 
 ```yaml
     environment:
-      HERMES_AMP_CA_FILE: /run/secrets/amp-ca.pem
+      MATCHDESK_AMP_CA_FILE: /run/secrets/amp-ca.pem
     volumes:
       - ./amp-ca.pem:/run/secrets/amp-ca.pem:ro
 ```
 
-Danach in Hermes unter **Admin → Betrieb → CubeCoders AMP** das Modul aktivieren, die Basis-URL des Controllers eintragen (z. B. `https://amp-ctl.lanparty.example`) und unter „Server-Bindungen" Spieltitel aus dem Katalog mit AMP-Instanzen verknüpfen (Host, Port, Verbinden-Art). Events mit passendem Spieltitel bekommen die Bindung automatisch.
+Danach in Matchdesk unter **Admin → Betrieb → CubeCoders AMP** das Modul aktivieren, die Basis-URL des Controllers eintragen (z. B. `https://amp-ctl.lanparty.example`) und unter „Server-Bindungen" Spieltitel aus dem Katalog mit AMP-Instanzen verknüpfen (Host, Port, Verbinden-Art). Events mit passendem Spieltitel bekommen die Bindung automatisch.
 
-Passwörter, RCON-Passwörter und Spielserver-Konfiguration bleiben in AMP. Hermes speichert pro Bindung nur Instanz-ID/-Name, Host, Port und Verbinden-Art; Konsolenausgaben mit Passwörtern werden maskiert.
+Passwörter, RCON-Passwörter und Spielserver-Konfiguration bleiben in AMP. Matchdesk speichert pro Bindung nur Instanz-ID/-Name, Host, Port und Verbinden-Art; Konsolenausgaben mit Passwörtern werden maskiert.
 
 ### Rollen
 
@@ -144,13 +156,13 @@ Die Rechte werden serverseitig geprüft; jede Steueraktion landet im Audit-Log u
 
 Beide Schalter sind standardmäßig aus (Admin → Betrieb → CubeCoders AMP):
 
-- **Server automatisch starten, wenn ein Event bereit ist:** Wird ein Event mit gebundenem Server `bereit` (oder läuft es schon) und der Server ist aus, startet Hermes ihn – **höchstens einmal pro Event**. Stoppt ein Manager den Server danach bewusst, bleibt er aus. Läuft der Server schon (auch im AMP-Ruhemodus „Sleeping") oder ist AMP gerade beim Starten/Updaten, passiert nichts. War die AMP-Instanz selbst aus, startet Hermes zuerst die Instanz und – sobald sie erreichbar ist und das Spiel noch steht – das Spiel genau ein zweites Mal (Nachstart, höchstens 10 Minuten nach dem Instanzstart; Audit `amp.auto_start` mit `followUp`).
-- **Leerlauf-Stopp nach Minuten (0 = aus):** Hermes stoppt einen Server, wenn kein aktives Event (offen, bereit, läuft) mehr an ihm hängt und er die ganze Zeit über **0 Spieler** hatte. Fehlt die Spielerzahl in AMP, zählt das nicht als leer. Zusätzlich muss der Leerlauf-Stopp **in der Bindung freigeschaltet** sein („Leerlauf-Stopp erlauben", Standard aus).
+- **Server automatisch starten, wenn ein Event bereit ist:** Wird ein Event mit gebundenem Server `bereit` (oder läuft es schon) und der Server ist aus, startet Matchdesk ihn – **höchstens einmal pro Event**. Stoppt ein Manager den Server danach bewusst, bleibt er aus. Läuft der Server schon (auch im AMP-Ruhemodus „Sleeping") oder ist AMP gerade beim Starten/Updaten, passiert nichts. War die AMP-Instanz selbst aus, startet Matchdesk zuerst die Instanz und – sobald sie erreichbar ist und das Spiel noch steht – das Spiel genau ein zweites Mal (Nachstart, höchstens 10 Minuten nach dem Instanzstart; Audit `amp.auto_start` mit `followUp`).
+- **Leerlauf-Stopp nach Minuten (0 = aus):** Matchdesk stoppt einen Server, wenn kein aktives Event (offen, bereit, läuft) mehr an ihm hängt und er die ganze Zeit über **0 Spieler** hatte. Fehlt die Spielerzahl in AMP, zählt das nicht als leer. Zusätzlich muss der Leerlauf-Stopp **in der Bindung freigeschaltet** sein („Leerlauf-Stopp erlauben", Standard aus).
 
 > **Spielerzählung prüfen, bevor du den Leerlauf-Stopp für eine Bindung erlaubst.** AMP zählt Spieler über das Konsolenmuster `Console.UserJoinRegex` der Instanz. In den CubeCoders-Vorlagen ist es bei **Soldat, UT2004 und Call of Duty 4** leer – dort meldet AMP immer 0 Spieler, auch mitten im Spiel, und ein Leerlauf-Stopp würde laufende Partien beenden. Bei CS2, CS 1.6 und Factorio ist ein Muster gesetzt, Minecraft zählt über das eigene AMP-Modul (Stand LAN-Abnahme 2026-10-16).
 - **Push „Server für <Spiel> läuft":** Sobald der Server eines aktiven Events beitretbar ist (Ready oder Ruhemodus), bekommen alle, die bei diesem Event **dabei** sind und Benachrichtigungen aktiviert haben, genau einen Push. Der Push enthält nur den Spieltitel und den Link zur Übersicht, keine Serveradresse.
 
-Nach einem Neustart von Hermes übernimmt der erste Durchlauf nur den aktuellen Stand: Es gehen keine Pushes raus, und Server bereits bereiter Events werden nicht automatisch gestartet. Die Automatik prüft alle 30 Sekunden; Auto-Start und Auto-Stopp stehen im Audit-Log als `amp.auto_start` bzw. `amp.auto_stop` (ohne Benutzer).
+Nach einem Neustart von Matchdesk übernimmt der erste Durchlauf nur den aktuellen Stand: Es gehen keine Pushes raus, und Server bereits bereiter Events werden nicht automatisch gestartet. Die Automatik prüft alle 30 Sekunden; Auto-Start und Auto-Stopp stehen im Audit-Log als `amp.auto_start` bzw. `amp.auto_stop` (ohne Benutzer).
 
 ## Spielt gerade (Windows-Agent)
 
@@ -176,11 +188,11 @@ npm start
 Für produktive Deployments sollten zusätzlich eigene Secrets gesetzt werden (in `.env`):
 
 ```env
-HERMES_CSRF_SECRET=change-me
+MATCHDESK_CSRF_SECRET=change-me
 # Einmal festlegen und danach stabil halten, sonst werden bekannte Geräte nicht mehr erkannt.
-HERMES_DEVICE_KEY_SECRET=change-me
+MATCHDESK_DEVICE_KEY_SECRET=change-me
 # Optional: Session-Idle-Timeout in Tagen (1-400, Standard 180)
-# HERMES_SESSION_TTL_DAYS=180
+# MATCHDESK_SESSION_TTL_DAYS=180
 ```
 
 Die App läuft danach auf:
@@ -208,37 +220,37 @@ docker compose up --build
 
 Das Compose-Setup nutzt:
 
-- SQLite unter `/data/hermes.sqlite`
-- Docker Volume `hermes-data`
+- SQLite unter `/data/matchdesk.sqlite` (bzw. die vorhandene `/data/hermes.sqlite`)
+- Docker Volume `hermes-data` (Name bleibt aus Kompatibilität)
 - Wasabi S3 Snapshot `s3://hermes-storage/hermes.sqlite`
 - Credentials aus `./s3.creds`
 
 ## Mail
 
-Login-Codes (Anmeldung, Registrierung) und Codes zur E-Mail-Änderung werden per SMTP versendet. Für lokale Tests kann `HERMES_MAIL_MODE=console` genutzt werden; dann landet nur der Code im Server-Log.
+Login-Codes (Anmeldung, Registrierung) und Codes zur E-Mail-Änderung werden per SMTP versendet. Für lokale Tests kann `MATCHDESK_MAIL_MODE=console` genutzt werden; dann landet nur der Code im Server-Log.
 
 ```env
-HERMES_MAIL_MODE=smtp
-HERMES_MAIL_FROM=Mitspielzentrale <lanparty@example.test>
+MATCHDESK_MAIL_MODE=smtp
+MATCHDESK_MAIL_FROM=Mitspielzentrale <lanparty@example.test>
 # Optional: öffentliche Adresse der App für den Link in System-Mails
-HERMES_PUBLIC_URL=https://mitspielzentrale.example.test
-HERMES_SMTP_HOST=smtp.example.test
-HERMES_SMTP_PORT=587
-HERMES_SMTP_SECURE=false
-HERMES_SMTP_SECURITY=starttls
-HERMES_SMTP_USER=
-HERMES_SMTP_PASSWORD=
+MATCHDESK_PUBLIC_URL=https://mitspielzentrale.example.test
+MATCHDESK_SMTP_HOST=smtp.example.test
+MATCHDESK_SMTP_PORT=587
+MATCHDESK_SMTP_SECURE=false
+MATCHDESK_SMTP_SECURITY=starttls
+MATCHDESK_SMTP_USER=
+MATCHDESK_SMTP_PASSWORD=
 ```
 
 Aufbau der System-Mails:
 
-- **Absender:** Die Adresse kommt aus `HERMES_MAIL_FROM`, der Anzeigename aus den Einstellungen – derselbe Name, den die Oberfläche in Kopfzeile und Browser-Titel zeigt (`appName`, sonst der eingebaute Name wie „Mitspielzentrale“ bzw. „MatchDesk“). Änderungen im Adminbereich wirken ohne Neustart. Der Name aus `HERMES_MAIL_FROM` dient nur als Notnagel, wenn die Einstellungen nicht lesbar sind.
-- **Link:** Nur wenn `HERMES_PUBLIC_URL` gesetzt ist (http/https, ohne Zugangsdaten), enthält die Mail einen Link zur Anmeldung. Die Adresse wird bewusst nicht aus Host- oder `X-Forwarded-*`-Headern abgeleitet, weil diese vom Client stammen und sonst fremde Links in echte Login-Mails gelangen könnten.
+- **Absender:** Die Adresse kommt aus `MATCHDESK_MAIL_FROM`, der Anzeigename aus den Einstellungen – derselbe Name, den die Oberfläche in Kopfzeile und Browser-Titel zeigt (`appName`, sonst der eingebaute Name wie „Mitspielzentrale“ bzw. „MatchDesk“). Änderungen im Adminbereich wirken ohne Neustart. Der Name aus `MATCHDESK_MAIL_FROM` dient nur als Notnagel, wenn die Einstellungen nicht lesbar sind.
+- **Link:** Nur wenn `MATCHDESK_PUBLIC_URL` gesetzt ist (http/https, ohne Zugangsdaten), enthält die Mail einen Link zur Anmeldung. Die Adresse wird bewusst nicht aus Host- oder `X-Forwarded-*`-Headern abgeleitet, weil diese vom Client stammen und sonst fremde Links in echte Login-Mails gelangen könnten.
 - **Sprache:** Wie in der Oberfläche: Profilsprache, sonst Browsersprache der auslösenden Anfrage, sonst `defaultLocale`.
 - **Format:** `multipart/alternative` mit Text- und HTML-Teil (UTF-8), Akzentfarbe aus `themePrimaryColor`, keine externen Bilder oder Tracking. Header `Auto-Submitted: auto-generated`, `X-Auto-Response-Suppress: All` und `Content-Language`; `Message-ID` und `Date` setzt nodemailer mit der Domain der Absenderadresse.
 - **Zustellbarkeit:** Die Absenderdomain braucht passende SPF-, DKIM- und DMARC-Einträge für den SMTP-Server; bei DMARC mit strenger Ausrichtung muss die From-Domain der DKIM-Domain entsprechen.
 
-Hinweis: Für Port `587` ist normalerweise STARTTLS korrekt (`HERMES_SMTP_SECURITY=starttls`). Für Port `465` ist implizites TLS korrekt (`HERMES_SMTP_SECURITY=tls`). Der Fehler `wrong version number` bedeutet fast immer, dass implizites TLS gegen einen STARTTLS-Port gesprochen wurde.
+Hinweis: Für Port `587` ist normalerweise STARTTLS korrekt (`MATCHDESK_SMTP_SECURITY=starttls`). Für Port `465` ist implizites TLS korrekt (`MATCHDESK_SMTP_SECURITY=tls`). Der Fehler `wrong version number` bedeutet fast immer, dass implizites TLS gegen einen STARTTLS-Port gesprochen wurde.
 
 ## Push Notifications
 
@@ -251,18 +263,18 @@ npx web-push generate-vapid-keys
 Danach in `.env` eintragen:
 
 ```env
-HERMES_VAPID_SUBJECT=mailto:admin@example.test
-HERMES_VAPID_PUBLIC_KEY=
-HERMES_VAPID_PRIVATE_KEY=
+MATCHDESK_VAPID_SUBJECT=mailto:admin@example.test
+MATCHDESK_VAPID_PUBLIC_KEY=
+MATCHDESK_VAPID_PRIVATE_KEY=
 ```
 
-Browser erlauben Push Notifications nur in einem Secure Context. `http://localhost` funktioniert für lokale Tests, normale HTTP-LAN-Adressen wie `http://192.168.x.x` gelten aber nicht als Secure Context. Hermes liefert kein SSL/TLS, keinen Reverse Proxy und kein Zertifikatsmanagement mit.
+Browser erlauben Push Notifications nur in einem Secure Context. `http://localhost` funktioniert für lokale Tests, normale HTTP-LAN-Adressen wie `http://192.168.x.x` gelten aber nicht als Secure Context. Matchdesk liefert kein SSL/TLS, keinen Reverse Proxy und kein Zertifikatsmanagement mit.
 
-Hermes setzt bei Push-Benachrichtigungen eine Vibrationssequenz und nutzt `requireInteraction` für neue Runden. Ob das Smartphone vibriert oder einen Ton abspielt, entscheidet trotzdem das Betriebssystem, der Browser und die App-/PWA-Installation. Eigene Benachrichtigungstöne können Web Push Benachrichtigungen auf iOS/Android nicht zuverlässig erzwingen.
+Matchdesk setzt bei Push-Benachrichtigungen eine Vibrationssequenz und nutzt `requireInteraction` für neue Runden. Ob das Smartphone vibriert oder einen Ton abspielt, entscheidet trotzdem das Betriebssystem, der Browser und die App-/PWA-Installation. Eigene Benachrichtigungstöne können Web Push Benachrichtigungen auf iOS/Android nicht zuverlässig erzwingen.
 
 ## Realtime (SSE)
 
-Hermes nutzt für Live-Updates **Server-Sent Events (SSE)**. Die Verbindung sendet Heartbeats und der Client verbindet sich bei Fehlern automatisch neu. Trotzdem können Reverse-Proxies oder Load-Balancer Idle-Timeouts erzwingen — Hermes fällt dann zusätzlich auf Polling zurück.
+Matchdesk nutzt für Live-Updates **Server-Sent Events (SSE)**. Die Verbindung sendet Heartbeats und der Client verbindet sich bei Fehlern automatisch neu. Trotzdem können Reverse-Proxies oder Load-Balancer Idle-Timeouts erzwingen — Matchdesk fällt dann zusätzlich auf Polling zurück.
 
 ## HTTP-API, API-Tokens und Doku
 
@@ -270,14 +282,14 @@ Die JSON-API liegt unter **`/api/*`** (siehe OpenAPI). Typische Ressourcen: Even
 
 ### Authentifizierung
 
-- **Browser / Web-UI:** Session-Cookie `hermes_session` nach erfolgreichem Login. Die Session läuft nach `HERMES_SESSION_TTL_DAYS` Tagen **ohne Nutzung** ab (Standard 180); jede Nutzung verlängert sie (Cookie wird höchstens einmal täglich neu gesetzt).
-- **Geräte:** Ein separates, langlebiges `httpOnly`-Cookie `hermes_device` (plus ein Schlüssel im `localStorage` als Fallback) erkennt den Browser beim nächsten Login wieder. Der Gerätename bleibt dadurch auch nach Logout erhalten. Das Cookie authentifiziert **nicht** – ein Mailcode oder Pairing-Link ist immer nötig. „Dieses Gerät vergessen“ verwirft Gerät und Namen.
+- **Browser / Web-UI:** Session-Cookie `matchdesk_session` nach erfolgreichem Login. Die Session läuft nach `MATCHDESK_SESSION_TTL_DAYS` Tagen **ohne Nutzung** ab (Standard 180); jede Nutzung verlängert sie (Cookie wird höchstens einmal täglich neu gesetzt).
+- **Geräte:** Ein separates, langlebiges `httpOnly`-Cookie `matchdesk_device` (plus ein Schlüssel im `localStorage` als Fallback) erkennt den Browser beim nächsten Login wieder. Der Gerätename bleibt dadurch auch nach Logout erhalten. Das Cookie authentifiziert **nicht** – ein Mailcode oder Pairing-Link ist immer nötig. „Dieses Gerät vergessen“ verwirft Gerät und Namen.
 - **iPhone/iPad Home-Bildschirm-App:** hat einen eigenen Speicher und übernimmt die Safari-Anmeldung nicht. Im Profil einen Pairing-Link erzeugen, kopieren und in der App unter „Mit Pairing-Link anmelden“ einfügen.
 - **Skripte & Integrationen:** persönliches **API-Token** mit Header  
   `Authorization: Bearer <token>`  
   Tokens werden unter **`/#login`** (Profil) erzeugt und widerrufen. Der Klartext wird **nur einmal** beim Anlegen angezeigt und danach nur noch als Hash gespeichert.
 
-Ist der Header `Authorization: Bearer …` gesetzt und der Token **ungültig**, nutzt Hermes **keinen** Cookie-Fallback (explizit nur gültiger Bearer oder Cookie).
+Ist der Header `Authorization: Bearer …` gesetzt und der Token **ungültig**, nutzt Matchdesk **keinen** Cookie-Fallback (explizit nur gültiger Bearer oder Cookie).
 
 ### API-Token-Scopes
 
@@ -287,7 +299,7 @@ Ist der Header `Authorization: Bearer …` gesetzt und der Token **ungültig**, 
 
 ### CSRF (Browser vs. Bearer)
 
-Schreibende Requests aus dem **Browser** mit Cookie-Session benötigen den Header **`x-hermes-csrf`** (Token über `GET /api/auth/csrf`).  
+Schreibende Requests aus dem **Browser** mit Cookie-Session benötigen den Header **`x-matchdesk-csrf`** (Token über `GET /api/auth/csrf`).  
 Reine **Bearer**-Clients sind von der CSRF-Pflicht **befreit**.
 
 ### OpenAPI und Swagger UI
@@ -297,17 +309,17 @@ Reine **Bearer**-Clients sind von der CSRF-Pflicht **befreit**.
 
 In Produktion sollte die API nur über **HTTPS** erreichbar sein; Tokens wie Passwörter behandeln.
 
-Die **Fußzeile** der Web-UI zeigt den Link zum Quellrepository und die **Version** aus der laufenden Instanz (`package.json`). Optional kann `HERMES_SOURCE_REPO_URL` in der `.env` auf ein Fork- oder Intern-Repo zeigen.
+Die **Fußzeile** der Web-UI zeigt den Link zum Quellrepository und die **Version** aus der laufenden Instanz (`package.json`). Optional kann `MATCHDESK_SOURCE_REPO_URL` in der `.env` auf ein Fork- oder Intern-Repo zeigen.
 
 ## Backup, Restore Und Reset
 
 S3 ist das primäre persistente Snapshot-Backend. Admins können im Adminbereich aktiv ein Backup nach S3 starten oder den aktuellen Datenstand aus dem S3-Snapshot wiederherstellen.
 
-**Single-Writer Warnung:** Hermes nutzt SQLite + S3 Snapshots. Das ist **kein** Live-Locking-Backend. Es sollte immer nur **eine** schreibende Hermes-Instanz laufen, sonst können Snapshots inkonsistent werden.
+**Single-Writer Warnung:** Matchdesk nutzt SQLite + S3 Snapshots. Das ist **kein** Live-Locking-Backend. Es sollte immer nur **eine** schreibende Matchdesk-Instanz laufen, sonst können Snapshots inkonsistent werden.
 
 ### Backup prüfen (Admin UI)
 
-Im Adminbereich (`/#admin`) zeigt Hermes im Storage-Bereich:
+Im Adminbereich (`/#admin`) zeigt Matchdesk im Storage-Bereich:
 
 - letzte erfolgreiche Backup-Zeit
 - letzte Backup-Fehlerzeit inkl. Fehlercode + kurzer Hinweis (ohne Secrets)
@@ -319,14 +331,14 @@ Restore ist bewusst **validation-first** und **hard-blocked**:
 
 - Snapshot wird vor dem Überschreiben geprüft (Tabellen, Migrations-Stand, kompatible Spalten, Foreign Keys).
 - Wenn die Validierung fehlschlägt, wird **nichts** mutiert (kein “force restore”).
-- Vor dem eigentlichen Restore erstellt Hermes ein **Recovery-Snapshot** nach S3.
+- Vor dem eigentlichen Restore erstellt Matchdesk ein **Recovery-Snapshot** nach S3.
 - Restore läuft all-or-nothing in einer Transaktion.
 
-Recovery Retention: Hermes behält die letzten **10** Recoveries (ältere werden best-effort gelöscht).
+Recovery Retention: Matchdesk behält die letzten **10** Recoveries (ältere werden best-effort gelöscht).
 
 ### Failed-Restore Recovery (Rollback)
 
-Bei einem erfolgreichen Restore zeigt Hermes die Recovery Info:
+Bei einem erfolgreichen Restore zeigt Matchdesk die Recovery Info:
 
 - `recovery.id`
 - `recovery.key` (z.B. `recoveries/...sqlite`)
@@ -339,15 +351,15 @@ aws s3 cp "s3://<bucket>/<recovery.key>" ./recovery.sqlite
 
 Rollback-Optionen:
 
-1) Recovery-Snapshot als neues Live-Snapshot-Target hochladen (z.B. `HERMES_S3_DB_KEY=hermes.sqlite`):
+1) Recovery-Snapshot als neues Live-Snapshot-Target hochladen (z.B. `MATCHDESK_S3_DB_KEY=matchdesk.sqlite`):
 
 ```bash
-aws s3 cp ./recovery.sqlite "s3://<bucket>/<HERMES_S3_DB_KEY>"
+aws s3 cp ./recovery.sqlite "s3://<bucket>/<MATCHDESK_S3_DB_KEY>"
 ```
 
-2) Alternativ temporär `HERMES_S3_DB_KEY` auf den Recovery-Key setzen und Restore erneut ausführen.
+2) Alternativ temporär `MATCHDESK_S3_DB_KEY` auf den Recovery-Key setzen und Restore erneut ausführen.
 
-Hermes validiert den Snapshot immer vor dem Überschreiben.
+Matchdesk validiert den Snapshot immer vor dem Überschreiben.
 
 Für lokale manuelle Backups kann zusätzlich die SQLite-Datei gesichert werden.
 
@@ -355,7 +367,7 @@ Backup aus Docker Volume:
 
 ```bash
 docker compose stop
-docker run --rm -v hermes_hermes-data:/data -v "$PWD":/backup busybox cp /data/hermes.sqlite /backup/hermes.sqlite.bak
+docker run --rm -v hermes_hermes-data:/data -v "$PWD":/backup busybox sh -c 'cp /data/*.sqlite /backup/'
 docker compose up -d
 ```
 
@@ -365,7 +377,7 @@ Reset lokaler Docker-Daten:
 docker compose down -v
 ```
 
-Wenn `HERMES_S3_RESTORE_MODE=if-missing` gesetzt ist, wird beim nächsten Start wieder aus S3 geladen, sofern dort ein Snapshot existiert.
+Wenn `MATCHDESK_S3_RESTORE_MODE=if-missing` gesetzt ist, wird beim nächsten Start wieder aus S3 geladen, sofern dort ein Snapshot existiert.
 
 ## Prüfung
 
@@ -386,14 +398,14 @@ Falls Chromium wegen fehlender Systembibliotheken nicht startet, müssen die Pla
 ## Release-Checklist (Operator)
 
 - HTTP-API verstanden: bei Bedarf **`/api/docs`** für Operatoren/Integratoren bereitstellen; Tokens nur über vertrauenswürdige Kanäle verteilen
-- Reverse Proxy / TLS ist **operator-owned** (Hermes liefert kein TLS, nur HTTP)
-- `HERMES_COOKIE_SECURE=true` sobald Hermes hinter HTTPS läuft
-- `HERMES_CSRF_SECRET` und `HERMES_DEVICE_KEY_SECRET` gesetzt (Device-Secret danach nicht mehr ändern)
-- SMTP konfiguriert (und `HERMES_MAIL_MODE=smtp`), `HERMES_MAIL_FROM` gesetzt
-- VAPID Keys generiert und gesetzt (`HERMES_VAPID_*`)
-- S3 Snapshot-Storage konfiguriert (`HERMES_STORAGE_BACKEND=s3`, Bucket/Endpoint/Region/Key)
-- Credentials-Quelle geklärt (Env oder `HERMES_S3_CREDS_FILE`), `s3.creds` bleibt lokal/Secret
-- **Single-Writer**: genau eine schreibende Hermes-Instanz
+- Reverse Proxy / TLS ist **operator-owned** (Matchdesk liefert kein TLS, nur HTTP)
+- `MATCHDESK_COOKIE_SECURE=true` sobald Matchdesk hinter HTTPS läuft
+- `MATCHDESK_CSRF_SECRET` und `MATCHDESK_DEVICE_KEY_SECRET` gesetzt (Device-Secret danach nicht mehr ändern)
+- SMTP konfiguriert (und `MATCHDESK_MAIL_MODE=smtp`), `MATCHDESK_MAIL_FROM` gesetzt
+- VAPID Keys generiert und gesetzt (`MATCHDESK_VAPID_*`)
+- S3 Snapshot-Storage konfiguriert (`MATCHDESK_STORAGE_BACKEND=s3`, Bucket/Endpoint/Region/Key)
+- Credentials-Quelle geklärt (Env oder `MATCHDESK_S3_CREDS_FILE`), `s3.creds` bleibt lokal/Secret
+- **Single-Writer**: genau eine schreibende Matchdesk-Instanz
 - Backup-Status im Admin UI geprüft (letztes Success/Failure + Location)
 - Restore/Rollback verstanden: Recovery-Key wird bei Restore ausgegeben, Rollback via Recovery-Snapshot möglich
-- Falls das Gameserver-Modul genutzt wird: AMP-Dienstkonto mit minimaler Rolle, `HERMES_AMP_USERNAME`/`HERMES_AMP_PASSWORD` gesetzt, CA gemountet (`HERMES_AMP_CA_FILE`), jedes Spiel in AMP einmal erfolgreich aktualisiert
+- Falls das Gameserver-Modul genutzt wird: AMP-Dienstkonto mit minimaler Rolle, `MATCHDESK_AMP_USERNAME`/`MATCHDESK_AMP_PASSWORD` gesetzt, CA gemountet (`MATCHDESK_AMP_CA_FILE`), jedes Spiel in AMP einmal erfolgreich aktualisiert

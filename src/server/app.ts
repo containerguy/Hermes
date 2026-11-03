@@ -19,7 +19,7 @@ import { createDb } from "./db/client";
 import { runMigrations } from "./db/migrate";
 import { broadcastEventsChanged, broadcastPresenceChanged } from "./realtime/event-bus";
 import { requireUser } from "./auth/current-user";
-import { hermesAuthMiddleware } from "./auth/hermes-auth";
+import { matchdeskAuthMiddleware } from "./auth/matchdesk-auth";
 import { mountApiDocs } from "./http/api-docs";
 import { pickPublicSettings, readSettings } from "./settings";
 import {
@@ -29,7 +29,7 @@ import {
 } from "./storage/s3-storage";
 import { getReleaseInfo } from "./version-info";
 
-export async function createHermesApp() {
+export async function createMatchdeskApp() {
   await restoreDatabaseFromStorageIfNeeded();
   const context = createDb();
   runMigrations(context.sqlite);
@@ -38,7 +38,7 @@ export async function createHermesApp() {
   app.disable("x-powered-by");
   app.use(express.json({ limit: "1mb" }));
   app.use(cookieParser());
-  app.use(hermesAuthMiddleware(context));
+  app.use(matchdeskAuthMiddleware(context));
   mountApiDocs(app);
   app.use((_request, response, next) => {
     response.setHeader("X-Content-Type-Options", "nosniff");

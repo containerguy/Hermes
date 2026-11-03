@@ -1,7 +1,7 @@
-import type { HermesSettings } from "../../settings";
+import type { MatchdeskSettings } from "../../settings";
 import { ampCall, unwrapAmpData } from "./amp-session";
 
-export type HermesAmpInstanceRow = {
+export type MatchdeskAmpInstanceRow = {
   id: string;
   friendlyName: string;
   instanceName: string;
@@ -121,13 +121,13 @@ export function flattenAmpInstances(
   return out;
 }
 
-export async function fetchAmpInstances(settings: HermesSettings): Promise<HermesAmpInstanceRow[]> {
+export async function fetchAmpInstances(settings: MatchdeskSettings): Promise<MatchdeskAmpInstanceRow[]> {
   if (!settings.ampIntegrationEnabled) {
     throw new Error("amp_deaktiviert");
   }
 
   const instances = flattenAmpInstances(await ampCall(settings, "ADSModule/GetInstances"));
-  const rows: HermesAmpInstanceRow[] = [];
+  const rows: MatchdeskAmpInstanceRow[] = [];
 
   for (const { row: inst, targetName, targetHost } of instances) {
     const id = pickInstanceId(inst);

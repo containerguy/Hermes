@@ -1,4 +1,4 @@
-# Hermes
+# Matchdesk (Mitspielzentrale, formerly Hermes)
 
 ## What This Is
 

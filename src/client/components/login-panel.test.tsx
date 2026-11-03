@@ -179,11 +179,11 @@ describe("LoginPanel pairing redemption", () => {
     const text = rendered.container.textContent || "";
     expect(text).toContain("Profil und E-Mail aktuell halten.");
     expect(text).toContain("Push vor dem Match testen.");
-    expect(text).toContain("Hermes sendet Standard-Browser-Benachrichtigungen.");
-    expect(text).toContain("Klingeltöne und garantiertes Audio kann Hermes nicht erzwingen.");
+    expect(text).toContain("Die Mitspielzentrale sendet Standard-Browser-Benachrichtigungen.");
+    expect(text).toContain("Klingeltöne und garantiertes Audio kann sie nicht erzwingen.");
     expect(text).toMatch(/HTTPS|sicheren Kontext|Lokal|HTTP/);
     expect(rendered.container.querySelector(".runtime-callout")).toBeTruthy();
-    expect(text).toContain("Hermes wie eine App nutzen");
+    expect(text).toContain("Mitspielzentrale wie eine App nutzen");
     expect(text).toContain("Weiteres Gerät verbinden.");
     expect(text).toContain("Angemeldete Geräte im Blick behalten.");
     expect(text).toContain("Keine Geräte geladen.");
@@ -326,7 +326,7 @@ describe("LoginPanel device persistence", () => {
     const requestJsonMock = requestJson as unknown as ReturnType<typeof vi.fn>;
     requestJsonMock.mockResolvedValue({});
     window.localStorage.setItem(
-      "hermes_known_device_v1",
+      "matchdesk_known_device_v1",
       JSON.stringify({ username: "u", name: "Gaming-PC" })
     );
 
@@ -392,7 +392,7 @@ describe("LoginPanel device persistence", () => {
     await act(async () => {
       setInputValue(
         pairForm.querySelector("input")!,
-        "https://hermes.lan/#login?pair=PAIR_TOKEN_TEST_VALUE_BBBBBBBBBBBB"
+        "https://matchdesk.lan/#login?pair=PAIR_TOKEN_TEST_VALUE_BBBBBBBBBBBB"
       );
       await flushMicrotasks();
     });
@@ -406,7 +406,7 @@ describe("LoginPanel device persistence", () => {
     const body = JSON.parse((redeemCalls[0][1] as RequestInit).body as string) as { token: string };
     expect(body.token).toBe("PAIR_TOKEN_TEST_VALUE_BBBBBBBBBBBB");
     expect(onLoggedIn).toHaveBeenCalledWith(redeemedUser);
-    expect(JSON.parse(window.localStorage.getItem("hermes_known_device_v1") ?? "{}")).toEqual({
+    expect(JSON.parse(window.localStorage.getItem("matchdesk_known_device_v1") ?? "{}")).toEqual({
       username: "u",
       email: "u@example.test",
       name: "iPhone · Safari"

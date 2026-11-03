@@ -1,8 +1,8 @@
-import type { HermesSettings } from "../../settings";
+import type { MatchdeskSettings } from "../../settings";
 
 export type PizzaPaymentMethod = "cash" | "paypal";
 
-type PaymentSettings = Pick<HermesSettings, "pizzaPaymentMethods" | "pizzaPaypalHandle">;
+type PaymentSettings = Pick<MatchdeskSettings, "pizzaPaymentMethods" | "pizzaPaypalHandle">;
 
 /**
  * Tatsächlich angebotene Bezahlarten. PayPal braucht zusätzlich ein gesetztes Handle; bleibt

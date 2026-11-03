@@ -1,8 +1,12 @@
 import type { Request, Response } from "express";
 import { createHash, randomBytes, randomUUID } from "node:crypto";
+import { readEnv } from "../env";
 
-export const SESSION_COOKIE = "hermes_session";
-export const DEVICE_COOKIE = "hermes_device";
+export const SESSION_COOKIE = "matchdesk_session";
+export const DEVICE_COOKIE = "matchdesk_device";
+/** Cookie-Namen vor der Umbenennung; werden gelesen und beim nächsten Setzen ersetzt. */
+export const LEGACY_SESSION_COOKIE = "hermes_session";
+export const LEGACY_DEVICE_COOKIE = "hermes_device";
 
 const DAY_MS = 1000 * 60 * 60 * 24;
 const DEFAULT_SESSION_TTL_DAYS = 180;
@@ -18,7 +22,7 @@ export const DEVICE_KEY_PATTERN = /^[A-Za-z0-9_-]{22,44}$/;
  * Every use within the window extends it again (cookie renewal + `lastSeenAt`).
  */
 export function getSessionTtlMs() {
-  const raw = Number.parseInt(process.env.HERMES_SESSION_TTL_DAYS ?? "", 10);
+  const raw = Number.parseInt(readEnv("SESSION_TTL_DAYS") ?? "", 10);
   const days = Number.isFinite(raw) && raw > 0 ? Math.min(raw, MAX_COOKIE_DAYS) : DEFAULT_SESSION_TTL_DAYS;
   return days * DAY_MS;
 }
@@ -48,10 +52,35 @@ export function hashSessionToken(token: string) {
 }
 
 function cookieSecure() {
-  return process.env.HERMES_COOKIE_SECURE === "true";
+  return readEnv("COOKIE_SECURE") === "true";
+}
+
+function cookieValue(request: Request, name: string): string | undefined {
+  const value = request.cookies?.[name];
+  return typeof value === "string" && value.length > 0 ? value : undefined;
+}
+
+/** Session-Token aus dem neuen Cookie, sonst aus dem alten `hermes_session`. */
+export function readSessionCookie(request: Request): string | undefined {
+  return cookieValue(request, SESSION_COOKIE) ?? cookieValue(request, LEGACY_SESSION_COOKIE);
+}
+
+/** true, wenn die Session nur über den alten Cookie-Namen kam und umgezogen werden sollte. */
+export function hasOnlyLegacySessionCookie(request: Request): boolean {
+  return !cookieValue(request, SESSION_COOKIE) && Boolean(cookieValue(request, LEGACY_SESSION_COOKIE));
+}
+
+function clearLegacyCookie(response: Response, name: string) {
+  response.clearCookie(name, {
+    httpOnly: true,
+    sameSite: "lax",
+    secure: cookieSecure(),
+    path: "/"
+  });
 }
 
 export function setSessionCookie(response: Response, token: string) {
+  clearLegacyCookie(response, LEGACY_SESSION_COOKIE);
   response.cookie(SESSION_COOKIE, token, {
     httpOnly: true,
     sameSite: "lax",
@@ -62,6 +91,7 @@ export function setSessionCookie(response: Response, token: string) {
 }
 
 export function clearSessionCookie(response: Response) {
+  clearLegacyCookie(response, LEGACY_SESSION_COOKIE);
   response.clearCookie(SESSION_COOKIE, {
     httpOnly: true,
     sameSite: "lax",
@@ -76,6 +106,7 @@ export function clearSessionCookie(response: Response) {
  * always required). Server-set cookies survive Safari's 7-day purge of script storage.
  */
 export function setDeviceCookie(response: Response, deviceKey: string) {
+  clearLegacyCookie(response, LEGACY_DEVICE_COOKIE);
   response.cookie(DEVICE_COOKIE, deviceKey, {
     httpOnly: true,
     sameSite: "lax",
@@ -86,6 +117,7 @@ export function setDeviceCookie(response: Response, deviceKey: string) {
 }
 
 export function clearDeviceCookie(response: Response) {
+  clearLegacyCookie(response, LEGACY_DEVICE_COOKIE);
   response.clearCookie(DEVICE_COOKIE, {
     httpOnly: true,
     sameSite: "lax",
@@ -95,8 +127,13 @@ export function clearDeviceCookie(response: Response) {
 }
 
 export function readDeviceCookie(request: Request): string | undefined {
-  const value = request.cookies?.[DEVICE_COOKIE];
-  return typeof value === "string" && DEVICE_KEY_PATTERN.test(value) ? value : undefined;
+  for (const name of [DEVICE_COOKIE, LEGACY_DEVICE_COOKIE]) {
+    const value = cookieValue(request, name);
+    if (value && DEVICE_KEY_PATTERN.test(value)) {
+      return value;
+    }
+  }
+  return undefined;
 }
 
 export function createDeviceKey() {

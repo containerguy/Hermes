@@ -6,7 +6,7 @@ import type { ProjectTemplateId } from "./project-template";
  * aus den Client-Katalogen (inkl. Template-Overlays) übereinstimmen – ein Test prüft das.
  */
 export const builtinAppDisplayNames: Record<ProjectTemplateId, Record<AppLocale, string>> = {
-  lan_party: { de: "Mitspielzentrale", en: "MatchDesk" },
+  lan_party: { de: "Mitspielzentrale", en: "Matchdesk" },
   table_tennis: { de: "Turnierzentrale", en: "Tournament desk" }
 };
 
