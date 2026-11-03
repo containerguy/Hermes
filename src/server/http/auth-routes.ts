@@ -288,7 +288,7 @@ export function createAuthRouter(context: DatabaseContext) {
         action: "auth.request_unknown",
         entityType: "user",
         entityId: null,
-        summary: `Unbekannter Login-Code-Request für ${usernameKey}.`,
+        summary: `Unbekannter Login-Code-Request für ${usernameKey.slice(0, 3)}***.`,
         metadata: { username: usernameKey.slice(0, 3) + "***" }
       });
       response.status(202).json({ ok: true });
@@ -365,15 +365,6 @@ export function createAuthRouter(context: DatabaseContext) {
       return;
     }
 
-    // Anmeldenamen, die sich nur in der Groß-/Kleinschreibung unterscheiden, wären beim
-    // Login nicht mehr unterscheidbar. Fehlercode wie beim Unique-Index-Konflikt.
-    const usernameCheck = ensureActiveUsernameAvailable(context, parsed.data.username);
-    if (!usernameCheck.ok) {
-      recordRateLimitFailure(context, { scope: "invite_register", key: registerKey });
-      response.status(409).json({ error: "user_existiert_bereits" });
-      return;
-    }
-
     const normalizedCode = normalizeInviteCode(parsed.data.inviteCode);
     const invite = context.db
       .select()
@@ -385,6 +376,16 @@ export function createAuthRouter(context: DatabaseContext) {
     if (!invite || invite.revokedAt || (invite.expiresAt && invite.expiresAt < timestamp)) {
       recordRateLimitFailure(context, { scope: "invite_register", key: registerKey });
       response.status(403).json({ error: "invite_ungueltig" });
+      return;
+    }
+
+    // Anmeldenamen, die sich nur in der Groß-/Kleinschreibung unterscheiden, wären beim
+    // Login nicht mehr unterscheidbar. Fehlercode wie beim Unique-Index-Konflikt; erst nach
+    // gültigem Invite geprüft, damit sich Namen nicht mit erfundenen Codes abfragen lassen.
+    const usernameCheck = ensureActiveUsernameAvailable(context, parsed.data.username);
+    if (!usernameCheck.ok) {
+      recordRateLimitFailure(context, { scope: "invite_register", key: registerKey });
+      response.status(409).json({ error: "user_existiert_bereits" });
       return;
     }
 

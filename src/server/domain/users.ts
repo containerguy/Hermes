@@ -67,7 +67,14 @@ export function findActiveUserByUsername(context: DatabaseContext, username: str
  */
 export function findActiveUserByLoginIdentifier(context: DatabaseContext, identifier: string) {
   if (identifier.includes("@")) {
-    return findActiveUserByEmail(context, identifier) ?? findActiveUserByUsername(context, identifier);
+    // Ein exakt passender Anmeldename (Usernames dürfen „@“ enthalten) gewinnt vor der
+    // Mail-Suche, damit niemand per ähnlicher Mailadresse ein fremdes Login „überdeckt“.
+    const exactUsername = context.db
+      .select()
+      .from(users)
+      .where(and(eq(users.username, identifier.trim()), isNull(users.deletedAt)))
+      .get();
+    return exactUsername ?? findActiveUserByEmail(context, identifier) ?? findActiveUserByUsername(context, identifier);
   }
   return findActiveUserByUsername(context, identifier);
 }

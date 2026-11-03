@@ -195,4 +195,24 @@ describe("login by username or email, case-insensitive", () => {
       .set(CSRF_HEADER, csrf);
     expect(response.status).toBe(200);
   });
+
+  it("flags case-only duplicates inside one bulk import file", async () => {
+    const { agent, csrf } = await adminWithCsrf();
+    const source = ["username,email,displayName,role", "Max,max@x.test,,user", "max,MAX@x.test,,user"].join("\n");
+    const response = await agent
+      .post("/api/admin/users/import/preview")
+      .set(CSRF_HEADER, csrf)
+      .send({ format: "csv", source })
+      .expect(200);
+    expect(response.body.import.hasBlockingIssues).toBe(true);
+    expect(response.body.import.acceptedRows).toBe(1);
+  });
+
+  it("prefers an exact username containing @ over another user's email", async () => {
+    await createUser("bob@lan.test", "bob-real@example.test").then((response) => expect(response.status).toBe(201));
+    await createUser("mallory", "Bob@lan.test").then((response) => expect(response.status).toBe(201));
+
+    expect((await login(request.agent(started!.app), "bob@lan.test")).username).toBe("bob@lan.test");
+    expect((await login(request.agent(started!.app), "BOB@lan.test")).username).toBe("mallory");
+  });
 });
