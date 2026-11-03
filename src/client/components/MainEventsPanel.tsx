@@ -1,5 +1,6 @@
 import React, { FormEvent, useEffect, useState } from "react";
 import type { MainEvent } from "../types/core";
+import { MainEventParticipantList, MainEventRegistrationEditor } from "./MainEventRegistration";
 import { requestJson } from "../api/request";
 import { getErrorMessage } from "../errors/errors";
 import { useI18n } from "../i18n/I18nContext";
@@ -20,7 +21,15 @@ const statusClasses: Record<MainEvent["status"], string> = {
   ended: "archived"
 };
 
-const emptyDraft = { name: "", description: "", plannedStartAt: "", plannedEndAt: "", private: false };
+const emptyDraft = {
+  name: "",
+  description: "",
+  plannedStartAt: "",
+  plannedEndAt: "",
+  maxParticipants: "",
+  registrationDeadline: "",
+  private: false
+};
 
 /**
  * Seite „Events“: alle sichtbaren Events mit eigener Teilnahme. Manager und Admins legen hier
@@ -92,7 +101,9 @@ export function MainEventsPanel({ canManage = true }: { canManage?: boolean }) {
           description: draft.description.trim() || null,
           visibility: draft.private ? "private" : "public",
           plannedStartAt: draft.plannedStartAt ? fromDatetimeLocal(draft.plannedStartAt) : null,
-          plannedEndAt: draft.plannedEndAt ? fromDatetimeLocal(draft.plannedEndAt) : null
+          plannedEndAt: draft.plannedEndAt ? fromDatetimeLocal(draft.plannedEndAt) : null,
+          maxParticipants: draft.maxParticipants.trim() ? Number(draft.maxParticipants) : null,
+          registrationDeadline: draft.registrationDeadline ? fromDatetimeLocal(draft.registrationDeadline) : null
         })
       });
       setDraft(emptyDraft);
@@ -158,15 +169,60 @@ export function MainEventsPanel({ canManage = true }: { canManage?: boolean }) {
     );
   }
 
-  async function setParticipation(mainEvent: MainEvent, status: "joined" | "declined") {
+  async function saveRegistration(
+    mainEvent: MainEvent,
+    changes: { maxParticipants: number | null; registrationDeadline: string | null }
+  ) {
     await run(
       () =>
-        requestJson<{ mainEvent: MainEvent }>(`/api/main-events/${mainEvent.id}/participation`, {
-          method: "POST",
-          body: JSON.stringify({ status })
+        requestJson<{ mainEvent: MainEvent }>(`/api/main-events/${mainEvent.id}`, {
+          method: "PATCH",
+          body: JSON.stringify(changes)
         }),
-      status === "joined" ? "mainEvents.participation.joined" : "mainEvents.participation.declined"
+      "mainEvents.msg.registration"
     );
+  }
+
+  /** Text zum eigenen Anmeldestatus; Nachrücker sehen ihren Platz in der Liste. */
+  function participationText(mainEvent: MainEvent) {
+    switch (mainEvent.myParticipation) {
+      case "joined":
+        return t("mainEvents.participation.joined");
+      case "interested":
+        return t("mainEvents.participation.interested");
+      case "waitlisted":
+        return t("mainEvents.participation.waitlisted", { n: mainEvent.myWaitlistPosition ?? 1 });
+      case "declined":
+        return t("mainEvents.participation.declined");
+      default:
+        return t("mainEvents.participation.open");
+    }
+  }
+
+  async function setParticipation(mainEvent: MainEvent, status: "joined" | "interested" | "declined") {
+    setBusy(true);
+    setError("");
+    setMessage("");
+    try {
+      const result = await requestJson<{ mainEvent: MainEvent }>(`/api/main-events/${mainEvent.id}/participation`, {
+        method: "POST",
+        body: JSON.stringify({ status })
+      });
+      await load();
+      // Bei vollem Event wird aus der Zusage ein Nachrückerplatz: das sagen wir deutlich.
+      const updated = result?.mainEvent;
+      setMessage(
+        updated?.myParticipation === "waitlisted"
+          ? t("mainEvents.participation.waitlistedShort", { n: updated.myWaitlistPosition ?? 1 })
+          : updated
+            ? participationText(updated)
+            : ""
+      );
+    } catch (caught) {
+      setError(getErrorMessage(caught, locale));
+    } finally {
+      setBusy(false);
+    }
   }
 
   const running = mainEvents.find((entry) => entry.status === "running");
@@ -203,9 +259,15 @@ export function MainEventsPanel({ canManage = true }: { canManage?: boolean }) {
                   ? t("mainEvents.rounds.one")
                   : t("mainEvents.rounds.many", { n: mainEvent.roundCount })}
                 {" · "}
-                {mainEvent.participantCount === 1
-                  ? t("mainEvents.participants.one")
-                  : t("mainEvents.participants.many", { n: mainEvent.participantCount })}
+                {mainEvent.maxParticipants !== null
+                  ? t("mainEvents.seats", { n: mainEvent.participantCount, max: mainEvent.maxParticipants })
+                  : mainEvent.participantCount === 1
+                    ? t("mainEvents.participants.one")
+                    : t("mainEvents.participants.many", { n: mainEvent.participantCount })}
+                {mainEvent.waitlistCount > 0 ? ` · ${t("mainEvents.waitlist", { n: mainEvent.waitlistCount })}` : null}
+                {mainEvent.interestedCount > 0
+                  ? ` · ${t("mainEvents.interested", { n: mainEvent.interestedCount })}`
+                  : null}
                 {mainEvent.status === "planned" && planned ? ` · ${t("mainEvents.planned", { range: planned })}` : null}
                 {mainEvent.status === "running" && mainEvent.startedAt
                   ? ` · ${t("mainEvents.startedAt", { at: formatDate(mainEvent.startedAt) })}`
@@ -214,18 +276,33 @@ export function MainEventsPanel({ canManage = true }: { canManage?: boolean }) {
                   ? ` · ${t("mainEvents.endedAt", { at: formatDate(mainEvent.endedAt) })}`
                   : null}
               </p>
+              {mainEvent.status === "planned" && mainEvent.registrationDeadline ? (
+                <p className={mainEvent.registrationClosed ? "muted main-event-deadline closed" : "muted main-event-deadline"}>
+                  {mainEvent.registrationClosed
+                    ? t("mainEvents.deadlinePassed", { at: formatDate(mainEvent.registrationDeadline) })
+                    : t("mainEvents.deadline", { at: formatDate(mainEvent.registrationDeadline) })}
+                </p>
+              ) : null}
               {mainEvent.status !== "ended" ? (
                 <div className="action-row main-event-participation">
-                  <span className="toolbar-hint">
-                    {mainEvent.myParticipation === "joined"
-                      ? t("mainEvents.participation.joined")
-                      : mainEvent.myParticipation === "declined"
-                        ? t("mainEvents.participation.declined")
-                        : t("mainEvents.participation.open")}
-                  </span>
-                  {mainEvent.myParticipation !== "joined" ? (
-                    <button type="button" disabled={busy} onClick={() => setParticipation(mainEvent, "joined")}>
+                  <span className="toolbar-hint">{participationText(mainEvent)}</span>
+                  {mainEvent.myParticipation !== "joined" && mainEvent.myParticipation !== "waitlisted" ? (
+                    <button
+                      type="button"
+                      disabled={busy || mainEvent.registrationClosed}
+                      onClick={() => setParticipation(mainEvent, "joined")}
+                    >
                       {t("mainEvents.participation.join")}
+                    </button>
+                  ) : null}
+                  {mainEvent.myParticipation !== "interested" && mainEvent.myParticipation !== "joined" ? (
+                    <button
+                      type="button"
+                      className="secondary"
+                      disabled={busy || mainEvent.registrationClosed}
+                      onClick={() => setParticipation(mainEvent, "interested")}
+                    >
+                      {t("mainEvents.participation.interest")}
                     </button>
                   ) : null}
                   {mainEvent.myParticipation !== "declined" ? (
@@ -286,6 +363,15 @@ export function MainEventsPanel({ canManage = true }: { canManage?: boolean }) {
                   </div>
                 </div>
               ) : null}
+              {canManage && mainEvent.status !== "ended" ? (
+                <MainEventRegistrationEditor
+                  key={`${mainEvent.id}-${mainEvent.maxParticipants}-${mainEvent.registrationDeadline}`}
+                  mainEvent={mainEvent}
+                  busy={busy}
+                  onSave={(changes) => saveRegistration(mainEvent, changes)}
+                />
+              ) : null}
+              {canManage ? <MainEventParticipantList mainEvent={mainEvent} /> : null}
               {canManage ? (
               <div className="action-row">
                 {mainEvent.status === "planned" ? (
@@ -364,6 +450,26 @@ export function MainEventsPanel({ canManage = true }: { canManage?: boolean }) {
               type="datetime-local"
               value={draft.plannedEndAt}
               onChange={(ev) => setDraft({ ...draft, plannedEndAt: ev.target.value })}
+            />
+          </label>
+        </div>
+        <div className="form-grid">
+          <label>
+            {t("mainEvents.form.maxParticipants")}
+            <input
+              type="number"
+              min={1}
+              max={10000}
+              value={draft.maxParticipants}
+              onChange={(ev) => setDraft({ ...draft, maxParticipants: ev.target.value })}
+            />
+          </label>
+          <label>
+            {t("mainEvents.form.registrationDeadline")}
+            <input
+              type="datetime-local"
+              value={draft.registrationDeadline}
+              onChange={(ev) => setDraft({ ...draft, registrationDeadline: ev.target.value })}
             />
           </label>
         </div>

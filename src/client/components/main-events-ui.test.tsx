@@ -90,7 +90,13 @@ function mainEvent(overrides: Partial<MainEvent>): MainEvent {
     createdByUsername: "mgr",
     roundCount: 1,
     participantCount: 0,
+    interestedCount: 0,
+    waitlistCount: 0,
+    maxParticipants: null,
+    registrationDeadline: null,
+    registrationClosed: false,
     myParticipation: null,
+    myWaitlistPosition: null,
     ...overrides
   };
 }
@@ -347,6 +353,98 @@ describe("Events mit Start und Ende – Oberfläche", () => {
       await flush();
     });
     expect(posted).toEqual([{ url: "/api/main-events/m-1/participation", body: { status: "joined" } }]);
+    await rendered.cleanup();
+  });
+
+  it("shows seats, waitlist position and interest, and blocks sign-up after the deadline", async () => {
+    const posted = installRequests([
+      mainEvent({
+        id: "m-1",
+        status: "planned",
+        maxParticipants: 10,
+        participantCount: 10,
+        waitlistCount: 2,
+        interestedCount: 3,
+        myParticipation: "waitlisted",
+        myWaitlistPosition: 2
+      }),
+      mainEvent({
+        id: "m-2",
+        name: "Tag 2",
+        status: "planned",
+        registrationDeadline: "2026-11-01T12:00:00.000Z",
+        registrationClosed: true
+      })
+    ]);
+    const rendered = await render(<MainEventsPanel canManage={false} />);
+    const [full, closed] = Array.from(rendered.container.querySelectorAll(".main-event")) as HTMLElement[];
+    expect(full.textContent).toContain("10 von 10 Plätzen belegt");
+    expect(full.textContent).toContain("2 Nachrücker");
+    expect(full.textContent).toContain("3 interessiert");
+    expect(full.textContent).toContain("Du bist Nachrücker (Platz 2)");
+    const fullButtons = Array.from(full.querySelectorAll(".main-event-participation button")).map((b) => b.textContent);
+    expect(fullButtons).toEqual(["Interessiert", "Nicht dabei"]);
+
+    expect(closed.textContent).toContain("Anmeldeschluss vorbei");
+    const closedButtons = Array.from(closed.querySelectorAll(".main-event-participation button")) as HTMLButtonElement[];
+    expect(closedButtons.find((b) => b.textContent === "Dabei")!.disabled).toBe(true);
+    expect(closedButtons.find((b) => b.textContent === "Interessiert")!.disabled).toBe(true);
+    expect(closedButtons.find((b) => b.textContent === "Nicht dabei")!.disabled).toBe(false);
+
+    const interest = Array.from(full.querySelectorAll("button")).find((b) => b.textContent === "Interessiert")!;
+    await act(async () => {
+      (interest as HTMLButtonElement).click();
+      await flush();
+    });
+    expect(posted).toEqual([{ url: "/api/main-events/m-1/participation", body: { status: "interested" } }]);
+    await rendered.cleanup();
+  });
+
+  it("lets managers set seats and deadline and see the registration overview with CSV link", async () => {
+    const patched: Array<Record<string, unknown>> = [];
+    requestMock.mockImplementation(async (url: string, options?: RequestInit) => {
+      if (options?.method === "PATCH") {
+        patched.push(JSON.parse(String(options.body)) as Record<string, unknown>);
+        return { mainEvent: mainEvent({ status: "planned" }) };
+      }
+      if (url === "/api/main-events/m-1/participants") {
+        return {
+          participants: [
+            { userId: "u-1", username: "anna", displayName: null, status: "joined", updatedAt: "x", waitlistPosition: null },
+            { userId: "u-2", username: "bert", displayName: "Bert B.", status: "waitlisted", updatedAt: "x", waitlistPosition: 1 }
+          ],
+          noResponse: [{ userId: "u-3", username: "carl", displayName: null }]
+        };
+      }
+      if (url === "/api/main-events") return { mainEvents: [mainEvent({ status: "planned" })] };
+      throw new Error(`unexpected ${url}`);
+    });
+    const rendered = await render(<MainEventsPanel />);
+
+    const editor = rendered.container.querySelector(".main-event-registration") as HTMLDetailsElement;
+    const seats = editor.querySelector('input[type="number"]') as HTMLInputElement;
+    await act(async () => {
+      setInputValue(seats, "12");
+      await flush();
+    });
+    await act(async () => {
+      (editor.querySelector("form") as HTMLFormElement).requestSubmit();
+      await flush();
+    });
+    expect(patched).toEqual([{ maxParticipants: 12, registrationDeadline: null }]);
+
+    const overview = rendered.container.querySelector(".main-event-overview") as HTMLDetailsElement;
+    await act(async () => {
+      overview.open = true;
+      overview.dispatchEvent(new Event("toggle"));
+      await flush();
+    });
+    const text = overview.textContent ?? "";
+    expect(text).toContain("Dabei (1)");
+    expect(text).toContain("Nachrücker (1)");
+    expect(text).toContain("1. Bert B. (bert)");
+    expect(text).toContain("Noch keine Antwort (1)");
+    expect(overview.querySelector("a")!.getAttribute("href")).toBe("/api/main-events/m-1/participants.csv");
     await rendered.cleanup();
   });
 });

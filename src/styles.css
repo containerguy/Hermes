@@ -2985,3 +2985,24 @@ dd {
     transition: none;
   }
 }
+
+/* Anmeldung zum Event: Anmeldeschluss, Plätze und Übersicht für Manager */
+.main-event-deadline.closed {
+  color: var(--color-danger, #b91c1c);
+}
+.main-event-registration,
+.main-event-overview {
+  margin-top: 0.5rem;
+}
+.main-event-registration summary,
+.main-event-overview summary {
+  cursor: pointer;
+}
+.main-event-registration form {
+  margin-top: 0.5rem;
+  align-items: end;
+}
+.main-event-overview-body ul {
+  margin: 0.2rem 0 0.6rem;
+  padding-left: 1.2rem;
+}

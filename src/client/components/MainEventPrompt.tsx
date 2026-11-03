@@ -46,7 +46,9 @@ export function MainEventPrompt({ currentUserId }: { currentUserId: string }) {
     });
   }, [currentUserId]);
 
-  if (!running || running.myParticipation !== null || dismissed === running.id) {
+  // Interessenten werden beim laufenden Event noch einmal gefragt; Nachrücker warten auf einen Platz.
+  const undecided = running?.myParticipation === null || running?.myParticipation === "interested";
+  if (!running || !undecided || dismissed === running.id) {
     return null;
   }
 

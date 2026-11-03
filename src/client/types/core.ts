@@ -302,7 +302,32 @@ export type MainEvent = {
   roundCount: number;
   /** Zahl der Zusagen („dabei"). */
   participantCount: number;
-  myParticipation: "joined" | "declined" | null;
+  /** Interessentenliste. */
+  interestedCount: number;
+  /** Nachrücker (Event voll). */
+  waitlistCount: number;
+  /** Plätze, null = unbegrenzt. */
+  maxParticipants: number | null;
+  registrationDeadline: string | null;
+  /** Anmeldeschluss vorbei (nur für geplante Events). */
+  registrationClosed: boolean;
+  myParticipation: MainEventParticipation | null;
+  myWaitlistPosition: number | null;
+};
+
+export type MainEventParticipation = "joined" | "interested" | "waitlisted" | "declined";
+
+/** Anmeldeübersicht für Manager. */
+export type MainEventParticipantOverview = {
+  participants: Array<{
+    userId: string;
+    username: string;
+    displayName: string | null;
+    status: MainEventParticipation;
+    updatedAt: string;
+    waitlistPosition: number | null;
+  }>;
+  noResponse: Array<{ userId: string; username: string; displayName: string | null }>;
 };
 
 export type GameEvent = {
