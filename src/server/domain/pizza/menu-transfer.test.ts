@@ -13,6 +13,7 @@ import {
   extrasToCsv,
   menuToCsv,
   menuToYaml,
+  parseMenuYaml,
   parsePriceToCents,
   previewMenuTransfer
 } from "./menu-transfer";
@@ -369,5 +370,19 @@ describe("Roundtrip mit Sonderfällen (Review B1/N1)", () => {
     ]);
     const csv = "kategorie;nummer;artikel;zutaten;allergene;artikel_aktiv;variante;preis_eur;variante_aktiv;notiz\nPizza;01;Margherita;;;ja;30cm;7;ja;x";
     expect(previewMenuTransfer(context, "csv", csv).errors[0].code).toBe("csv_header");
+  });
+});
+
+describe("Formatkennung nach der Umbenennung", () => {
+  const body = "version: 1\nkategorien:\n  - name: Pizza\n    artikel:\n      - name: Margherita\n        aktiv: true\n        varianten:\n          - preis_eur: 7.5\n            aktiv: true\n";
+
+  it("schreibt matchdesk-pizza-menu und liest alte hermes-pizza-menu-Exporte", () => {
+    expect(menuToYaml(buildMenuDocument(context))).toContain("format: matchdesk-pizza-menu");
+    for (const format of ["matchdesk-pizza-menu", "hermes-pizza-menu"]) {
+      const { errors, doc } = parseMenuYaml(`format: ${format}\n${body}`);
+      expect(errors).toEqual([]);
+      expect(doc.categories?.[0]?.items[0]?.name).toBe("Margherita");
+    }
+    expect(parseMenuYaml(`format: fremd\n${body}`).errors.length).toBeGreaterThan(0);
   });
 });

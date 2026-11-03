@@ -1,5 +1,28 @@
-const DEVICE_KEY_STORAGE_KEY = "hermes_device_key_v1";
-const KNOWN_DEVICE_STORAGE_KEY = "hermes_known_device_v1";
+const DEVICE_KEY_STORAGE_KEY = "matchdesk_device_key_v1";
+const KNOWN_DEVICE_STORAGE_KEY = "matchdesk_known_device_v1";
+/**
+ * Schlüssel vor der Umbenennung. Werden beim ersten Lesen übernommen und bleiben bis v1.0
+ * liegen, damit ein Rollback auf eine ältere Version das Gerät weiter erkennt.
+ */
+const LEGACY_DEVICE_KEY_STORAGE_KEY = "hermes_device_key_v1";
+const LEGACY_KNOWN_DEVICE_STORAGE_KEY = "hermes_known_device_v1";
+
+/** Liest den neuen Schlüssel, sonst den alten und kopiert ihn auf den neuen. Kann werfen. */
+function readMigrated(key: string, legacyKey: string): string | null {
+  const current = window.localStorage.getItem(key);
+  if (current !== null) {
+    return current;
+  }
+  const legacy = window.localStorage.getItem(legacyKey);
+  if (legacy !== null) {
+    try {
+      window.localStorage.setItem(key, legacy);
+    } catch {
+      // Quota/blocked: alter Wert wird weiter direkt gelesen.
+    }
+  }
+  return legacy;
+}
 const DEVICE_KEY_BYTES = 16;
 const DEVICE_KEY_PATTERN = /^[A-Za-z0-9_-]{22,44}$/;
 
@@ -23,7 +46,7 @@ export function generateDeviceKey(): string {
 
 export function getOrCreateDeviceKey(): string {
   try {
-    const existing = window.localStorage.getItem(DEVICE_KEY_STORAGE_KEY);
+    const existing = readMigrated(DEVICE_KEY_STORAGE_KEY, LEGACY_DEVICE_KEY_STORAGE_KEY);
     if (existing && DEVICE_KEY_PATTERN.test(existing)) {
       return existing;
     }
@@ -44,6 +67,8 @@ export function forgetDeviceKey(): void {
   try {
     window.localStorage.removeItem(DEVICE_KEY_STORAGE_KEY);
     window.localStorage.removeItem(KNOWN_DEVICE_STORAGE_KEY);
+    window.localStorage.removeItem(LEGACY_DEVICE_KEY_STORAGE_KEY);
+    window.localStorage.removeItem(LEGACY_KNOWN_DEVICE_STORAGE_KEY);
   } catch {
     // swallow; nothing to do if storage is inaccessible
   }
@@ -82,7 +107,7 @@ export function getKnownDeviceName(identifier: string): string | null {
     return null;
   }
   try {
-    const raw = window.localStorage.getItem(KNOWN_DEVICE_STORAGE_KEY);
+    const raw = readMigrated(KNOWN_DEVICE_STORAGE_KEY, LEGACY_KNOWN_DEVICE_STORAGE_KEY);
     if (!raw) {
       return null;
     }

@@ -13,9 +13,9 @@ function nowIso() {
 }
 
 export async function bootstrapAdmin() {
-  const phoneNumber = readRequiredEnv("HERMES_ADMIN_PHONE");
-  const username = readRequiredEnv("HERMES_ADMIN_USERNAME");
-  const email = readRequiredEnv("HERMES_ADMIN_EMAIL");
+  const phoneNumber = readRequiredEnv("ADMIN_PHONE");
+  const username = readRequiredEnv("ADMIN_USERNAME");
+  const email = readRequiredEnv("ADMIN_EMAIL");
   await restoreDatabaseFromStorageIfNeeded();
   const { db, sqlite } = createDb();
 

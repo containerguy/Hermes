@@ -17,12 +17,12 @@ import webpush from "web-push";
 import fixture from "../integrations/amp/__fixtures__/get-instances.json";
 import { CSRF_HEADER } from "../auth/csrf";
 import { bootstrapAdmin } from "../db/bootstrap-admin";
-import { createHermesApp } from "../app";
+import { createMatchdeskApp } from "../app";
 import { setAmpFetchForTests } from "../integrations/amp/amp-session";
 import { resetAmpStatusForTests } from "../integrations/amp/amp-status";
 import { runAutomationNow } from "../integrations/amp/amp-automation";
 
-type StartedApp = Awaited<ReturnType<typeof createHermesApp>>;
+type StartedApp = Awaited<ReturnType<typeof createMatchdeskApp>>;
 type Agent = ReturnType<typeof request.agent>;
 type FixtureInstance = { InstanceID: string; InstanceName: string; AppState: number; Running: boolean };
 
@@ -115,24 +115,24 @@ function auditActions(action: string) {
 
 describe("AMP automation (Phase 15-04)", () => {
   beforeEach(async () => {
-    databasePath = path.join(os.tmpdir(), `hermes-test-${randomUUID()}.sqlite`);
-    process.env.HERMES_DB_PATH = databasePath;
-    process.env.HERMES_ADMIN_PHONE = "+491701234567";
-    process.env.HERMES_ADMIN_USERNAME = "hauptadmin";
-    process.env.HERMES_ADMIN_EMAIL = "hauptadmin@example.test";
-    process.env.HERMES_MAIL_MODE = "console";
-    process.env.HERMES_DEV_LOGIN_CODE = "123456";
-    process.env.HERMES_AMP_USERNAME = "hermes";
-    process.env.HERMES_AMP_PASSWORD = "geheim";
-    process.env.HERMES_VAPID_PUBLIC_KEY = "test-public";
-    process.env.HERMES_VAPID_PRIVATE_KEY = "test-private";
-    delete process.env.HERMES_AMP_CA_FILE;
-    delete process.env.HERMES_AMP_REMEMBER_TOKEN_FILE;
-    delete process.env.HERMES_STORAGE_BACKEND;
+    databasePath = path.join(os.tmpdir(), `matchdesk-test-${randomUUID()}.sqlite`);
+    process.env.MATCHDESK_DB_PATH = databasePath;
+    process.env.MATCHDESK_ADMIN_PHONE = "+491701234567";
+    process.env.MATCHDESK_ADMIN_USERNAME = "hauptadmin";
+    process.env.MATCHDESK_ADMIN_EMAIL = "hauptadmin@example.test";
+    process.env.MATCHDESK_MAIL_MODE = "console";
+    process.env.MATCHDESK_DEV_LOGIN_CODE = "123456";
+    process.env.MATCHDESK_AMP_USERNAME = "hermes";
+    process.env.MATCHDESK_AMP_PASSWORD = "geheim";
+    process.env.MATCHDESK_VAPID_PUBLIC_KEY = "test-public";
+    process.env.MATCHDESK_VAPID_PRIVATE_KEY = "test-private";
+    delete process.env.MATCHDESK_AMP_CA_FILE;
+    delete process.env.MATCHDESK_AMP_REMEMBER_TOKEN_FILE;
+    delete process.env.MATCHDESK_STORAGE_BACKEND;
     resetAmpStatusForTests();
     installAmpMock();
     await bootstrapAdmin();
-    started = await createHermesApp();
+    started = await createMatchdeskApp();
   }, 30_000);
 
   afterEach(async () => {
@@ -142,10 +142,10 @@ describe("AMP automation (Phase 15-04)", () => {
     resetAmpStatusForTests();
     vi.clearAllMocks();
     for (const key of [
-      "HERMES_AMP_USERNAME",
-      "HERMES_AMP_PASSWORD",
-      "HERMES_VAPID_PUBLIC_KEY",
-      "HERMES_VAPID_PRIVATE_KEY"
+      "MATCHDESK_AMP_USERNAME",
+      "MATCHDESK_AMP_PASSWORD",
+      "MATCHDESK_VAPID_PUBLIC_KEY",
+      "MATCHDESK_VAPID_PRIVATE_KEY"
     ]) {
       delete process.env[key];
     }

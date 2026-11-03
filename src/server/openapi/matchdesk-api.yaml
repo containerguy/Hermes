@@ -1,14 +1,14 @@
 openapi: 3.1.0
 info:
-  title: Hermes API
+  title: Matchdesk API
   description: |
-    HTTP API für die Hermes LAN-Party-Koordination.
+    HTTP API für die Matchdesk-LAN-Party-Koordination.
 
     **Authentifizierung**
-    - **Browser:** Session-Cookie `hermes_session` nach Login (wie die Web-UI).
+    - **Browser:** Session-Cookie `matchdesk_session` (bis v1.0 auch `hermes_session`) nach Login (wie die Web-UI).
     - **API-Client:** `Authorization: Bearer <token>` mit einem im Profil erzeugten API-Token.
 
-    **CSRF:** Schreibende Anfragen aus dem Browser senden den Header `x-hermes-csrf` (siehe `GET /api/auth/csrf`).
+    **CSRF:** Schreibende Anfragen aus dem Browser senden den Header `x-matchdesk-csrf` (bis v1.0 auch noch `x-hermes-csrf`) (siehe `GET /api/auth/csrf`).
     Bei reiner Bearer-Authentifizierung entfällt die CSRF-Pflicht.
 
     **API-Token-Scopes**
@@ -23,7 +23,7 @@ info:
 
 servers:
   - url: /
-    description: Relativ zur Hermes-Instanz
+    description: Relativ zur Matchdesk-Instanz
 
 tags:
   - name: auth
@@ -127,7 +127,7 @@ paths:
                     type: string
                   header:
                     type: string
-                    example: x-hermes-csrf
+                    example: x-matchdesk-csrf
         "401":
           $ref: "#/components/responses/Unauthorized"
 
@@ -627,7 +627,7 @@ components:
     cookieAuth:
       type: apiKey
       in: cookie
-      name: hermes_session
+      name: matchdesk_session
     bearerAuth:
       type: http
       scheme: bearer

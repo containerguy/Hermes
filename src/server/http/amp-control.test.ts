@@ -7,12 +7,12 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import fixture from "../integrations/amp/__fixtures__/get-instances.json";
 import { CSRF_HEADER } from "../auth/csrf";
 import { bootstrapAdmin } from "../db/bootstrap-admin";
-import { createHermesApp } from "../app";
+import { createMatchdeskApp } from "../app";
 import { setAmpFetchForTests } from "../integrations/amp/amp-session";
 import { pollNow, resetAmpStatusForTests } from "../integrations/amp/amp-status";
 import { maskConsoleSecrets, setBotCountPollForTests } from "./amp-routes";
 
-type StartedApp = Awaited<ReturnType<typeof createHermesApp>>;
+type StartedApp = Awaited<ReturnType<typeof createMatchdeskApp>>;
 type AmpCall = { endpoint: string; body: Record<string, unknown> };
 
 let started: StartedApp | undefined;
@@ -65,7 +65,7 @@ function installAmpMock() {
         ConsoleEntries: [
           { Timestamp: "2026-10-15T20:00:00Z", Source: "Console", Contents: "Server started" },
           { Timestamp: "2026-10-15T20:00:01Z", Source: "Console", Contents: 'rcon_password "SuperGeheim123"' },
-          // Antwort auf `status` (CS2): Hermes liest daraus die Botzahl
+          // Antwort auf `status` (CS2): Matchdesk liest daraus die Botzahl
           ...(lastSent?.body.message === "status"
             ? [{ Timestamp: "2026-10-15T20:00:02Z", Source: "Console", Contents: "players  : 0 humans, 3 bots (32 max)" }]
             : [])
@@ -109,24 +109,24 @@ async function createUser(admin: ReturnType<typeof request.agent>, csrf: string,
 
 describe("AMP control + status (Phase 15-02)", () => {
   beforeEach(async () => {
-    databasePath = path.join(os.tmpdir(), `hermes-test-${randomUUID()}.sqlite`);
-    process.env.HERMES_DB_PATH = databasePath;
-    process.env.HERMES_ADMIN_PHONE = "+491701234567";
-    process.env.HERMES_ADMIN_USERNAME = "hauptadmin";
-    process.env.HERMES_ADMIN_EMAIL = "hauptadmin@example.test";
-    process.env.HERMES_MAIL_MODE = "console";
-    process.env.HERMES_DEV_LOGIN_CODE = "123456";
-    process.env.HERMES_AMP_USERNAME = "hermes";
-    process.env.HERMES_AMP_PASSWORD = "geheim";
-    delete process.env.HERMES_AMP_CA_FILE;
-    delete process.env.HERMES_AMP_REMEMBER_TOKEN_FILE;
-    delete process.env.HERMES_STORAGE_BACKEND;
-    delete process.env.HERMES_VAPID_PUBLIC_KEY;
-    delete process.env.HERMES_VAPID_PRIVATE_KEY;
+    databasePath = path.join(os.tmpdir(), `matchdesk-test-${randomUUID()}.sqlite`);
+    process.env.MATCHDESK_DB_PATH = databasePath;
+    process.env.MATCHDESK_ADMIN_PHONE = "+491701234567";
+    process.env.MATCHDESK_ADMIN_USERNAME = "hauptadmin";
+    process.env.MATCHDESK_ADMIN_EMAIL = "hauptadmin@example.test";
+    process.env.MATCHDESK_MAIL_MODE = "console";
+    process.env.MATCHDESK_DEV_LOGIN_CODE = "123456";
+    process.env.MATCHDESK_AMP_USERNAME = "hermes";
+    process.env.MATCHDESK_AMP_PASSWORD = "geheim";
+    delete process.env.MATCHDESK_AMP_CA_FILE;
+    delete process.env.MATCHDESK_AMP_REMEMBER_TOKEN_FILE;
+    delete process.env.MATCHDESK_STORAGE_BACKEND;
+    delete process.env.MATCHDESK_VAPID_PUBLIC_KEY;
+    delete process.env.MATCHDESK_VAPID_PRIVATE_KEY;
     resetAmpStatusForTests();
     installAmpMock();
     await bootstrapAdmin();
-    started = await createHermesApp();
+    started = await createMatchdeskApp();
   }, 30_000);
 
   afterEach(async () => {
@@ -134,8 +134,8 @@ describe("AMP control + status (Phase 15-02)", () => {
     started = undefined;
     setAmpFetchForTests(null);
     resetAmpStatusForTests();
-    delete process.env.HERMES_AMP_USERNAME;
-    delete process.env.HERMES_AMP_PASSWORD;
+    delete process.env.MATCHDESK_AMP_USERNAME;
+    delete process.env.MATCHDESK_AMP_PASSWORD;
     for (const suffix of ["", "-wal", "-shm"]) {
       fs.rmSync(`${databasePath}${suffix}`, { force: true });
     }
@@ -327,7 +327,7 @@ describe("AMP control + status (Phase 15-02)", () => {
       .send({ command: "a;b;c;d;e;f;g;h;i", split: true })
       .expect(400);
 
-    // Bots: Hermes baut die Befehle je Spiel (CS2 laut AMP) und sendet sie einzeln
+    // Bots: Matchdesk baut die Befehle je Spiel (CS2 laut AMP) und sendet sie einzeln
     ampCalls = [];
     const bots = (body: unknown) =>
       manager.agent.post(`/api/integrations/amp/instances/${bindingId}/bots`).set(CSRF_HEADER, manager.csrf).send(body as object);

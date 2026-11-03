@@ -1,7 +1,7 @@
 import type { Request } from "express";
 import type { DatabaseContext } from "../db/client";
 import { users } from "../db/schema";
-import { resolveHermesAuth } from "./hermes-auth";
+import { resolveMatchdeskAuth } from "./matchdesk-auth";
 
 export function publicUser(user: typeof users.$inferSelect) {
   return {
@@ -18,8 +18,8 @@ export function publicUser(user: typeof users.$inferSelect) {
 }
 
 export function getCurrentSession(context: DatabaseContext, request: Request) {
-  resolveHermesAuth(context, request);
-  const auth = request.hermesAuth;
+  resolveMatchdeskAuth(context, request);
+  const auth = request.matchdeskAuth;
   if (auth?.kind === "session") {
     return { session: auth.session, user: auth.user };
   }
@@ -27,8 +27,8 @@ export function getCurrentSession(context: DatabaseContext, request: Request) {
 }
 
 export function requireUser(context: DatabaseContext, request: Request) {
-  resolveHermesAuth(context, request);
-  return request.hermesAuth?.user;
+  resolveMatchdeskAuth(context, request);
+  return request.matchdeskAuth?.user;
 }
 
 export function requireAdmin(context: DatabaseContext, request: Request) {

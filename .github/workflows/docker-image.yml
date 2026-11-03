@@ -16,7 +16,9 @@ permissions:
   packages: write
 
 env:
-  IMAGE_NAME: ghcr.io/containerguy/hermes
+  IMAGE_NAME: ghcr.io/containerguy/matchdesk
+  # Übergang nach der Umbenennung: dasselbe Image auch unter dem alten Namen, bis v1.0.
+  LEGACY_IMAGE_NAME: ghcr.io/containerguy/hermes
   NODE_VERSION: "22"
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
 
@@ -72,15 +74,17 @@ jobs:
         id: meta
         uses: docker/metadata-action@v6
         with:
-          images: ${{ env.IMAGE_NAME }}
+          images: |
+            ${{ env.IMAGE_NAME }}
+            ${{ env.LEGACY_IMAGE_NAME }}
           tags: |
             type=raw,value=latest,enable={{is_default_branch}}
             type=ref,event=branch
             type=ref,event=tag
             type=sha,prefix=sha-
           labels: |
-            org.opencontainers.image.title=Hermes
-            org.opencontainers.image.description=LAN party event voting web app
+            org.opencontainers.image.title=Matchdesk
+            org.opencontainers.image.description=Matchdesk (Mitspielzentrale) - LAN party game session web app
             org.opencontainers.image.source=https://github.com/containerguy/Hermes
 
       - name: Build Docker image

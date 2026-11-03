@@ -34,7 +34,7 @@ function mockWin(input: {
 describe("getSecureContextInfo", () => {
   it("describes HTTPS + secure context like production", () => {
     const info = getSecureContextInfo(
-      mockWin({ protocol: "https:", hostname: "hermes.familie-keller.info", isSecureContext: true })
+      mockWin({ protocol: "https:", hostname: "mitspielzentrale.familie-keller.info", isSecureContext: true })
     );
     expect(info.isHttps).toBe(true);
     expect(info.isSecureContext).toBe(true);

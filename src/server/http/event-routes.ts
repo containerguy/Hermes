@@ -3,7 +3,7 @@ import { Router } from "express";
 import { randomUUID } from "node:crypto";
 import { z } from "zod";
 import { requireUser } from "../auth/current-user";
-import { enforceApiTokenWriteAccess } from "../auth/hermes-auth";
+import { enforceApiTokenWriteAccess } from "../auth/matchdesk-auth";
 import { tryWriteAuditLog, writeAuditLog } from "../audit-log";
 import type { DatabaseContext } from "../db/client";
 import { appSettings, gameEvents, participations, users } from "../db/schema";
@@ -657,7 +657,7 @@ export function createEventRouter(context: DatabaseContext) {
 
           if (isSqliteBusyOrLocked(retryError)) {
             console.error(
-              "[Hermes] Participation update failed after retry (sqlite busy/locked)",
+              "[Matchdesk] Participation update failed after retry (sqlite busy/locked)",
               retryError
             );
             response.status(503).json({ error: "teilnahme_fehlgeschlagen" });

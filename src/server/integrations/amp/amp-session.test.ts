@@ -1,10 +1,10 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { defaultSettings, type HermesSettings } from "../../settings";
+import { defaultSettings, type MatchdeskSettings } from "../../settings";
 import { ampCall, ampInstanceCall, setAmpFetchForTests } from "./amp-session";
 
 type Call = { endpoint: string; body: Record<string, unknown> };
 
-const settings: HermesSettings = {
+const settings: MatchdeskSettings = {
   ...defaultSettings,
   ampIntegrationEnabled: true,
   ampBaseUrl: "https://amp-ctl.example.test"
@@ -34,16 +34,16 @@ function installFetch(handler: (call: Call, index: number) => { status: number; 
 
 describe("amp-session", () => {
   beforeEach(() => {
-    process.env.HERMES_AMP_USERNAME = "hermes";
-    process.env.HERMES_AMP_PASSWORD = "geheim";
-    delete process.env.HERMES_AMP_REMEMBER_TOKEN_FILE;
-    delete process.env.HERMES_AMP_CA_FILE;
+    process.env.MATCHDESK_AMP_USERNAME = "hermes";
+    process.env.MATCHDESK_AMP_PASSWORD = "geheim";
+    delete process.env.MATCHDESK_AMP_REMEMBER_TOKEN_FILE;
+    delete process.env.MATCHDESK_AMP_CA_FILE;
   });
 
   afterEach(() => {
     setAmpFetchForTests(null);
-    delete process.env.HERMES_AMP_USERNAME;
-    delete process.env.HERMES_AMP_PASSWORD;
+    delete process.env.MATCHDESK_AMP_USERNAME;
+    delete process.env.MATCHDESK_AMP_PASSWORD;
   });
 
   it("logs in once for parallel calls and reuses the session", async () => {
@@ -96,10 +96,10 @@ describe("amp-session", () => {
   });
 
   it("falls back to the password when the rememberMe token is rejected", async () => {
-    const tokenFile = `${process.env.TMP ?? process.env.TEMP ?? "/tmp"}/hermes-amp-${Date.now()}.token`;
+    const tokenFile = `${process.env.TMP ?? process.env.TEMP ?? "/tmp"}/matchdesk-amp-${Date.now()}.token`;
     const fs = await import("node:fs");
     fs.writeFileSync(tokenFile, "OLD-TOKEN\n");
-    process.env.HERMES_AMP_REMEMBER_TOKEN_FILE = tokenFile;
+    process.env.MATCHDESK_AMP_REMEMBER_TOKEN_FILE = tokenFile;
 
     const calls = installFetch(({ endpoint, body }) => {
       if (endpoint === "Core/Login") {
@@ -164,7 +164,7 @@ describe("amp-session", () => {
   });
 
   it("fails without env credentials and never touches the network", async () => {
-    delete process.env.HERMES_AMP_PASSWORD;
+    delete process.env.MATCHDESK_AMP_PASSWORD;
     const calls = installFetch(() => ({ status: 200, body: {} }));
 
     await expect(ampCall(settings, "ADSModule/GetInstances")).rejects.toThrow(
@@ -174,7 +174,7 @@ describe("amp-session", () => {
   });
 
   it("rejects when the CA file is configured but unreadable", async () => {
-    process.env.HERMES_AMP_CA_FILE = "/definitely/missing/amp-ca.pem";
+    process.env.MATCHDESK_AMP_CA_FILE = "/definitely/missing/amp-ca.pem";
     const calls = installFetch(() => ({ status: 200, body: {} }));
 
     await expect(ampCall(settings, "ADSModule/GetInstances")).rejects.toThrow("amp_ca_ungueltig");

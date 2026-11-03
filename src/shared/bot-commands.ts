@@ -2,7 +2,7 @@ import { z } from "zod";
 
 /**
  * Bot-Verwaltung für Gameserver mit Bots (CS 1.6 mit YaPB, CS2 mit den eingebauten Bots).
- * Hermes baut die Konsolenbefehle selbst und schickt sie einzeln über AMP; freie Eingaben
+ * Matchdesk baut die Konsolenbefehle selbst und schickt sie einzeln über AMP; freie Eingaben
  * sind dafür nicht nötig. Server und Oberfläche teilen sich diese Datei.
  */
 export type BotKind = "yapb" | "cs2";
@@ -28,7 +28,7 @@ export const botRequestSchema = z.discriminatedUnion("action", [
     level: botLevelSchema,
     /**
      * Nur CS2: Bots werden mit dieser Anzahl neu aufgesetzt, weil bot_difficulty nur für neue Bots gilt.
-     * Ohne Angabe nimmt Hermes die vom Server gelesene Botzahl.
+     * Ohne Angabe nimmt Matchdesk die vom Server gelesene Botzahl.
      */
     count: z.number().int().min(1).max(MAX_BOTS_ADD).optional()
   }),

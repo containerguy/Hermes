@@ -1,12 +1,12 @@
 # CS 1.6: Bots mit YaPB nachrüsten
 
-Ziel: Auf der AMP-Instanz **CS1601** (Target `retro`) sollen Bots verfügbar sein. So lassen sich Runden auch mit wenigen Leuten spielen, und Lücken werden gefüllt, bis Menschen nachkommen. Gesteuert wird über die Hermes-Konsole: Server-Bereich → Konsole → Vorlage „Bots (YaPB)“.
+Ziel: Auf der AMP-Instanz **CS1601** (Target `retro`) sollen Bots verfügbar sein. So lassen sich Runden auch mit wenigen Leuten spielen, und Lücken werden gefüllt, bis Menschen nachkommen. Gesteuert wird über die Matchdesk-Konsole: Server-Bereich → Konsole → Vorlage „Bots (YaPB)“.
 
 ## Entscheidung: YaPB 4.4.957
 
 | Option | Bewertung |
 |---|---|
-| **YaPB** (Nachfolger von POD-Bot) | **gewählt.** Aktiv gepflegt. Läuft als Standalone-DLL oder als Metamod-Plugin, ohne ReHLDS. Das Linux-Paket bringt Wegpunkte für alle 47 Standard-Maps mit, braucht im LAN also kein Internet. Bots werden per RCON/Konsole gesteuert (`yb …`), das passt zu Hermes. |
+| **YaPB** (Nachfolger von POD-Bot) | **gewählt.** Aktiv gepflegt. Läuft als Standalone-DLL oder als Metamod-Plugin, ohne ReHLDS. Das Linux-Paket bringt Wegpunkte für alle 47 Standard-Maps mit, braucht im LAN also kein Internet. Bots werden per RCON/Konsole gesteuert (`yb …`), das passt zu Matchdesk. |
 | ZBot (CS:CZ-Bots über ReGameDLL_CS) | verworfen. Dafür müsste die Spiel-DLL durch ReGameDLL ersetzt werden, und auf fremden Maps sind Nav-Dateien nötig. Das ist mehr Eingriff, als für LAN-Bots nötig ist. |
 | POD-Bot mm | veraltet und wird nicht mehr gepflegt. |
 
@@ -58,7 +58,7 @@ Paket: `yapb-4.4.957-linux.tar.xz`, SHA-256 `8c095ac89b9b2ccc70a66a71d608e1a570b
 
 ## Nach einem AMP-Update
 
-Ein Update in AMP (SteamCMD mit `validate`) setzt `liblist.gam` auf das Original zurück. YaPB bleibt zwar unter `addons/yapb` liegen, wird aber nicht mehr geladen. In der Hermes-Konsole antwortet `yb version` dann mit „Unknown command“.
+Ein Update in AMP (SteamCMD mit `validate`) setzt `liblist.gam` auf das Original zurück. YaPB bleibt zwar unter `addons/yapb` liegen, wird aber nicht mehr geladen. In der Matchdesk-Konsole antwortet `yb version` dann mit „Unknown command“.
 
 **Sofort:** Instanz stoppen, `./install.sh <pfad> --relink`, Instanz starten. Das dauert eine Sekunde und braucht kein Internet.
 
@@ -85,9 +85,9 @@ Die Stufe übersteht das Zurückschreiben der kvp beim Stoppen. Ob „Fetch late
 
 **Update nur bei gestopptem Spiel:**
 - Ein `Core/UpdateApplication` bei laufendem Spiel lässt den `hlds_linux` verwaist weiterlaufen. Er hält Port 27015, und der folgende Start scheitert mit „Address already in use“.
-- Hermes bietet „Update“ deshalb nur an, wenn AMP das Spiel als gestoppt meldet (`Stopped` oder `Failed`). Sonst antwortet es mit `409 amp_update_erst_stoppen`.
+- Matchdesk bietet „Update“ deshalb nur an, wenn AMP das Spiel als gestoppt meldet (`Stopped` oder `Failed`). Sonst antwortet es mit `409 amp_update_erst_stoppen`.
 
-## Hermes
+## Matchdesk
 
 **Bots per Bedienelement:** In der Event-Karte gibt es ab manager unter Server den Knopf „Bots“, für CS 1.6 mit YaPB und für CS2. Dort lassen sich Anzahl, Stufe (leicht/normal/schwer/Experte) und Team (automatisch/T/CT) wählen:
 
@@ -103,11 +103,11 @@ Die Stufe übersteht das Zurückschreiben der kvp beim Stoppen. Ob „Fetch late
 
 „Hinzufügen“ setzt die Quote deshalb erst auf den aktuellen Stand (Menschen + Bots). Jedes `yb add` bzw. `bot_add` erhöht sie um eins und bringt genau diesen Bot mit Stufe und Team.
 
-Die Zahlen liest Hermes aus der Konsolenantwort, weil AMP Bots nicht als Spieler zählt. Ohne Antwort lehnt Hermes „Hinzufügen“ mit `409 botzahl_unbekannt` ab, statt zu raten.
+Die Zahlen liest Matchdesk aus der Konsolenantwort, weil AMP Bots nicht als Spieler zählt. Ohne Antwort lehnt Matchdesk „Hinzufügen“ mit `409 botzahl_unbekannt` ab, statt zu raten.
 
-Mit festem Team (T/CT) schaltet Hermes Teamlimit und Teamausgleich ab, sonst lehnt das Spiel mit „Team is stacked“ ab.
+Mit festem Team (T/CT) schaltet Matchdesk Teamlimit und Teamausgleich ab, sonst lehnt das Spiel mit „Team is stacked“ ab.
 
-Den Ablauf macht Hermes serverseitig über `POST /api/integrations/amp/instances/:bindingId/bots`, die Botzahl kommt über `GET …/bots`:
+Den Ablauf macht Matchdesk serverseitig über `POST /api/integrations/amp/instances/:bindingId/bots`, die Botzahl kommt über `GET …/bots`:
 - Die Befehle werden einzeln gesendet.
 - Es gilt das Rate-Limit `amp_control`.
 - Das Audit-Log schreibt `amp.bots_<aktion>`.
@@ -126,7 +126,7 @@ Die Befehle gehen wie die übrigen CS-1.6-Befehle per RCON an den Server.
 
 GoldSrc-RCON über AMP trennt `;` nicht selbst. Ohne Aufteilung setzte `yb_quota_mode fill; yb_quota 10` nur `yb_quota_mode` auf `fill;`.
 
-Deshalb teilt Hermes Eingaben für CS 1.6, CS 2 und CoD4 an `;` auf und sendet die Teile einzeln nacheinander:
+Deshalb teilt Matchdesk Eingaben für CS 1.6, CS 2 und CoD4 an `;` auf und sendet die Teile einzeln nacheinander:
 - `;` in Anführungszeichen bleibt stehen.
 - Höchstens 8 Teile pro Eingabe.
 - Ein Eintrag im Audit-Log pro Eingabe.
@@ -135,7 +135,7 @@ Für Minecraft und Factorio bleibt die Zeile ganz, weil `;` dort zum Befehl geh�
 
 ## Aufgabenteilung
 
-Die Cloud-Session macht alles, was ohne LAN geht: Recherche, Skript, Hermes-Vorlagen, Doku. Die lokale Session übernimmt **nur** die Schritte, die das LAN brauchen.
+Die Cloud-Session macht alles, was ohne LAN geht: Recherche, Skript, Matchdesk-Vorlagen, Doku. Die lokale Session übernimmt **nur** die Schritte, die das LAN brauchen.
 
 ### Lokale Session: LAN-Schritte
 
@@ -150,7 +150,7 @@ Es gelten die üblichen Regeln: nichts mergen, keine Instanz mit Spielern anfass
    3. Ausgabe festhalten.
 3. **Funktionstest:**
    1. CS1601 starten.
-   2. In der Hermes-Konsole (Test-Instanz oder Produktion, nur lesend): `yb version` muss eine Version liefern.
+   2. In der Matchdesk-Konsole (Test-Instanz oder Produktion, nur lesend): `yb version` muss eine Version liefern.
    3. Auf `de_dust2`: „Mit Bots auffüllen auf 10“ → `yb list` zeigt Bots.
    4. Mit einem echten Client joinen: Ein Bot macht Platz.
    5. „Alle Bots entfernen“ → keine Bots mehr.

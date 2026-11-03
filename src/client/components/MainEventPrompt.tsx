@@ -5,7 +5,7 @@ import { getErrorMessage } from "../errors/errors";
 import { useI18n } from "../i18n/I18nContext";
 import { subscribeEventsChanged } from "../realtime/events-changed-bus";
 
-const DISMISS_KEY = "hermes.mainEventPrompt.dismissed";
+const DISMISS_KEY = "matchdesk.mainEventPrompt.dismissed";
 
 function readDismissed(): string | null {
   try {
