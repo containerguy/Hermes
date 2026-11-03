@@ -85,7 +85,7 @@ jobs:
           labels: |
             org.opencontainers.image.title=Matchdesk
             org.opencontainers.image.description=Matchdesk (Mitspielzentrale) - LAN party game session web app
-            org.opencontainers.image.source=https://github.com/containerguy/Hermes
+            org.opencontainers.image.source=https://github.com/containerguy/Matchdesk
 
       - name: Build Docker image
         uses: docker/build-push-action@v7
