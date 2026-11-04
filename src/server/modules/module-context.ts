@@ -2,10 +2,19 @@ import type { Request, Router } from "express";
 import type { DatabaseContext } from "../db/client";
 import { readEnv } from "../env";
 import { tryWriteAuditLog } from "../audit-log";
-import { publicUser, requireUser } from "../auth/current-user";
+import { currentMainEventIdOf, publicUser, requireUser } from "../auth/current-user";
+import { mainEventParticipants, mainEvents, users } from "../db/schema";
+import { and, eq } from "drizzle-orm";
+import { canSeeMainEvent } from "../http/main-event-routes";
+import { scopedEventIds, type PermissionKey } from "../domain/permissions";
 import { requireCsrf } from "../auth/csrf";
 import { enforceApiTokenWriteAccess } from "../auth/matchdesk-auth";
-import { sendPushToUserIds, type PushPayload } from "../push/push-service";
+import {
+  sendPushToEnabledUsers,
+  sendPushToMainEventParticipants,
+  sendPushToUserIds,
+  type PushPayload
+} from "../push/push-service";
 import { broadcastModuleEvent } from "../realtime/event-bus";
 import { resolvePublicUrl } from "../mail/mailer";
 import {
@@ -62,6 +71,20 @@ export function toModuleNotification(message: EventInfoMessage, user: Notificati
   };
 }
 
+/** Sicht eines Moduls auf ein Event (main_events). */
+export type ModuleMainEvent = {
+  id: string;
+  name: string;
+  status: "planned" | "running" | "ended";
+  visibility: "public" | "private";
+  plannedStartAt: string | null;
+  plannedEndAt: string | null;
+  startedAt: string | null;
+  endedAt: string | null;
+};
+
+export type ModuleParticipantStatus = "joined" | "interested" | "waitlisted" | "declined";
+
 export type ModuleRuntimeHandles = {
   router: Router;
   cleanups: Array<() => unknown>;
@@ -84,7 +107,22 @@ export type ModuleContext = {
   /** Prüft CSRF und Schreibrecht des API-Tokens; antwortet selbst mit 401/403 und gibt dann false zurück. */
   requireWrite: (request: Request, response: import("express").Response) => boolean;
   can: (user: PermissionActor, key: string, options?: CanOptions) => boolean;
-  settings: { get: () => Record<string, unknown> };
+  /** Events, für die der Benutzer `key` nur per Event-Vergabe hat (ohne globale Vergabe). */
+  scopedEventIds: (user: PermissionActor, key: string) => string[];
+  settings: {
+    get: () => Record<string, unknown>;
+    /** Ändert einzelne Werte (geprüft gegen das Schema, im Audit-Log). Wirft bei ungültigen Werten. */
+    set: (values: Record<string, unknown>, actor: { id: string; username: string; role: string }) => Record<string, unknown>;
+  };
+  /** Events des Kerns, nur lesend. */
+  events: {
+    get: (mainEventId: string) => ModuleMainEvent | null;
+    /** Aktuelles Event des Benutzers (globaler Umschalter), null wenn keins oder beendet. */
+    currentIdOf: (user: { id: string }) => string | null;
+    /** Darf der Benutzer das Event sehen (öffentlich, eingeladen oder Event-Verwalter)? */
+    canSee: (user: PermissionActor, mainEventId: string) => boolean;
+    participantStatus: (mainEventId: string, userId: string) => ModuleParticipantStatus | null;
+  };
   /** Liest ein im Manifest unter `secrets` genanntes Geheimnis (MATCHDESK_<NAME>). */
   env: (name: string) => string | undefined;
   /** better-sqlite3-Verbindung. Module schreiben nur in eigene Tabellen (Präfix = Kennung). */
@@ -96,7 +134,13 @@ export type ModuleContext = {
     entityId?: string | null;
     metadata?: Record<string, unknown>;
   }) => void;
-  push: { toUsers: (userIds: string[], payload: PushPayload) => Promise<void> };
+  push: {
+    toUsers: (userIds: string[], payload: PushPayload) => Promise<void>;
+    /** Alle Benutzer mit eingeschalteten Benachrichtigungen. */
+    toAll: (payload: PushPayload) => Promise<void>;
+    /** Teilnehmer („dabei“) eines Events. */
+    toEventParticipants: (mainEventId: string, payload: PushPayload) => Promise<void>;
+  };
   /**
    * Eigener Benachrichtigungskanal (Opt-in im Profil). Wird beim Ausschalten, Aktualisieren und
    * Herunterfahren automatisch abgemeldet; die gespeicherte Auswahl der Benutzer bleibt.
@@ -119,6 +163,7 @@ export function createModuleContext(input: {
   manifest: ModuleManifest;
   handles: ModuleRuntimeHandles;
   getSettings: () => Record<string, unknown>;
+  setSettings?: (values: Record<string, unknown>, actor: { id: string; username: string; role: string }) => Record<string, unknown>;
 }): ModuleContext {
   const { context, manifest, handles } = input;
   const id = manifest.id;
@@ -139,7 +184,51 @@ export function createModuleContext(input: {
     },
     requireWrite: (request, response) => requireCsrf(context, request, response) && enforceApiTokenWriteAccess(request, response),
     can: (user, key, options) => can(context, user, key, options),
-    settings: { get: input.getSettings },
+    scopedEventIds: (user, key) => {
+      if (!user || !key.startsWith(`${id}.`)) return [];
+      const row = context.db.select().from(users).where(eq(users.id, user.id)).get();
+      return row ? scopedEventIds(context, row, key as PermissionKey) : [];
+    },
+    settings: {
+      get: input.getSettings,
+      set: (values, actor) => {
+        if (!input.setSettings) throw new Error(`${prefix} Einstellungen können hier nicht geändert werden.`);
+        return input.setSettings(values, actor);
+      }
+    },
+    events: {
+      get: (mainEventId) => {
+        const row = context.db.select().from(mainEvents).where(eq(mainEvents.id, mainEventId)).get();
+        return row
+          ? {
+              id: row.id,
+              name: row.name,
+              status: row.status,
+              visibility: row.visibility,
+              plannedStartAt: row.plannedStartAt,
+              plannedEndAt: row.plannedEndAt,
+              startedAt: row.startedAt,
+              endedAt: row.endedAt
+            }
+          : null;
+      },
+      currentIdOf: (user) => {
+        const row = context.db.select({ currentMainEventId: users.currentMainEventId }).from(users).where(eq(users.id, user.id)).get();
+        return row ? currentMainEventIdOf(context, row) : null;
+      },
+      canSee: (user, mainEventId) => {
+        if (!user) return false;
+        const viewer = context.db.select().from(users).where(eq(users.id, user.id)).get();
+        const event = context.db.select().from(mainEvents).where(eq(mainEvents.id, mainEventId)).get();
+        return Boolean(viewer && event && canSeeMainEvent(context, viewer, event));
+      },
+      participantStatus: (mainEventId, userId) =>
+        context.db
+          .select({ status: mainEventParticipants.status })
+          .from(mainEventParticipants)
+          .where(and(eq(mainEventParticipants.mainEventId, mainEventId), eq(mainEventParticipants.userId, userId)))
+          .get()?.status ?? null
+    },
     env: (name) => {
       if (!manifest.secrets.includes(name)) {
         throw new Error(`${prefix} Geheimnis ${name} ist nicht im Manifest angemeldet.`);
@@ -156,7 +245,11 @@ export function createModuleContext(input: {
         summary: entry.summary,
         metadata: entry.metadata
       }),
-    push: { toUsers: (userIds, payload) => sendPushToUserIds(context, userIds, payload) },
+    push: {
+      toUsers: (userIds, payload) => sendPushToUserIds(context, userIds, payload),
+      toAll: (payload) => sendPushToEnabledUsers(context, payload),
+      toEventParticipants: (mainEventId, payload) => sendPushToMainEventParticipants(context, mainEventId, payload)
+    },
     notifications: {
       registerChannel: (channel) => {
         if (!channel.id.startsWith(id)) {

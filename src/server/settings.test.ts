@@ -22,7 +22,6 @@ describe("pickPublicSettings", () => {
     expect(picked.themePrimaryColor).toBe(defaultSettings.themePrimaryColor);
     expect(picked.kioskStreamEnabled).toBe(defaultSettings.kioskStreamEnabled);
     expect(picked.kioskStreamPath).toBe(defaultSettings.kioskStreamPath);
-    expect(picked.pizzaPaypalHandle).toBe(defaultSettings.pizzaPaypalHandle);
   });
 });
 

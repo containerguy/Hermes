@@ -1,7 +1,6 @@
 import React, { FormEvent, RefObject } from "react";
 import type { AppSettings, RestoreDiagnostics, RestoreRecovery, StorageInfo } from "../types/core";
 import { useI18n } from "../i18n/I18nContext";
-import { PizzaMenuJsonAdmin } from "../pizza/PizzaMenuJsonAdmin";
 import { BindingsAdmin } from "../gameservers/BindingsAdmin";
 import { KioskEventSelect } from "./KioskEventSelect";
 import { SaveBar } from "./SaveBar";
@@ -330,69 +329,6 @@ export function AdminPanelBetrieb({
               <p className="muted">{t("admin.features.presence.help")}</p>
             </fieldset>
             <fieldset className="admin-fieldset">
-              <legend>{t("admin.features.pizza.legend")}</legend>
-              <label className="checkbox-label">
-                <input
-                  type="checkbox"
-                  checked={settings.featuresPizzaEnabled}
-                  onChange={(event) => onSettingsChange({ ...settings, featuresPizzaEnabled: event.target.checked })}
-                />
-                {t("admin.features.pizza.enable")}
-              </label>
-              <p className="muted">{t("admin.features.pizza.help")}</p>
-              {settings.featuresPizzaEnabled ? (
-                <>
-                  <p className="muted">{t("admin.features.pizza.paymentHelp")}</p>
-                  <label>
-                    {t("admin.features.pizza.paymentMethods")}
-                    <select
-                      value={settings.pizzaPaymentMethods}
-                      onChange={(event) =>
-                        onSettingsChange({
-                          ...settings,
-                          pizzaPaymentMethods: event.target.value as AppSettings["pizzaPaymentMethods"]
-                        })
-                      }
-                    >
-                      <option value="cash_and_paypal">
-                        {t("admin.features.pizza.paymentMethods.cash_and_paypal")}
-                      </option>
-                      <option value="cash_only">{t("admin.features.pizza.paymentMethods.cash_only")}</option>
-                      <option value="paypal_only">{t("admin.features.pizza.paymentMethods.paypal_only")}</option>
-                    </select>
-                  </label>
-                  <p className="muted">{t("admin.features.pizza.paymentMethodsHelp")}</p>
-                  <label>
-                    {t("admin.features.pizza.paypalHandle")}
-                    <input
-                      value={settings.pizzaPaypalHandle}
-                      onChange={(event) => onSettingsChange({ ...settings, pizzaPaypalHandle: event.target.value })}
-                      maxLength={80}
-                      placeholder="renekeller"
-                    />
-                  </label>
-                  <label>
-                    {t("admin.features.pizza.paypalName")}
-                    <input
-                      value={settings.pizzaPaypalName}
-                      onChange={(event) => onSettingsChange({ ...settings, pizzaPaypalName: event.target.value })}
-                      maxLength={120}
-                      placeholder="Rene Keller"
-                    />
-                  </label>
-                  <label>
-                    {t("admin.features.pizza.cashRecipient")}
-                    <input
-                      value={settings.pizzaCashRecipient}
-                      onChange={(event) => onSettingsChange({ ...settings, pizzaCashRecipient: event.target.value })}
-                      maxLength={120}
-                      placeholder="Rene"
-                    />
-                  </label>
-                </>
-              ) : null}
-            </fieldset>
-            <fieldset className="admin-fieldset">
               <legend>{t("admin.amp.title")}</legend>
               <label className="checkbox-label">
                 <input
@@ -450,7 +386,6 @@ export function AdminPanelBetrieb({
             </fieldset>
             <SaveBar dirty={dirty} />
           </form>
-          {settings.featuresPizzaEnabled ? <PizzaMenuJsonAdmin /> : null}
           {savedSettings.ampIntegrationEnabled ? (
             // Neu laden, sobald eine andere Basis-URL gespeichert wurde.
             <BindingsAdmin key={savedSettings.ampBaseUrl} gameCatalog={savedSettings.gameCatalog} />

@@ -30,6 +30,16 @@ describe("restorable tables", () => {
       "module_sources",
       "modules",
       "email_change_challenges",
+      // Pizza ist seit 0.17 ein Modul: seine Tabellen stellt der Restore über das Modul-Manifest her.
+      "pizza_menu_categories",
+      "pizza_menu_items",
+      "pizza_menu_variants",
+      "pizza_menu_extras",
+      "pizza_menu_extra_categories",
+      "pizza_sessions",
+      "pizza_orders",
+      "pizza_order_lines",
+      "pizza_order_line_extras",
       // „Spielt gerade“: Agent-Schlüssel wie API-Tokens nicht im Restore; neu einrichten genügt.
       "game_agent_keys",
       "pairing_tokens",
@@ -49,18 +59,5 @@ describe("restorable tables", () => {
     sqlite.close();
     const decided = new Set([...restorableTables, ...notRestored]);
     expect(tables.filter((table) => !decided.has(table))).toEqual([]);
-    expect(restorableTables).toEqual(
-      expect.arrayContaining([
-        "pizza_menu_categories",
-        "pizza_menu_items",
-        "pizza_menu_variants",
-        "pizza_menu_extras",
-        "pizza_menu_extra_categories",
-        "pizza_sessions",
-        "pizza_orders",
-        "pizza_order_lines",
-        "pizza_order_line_extras"
-      ])
-    );
   });
 });

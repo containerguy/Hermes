@@ -6,6 +6,7 @@ import request from "supertest";
 import { CSRF_HEADER } from "../auth/csrf";
 import { bootstrapAdmin } from "../db/bootstrap-admin";
 import { createMatchdeskApp } from "../app";
+import { createDb } from "../db/client";
 
 type StartedApp = Awaited<ReturnType<typeof createMatchdeskApp>>;
 type Agent = ReturnType<typeof request.agent>;
@@ -46,19 +47,21 @@ export async function startPizzaTestEnv(): Promise<PizzaTestEnv> {
   delete process.env.MATCHDESK_VAPID_PUBLIC_KEY;
   delete process.env.MATCHDESK_VAPID_PRIVATE_KEY;
   await bootstrapAdmin();
-  const started = await createMatchdeskApp();
+  // Wie ein Update von 0.16: Pizza war eingeschaltet. Beim Start installiert der Kern das Modul aus
+  // dem eingebauten Startpaket und übernimmt die Einstellungen.
+  const seed = createDb(databasePath);
+  const insert = seed.sqlite.prepare("INSERT OR REPLACE INTO app_settings (key, value, updated_at) VALUES (?, ?, ?)");
+  for (const [key, value] of Object.entries({
+    featuresPizzaEnabled: true,
+    pizzaPaypalHandle: "lanpizza",
+    pizzaPaymentMethods: "cash_and_paypal"
+  })) {
+    insert.run(key, JSON.stringify(value), new Date().toISOString());
+  }
+  seed.sqlite.close();
+  const modulesDir = fs.mkdtempSync(path.join(os.tmpdir(), "matchdesk-modules-"));
+  const started = await createMatchdeskApp({ modules: { modulesDir } });
   const admin = await login(started.app, "hauptadmin");
-  const current = await admin.agent.get("/api/admin/settings").expect(200);
-  await admin.agent
-    .put("/api/admin/settings")
-    .set(CSRF_HEADER, admin.csrf)
-    .send({
-      ...current.body.settings,
-      featuresPizzaEnabled: true,
-      pizzaPaypalHandle: "lanpizza",
-      pizzaPaymentMethods: "cash_and_paypal"
-    })
-    .expect(200);
   const createUser = async (username: string, role: string) => {
     await admin.agent
       .post("/api/admin/users")
@@ -79,6 +82,7 @@ export async function startPizzaTestEnv(): Promise<PizzaTestEnv> {
     guest,
     close: async () => {
       await started.close();
+      fs.rmSync(modulesDir, { recursive: true, force: true });
       for (const suffix of ["", "-wal", "-shm"]) {
         fs.rmSync(`${databasePath}${suffix}`, { force: true });
       }

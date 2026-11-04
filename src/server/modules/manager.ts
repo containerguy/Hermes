@@ -648,6 +648,50 @@ export function createModuleManager(context: DatabaseContext, options: ModuleMan
     return { confirmed: true as const, module: describeModule(requireModule(pkg.manifest.id)) };
   }
 
+  /**
+   * Eingebautes Startpaket (z. B. Pizza beim Umstieg auf Matchdesk 0.17): wie install + enable,
+   * aber ohne Netz. Die Prüfsumme ergibt sich aus dem Paket selbst; die Quelle ist die offizielle,
+   * damit spätere Updates von dort kommen. Gibt `false` zurück, wenn das Modul schon installiert ist.
+   */
+  async function installBundled(buffer: Buffer, input: { settings?: Record<string, unknown> } = {}) {
+    const pkg = verifyPackage(buffer, sha256(buffer), "bundled");
+    const id = pkg.manifest.id;
+    if (getModule(id)) return false;
+    writePackage(pkg);
+    const at = nowIso();
+    const official = sqlite.prepare("SELECT id FROM module_sources WHERE id = 'official'").get() as { id: string } | undefined;
+    sqlite
+      .prepare(
+        `INSERT INTO modules (id, source_id, version, sha256, package_url, previous_version, state, manifest_json, installed_at, updated_at)
+         VALUES (?, ?, ?, ?, ?, NULL, 'installed', ?, ?, ?)`
+      )
+      .run(id, official?.id ?? null, pkg.manifest.version, pkg.sha256, null, JSON.stringify(pkg.manifest), at, at);
+    if (input.settings) {
+      const merged = { ...settingsDefaults(pkg.manifest), ...input.settings };
+      const parsed = settingsValidator(pkg.manifest).safeParse(merged);
+      sqlite
+        .prepare("INSERT INTO module_settings (module_id, value_json, updated_at) VALUES (?, ?, ?)")
+        .run(id, JSON.stringify(parsed.success ? parsed.data : settingsDefaults(pkg.manifest)), at);
+    }
+    const module = requireModule(id);
+    try {
+      await activate(module);
+    } catch (error) {
+      runtimeErrors.set(id, errorText(error));
+      sqlite.prepare("UPDATE modules SET last_error = ?, updated_at = ? WHERE id = ?").run(errorText(error), nowIso(), id);
+      throw error;
+    }
+    setState(id, "enabled");
+    tryWriteAuditLog(context, {
+      action: "module.installed",
+      entityType: "module",
+      entityId: id,
+      summary: `Modul ${id} ${pkg.manifest.version} aus dem eingebauten Startpaket installiert und eingeschaltet`,
+      metadata: { sha256: pkg.sha256, bundled: true }
+    });
+    return true;
+  }
+
   function migrate(module: ModuleRow) {
     const files = readPackageFiles(module.id, module.version);
     return runModuleMigrations(sqlite, module.id, moduleMigrationFiles(files), coreTableExceptions[module.id] ?? []);
@@ -678,7 +722,8 @@ export function createModuleManager(context: DatabaseContext, options: ModuleMan
         context,
         manifest: module.manifest,
         handles,
-        getSettings: () => getSettings(module.id)
+        getSettings: () => getSettings(module.id),
+        setSettings: (values, actor) => putSettings(actor as ModuleActor, module.id, { ...getSettings(module.id), ...values })
       });
       try {
         const cleanup = await entry.register(ctx);
@@ -1069,6 +1114,8 @@ export function createModuleManager(context: DatabaseContext, options: ModuleMan
     describeModule,
     install: (actor: ModuleActor, input: Parameters<typeof install>[1]) => withLock(input.moduleId, () => install(actor, input)),
     enable: (actor: ModuleActor, id: string) => withLock(id, () => enable(actor, id)),
+    installBundled: (buffer: Buffer, input?: Parameters<typeof installBundled>[1]) =>
+      withLock("bundled", () => installBundled(buffer, input)),
     disable: (actor: ModuleActor, id: string) => withLock(id, () => disable(actor, id)),
     update: (actor: ModuleActor, id: string, input: Parameters<typeof update>[2]) => withLock(id, () => update(actor, id, input)),
     uninstall: (actor: ModuleActor, id: string, input: Parameters<typeof uninstall>[2]) => withLock(id, () => uninstall(actor, id, input)),

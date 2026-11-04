@@ -185,7 +185,7 @@ export function EventBoard({
         retryMs = 1_000;
         setLiveState("live");
         if (hadConnection) {
-          // Während der Unterbrechung verpasste Änderungen: Abonnenten (Pizza-Panel) gleichen ab.
+          // Während der Unterbrechung verpasste Änderungen: Abonnenten gleichen ab.
           publishEventsChanged(null);
         }
         hadConnection = true;

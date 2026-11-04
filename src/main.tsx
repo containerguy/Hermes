@@ -51,12 +51,7 @@ const defaultSettings: AppSettings = {
   kioskStreamPath: "stream",
   kioskStreamSecret: "",
   kioskMainEventId: "",
-  featuresPizzaEnabled: false,
   featuresGamePresenceEnabled: false,
-  pizzaPaypalHandle: "",
-  pizzaPaypalName: "",
-  pizzaCashRecipient: "",
-  pizzaPaymentMethods: "cash_and_paypal",
   ampIntegrationEnabled: false,
   ampBaseUrl: "",
   ampAutoStartOnReady: false,
@@ -82,10 +77,15 @@ function profileInitials(user: User): string {
   return base.slice(0, 2).toUpperCase() || "?";
 }
 
-/** Alte Admin-Hashes (#admin-design) auf das neue Schema (#admin/design) umbiegen. */
+/**
+ * Alte Hashes umbiegen: Admin (#admin-design → #admin/design) und bis 0.16 eingebaute Funktionen,
+ * die jetzt Module sind (#pizza → #m/pizza, z. B. aus alten Push-Benachrichtigungen).
+ */
 function normalizeLegacyHash(rawHash: string): string {
   const legacy = rawHash.match(/^#admin-([a-z]+)(.*)$/);
-  return legacy ? `#admin/${legacy[1]}${legacy[2]}` : rawHash;
+  if (legacy) return `#admin/${legacy[1]}${legacy[2]}`;
+  const moved = rawHash.match(/^#(pizza)(\/.*)?$/);
+  return moved ? `#m/${moved[1]}${moved[2] ?? ""}` : rawHash;
 }
 
 function normalizeDocumentPath(path: string) {

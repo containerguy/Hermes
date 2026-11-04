@@ -20,7 +20,6 @@ const BUILTIN_ROLE_PERMISSIONS: Record<User["role"], string[]> = {
     "rounds.manage",
     "main_events.manage",
     "notifications.operator",
-    "pizza.manage",
     "servers.view",
     "servers.manage"
   ],

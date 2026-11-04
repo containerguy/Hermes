@@ -179,11 +179,6 @@ export function canManageServers(context: DatabaseContext, actor: Actor) {
   return can(context, actor, "servers.manage");
 }
 
-/** Pizzabestellung verwalten (Runden, Menü, Archiv, Zahlungen). */
-export function canManagePizza(context: DatabaseContext, actor: Actor) {
-  return can(context, actor, "pizza.manage");
-}
-
 /**
  * Events verwalten. Ohne `mainEventId` nur global (z. B. neues Event anlegen),
  * mit `mainEventId` zählt auch ein Recht nur für dieses Event.

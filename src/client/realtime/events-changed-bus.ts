@@ -1,8 +1,8 @@
 /**
  * Verteilt `events_changed`-Signale des bestehenden EventSource (EventBoard) an weitere
- * Komponenten, z. B. das Pizza-Panel. Kein zweiter EventSource pro Seite.
+ * Komponenten. Kein zweiter EventSource pro Seite.
  *
- * `reason` ist der Grund aus dem SSE-Payload (`pizza_line_added`, `event_created`, …) oder
+ * `reason` ist der Grund aus dem SSE-Payload (`event_created`, …) oder
  * `null`, wenn er fehlt bzw. nach einem Reconnect ein vollständiger Abgleich nötig ist.
  */
 export interface EventsChangedSignal {
@@ -40,7 +40,3 @@ export function parseEventsChangedReason(data: unknown): string | null {
   }
 }
 
-/** Pizza-relevant: Grund mit Präfix `pizza_` oder unbekannter Grund (lieber einmal zu viel laden). */
-export function isPizzaReason(reason: string | null): boolean {
-  return reason === null || reason.startsWith("pizza_");
-}

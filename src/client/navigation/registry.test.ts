@@ -4,7 +4,6 @@ import { appPages } from "./modules";
 import { menuPages, parseHash, resolvePage, type NavContext } from "./registry";
 
 const settings = {
-  featuresPizzaEnabled: false,
   featuresGamePresenceEnabled: false,
   infosEnabled: false,
   shellStartTitle: "",
@@ -26,12 +25,12 @@ describe("navigation registry", () => {
     expect(parseHash("")).toEqual({ head: "", subPath: "" });
   });
 
-  it("orders the menu as Runden, Events, Pizza, Infos, Admin", () => {
+  it("orders the menu as Runden, Events, Infos, Admin", () => {
     const admin = ctx({
       currentUser: user("admin"),
-      settings: { ...settings, featuresPizzaEnabled: true, infosEnabled: true }
+      settings: { ...settings, infosEnabled: true }
     });
-    expect(menuPages(appPages, admin).map((page) => page.id)).toEqual(["events", "main-events", "pizza", "infos", "admin"]);
+    expect(menuPages(appPages, admin).map((page) => page.id)).toEqual(["events", "main-events", "infos", "admin"]);
   });
 
   it("hides modules that are switched off and admin for non-admins", () => {
@@ -43,8 +42,6 @@ describe("navigation registry", () => {
     expect(resolvePage(appPages, ctx(), "#pizza").page.id).toBe("events");
     expect(resolvePage(appPages, ctx(), "#gibtsnicht").page.id).toBe("events");
     expect(resolvePage(appPages, ctx(), "#manager").page.id).toBe("events");
-    const withPizza = ctx({ settings: { ...settings, featuresPizzaEnabled: true } });
-    expect(resolvePage(appPages, withPizza, "#pizza").page.id).toBe("pizza");
   });
 
   it("keeps the sub path for admin and profile sections", () => {
