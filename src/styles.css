@@ -3806,3 +3806,45 @@ button.side-panel__close {
   margin: 0 0 clamp(10px, 1.4vw, 16px);
   font-size: clamp(1.3rem, 2.2vw, 2rem);
 }
+
+/* Speichern-Leiste in Einstellungsformularen: klebt bei ungespeicherten Änderungen unten. */
+.save-bar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px 16px;
+  align-items: center;
+  justify-content: flex-end;
+}
+
+.save-bar button {
+  width: auto;
+  min-width: 220px;
+}
+
+.save-bar--dirty {
+  position: sticky;
+  bottom: 12px;
+  z-index: 6;
+  padding: 10px 12px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--paper);
+  box-shadow: var(--shadow);
+}
+
+.save-bar__hint {
+  margin: 0 auto 0 0;
+  color: var(--amber);
+  font-weight: 800;
+}
+
+@media (max-width: 768px) {
+  .app-shell--tabbar .save-bar--dirty {
+    bottom: calc(76px + env(safe-area-inset-bottom, 0px));
+  }
+
+  .save-bar button {
+    flex: 1 1 auto;
+    min-width: 0;
+  }
+}

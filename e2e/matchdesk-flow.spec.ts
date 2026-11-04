@@ -198,7 +198,7 @@ test("gameserver: admin binds Minecraft, manager's event shows the server panel,
   await createUserAsAdmin(page, "srvspieler", "user");
 
   // Modul aktivieren
-  await page.goto(`${baseUrl}/#admin/betrieb`);
+  await page.goto(`${baseUrl}/#admin/integrationen`);
   const ops = page.locator("form#admin-betrieb");
   await ops.getByLabel("AMP-Anbindung aktivieren").check();
   await ops.getByLabel("AMP-Basis-URL").fill("https://amp-ctl.lanparty.example");

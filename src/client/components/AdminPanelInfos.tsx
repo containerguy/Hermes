@@ -1,14 +1,16 @@
 import React, { FormEvent } from "react";
 import type { AppSettings } from "../types/core";
 import { useI18n } from "../i18n/I18nContext";
+import { SaveBar } from "./SaveBar";
 
 interface AdminPanelInfosProps {
   settings: AppSettings;
   onSettingsChange: (next: AppSettings) => void;
   onSubmit: (event: FormEvent<HTMLFormElement>) => void;
+  dirty?: boolean;
 }
 
-export function AdminPanelInfos({ settings, onSettingsChange, onSubmit }: AdminPanelInfosProps) {
+export function AdminPanelInfos({ settings, onSettingsChange, onSubmit, dirty = false }: AdminPanelInfosProps) {
   const { t } = useI18n();
 
   return (
@@ -43,7 +45,7 @@ export function AdminPanelInfos({ settings, onSettingsChange, onSubmit }: AdminP
             placeholder={t("admin.infos.markdownPlaceholder")}
           />
         </label>
-        <button type="submit">{t("admin.settings.save")}</button>
+        <SaveBar dirty={dirty} />
       </form>
     </>
   );

@@ -637,6 +637,11 @@ export function AdminPanel({
     }
   }
 
+  // Entwurf weicht vom gespeicherten Stand ab (Unterseiten teilen sich den Entwurf).
+  const settingsDirty =
+    JSON.stringify(settings) !== JSON.stringify(savedSettings) ||
+    gameCatalogDraft !== savedSettings.gameCatalog.join("\n");
+
   async function saveSettings(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setError("");
@@ -782,8 +787,14 @@ export function AdminPanel({
         />
       ) : null}
 
-      {adminSection === "betrieb" ? (
+      {adminSection === "betrieb" ||
+      adminSection === "texte" ||
+      adminSection === "kiosk" ||
+      adminSection === "integrationen" ||
+      adminSection === "backup" ? (
         <AdminPanelBetrieb
+          part={adminSection}
+          dirty={settingsDirty}
           settings={settings}
           savedSettings={savedSettings}
           gameCatalogDraft={gameCatalogDraft}
@@ -807,11 +818,21 @@ export function AdminPanel({
 
 
       {adminSection === "design" ? (
-        <AdminPanelDesign settings={settings} onSettingsChange={setSettings} onSubmit={saveSettings} />
+        <AdminPanelDesign
+          settings={settings}
+          onSettingsChange={setSettings}
+          onSubmit={saveSettings}
+          dirty={settingsDirty}
+        />
       ) : null}
 
       {adminSection === "infos" ? (
-        <AdminPanelInfos settings={settings} onSettingsChange={setSettings} onSubmit={saveSettings} />
+        <AdminPanelInfos
+          settings={settings}
+          onSettingsChange={setSettings}
+          onSubmit={saveSettings}
+          dirty={settingsDirty}
+        />
       ) : null}
 
       {adminSection === "sicherheit" ? (
