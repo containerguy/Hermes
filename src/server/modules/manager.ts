@@ -7,6 +7,8 @@ import { z } from "zod";
 import type { DatabaseContext } from "../db/client";
 import { getDatabasePath, readEnv } from "../env";
 import { tryWriteAuditLog } from "../audit-log";
+import { requireCsrf } from "../auth/csrf";
+import { enforceApiTokenWriteAccess, resolveMatchdeskAuth } from "../auth/matchdesk-auth";
 import type { UserRole } from "../domain/users";
 import {
   compareVersions,
@@ -211,6 +213,18 @@ export function createModuleManager(context: DatabaseContext, options: ModuleMan
   const indexCache = new Map<string, { index: SourceIndex; indexUrl: string; at: number }>();
   const previewCache = new Map<string, { pkg: DownloadedPackage; at: number }>();
   const sqlite = context.sqlite;
+  const locks = new Map<string, Promise<unknown>>();
+
+  /** Lebenszyklus-Schritte je Modul nacheinander ausführen (kein doppeltes Starten). */
+  function withLock<T>(id: string, task: () => Promise<T>): Promise<T> {
+    const previous = locks.get(id) ?? Promise.resolve();
+    const next = previous.catch(() => undefined).then(task);
+    locks.set(id, next);
+    void next.finally(() => {
+      if (locks.get(id) === next) locks.delete(id);
+    }).catch(() => undefined);
+    return next;
+  }
 
   // ---------- Quellen ----------
 
@@ -417,6 +431,11 @@ export function createModuleManager(context: DatabaseContext, options: ModuleMan
         required: manifest.matchdeskApi,
         supported: MATCHDESK_MODULE_API
       });
+    }
+    try {
+      settingsValidator(manifest);
+    } catch (error) {
+      throw new ModuleError("manifest_ungueltig", 422, `settings: JSON-Schema wird nicht unterstützt (${errorText(error)})`);
     }
     const paths = new Set(entries.map((entry) => entry.path));
     for (const file of [manifest.server, manifest.client]) {
@@ -975,6 +994,14 @@ export function createModuleManager(context: DatabaseContext, options: ModuleMan
       response.status(404).json({ error: "modul_inaktiv" });
       return;
     }
+    // Schreibende Anfragen mit Sitzungs-Cookie brauchen wie im Kern das CSRF-Token; API-Tokens
+    // nur mit Schreibrecht. Anfragen ohne Anmeldung entscheidet das Modul selbst.
+    if (!["GET", "HEAD", "OPTIONS"].includes(request.method)) {
+      resolveMatchdeskAuth(context, request);
+      const kind = request.matchdeskAuth?.kind;
+      if (kind === "session" && !requireCsrf(context, request, response)) return;
+      if (kind === "api_token" && !enforceApiTokenWriteAccess(request, response)) return;
+    }
     runtime.router(request, response, (error?: unknown) => {
       if (error && error !== "route" && error !== "router") {
         console.error(`[Matchdesk] Fehler in Modul ${id}`, error);
@@ -1040,11 +1067,11 @@ export function createModuleManager(context: DatabaseContext, options: ModuleMan
     listModules,
     getModule,
     describeModule,
-    install,
-    enable,
-    disable,
-    update,
-    uninstall,
+    install: (actor: ModuleActor, input: Parameters<typeof install>[1]) => withLock(input.moduleId, () => install(actor, input)),
+    enable: (actor: ModuleActor, id: string) => withLock(id, () => enable(actor, id)),
+    disable: (actor: ModuleActor, id: string) => withLock(id, () => disable(actor, id)),
+    update: (actor: ModuleActor, id: string, input: Parameters<typeof update>[2]) => withLock(id, () => update(actor, id, input)),
+    uninstall: (actor: ModuleActor, id: string, input: Parameters<typeof uninstall>[2]) => withLock(id, () => uninstall(actor, id, input)),
     exportData,
     getSettings,
     putSettings,

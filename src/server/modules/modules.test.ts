@@ -53,6 +53,7 @@ export function register(ctx) {
     catch { response.json({ leaked: false }); }
   });
   ctx.router.get("/boom", () => { throw new Error("kaputt"); });
+  ctx.router.post("/ohne-pruefung", (_request, response) => { response.json({ ok: true }); });
   globalThis.__demoStarts = (globalThis.__demoStarts ?? 0) + 1;
   ctx.onStop(() => { globalThis.__demoStops = (globalThis.__demoStops ?? 0) + 1; });
 }
@@ -67,7 +68,7 @@ function demoManifest(version: string, extra: Record<string, unknown> = {}) {
     server: "server.mjs",
     client: "client.mjs",
     permissions: [
-      { key: "demo.write", label: "Notizen schreiben", defaultRoles: ["user", "manager"] },
+      { key: "demo.write", label: "Notizen schreiben", defaultRoles: ["user"] },
       { key: "demo.manage", label: "Demo verwalten", scopable: true, defaultRoles: ["manager"] }
     ],
     settings: {
@@ -303,6 +304,11 @@ describe("Modulverwaltung", () => {
     await player.agent.post("/api/m/demo/notes").set(CSRF_HEADER, player.csrf).send({ id: "n1", text: "Hallo" }).expect(201);
     expect((await player.agent.get("/api/m/demo/notes").expect(200)).body.notes).toEqual([{ id: "n1", text: "Hallo" }]);
 
+    // CSRF prüft der Kern, auch wenn das Modul es vergisst; ohne Anmeldung entscheidet das Modul
+    await player.agent.post("/api/m/demo/ohne-pruefung").send({}).expect(403);
+    await player.agent.post("/api/m/demo/ohne-pruefung").set(CSRF_HEADER, player.csrf).send({}).expect(200);
+    await request(app.app).post("/api/m/demo/ohne-pruefung").send({}).expect(200);
+
     // Deinstallieren nur im ausgeschalteten Zustand und mit Bestätigung
     await admin.agent.post("/api/admin/modules/demo/uninstall").set(CSRF_HEADER, admin.csrf).send({ confirmId: "demo" }).expect(409);
     await admin.agent.post("/api/admin/modules/demo/disable").set(CSRF_HEADER, admin.csrf).send({}).expect(200);
@@ -457,7 +463,7 @@ describe("Modulverwaltung", () => {
       },
       manifest: demoManifest("1.1.0", {
         permissions: [
-          { key: "demo.write", label: "Notizen schreiben", defaultRoles: ["user", "manager"] },
+          { key: "demo.write", label: "Notizen schreiben", defaultRoles: ["user"] },
           { key: "demo.manage", label: "Demo verwalten", scopable: true, defaultRoles: ["manager"] },
           { key: "demo.pin", label: "Anheften", defaultRoles: ["manager"] }
         ]
