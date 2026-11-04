@@ -30,6 +30,8 @@ describe("restorable tables", () => {
       "module_sources",
       "modules",
       "email_change_challenges",
+      // „Spielt gerade“: Agent-Schlüssel wie API-Tokens nicht im Restore; neu einrichten genügt.
+      "game_agent_keys",
       "pairing_tokens",
       "rate_limit_allowlist",
       "rate_limit_entries",

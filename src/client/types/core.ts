@@ -95,6 +95,8 @@ export type AppSettings = {
   kioskStreamSecret: string;
   /** Pizzabestellung als optionales Feature; Standard `false` (Admin opt-in). */
   featuresPizzaEnabled: boolean;
+  /** „Spielt gerade“ (Windows-Agent meldet laufende Spiele); Standard `false`. */
+  featuresGamePresenceEnabled: boolean;
   /** PayPal-Handle (paypal.me/<handle>) für die Pizzabestellungs-Kassenliste. */
   pizzaPaypalHandle: string;
   /** Anzeigename für PayPal-Empfänger im Anteilsbildschirm. */
@@ -215,6 +217,7 @@ export type PublicAppSettings = Pick<
   | "kioskStreamEnabled"
   | "kioskStreamPath"
   | "featuresPizzaEnabled"
+  | "featuresGamePresenceEnabled"
   | "pizzaPaypalHandle"
   | "pizzaPaypalName"
   | "pizzaCashRecipient"

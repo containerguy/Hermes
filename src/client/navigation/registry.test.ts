@@ -5,6 +5,7 @@ import { menuPages, parseHash, resolvePage, type NavContext } from "./registry";
 
 const settings = {
   featuresPizzaEnabled: false,
+  featuresGamePresenceEnabled: false,
   infosEnabled: false,
   shellStartTitle: "",
   shellStartDescription: ""
