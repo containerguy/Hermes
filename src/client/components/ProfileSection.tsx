@@ -43,32 +43,35 @@ export function ProfileSection({
       </div>
 
       <form onSubmit={onUpdateProfile} className="admin-form">
-        <label>
-          {t("loginProfile.displayName")}
-          <input
-            value={displayNameDraft}
-            onChange={(event) => onDisplayNameChange(event.target.value)}
-            required
-          />
-        </label>
-        <label>
-          {t("loginProfile.localeLabel")}
-          <select
-            value={localeDraft}
-            onChange={(event) => onLocaleChange(event.target.value as "" | "de" | "en")}
-          >
-            <option value="">{t("loginProfile.localeAuto")}</option>
-            <option value="de">{t("loginProfile.locale.de")}</option>
-            <option value="en">{t("loginProfile.locale.en")}</option>
-          </select>
-        </label>
+        <div className="form-row">
+          <label>
+            {t("loginProfile.displayName")}
+            <input
+              value={displayNameDraft}
+              onChange={(event) => onDisplayNameChange(event.target.value)}
+              required
+            />
+          </label>
+          <label>
+            {t("loginProfile.localeLabel")}
+            <select
+              value={localeDraft}
+              onChange={(event) => onLocaleChange(event.target.value as "" | "de" | "en")}
+            >
+              <option value="">{t("loginProfile.localeAuto")}</option>
+              <option value="de">{t("loginProfile.locale.de")}</option>
+              <option value="en">{t("loginProfile.locale.en")}</option>
+            </select>
+          </label>
+        </div>
         <p className="muted">{t("loginProfile.localeHelp")}</p>
         <button type="submit" disabled={busy}>
           {t("loginProfile.saveProfile")}
         </button>
       </form>
 
-      <form onSubmit={onRequestEmailChange} className="admin-form">
+      <h4 className="profile-subhead">{t("loginProfile.emailChangeTitle")}</h4>
+      <form onSubmit={onRequestEmailChange} className="admin-form field-action-row">
         <label>
           {t("loginProfile.newEmail")}
           <input
@@ -78,12 +81,12 @@ export function ProfileSection({
             required
           />
         </label>
-        <button type="submit" disabled={busy}>
+        <button type="submit" className="secondary" disabled={busy}>
           {t("loginProfile.sendEmailCode")}
         </button>
       </form>
 
-      <form onSubmit={onVerifyEmailChange} className="admin-form">
+      <form onSubmit={onVerifyEmailChange} className="admin-form field-action-row">
         <label>
           {t("loginProfile.emailCode")}
           <input
@@ -96,7 +99,7 @@ export function ProfileSection({
             required
           />
         </label>
-        <button type="submit" disabled={busy}>
+        <button type="submit" className="secondary" disabled={busy}>
           {t("loginProfile.confirmEmail")}
         </button>
       </form>

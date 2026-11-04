@@ -606,6 +606,32 @@ export function LoginPanel({
         {error ? <p className="error">{error}</p> : null}
         {show("konto") ? (
           <>
+          <section className="account-summary account-summary-panel" aria-label={t("loginProfile.accountEyebrow")}>
+            <div>
+              <h3>
+                {t("loginProfile.accountTitle", {
+                  name: currentUser.displayName || currentUser.username
+                })}
+              </h3>
+              <dl className="account-list">
+                <div>
+                  <dt>{t("loginProfile.account.login")}</dt>
+                  <dd>{currentUser.username}</dd>
+                </div>
+                <div>
+                  <dt>{t("loginProfile.account.role")}</dt>
+                  <dd>{t(`admin.role.${currentUser.role}` as MessageKey)}</dd>
+                </div>
+                <div>
+                  <dt>{t("loginProfile.account.email")}</dt>
+                  <dd>{currentUser.email}</dd>
+                </div>
+              </dl>
+            </div>
+            <button type="button" className="secondary" onClick={logout} disabled={busy}>
+              {t("loginProfile.logout")}
+            </button>
+          </section>
           <ProfileSection
             displayNameDraft={displayNameDraft}
             localeDraft={localeDraft}
@@ -620,29 +646,6 @@ export function LoginPanel({
             onRequestEmailChange={requestEmailChange}
             onVerifyEmailChange={verifyEmailChange}
           />
-
-          <section className="device-panel account-summary-panel" aria-label={t("loginProfile.accountEyebrow")}>
-            <p className="eyebrow">{t("loginProfile.accountEyebrow")}</p>
-            <h3>
-              {t("loginProfile.accountTitle", {
-                name: currentUser.displayName || currentUser.username
-              })}
-            </h3>
-            <dl className="account-list">
-              <div>
-                <dt>{t("loginProfile.account.login")}</dt>
-                <dd>{currentUser.username}</dd>
-              </div>
-              <div>
-                <dt>{t("loginProfile.account.role")}</dt>
-                <dd>{t(`admin.role.${currentUser.role}` as MessageKey)}</dd>
-              </div>
-              <div>
-                <dt>{t("loginProfile.account.email")}</dt>
-                <dd>{currentUser.email}</dd>
-              </div>
-            </dl>
-          </section>
           </>
         ) : null}
         {show("spielkonten") && settings.featuresGamePresenceEnabled ? <GameAccountsSection /> : null}
@@ -696,9 +699,6 @@ export function LoginPanel({
           />
           </>
         ) : null}
-        <button type="button" className="secondary" onClick={logout} disabled={busy}>
-          {t("loginProfile.logout")}
-        </button>
       </section>
     );
   }
