@@ -97,6 +97,8 @@ export type AppSettings = {
   kioskStreamPath: string;
   /** Geheimer Zugriffsschlüssel; nur in Admin-API sichtbar, nicht in /api/settings/public */
   kioskStreamSecret: string;
+  /** Kiosk zeigt nur dieses Event (leer = alle laufenden Events gruppiert). */
+  kioskMainEventId: string;
   /** Pizzabestellung als optionales Feature; Standard `false` (Admin opt-in). */
   featuresPizzaEnabled: boolean;
   /** „Spielt gerade“ (Windows-Agent meldet laufende Spiele); Standard `false`. */

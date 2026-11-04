@@ -66,6 +66,8 @@ const settingsObjectSchema = z.object({
   kioskStreamPath: kioskPathSegmentSchema,
   /** Geheimer Zugriffsschlüssel (Query id), min. 12 Zeichen wenn Kiosk aktiv */
   kioskStreamSecret: z.string().max(128),
+  /** Kiosk zeigt nur dieses Event (leer = alle laufenden Events gruppiert); `&event=` in der URL hat Vorrang. */
+  kioskMainEventId: z.string().max(64),
   /**
    * Pizzabestellung als optionales Feature.
    * Standard `false`: Modul nicht aktiv, Routen liefern 404, UI bleibt verborgen.
@@ -234,6 +236,7 @@ export const defaultSettings: MatchdeskSettings = {
   kioskStreamEnabled: false,
   kioskStreamPath: "stream",
   kioskStreamSecret: "",
+  kioskMainEventId: "",
   featuresPizzaEnabled: false,
   featuresGamePresenceEnabled: false,
   pizzaPaypalHandle: "",

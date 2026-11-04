@@ -35,6 +35,7 @@ const settings: AppSettings = {
   kioskStreamEnabled: false,
   kioskStreamPath: "stream",
   kioskStreamSecret: "",
+  kioskMainEventId: "",
   featuresPizzaEnabled: false,
   featuresGamePresenceEnabled: false,
   pizzaPaypalHandle: "",
@@ -136,7 +137,8 @@ describe("AdminPanelBetrieb AMP automation", () => {
     const draftView = await render(vi.fn(), { ampIntegrationEnabled: true }, { ampIntegrationEnabled: false });
     expect(draftView.textContent).toContain("Einstellungen speichern, um danach Server-Bindungen anzulegen.");
     expect(draftView.querySelector('[aria-label="Server-Bindungen"]')).toBeNull();
-    expect(requestMock).not.toHaveBeenCalled();
+    // Nur die Kiosk-Eventauswahl lädt die Events; AMP bleibt still.
+    expect(requestMock.mock.calls.map((call) => String(call[0])).filter((url) => url !== "/api/main-events")).toEqual([]);
     await act(async () => {
       root?.unmount();
     });

@@ -597,6 +597,10 @@ export const deMessages = {
   "admin.kiosk.help":
     "Zeigt aktive Spielrunden ohne Login auf einem festen URL-Pfad mit geheimem id-Parameter. Beispiel: https://dein-host/stream?id=… — Passe Pfad und Geheimnis an und speichere, bevor du die URL auf dem Anzeigegerät einträgst.",
   "admin.kiosk.enabled": "Kiosk-Ansicht aktivieren",
+  "admin.kiosk.event": "Event auf dem Kiosk (in der Adresse auch per &event=…)",
+  "admin.kiosk.eventAll": "Alle laufenden Events",
+  "admin.kiosk.eventGone": "Event nicht mehr vorhanden",
+  "kiosk.group.none": "Ohne Event",
   "admin.kiosk.path": "URL-Pfad (ein Segment, z. B. stream)",
   "admin.kiosk.secret": "Geheimer Schlüssel (Query-Parameter id)",
   "admin.kiosk.secretPlaceholder": "mindestens 12 Zeichen (Buchstaben, Ziffern, _ und -)",

@@ -599,6 +599,10 @@ export const enMessages: { [K in keyof typeof deMessages]: string } = {
   "admin.kiosk.help":
     "Shows active game rounds without login at a fixed URL path with a secret id query parameter. Example: https://your-host/stream?id=… — adjust the path and secret, save, then use the URL on the display device.",
   "admin.kiosk.enabled": "Enable kiosk view",
+  "admin.kiosk.event": "Event on the kiosk (also via &event=… in the address)",
+  "admin.kiosk.eventAll": "All running events",
+  "admin.kiosk.eventGone": "Event no longer exists",
+  "kiosk.group.none": "Without event",
   "admin.kiosk.path": "URL path (one segment, e.g. stream)",
   "admin.kiosk.secret": "Secret key (id query parameter)",
   "admin.kiosk.secretPlaceholder": "at least 12 characters (letters, digits, _ and -)",
