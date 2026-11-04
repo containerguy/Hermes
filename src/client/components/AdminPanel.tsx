@@ -746,8 +746,9 @@ export function AdminPanel({
       {message ? <p className="notice admin-panel-notice">{message}</p> : null}
       {error ? <p className="error admin-panel-notice">{error}</p> : null}
 
-      {adminSection === "users" ? (
+      {adminSection === "users" || adminSection === "import" ? (
         <AdminPanelUsers
+          view={adminSection}
           users={users}
           currentUser={currentUser}
           newUser={newUser}

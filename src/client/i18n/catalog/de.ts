@@ -42,6 +42,7 @@ export const deMessages = {
   "main.footer.sourceRelease": "Source Release {version}",
   "main.admin.subnav": "Admin Unterseiten",
   "main.admin.nav.users": "Benutzer",
+  "main.admin.nav.import": "Import & Export",
   "main.admin.nav.ops": "Betrieb",
   "main.admin.nav.design": "Design",
   "main.admin.nav.infos": "Infos",
@@ -521,9 +522,10 @@ export const deMessages = {
   "admin.gate.title": "User, Manager und Einstellungen.",
   "admin.gate.body": "Der Adminbereich ist nach Admin-Login verfügbar.",
   "admin.gate.link": "Admin-Login öffnen",
-  "admin.users.title": "Zugänge, Einzelanlage und Import",
-  "admin.users.intro":
-    "Lege User an, importiere Listen und pflege Rollen. Änderungen wirken nach dem Speichern sofort im System.",
+  "admin.users.title": "Zugänge und Rechte",
+  "admin.users.intro": "Lege Benutzer an und vergib Rollen und Rechte. Änderungen wirken sofort.",
+  "admin.transfer.title": "Benutzer exportieren und importieren",
+  "admin.transfer.intro": "Alle aktiven Benutzer als JSON sichern, eine Export-Datei wieder einspielen oder neue Benutzer aus CSV oder JSON anlegen.",
   "admin.exportUsers.eyebrow": "Export / Import",
   "admin.exportUsers.title": "Alle aktiven User als JSON.",
   "admin.exportUsers.help":

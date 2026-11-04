@@ -44,6 +44,7 @@ export const enMessages: { [K in keyof typeof deMessages]: string } = {
   "main.footer.sourceRelease": "Source Release {version}",
   "main.admin.subnav": "Admin sections",
   "main.admin.nav.users": "Users",
+  "main.admin.nav.import": "Import & export",
   "main.admin.nav.ops": "Operations",
   "main.admin.nav.design": "Design",
   "main.admin.nav.infos": "Info",
@@ -522,9 +523,10 @@ export const enMessages: { [K in keyof typeof deMessages]: string } = {
   "admin.gate.title": "Users, managers, and settings.",
   "admin.gate.body": "The admin area is available after admin sign-in.",
   "admin.gate.link": "Open admin login",
-  "admin.users.title": "Access, single creation, and import",
-  "admin.users.intro":
-    "Create users, import lists, and manage roles. Changes apply immediately after saving.",
+  "admin.users.title": "Access and permissions",
+  "admin.users.intro": "Create users and assign roles and permissions. Changes apply immediately.",
+  "admin.transfer.title": "Export and import users",
+  "admin.transfer.intro": "Save all active users as JSON, load an export file back, or create new users from CSV or JSON.",
   "admin.exportUsers.eyebrow": "Export / import",
   "admin.exportUsers.title": "All active users as JSON.",
   "admin.exportUsers.help":

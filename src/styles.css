@@ -1390,7 +1390,7 @@ dd {
 }
 
 .admin-panel--users {
-  grid-template-columns: minmax(280px, 400px) minmax(0, 1fr);
+  grid-template-columns: minmax(0, 1fr);
 }
 
 .admin-panel--single {
@@ -1421,8 +1421,7 @@ dd {
 
 .admin-panel--users .admin-list {
   display: grid;
-  grid-column: 2;
-  grid-row: 2 / span 20;
+  grid-column: 1;
   gap: 10px;
   align-content: start;
   align-self: start;
@@ -3357,19 +3356,8 @@ dd {
   }
 }
 
-/* Benutzerverwaltung schmal: eine Spalte, Benutzerliste direkt unter der Überschrift. */
-@media (max-width: 980px) {
-  .admin-panel--users {
-    grid-template-columns: minmax(0, 1fr);
-  }
-
-  .admin-panel--users .admin-section-head {
-    order: -2;
-  }
-
-  .admin-panel--users .admin-list {
-    grid-column: 1;
-    grid-row: auto;
-    order: -1;
-  }
+/* Benutzer anlegen: auf breiten Bildschirmen eine Zeile über der Liste. */
+.admin-panel--users .admin-user-create-form {
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 180px), 1fr));
+  align-items: end;
 }

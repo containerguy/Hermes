@@ -12,10 +12,11 @@ import { NAV_ICONS } from "./icons";
 import type { AdminNavEntry, AdminNavGroup, AppModule, NavContext, NavPageRenderContext, SubnavEntry } from "./registry";
 import { hasPermission, hasPermissionAnywhere, isAdministrator } from "../permissions";
 
-export const coreAdminSections: AdminSection[] = ["users", "betrieb", "design", "infos", "sicherheit", "invites", "audit"];
+export const coreAdminSections: AdminSection[] = ["users", "import", "betrieb", "design", "infos", "sicherheit", "invites", "audit"];
 
 const coreAdminLabelKeys = {
   users: "main.admin.nav.users",
+  import: "main.admin.nav.import",
   betrieb: "main.admin.nav.ops",
   design: "main.admin.nav.design",
   infos: "main.admin.nav.infos",
@@ -26,6 +27,7 @@ const coreAdminLabelKeys = {
 
 const coreAdminGroups: Record<AdminSection, AdminNavGroup> = {
   users: "people",
+  import: "people",
   invites: "people",
   betrieb: "system",
   design: "system",
