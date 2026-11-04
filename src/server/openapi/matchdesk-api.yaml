@@ -1090,6 +1090,10 @@ components:
         description:
           type: string
           nullable: true
+        infosMarkdown:
+          type: string
+          nullable: true
+          description: Infos zum Event (Markdown) für die Seite „Infos“; per POST/PATCH setzbar.
         status:
           type: string
           enum: [planned, running, ended]

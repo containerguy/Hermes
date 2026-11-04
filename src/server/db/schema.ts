@@ -229,6 +229,8 @@ export const mainEvents = sqliteTable(
     /** 0027: Plätze (null = unbegrenzt); ist das Event voll, wird man Nachrücker. */
     maxParticipants: integer("max_participants"),
     /** 0027: Anmeldeschluss (null = keiner); gilt nur, solange das Event geplant ist. */
+    /** 0035: Infos zum Event (Markdown), zusätzlich zu den allgemeinen Infos. */
+    infosMarkdown: text("infos_markdown"),
     registrationDeadline: text("registration_deadline"),
     /** 0031: geplante Erinnerungen an Teilnehmer verschicken. */
     remindersEnabled: integer("reminders_enabled", { mode: "boolean" }).notNull().default(true),

@@ -59,6 +59,11 @@ function nowIso() {
   return new Date().toISOString();
 }
 
+/** Markdown bleibt wie eingegeben (Zeilenumbrüche, Einrückung); nur leer wird zu null. */
+function normalizeMarkdown(value: string | null | undefined) {
+  return value?.trim() ? value : null;
+}
+
 function normalizeText(value: string | null | undefined) {
   return value?.trim() ? value.trim() : null;
 }
@@ -312,6 +317,7 @@ function serializeMainEvent(context: DatabaseContext, event: MainEventRow, viewe
     id: event.id,
     name: event.name,
     description: event.description,
+    infosMarkdown: event.infosMarkdown,
     status: event.status,
     visibility: event.visibility,
     ...(invites ? { invites } : {}),
@@ -427,6 +433,7 @@ export function createMainEventRouter(context: DatabaseContext) {
         id,
         name: parsed.data.name,
         description: normalizeText(parsed.data.description),
+        infosMarkdown: normalizeMarkdown(parsed.data.infosMarkdown),
         status: "planned",
         visibility: parsed.data.visibility ?? "public",
         plannedStartAt: parsed.data.plannedStartAt ?? null,
@@ -515,6 +522,8 @@ export function createMainEventRouter(context: DatabaseContext) {
           visibility,
           description:
             parsed.data.description === undefined ? event.description : normalizeText(parsed.data.description),
+          infosMarkdown:
+            parsed.data.infosMarkdown === undefined ? event.infosMarkdown : normalizeMarkdown(parsed.data.infosMarkdown),
           plannedStartAt,
           plannedEndAt,
           maxParticipants:

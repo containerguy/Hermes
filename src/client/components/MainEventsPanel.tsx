@@ -1,6 +1,6 @@
 import React, { FormEvent, useEffect, useState } from "react";
 import type { MainEvent } from "../types/core";
-import { MainEventParticipantList, MainEventRegistrationEditor } from "./MainEventRegistration";
+import { MainEventInfosEditor, MainEventParticipantList, MainEventRegistrationEditor } from "./MainEventRegistration";
 import { eventShareText, MainEventBroadcast, whatsappShareUrl } from "./MainEventBroadcast";
 import { requestJson } from "../api/request";
 import { getErrorMessage } from "../errors/errors";
@@ -195,6 +195,17 @@ export function MainEventsPanel({
     );
   }
 
+  async function saveInfos(mainEvent: MainEvent, infosMarkdown: string | null) {
+    await run(
+      () =>
+        requestJson<{ mainEvent: MainEvent }>(`/api/main-events/${mainEvent.id}`, {
+          method: "PATCH",
+          body: JSON.stringify({ infosMarkdown })
+        }),
+      "mainEvents.msg.infos"
+    );
+  }
+
   /** Text zum eigenen Anmeldestatus; Nachrücker sehen ihren Platz in der Liste. */
   function participationText(mainEvent: MainEvent) {
     switch (mainEvent.myParticipation) {
@@ -381,6 +392,14 @@ export function MainEventsPanel({
                   mainEvent={mainEvent}
                   busy={busy}
                   onSave={(changes) => saveRegistration(mainEvent, changes)}
+                />
+              ) : null}
+              {manages(mainEvent.id) && mainEvent.status !== "ended" ? (
+                <MainEventInfosEditor
+                  key={`${mainEvent.id}-infos-${mainEvent.infosMarkdown ?? ""}`}
+                  mainEvent={mainEvent}
+                  busy={busy}
+                  onSave={(infosMarkdown) => saveInfos(mainEvent, infosMarkdown)}
                 />
               ) : null}
               {manages(mainEvent.id) ? <MainEventParticipantList mainEvent={mainEvent} /> : null}

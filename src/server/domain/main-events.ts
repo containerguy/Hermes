@@ -29,6 +29,8 @@ export const mainEventInputSchema = z
   .object({
     name: z.string().trim().min(1).max(120),
     description: z.string().trim().max(4000).nullable().optional(),
+    /** 0035: Infos zum Event (Markdown). */
+    infosMarkdown: z.string().max(100_000).nullable().optional(),
     visibility: mainEventVisibilitySchema.optional(),
     plannedStartAt: optionalIso,
     plannedEndAt: optionalIso,
@@ -52,6 +54,8 @@ export const mainEventInputSchema = z
 export const mainEventUpdateSchema = z.object({
   name: z.string().trim().min(1).max(120).optional(),
   description: z.string().trim().max(4000).nullable().optional(),
+  /** 0035: Infos zum Event (Markdown). */
+  infosMarkdown: z.string().max(100_000).nullable().optional(),
   visibility: mainEventVisibilitySchema.optional(),
   plannedStartAt: optionalIso,
   plannedEndAt: optionalIso,

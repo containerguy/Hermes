@@ -331,6 +331,8 @@ export type MainEvent = {
   id: string;
   name: string;
   description: string | null;
+  /** Infos zum Event (Markdown), zusätzlich zu den allgemeinen Infos. */
+  infosMarkdown?: string | null;
   status: "planned" | "running" | "ended";
   /** Private Events sehen nur Eingeladene sowie Manager und Admins. */
   visibility: "public" | "private";

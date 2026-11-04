@@ -150,3 +150,39 @@ export function MainEventParticipantList({ mainEvent }: { mainEvent: MainEvent }
     </details>
   );
 }
+
+/** Infos zum Event (Anfahrt, WLAN, Ablauf …) als Markdown; erscheinen auf der Seite „Infos“. */
+export function MainEventInfosEditor({
+  mainEvent,
+  busy,
+  onSave
+}: {
+  mainEvent: MainEvent;
+  busy: boolean;
+  onSave: (infosMarkdown: string | null) => void;
+}) {
+  const { t } = useI18n();
+  const [markdown, setMarkdown] = useState(mainEvent.infosMarkdown ?? "");
+
+  return (
+    <details className="main-event-infos-editor">
+      <summary>{t("mainEvents.infos.toggle")}</summary>
+      <form
+        className="form-grid"
+        onSubmit={(event) => {
+          event.preventDefault();
+          onSave(markdown.trim() ? markdown : null);
+        }}
+      >
+        <label>
+          {t("mainEvents.infos.label")}
+          <textarea rows={8} value={markdown} onChange={(ev) => setMarkdown(ev.target.value)} />
+        </label>
+        <p className="muted">{t("mainEvents.infos.help")}</p>
+        <button type="submit" disabled={busy}>
+          {t("mainEvents.infos.save")}
+        </button>
+      </form>
+    </details>
+  );
+}
