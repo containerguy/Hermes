@@ -551,7 +551,7 @@ export const inviteCodeUses = sqliteTable(
   (table) => [uniqueIndex("invite_code_uses_user_unique").on(table.userId)]
 );
 
-/** 0033: Spielkonten pro Benutzer (Steam vom Agenten, Rest manuell). */
+/** 0035: Spielkonten pro Benutzer (Steam vom Agenten, Rest manuell). */
 export const userGameAccounts = sqliteTable(
   "user_game_accounts",
   {
