@@ -1,4 +1,5 @@
-import { and, asc, eq, inArray, isNull } from "drizzle-orm";
+import { and, asc, desc, eq, inArray, isNull } from "drizzle-orm";
+import { z } from "zod";
 import { Router, type Request, type Response } from "express";
 import { randomUUID } from "node:crypto";
 import { requireUser } from "../auth/current-user";
@@ -6,7 +7,18 @@ import { requireCsrf } from "../auth/csrf";
 import { enforceApiTokenWriteAccess } from "../auth/matchdesk-auth";
 import { tryWriteAuditLog, writeAuditLog } from "../audit-log";
 import type { DatabaseContext } from "../db/client";
-import { gameEvents, mainEventInvites, mainEventParticipants, mainEvents, users } from "../db/schema";
+import {
+  gameEvents,
+  inviteCodes,
+  mainEventBroadcastDeliveries,
+  mainEventBroadcasts,
+  mainEventInvites,
+  mainEventParticipants,
+  mainEvents,
+  users
+} from "../db/schema";
+import { notifyUsers } from "../notifications/dispatcher";
+import { calendarFor, resetRemindersOnChange, sendJoinConfirmation } from "../notifications/reminders";
 import {
   csvCell,
   isRegistrationClosed,
@@ -19,6 +31,7 @@ import {
   type RequestedMainEventParticipation
 } from "../domain/main-events";
 import { canManageMainEvents, type UserRole } from "../domain/users";
+import { revokeEventGrants, scopedEventIds } from "../domain/permissions";
 import {
   sendPushToEnabledUsers,
   sendPushToMainEventParticipants,
@@ -28,6 +41,18 @@ import { broadcastEventsChanged } from "../realtime/event-bus";
 
 type MainEventRow = typeof mainEvents.$inferSelect;
 type Viewer = { id: string; role: UserRole };
+
+const broadcastSchema = z.object({
+  subject: z.string().trim().min(1).max(150),
+  body: z.string().trim().min(1).max(5000),
+  audience: z
+    .array(z.enum(["joined", "interested", "waitlisted", "declined", "no_response"]))
+    .min(1)
+    .max(5)
+});
+
+/** Für Tests: Versand der letzten Rundnachricht abwarten. */
+export let lastBroadcastDelivery: Promise<void> = Promise.resolve();
 
 function nowIso() {
   return new Date().toISOString();
@@ -70,14 +95,20 @@ export function canSeeMainEvent(
   viewer: Viewer,
   event: Pick<MainEventRow, "id" | "visibility">
 ) {
-  return event.visibility === "public" || canManageMainEvents(viewer) || isInvited(context, event.id, viewer.id);
+  return (
+    event.visibility === "public" ||
+    canManageMainEvents(context, viewer, event.id) ||
+    isInvited(context, event.id, viewer.id)
+  );
 }
 
 /** IDs der Events, deren Runden der Betrachter nicht sehen darf (ohne Betrachter, z. B. Kiosk: alle privaten). */
 export function hiddenMainEventIds(context: DatabaseContext, viewer: Viewer | null) {
-  if (viewer && canManageMainEvents(viewer)) {
+  if (viewer && canManageMainEvents(context, viewer)) {
     return new Set<string>();
   }
+  // Wer ein Event nur per Event-Vergabe verwaltet, sieht dessen Runden auch ohne Einladung.
+  const managed = new Set(viewer ? scopedEventIds(context, viewer, "main_events.manage") : []);
   const privateEvents = context.db
     .select({ id: mainEvents.id, visibility: mainEvents.visibility })
     .from(mainEvents)
@@ -85,7 +116,7 @@ export function hiddenMainEventIds(context: DatabaseContext, viewer: Viewer | nu
     .all();
   return new Set(
     privateEvents
-      .filter((event) => !viewer || !isInvited(context, event.id, viewer.id))
+      .filter((event) => !viewer || (!managed.has(event.id) && !isInvited(context, event.id, viewer.id)))
       .map((event) => event.id)
   );
 }
@@ -202,6 +233,7 @@ function notifyPromoted(context: DatabaseContext, event: MainEventRow, userIds: 
   if (userIds.length === 0) {
     return;
   }
+  sendJoinConfirmation(context, event, userIds);
   void sendPushToUserIds(context, userIds, {
     title: "Nachgerückt",
     body: `Ein Platz bei ${event.name} ist frei geworden: Du bist jetzt dabei.`,
@@ -221,7 +253,7 @@ function applyParticipation(
   userId: string,
   requested: RequestedMainEventParticipation
 ) {
-  return context.sqlite.transaction(() => {
+  const result = context.sqlite.transaction(() => {
     const previous = findParticipation(context, event.id, userId)?.status ?? null;
     const status = resolveParticipationStatus({
       requested,
@@ -238,6 +270,11 @@ function applyParticipation(
     const finalStatus = promoted.includes(userId) ? "joined" : status;
     return { previous, status: finalStatus, promoted: promoted.filter((id) => id !== userId) };
   })();
+  // Zusage-Mail mit Kalendereintrag (nur Mail, nur beim Wechsel auf „dabei“).
+  if (result.status === "joined" && result.previous !== "joined") {
+    sendJoinConfirmation(context, event, [userId]);
+  }
+  return result;
 }
 
 /** Wer bei einer Runde des Events „dabei" sagt und sich zum Event noch nicht entschieden hat, nimmt teil. */
@@ -262,7 +299,7 @@ function serializeMainEvent(context: DatabaseContext, event: MainEventRow, viewe
   const creator = context.db.select().from(users).where(eq(users.id, event.createdByUserId)).get();
   // Die Gästeliste privater Events sehen nur Manager und Admins.
   const invites =
-    event.visibility === "private" && canManageMainEvents(viewer)
+    event.visibility === "private" && canManageMainEvents(context, viewer, event.id)
       ? invitedUserIds(context, event.id).map((userId) => ({
           userId,
           username: context.db.select().from(users).where(eq(users.id, userId)).get()?.username ?? "unbekannt"
@@ -289,6 +326,7 @@ function serializeMainEvent(context: DatabaseContext, event: MainEventRow, viewe
     maxParticipants: event.maxParticipants,
     registrationDeadline: event.registrationDeadline,
     registrationClosed: isRegistrationClosed(event),
+    remindersEnabled: event.remindersEnabled,
     myParticipation: findParticipation(context, event.id, viewer.id)?.status ?? null,
     myWaitlistPosition: waitlistPosition(context, event.id, viewer.id),
     createdAt: event.createdAt,
@@ -344,7 +382,9 @@ export function createMainEventRouter(context: DatabaseContext) {
       }
       // Teilnahme zu- oder absagen darf jeder; alles andere ist Verwaltung.
       const isParticipation = request.method === "POST" && /^\/[^/]+\/participation$/.test(request.path);
-      if (!isParticipation && !canManageMainEvents(user)) {
+      // Anlegen nur mit globalem Recht; ein bestehendes Event auch mit Vergabe nur für dieses Event.
+      const eventId = request.path === "/" ? null : (/^\/([^/]+)/.exec(request.path)?.[1] ?? null);
+      if (!isParticipation && !canManageMainEvents(context, user, eventId)) {
         response.status(403).json({ error: "hauptevent_manager_erforderlich" });
         return;
       }
@@ -479,10 +519,18 @@ export function createMainEventRouter(context: DatabaseContext) {
             parsed.data.registrationDeadline === undefined
               ? event.registrationDeadline
               : parsed.data.registrationDeadline,
+          remindersEnabled: parsed.data.remindersEnabled ?? event.remindersEnabled,
           updatedAt: nowIso()
         })
         .where(eq(mainEvents.id, event.id))
         .run();
+
+      // Neuer Termin oder Anmeldeschluss: die zugehörigen Erinnerungen dürfen neu verschickt werden.
+      resetRemindersOnChange(context, event, {
+        plannedStartAt,
+        registrationDeadline:
+          parsed.data.registrationDeadline === undefined ? event.registrationDeadline : parsed.data.registrationDeadline
+      });
 
       // Mehr Plätze (oder keine Grenze mehr): Nachrücker rücken auf. Weniger Plätze nehmen
       // niemandem eine Zusage weg.
@@ -569,7 +617,7 @@ export function createMainEventRouter(context: DatabaseContext) {
     const timestamp = nowIso();
     // Mit dem Event enden auch seine offenen Runden: sie werden archiviert, damit keine
     // Benachrichtigungen mehr zu einem beendeten Event verschickt werden.
-    const archivedRounds = context.sqlite.transaction(() => {
+    const { archivedRounds, revokedGrants } = context.sqlite.transaction(() => {
       const activeRounds = context.db
         .select({ id: gameEvents.id })
         .from(gameEvents)
@@ -601,7 +649,10 @@ export function createMainEventRouter(context: DatabaseContext) {
         .where(eq(mainEvents.id, event.id))
         .run();
 
-      return activeRounds.length;
+      // Rechte, die nur für dieses Event vergeben waren, erlöschen mit dem Ende.
+      const revokedGrants = revokeEventGrants(context, event.id, timestamp);
+
+      return { archivedRounds: activeRounds.length, revokedGrants };
     })();
 
     const updated = getMainEvent(context, event.id)!;
@@ -611,7 +662,7 @@ export function createMainEventRouter(context: DatabaseContext) {
       entityType: "main_event",
       entityId: event.id,
       summary: `${actor.username} hat das Event ${event.name} beendet.`,
-      metadata: { archivedRounds }
+      metadata: { archivedRounds, revokedGrants }
     });
     broadcastEventsChanged("main_event_ended");
     void sendPushToMainEventParticipants(context, event.id, {
@@ -732,7 +783,7 @@ export function createMainEventRouter(context: DatabaseContext) {
 
   function requireManagedEvent(request: Request, response: Response) {
     const actor = requireUser(context, request)!;
-    if (!canManageMainEvents(actor)) {
+    if (!canManageMainEvents(context, actor, String(request.params.id))) {
       response.status(403).json({ error: "hauptevent_manager_erforderlich" });
       return null;
     }
@@ -743,6 +794,143 @@ export function createMainEventRouter(context: DatabaseContext) {
     }
     return event;
   }
+
+  // Rundnachricht an Teilnehmer, gefiltert nach Status; Versand über den Verteiler (Kanalwahl je Person).
+  router.post("/:id/broadcasts", (request, response) => {
+    const actor = requireUser(context, request)!;
+    const event = requireManagedEvent(request, response);
+    if (!event) {
+      return;
+    }
+    const parsed = broadcastSchema.safeParse(request.body);
+    if (!parsed.success) {
+      response.status(400).json({ error: "ungueltige_rundnachricht" });
+      return;
+    }
+    const audience = new Set(parsed.data.audience);
+    const { participants, noResponse } = participantOverview(event);
+    const recipientIds = Array.from(
+      new Set([
+        ...participants.filter((row) => audience.has(row.status)).map((row) => row.userId),
+        ...(audience.has("no_response") ? noResponse.map((row) => row.userId) : [])
+      ])
+    );
+    if (recipientIds.length === 0) {
+      response.status(409).json({ error: "rundnachricht_ohne_empfaenger" });
+      return;
+    }
+    const id = randomUUID();
+    const timestamp = nowIso();
+    context.db
+      .insert(mainEventBroadcasts)
+      .values({
+        id,
+        mainEventId: event.id,
+        authorUserId: actor.id,
+        subject: parsed.data.subject,
+        body: parsed.data.body,
+        audience: JSON.stringify(Array.from(audience)),
+        recipientCount: recipientIds.length,
+        createdAt: timestamp
+      })
+      .run();
+    tryWriteAuditLog(context, {
+      actor,
+      action: "main_event.broadcast",
+      entityType: "main_event",
+      entityId: event.id,
+      summary: `${actor.username} hat eine Rundnachricht zum Event ${event.name} an ${recipientIds.length} Personen geschickt.`,
+      metadata: { broadcastId: id, audience: Array.from(audience), recipients: recipientIds.length }
+    });
+    // Versand im Hintergrund: SMTP und Modulkanäle können dauern. Ergebnis steht danach im Verlauf.
+    lastBroadcastDelivery = notifyUsers(context, recipientIds, {
+      mainEventId: event.id,
+      eventName: event.name,
+      subject: parsed.data.subject,
+      body: parsed.data.body,
+      path: "#main-events"
+    })
+      .then((deliveries) => {
+        const created = nowIso();
+        for (const delivery of deliveries) {
+          context.db
+            .insert(mainEventBroadcastDeliveries)
+            .values({ broadcastId: id, ...delivery, createdAt: created })
+            .onConflictDoNothing()
+            .run();
+        }
+      })
+      .catch((error) => console.error("[Matchdesk] Broadcast delivery failed", error));
+    response.status(202).json({ broadcast: serializeBroadcast(id) });
+  });
+
+  router.get("/:id/broadcasts", (request, response) => {
+    const event = requireManagedEvent(request, response);
+    if (!event) {
+      return;
+    }
+    const rows = context.db
+      .select({ id: mainEventBroadcasts.id })
+      .from(mainEventBroadcasts)
+      .where(eq(mainEventBroadcasts.mainEventId, event.id))
+      .orderBy(desc(mainEventBroadcasts.createdAt))
+      .limit(50)
+      .all();
+    response.json({ broadcasts: rows.map((row) => serializeBroadcast(row.id)) });
+  });
+
+  function serializeBroadcast(id: string) {
+    const row = context.db.select().from(mainEventBroadcasts).where(eq(mainEventBroadcasts.id, id)).get()!;
+    const author = row.authorUserId
+      ? context.db.select({ username: users.username }).from(users).where(eq(users.id, row.authorUserId)).get()
+      : undefined;
+    const deliveries = context.db
+      .select({ channelId: mainEventBroadcastDeliveries.channelId, status: mainEventBroadcastDeliveries.status })
+      .from(mainEventBroadcastDeliveries)
+      .where(eq(mainEventBroadcastDeliveries.broadcastId, id))
+      .all();
+    // Zusammenfassung je Kanal: wie viele erreicht, fehlgeschlagen; dazu ohne Kanal/abgemeldet.
+    const summary: Record<string, { sent: number; failed: number }> = {};
+    let skipped = 0;
+    for (const delivery of deliveries) {
+      if (delivery.status === "skipped") {
+        skipped += 1;
+        continue;
+      }
+      const entry = (summary[delivery.channelId] ??= { sent: 0, failed: 0 });
+      entry[delivery.status] += 1;
+    }
+    return {
+      id: row.id,
+      subject: row.subject,
+      body: row.body,
+      audience: JSON.parse(row.audience) as string[],
+      recipientCount: row.recipientCount,
+      authorUsername: author?.username ?? null,
+      createdAt: row.createdAt,
+      delivered: deliveries.length > 0,
+      channels: summary,
+      skipped
+    };
+  }
+
+  // Kalendereintrag zum Herunterladen (für alle, die das Event sehen).
+  router.get("/:id/calendar.ics", (request, response) => {
+    const viewer = requireUser(context, request)!;
+    const event = getMainEvent(context, String(request.params.id));
+    if (!event || !canSeeMainEvent(context, viewer, event)) {
+      response.status(404).json({ error: "hauptevent_nicht_gefunden" });
+      return;
+    }
+    if (!event.plannedStartAt) {
+      response.status(409).json({ error: "hauptevent_ohne_termin" });
+      return;
+    }
+    const fileName = `${event.name.replace(/[^a-zA-Z0-9_-]+/g, "_").slice(0, 60) || "event"}.ics`;
+    response.setHeader("Content-Type", "text/calendar; charset=utf-8");
+    response.setHeader("Content-Disposition", `attachment; filename="${fileName}"`);
+    response.send(calendarFor([event], event.name));
+  });
 
   router.get("/:id/participants", (request, response) => {
     const event = requireManagedEvent(request, response);
@@ -774,7 +962,7 @@ export function createMainEventRouter(context: DatabaseContext) {
 
   router.get("/invite-candidates", (request, response) => {
     const actor = requireUser(context, request)!;
-    if (!canManageMainEvents(actor)) {
+    if (!canManageMainEvents(context, actor) && scopedEventIds(context, actor, "main_events.manage").length === 0) {
       response.status(403).json({ error: "hauptevent_manager_erforderlich" });
       return;
     }
@@ -912,7 +1100,15 @@ export function createMainEventRouter(context: DatabaseContext) {
     }
 
     // Zugeordnete Runden bleiben bestehen und verlieren nur die Zuordnung (ON DELETE SET NULL).
-    context.db.delete(mainEvents).where(eq(mainEvents.id, event.id)).run();
+    // Einladungscodes des Events werden deaktiviert, sonst würden sie still zu allgemeinen Codes.
+    context.sqlite.transaction(() => {
+      context.db
+        .update(inviteCodes)
+        .set({ revokedAt: nowIso(), updatedAt: nowIso() })
+        .where(and(eq(inviteCodes.mainEventId, event.id), isNull(inviteCodes.revokedAt)))
+        .run();
+      context.db.delete(mainEvents).where(eq(mainEvents.id, event.id)).run();
+    })();
     writeAuditLog(context, {
       actor,
       action: "main_event.delete",

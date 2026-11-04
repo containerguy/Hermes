@@ -26,6 +26,7 @@ import { AdminPanelInfos } from "./AdminPanelInfos";
 import { AdminPanelInvites } from "./AdminPanelInvites";
 import { AdminPanelSicherheit } from "./AdminPanelSicherheit";
 import { AdminPanelUsers } from "./AdminPanelUsers";
+import { isAdministrator } from "../permissions";
 
 function toDatetimeLocal(value: string) {
   const date = new Date(value);
@@ -119,7 +120,8 @@ export function AdminPanel({
   const [newInvite, setNewInvite] = useState({
     label: "",
     maxUses: "",
-    expiresAt: ""
+    expiresAt: "",
+    mainEventId: ""
   });
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
@@ -138,7 +140,7 @@ export function AdminPanel({
     return t("admin.bulk.summaryBlocking", { count: result.blockingIssueCount });
   }
 
-  const isAdmin = currentUser?.role === "admin";
+  const isAdmin = isAdministrator(currentUser);
 
   async function downloadJsonAttachment(path: string, fallbackName: string) {
     setError("");
@@ -503,9 +505,13 @@ export function AdminPanel({
     setMessage("");
 
     try {
-      const payload: { label: string; maxUses?: number | null; expiresAt?: string | null } = {
+      const payload: { label: string; maxUses?: number | null; expiresAt?: string | null; mainEventId?: string } = {
         label: newInvite.label
       };
+
+      if (newInvite.mainEventId !== "") {
+        payload.mainEventId = newInvite.mainEventId;
+      }
 
       if (newInvite.maxUses !== "") {
         payload.maxUses = Number(newInvite.maxUses);
@@ -519,7 +525,7 @@ export function AdminPanel({
         method: "POST",
         body: JSON.stringify(payload)
       });
-      setNewInvite({ label: "", maxUses: "", expiresAt: "" });
+      setNewInvite({ label: "", maxUses: "", expiresAt: "", mainEventId: "" });
       await loadAdminData();
       setMessage("Invite-Code erstellt.");
     } catch (caught) {
@@ -757,6 +763,14 @@ export function AdminPanel({
           onClearBulkImportPreview={() => setBulkImportPreview(null)}
           onCreateUser={createUser}
           onUpdateRole={updateRole}
+          onPermissionMessage={(text) => {
+            setError("");
+            setMessage(text);
+          }}
+          onPermissionError={(text) => {
+            setMessage("");
+            setError(text);
+          }}
           onDeleteUser={deleteUser}
           onDownloadJsonAttachment={(p, n) => void downloadJsonAttachment(p, n)}
           onRunUsersExportImport={(f) => void runUsersExportImport(f)}

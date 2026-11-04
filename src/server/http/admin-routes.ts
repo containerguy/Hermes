@@ -1,3 +1,4 @@
+import { can } from "../domain/permissions";
 import { asc, eq, isNull } from "drizzle-orm";
 import { Router } from "express";
 import { z } from "zod";
@@ -13,6 +14,18 @@ import {
   listRateLimitEntries
 } from "../auth/rate-limits";
 import type { DatabaseContext } from "../db/client";
+import {
+  addGrant,
+  createRole,
+  deleteRole,
+  grantInputSchema,
+  listActiveGrants,
+  listPermissionCatalog,
+  revokeGrant,
+  roleInputSchema,
+  roleUpdateSchema,
+  updateRole
+} from "../domain/rbac-admin";
 import { gameEvents, users } from "../db/schema";
 import {
   analyzeBulkImport,
@@ -80,7 +93,7 @@ export function createAdminRouter(context: DatabaseContext) {
       return;
     }
 
-    if (user.role !== "admin") {
+    if (!can(context, user, "admin.access")) {
       response.status(403).json({ error: "admin_erforderlich" });
       return;
     }
@@ -107,7 +120,93 @@ export function createAdminRouter(context: DatabaseContext) {
       .where(isNull(users.deletedAt))
       .orderBy(asc(users.username))
       .all();
-    response.json({ users: allUsers.map(publicUser) });
+    const grantsByUser = new Map<string, ReturnType<typeof listActiveGrants>>();
+    for (const grant of listActiveGrants(context)) {
+      grantsByUser.set(grant.userId, [...(grantsByUser.get(grant.userId) ?? []), grant]);
+    }
+    // Für Admins zusätzlich: über welches Event (Einladungscode pro Event) jemand registriert wurde.
+    response.json({
+      users: allUsers.map((row) => ({
+        ...publicUser(row),
+        registeredViaMainEventId: row.registeredViaMainEventId,
+        registeredViaMainEventName: row.registeredViaMainEventName,
+        registeredViaInviteCodeId: row.registeredViaInviteCodeId,
+        createdAt: row.createdAt,
+        grants: grantsByUser.get(row.id) ?? []
+      }))
+    });
+  });
+
+  // Rechte und Rollen: Katalog, eigene Rollen, Vergaben pro Benutzer (global oder für ein Event).
+  router.get("/rbac", (_request, response) => {
+    response.json(listPermissionCatalog(context));
+  });
+
+  router.post("/roles", (request, response) => {
+    const admin = requireAdmin(context, request)!;
+    const parsed = roleInputSchema.safeParse(request.body);
+    if (!parsed.success) {
+      response.status(400).json({ error: "ungueltige_rolle" });
+      return;
+    }
+    const result = createRole(context, admin, parsed.data);
+    if (!result.ok) {
+      response.status(result.status).json({ error: result.error });
+      return;
+    }
+    response.status(201).json(listPermissionCatalog(context));
+  });
+
+  router.patch("/roles/:id", (request, response) => {
+    const admin = requireAdmin(context, request)!;
+    const parsed = roleUpdateSchema.safeParse(request.body);
+    if (!parsed.success) {
+      response.status(400).json({ error: "ungueltige_rolle" });
+      return;
+    }
+    const result = updateRole(context, admin, String(request.params.id), parsed.data);
+    if (!result.ok) {
+      response.status(result.status).json({ error: result.error });
+      return;
+    }
+    response.json(listPermissionCatalog(context));
+  });
+
+  router.delete("/roles/:id", (request, response) => {
+    const admin = requireAdmin(context, request)!;
+    const result = deleteRole(context, admin, String(request.params.id));
+    if (!result.ok) {
+      response.status(result.status).json({ error: result.error });
+      return;
+    }
+    response.status(204).send();
+  });
+
+  router.post("/users/:id/grants", (request, response) => {
+    const admin = requireAdmin(context, request)!;
+    const parsed = grantInputSchema.safeParse(request.body);
+    if (!parsed.success) {
+      response.status(400).json({ error: "ungueltige_vergabe" });
+      return;
+    }
+    const userId = String(request.params.id);
+    const result = addGrant(context, admin, userId, parsed.data);
+    if (!result.ok) {
+      response.status(result.status).json({ error: result.error });
+      return;
+    }
+    response.status(201).json({ grants: listActiveGrants(context, [userId]) });
+  });
+
+  router.delete("/users/:id/grants/:grantId", (request, response) => {
+    const admin = requireAdmin(context, request)!;
+    const userId = String(request.params.id);
+    const result = revokeGrant(context, admin, userId, String(request.params.grantId));
+    if (!result.ok) {
+      response.status(result.status).json({ error: result.error });
+      return;
+    }
+    response.json({ grants: listActiveGrants(context, [userId]) });
   });
 
   router.get("/users/export", (request, response) => {

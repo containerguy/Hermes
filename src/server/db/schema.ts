@@ -1,5 +1,5 @@
 import { relations, sql } from "drizzle-orm";
-import { index, integer, primaryKey, sqliteTable, text, uniqueIndex } from "drizzle-orm/sqlite-core";
+import { index, integer, primaryKey, sqliteTable, text, uniqueIndex, type AnySQLiteColumn } from "drizzle-orm/sqlite-core";
 
 export const users = sqliteTable(
   "users",
@@ -16,6 +16,20 @@ export const users = sqliteTable(
     /** "de" | "en" | NULL — NULL: Browser + Admin-Fallback */
     locale: text("locale"),
     createdByUserId: text("created_by_user_id"),
+    /** 0028: über welches Event (Einladungscode pro Event) sich der Benutzer registriert hat. */
+    registeredViaMainEventId: text("registered_via_main_event_id").references(
+      (): AnySQLiteColumn => mainEvents.id,
+      { onDelete: "set null" }
+    ),
+    /** 0028: Eventname zum Zeitpunkt der Registrierung (bleibt, falls das Event gelöscht wird). */
+    registeredViaMainEventName: text("registered_via_main_event_name"),
+    /** 0028: verwendeter Einladungscode. */
+    registeredViaInviteCodeId: text("registered_via_invite_code_id").references(
+      (): AnySQLiteColumn => inviteCodes.id,
+      { onDelete: "set null" }
+    ),
+    /** 0031: von allen Event-Infos abgemeldet (Abmeldelink); Login-Mails kommen weiter. */
+    eventInfoUnsubscribedAt: text("event_info_unsubscribed_at"),
     deletedAt: text("deleted_at"),
     createdAt: text("created_at").notNull(),
     updatedAt: text("updated_at").notNull()
@@ -212,6 +226,8 @@ export const mainEvents = sqliteTable(
     maxParticipants: integer("max_participants"),
     /** 0027: Anmeldeschluss (null = keiner); gilt nur, solange das Event geplant ist. */
     registrationDeadline: text("registration_deadline"),
+    /** 0031: geplante Erinnerungen an Teilnehmer verschicken. */
+    remindersEnabled: integer("reminders_enabled", { mode: "boolean" }).notNull().default(true),
     startedAt: text("started_at"),
     startedByUserId: text("started_by_user_id").references(() => users.id, { onDelete: "set null" }),
     endedAt: text("ended_at"),
@@ -245,6 +261,134 @@ export const mainEventInvites = sqliteTable(
  * 0025: Teilnahme am Event; „joined" bekommt die Benachrichtigungen zu dessen Runden.
  * 0027: „interested" (Interessentenliste) und „waitlisted" (Nachrücker, Event voll).
  */
+/** 0029: Rechte (Kern und Module). */
+export const permissions = sqliteTable("permissions", {
+  key: text("key").primaryKey(),
+  moduleId: text("module_id"),
+  label: text("label").notNull(),
+  description: text("description"),
+  scopable: integer("scopable", { mode: "boolean" }).notNull().default(false),
+  createdAt: text("created_at").notNull()
+});
+
+/** 0029: Rollen als Bündel von Rechten; builtin = user, organizer, manager, admin. */
+export const roles = sqliteTable(
+  "roles",
+  {
+    id: text("id").primaryKey(),
+    key: text("key").notNull(),
+    label: text("label").notNull(),
+    builtin: integer("builtin", { mode: "boolean" }).notNull().default(false),
+    createdAt: text("created_at").notNull(),
+    updatedAt: text("updated_at").notNull()
+  },
+  (table) => [uniqueIndex("roles_key_unique").on(table.key)]
+);
+
+export const rolePermissions = sqliteTable(
+  "role_permissions",
+  {
+    roleId: text("role_id")
+      .notNull()
+      .references(() => roles.id, { onDelete: "cascade" }),
+    permissionKey: text("permission_key")
+      .notNull()
+      .references(() => permissions.key, { onDelete: "cascade" })
+  },
+  (table) => [primaryKey({ columns: [table.roleId, table.permissionKey] })]
+);
+
+/** 0029: Vergabe einer Rolle oder eines Rechts an einen Benutzer, global oder nur für ein Event. */
+export const userGrants = sqliteTable("user_grants", {
+  id: text("id").primaryKey(),
+  userId: text("user_id")
+    .notNull()
+    .references(() => users.id, { onDelete: "cascade" }),
+  roleId: text("role_id").references(() => roles.id, { onDelete: "cascade" }),
+  permissionKey: text("permission_key").references(() => permissions.key, { onDelete: "cascade" }),
+  mainEventId: text("main_event_id").references(() => mainEvents.id, { onDelete: "cascade" }),
+  grantedByUserId: text("granted_by_user_id").references(() => users.id, { onDelete: "set null" }),
+  createdAt: text("created_at").notNull(),
+  revokedAt: text("revoked_at")
+});
+
+/** 0031: Kanalwahl pro Benutzer für Event-Infos; fehlt die Zeile, gilt die Vorgabe des Kanals. */
+export const notificationChannelPreferences = sqliteTable(
+  "notification_channel_preferences",
+  {
+    userId: text("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    channelId: text("channel_id").notNull(),
+    enabled: integer("enabled", { mode: "boolean" }).notNull(),
+    updatedAt: text("updated_at").notNull()
+  },
+  (table) => [primaryKey({ columns: [table.userId, table.channelId] })]
+);
+
+/** 0031: persönlicher Abmeldelink für Event-Infos. */
+export const notificationUnsubscribeTokens = sqliteTable("notification_unsubscribe_tokens", {
+  token: text("token").primaryKey(),
+  userId: text("user_id")
+    .notNull()
+    .references(() => users.id, { onDelete: "cascade" }),
+  createdAt: text("created_at").notNull()
+});
+
+/** 0031: Rundnachricht an Teilnehmer eines Events. */
+export const mainEventBroadcasts = sqliteTable("main_event_broadcasts", {
+  id: text("id").primaryKey(),
+  mainEventId: text("main_event_id")
+    .notNull()
+    .references(() => mainEvents.id, { onDelete: "cascade" }),
+  authorUserId: text("author_user_id").references(() => users.id, { onDelete: "set null" }),
+  subject: text("subject").notNull(),
+  body: text("body").notNull(),
+  audience: text("audience").notNull(),
+  recipientCount: integer("recipient_count").notNull().default(0),
+  createdAt: text("created_at").notNull()
+});
+
+export const mainEventBroadcastDeliveries = sqliteTable(
+  "main_event_broadcast_deliveries",
+  {
+    broadcastId: text("broadcast_id")
+      .notNull()
+      .references(() => mainEventBroadcasts.id, { onDelete: "cascade" }),
+    userId: text("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    channelId: text("channel_id").notNull(),
+    status: text("status", { enum: ["sent", "failed", "skipped"] }).notNull(),
+    error: text("error"),
+    createdAt: text("created_at").notNull()
+  },
+  (table) => [primaryKey({ columns: [table.broadcastId, table.userId, table.channelId] })]
+);
+
+/** 0031: welche Erinnerung für ein Event schon verschickt wurde. */
+export const mainEventRemindersSent = sqliteTable(
+  "main_event_reminders_sent",
+  {
+    mainEventId: text("main_event_id")
+      .notNull()
+      .references(() => mainEvents.id, { onDelete: "cascade" }),
+    kind: text("kind", { enum: ["start_7d", "start_1d", "deadline_1d"] }).notNull(),
+    sentAt: text("sent_at").notNull(),
+    recipientCount: integer("recipient_count").notNull().default(0)
+  },
+  (table) => [primaryKey({ columns: [table.mainEventId, table.kind] })]
+);
+
+/** 0031: persönlicher Kalender-Link. */
+export const calendarFeedTokens = sqliteTable("calendar_feed_tokens", {
+  token: text("token").primaryKey(),
+  userId: text("user_id")
+    .notNull()
+    .references(() => users.id, { onDelete: "cascade" }),
+  createdAt: text("created_at").notNull()
+});
+
 export const mainEventParticipants = sqliteTable(
   "main_event_participants",
   {
@@ -377,6 +521,8 @@ export const inviteCodes = sqliteTable(
     maxUses: integer("max_uses"),
     expiresAt: text("expires_at"),
     revokedAt: text("revoked_at"),
+    /** 0028: Code gehört zu einem Event; Registrierte werden dort als interessiert eingetragen. */
+    mainEventId: text("main_event_id").references(() => mainEvents.id, { onDelete: "set null" }),
     createdByUserId: text("created_by_user_id").references(() => users.id, {
       onDelete: "set null"
     }),
@@ -401,7 +547,7 @@ export const inviteCodeUses = sqliteTable(
   (table) => [uniqueIndex("invite_code_uses_user_unique").on(table.userId)]
 );
 
-/** 0028: „Spielt gerade“ – ein Agent-Schlüssel pro Benutzer, darf nur Spiele melden. */
+/** 0032: „Spielt gerade“ – ein Agent-Schlüssel pro Benutzer, darf nur Spiele melden. */
 export const gameAgentKeys = sqliteTable(
   "game_agent_keys",
   {

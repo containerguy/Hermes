@@ -10,7 +10,7 @@ import { appSettings, gameEvents, participations, users } from "../db/schema";
 import { deriveEventStatus, eventInputSchema, shouldAutoArchive } from "../domain/events";
 import { acceptsRounds, withMainEventLabel } from "../domain/main-events";
 import { findBindingForTitle, getBinding } from "../domain/gameservers/bindings";
-import { canCreateEvent, canManageEvent, type UserRole } from "../domain/users";
+import { canCreateEvent, canCreateEventSomewhere, canManageEvent, type UserRole } from "../domain/users";
 import {
   sendPushToEnabledUsers,
   sendPushToMainEventParticipants,
@@ -72,9 +72,13 @@ function notifyOperatorsAboutRound(
   payload: PushPayload
 ) {
   const mainEvent = round.mainEventId ? getMainEvent(context, round.mainEventId) : undefined;
-  return mainEvent?.visibility === "private"
-    ? sendPushToOperators(context, payload, (user) => canSeeMainEvent(context, user, mainEvent))
-    : sendPushToOperators(context, payload);
+  if (!mainEvent) {
+    return sendPushToOperators(context, payload);
+  }
+  return sendPushToOperators(context, payload, {
+    mainEventId: mainEvent.id,
+    canSee: mainEvent.visibility === "private" ? (user) => canSeeMainEvent(context, user, mainEvent) : undefined
+  });
 }
 
 /** 0025: Event einer Runde bestimmen — explizit (auch null) oder das gerade laufende Event. */
@@ -299,7 +303,7 @@ export function createEventRouter(context: DatabaseContext) {
   router.post("/", (request, response) => {
     const actor = requireUser(context, request);
 
-    if (!actor || !canCreateEvent(actor)) {
+    if (!actor || !canCreateEventSomewhere(context, actor)) {
       response.status(403).json({ error: "manager_erforderlich" });
       return;
     }
@@ -325,6 +329,11 @@ export function createEventRouter(context: DatabaseContext) {
     const mainEvent = resolveMainEventId(context, actor, parsed.data.mainEventId);
     if (!mainEvent.ok) {
       response.status(mainEvent.status).json({ error: mainEvent.error });
+      return;
+    }
+    // Wer Runden nur für ein Event anlegen darf, legt sie nur dort an.
+    if (!canCreateEvent(context, actor, mainEvent.mainEventId)) {
+      response.status(403).json({ error: "manager_erforderlich" });
       return;
     }
 
@@ -403,7 +412,7 @@ export function createEventRouter(context: DatabaseContext) {
       return;
     }
 
-    if (!canManageEvent(actor, event)) {
+    if (!canManageEvent(context, actor, event)) {
       response.status(403).json({ error: "verboten" });
       return;
     }
@@ -450,6 +459,10 @@ export function createEventRouter(context: DatabaseContext) {
       const resolved = resolveMainEventId(context, actor, parsed.data.mainEventId);
       if (!resolved.ok) {
         response.status(resolved.status).json({ error: resolved.error });
+        return;
+      }
+      if (resolved.mainEventId !== mainEventId && !canCreateEvent(context, actor, resolved.mainEventId)) {
+        response.status(403).json({ error: "verboten" });
         return;
       }
       mainEventId = resolved.mainEventId;
@@ -719,7 +732,7 @@ export function createEventRouter(context: DatabaseContext) {
       return;
     }
 
-    if (!canManageEvent(actor, event)) {
+    if (!canManageEvent(context, actor, event)) {
       response.status(403).json({ error: "verboten" });
       return;
     }
@@ -767,7 +780,7 @@ export function createEventRouter(context: DatabaseContext) {
       return;
     }
 
-    if (!canManageEvent(actor, event)) {
+    if (!canManageEvent(context, actor, event)) {
       response.status(403).json({ error: "verboten" });
       return;
     }

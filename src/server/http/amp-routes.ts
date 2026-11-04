@@ -14,7 +14,7 @@ import {
   upsertBinding
 } from "../domain/gameservers/bindings";
 import { suggestBindings } from "../domain/gameservers/suggestions";
-import { canAssignRoles, canManageServers } from "../domain/users";
+import { canBindServers, canListServers, canManageServers } from "../domain/users";
 import { checkRateLimit, recordRateLimitFailure } from "../auth/rate-limits";
 import { fetchAmpInstances } from "../integrations/amp/amp-client";
 import { ampInstanceCall, unwrapAmpData } from "../integrations/amp/amp-session";
@@ -147,11 +147,6 @@ function mapAmpErrorToCode(message: string): string {
   return KNOWN_AMP_ERRORS.has(message) ? message : "amp_anfrage_fehlgeschlagen";
 }
 
-/** Instanzliste: Orga ab organizer (Event-Formular), Bindungspflege nur admin. */
-function canListInstances(role: string): boolean {
-  return role === "admin" || role === "manager" || role === "organizer";
-}
-
 const bindingIdSchema = z.string().min(1).max(64);
 
 export function createAmpIntegrationRouter(context: DatabaseContext) {
@@ -173,7 +168,7 @@ export function createAmpIntegrationRouter(context: DatabaseContext) {
 
   router.get("/instances", async (request, response) => {
     const user = requireUser(context, request);
-    if (!user || !canListInstances(user.role)) {
+    if (!user || !canListServers(context, user)) {
       response.status(403).json({ error: "manager_erforderlich" });
       return;
     }
@@ -208,7 +203,7 @@ export function createAmpIntegrationRouter(context: DatabaseContext) {
   // Vorschläge: AMP-Instanzen mit Target-DNS-Name, Spielport und Katalogtreffer (nur admin).
   router.get("/bindings/suggestions", async (request, response) => {
     const user = requireUser(context, request);
-    if (!user || !canAssignRoles(user)) {
+    if (!user || !canBindServers(context, user)) {
       response.status(403).json({ error: "admin_erforderlich" });
       return;
     }
@@ -231,7 +226,7 @@ export function createAmpIntegrationRouter(context: DatabaseContext) {
 
   router.get("/bindings/all", (request, response) => {
     const user = requireUser(context, request);
-    if (!user || !canAssignRoles(user)) {
+    if (!user || !canBindServers(context, user)) {
       response.status(403).json({ error: "admin_erforderlich" });
       return;
     }
@@ -240,7 +235,7 @@ export function createAmpIntegrationRouter(context: DatabaseContext) {
 
   function requireBindingAdmin(request: Parameters<typeof requireUser>[1], response: import("express").Response) {
     const user = requireUser(context, request);
-    if (!user || !canAssignRoles(user)) {
+    if (!user || !canBindServers(context, user)) {
       response.status(403).json({ error: "admin_erforderlich" });
       return undefined;
     }
@@ -372,7 +367,7 @@ export function createAmpIntegrationRouter(context: DatabaseContext) {
     response: import("express").Response
   ) {
     const user = requireUser(context, request);
-    if (!user || !canManageServers(user)) {
+    if (!user || !canManageServers(context, user)) {
       response.status(403).json({ error: "manager_erforderlich" });
       return undefined;
     }

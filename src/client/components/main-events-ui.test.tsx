@@ -432,7 +432,7 @@ describe("Events mit Start und Ende – Oberfläche", () => {
       (editor.querySelector("form") as HTMLFormElement).requestSubmit();
       await flush();
     });
-    expect(patched).toEqual([{ maxParticipants: 12, registrationDeadline: null }]);
+    expect(patched).toEqual([{ maxParticipants: 12, registrationDeadline: null, remindersEnabled: true }]);
 
     const overview = rendered.container.querySelector(".main-event-overview") as HTMLDetailsElement;
     await act(async () => {

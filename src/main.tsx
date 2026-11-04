@@ -7,12 +7,14 @@ import { requestJson } from "./client/api/request";
 import { clearCsrfToken, primeCsrfToken } from "./client/api/csrf";
 import { KioskStreamPage } from "./client/components/KioskStreamPage";
 import { appPages } from "./client/navigation/modules";
-import { menuPages, resolvePage, type NavContext, type NavPage, type PageHero } from "./client/navigation/registry";
+import { buildRuntimeAppModules, useRuntimeModules } from "./client/modules/runtime";
+import { collectPages, menuPages, resolvePage, type NavContext, type NavPage, type PageHero } from "./client/navigation/registry";
 import { I18nProvider, useI18n } from "./client/i18n/I18nContext";
 import { BrandingProvider, useBrandIconSrc } from "./client/lib/BrandingContext";
 import { brandIconSrc } from "./client/lib/brand-icon";
 import { resolveEffectiveLocale } from "./client/lib/locale-display";
 import { pickAppDisplayName } from "./shared/app-display-name";
+import { isAdministrator } from "./client/permissions";
 
 const defaultSettings: AppSettings = {
   appName: "",
@@ -243,7 +245,7 @@ function AppShell({
   }, [documentPath, isKioskDocumentEntry, publicSettingsReady]);
 
   useEffect(() => {
-    if (currentUser?.role !== "admin") {
+    if (!isAdministrator(currentUser)) {
       return;
     }
 
@@ -253,7 +255,7 @@ function AppShell({
         applyTheme(result.settings);
       })
       .catch(() => {});
-  }, [currentUser?.id, currentUser?.role, setAppSettings]);
+  }, [currentUser?.id, currentUser?.role, currentUser?.permissions?.isAdmin, setAppSettings]);
 
   useEffect(() => {
     function syncHash() {
@@ -269,8 +271,18 @@ function AppShell({
     () => ({ currentUser, settings: appSettings }),
     [currentUser, appSettings]
   );
-  const { page: activePage, subPath } = resolvePage(appPages, navContext, rawHash);
-  const menu = menuPages(appPages, navContext);
+  const { locale } = useI18n();
+  const runtimeModules = useRuntimeModules(currentUser);
+  // Kernseiten plus Menüpunkte der aktiven Laufzeit-Module (GET /api/modules).
+  const pages = useMemo(
+    () =>
+      runtimeModules.length === 0
+        ? appPages
+        : collectPages([{ id: "static", pages: appPages }, ...buildRuntimeAppModules(runtimeModules, locale)]),
+    [runtimeModules, locale]
+  );
+  const { page: activePage, subPath } = resolvePage(pages, navContext, rawHash);
+  const menu = menuPages(pages, navContext);
   const subnav = activePage.subnav?.(t, navContext) ?? [];
   const activeSubSlug = subPath.split("/")[0] || subnav[0]?.slug || "";
 

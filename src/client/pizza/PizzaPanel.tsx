@@ -35,6 +35,8 @@ import type {
 interface PizzaPanelProps {
   currentUserId: string;
   currentUserRole: "user" | "organizer" | "manager" | "admin";
+  /** Recht `pizza.manage`; fehlt es, gilt die Grundrolle. */
+  canManagePizza?: boolean;
   paypalHandle: string;
   paypalName: string;
   cashRecipient: string;
@@ -88,6 +90,7 @@ function effectiveMethod(order: PizzaOrder, offered: PizzaPaymentMethod[]): Pizz
 export function PizzaPanel({
   currentUserId,
   currentUserRole,
+  canManagePizza,
   paypalHandle,
   paypalName,
   cashRecipient
@@ -181,7 +184,7 @@ export function PizzaPanel({
     void reload(false);
   }, isPizzaReason);
 
-  const isManager = currentUserRole === "admin" || currentUserRole === "manager";
+  const isManager = canManagePizza ?? (currentUserRole === "admin" || currentUserRole === "manager");
   const myTotalCents = useMemo(() => orderTotal(state?.myOrder ?? null), [state]);
 
   if (loading) return <p className="muted pizza-loading">{t("pizza.panel.loading")}</p>;

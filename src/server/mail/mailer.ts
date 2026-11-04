@@ -5,6 +5,7 @@ import { readSettings, type MatchdeskSettings } from "../settings";
 import { resolveAppDisplayName, fallbackAppDisplayName } from "../../shared/app-display-name";
 import { browserLanguageToLocale, type AppLocale } from "../../shared/locale";
 import { renderSystemMail, sanitizeInline, type SystemMailKind } from "./templates";
+import { renderEventInfoMail } from "./event-info-template";
 import { readEnv } from "../env";
 
 export const MAIL_CODE_VALID_MINUTES = 10;
@@ -231,4 +232,65 @@ export async function sendLoginCode(
 
 export async function sendEmailChangeCode(context: DatabaseContext | null, input: SendCodeInput) {
   await sendSystemMail(context, "email_change_code", input);
+}
+
+/** Event-Info (Rundnachricht, Erinnerung) an einen Benutzer. */
+export type EventInfoMailInput = SystemMailRecipient & {
+  eventName: string;
+  subject: string;
+  body: string;
+  eventPath: string;
+  unsubscribeToken: string | null;
+  attachments?: Mail.Attachment[];
+  footerNote?: string | null;
+};
+
+export function buildEventInfoMail(
+  context: DatabaseContext | null,
+  input: EventInfoMailInput,
+  env: { mailFrom?: string | null; publicUrl?: string | null } = {
+    mailFrom: readEnv("MAIL_FROM"),
+    publicUrl: readEnv("PUBLIC_URL")
+  }
+): Mail.Options {
+  const settings = tryReadSettings(context);
+  const from = parseMailFrom(env.mailFrom);
+  const locale = resolveMailLocale(input, settings);
+  const appName = resolveSenderName(settings, locale, from.name);
+  const publicUrl = resolvePublicUrl(env.publicUrl);
+  const rendered = renderEventInfoMail({
+    locale,
+    appName,
+    recipientName: input.displayName?.trim() || input.username,
+    eventName: input.eventName,
+    subject: input.subject,
+    body: input.body,
+    eventUrl: publicUrl ? `${publicUrl}/${input.eventPath.replace(/^\/+/, "")}` : null,
+    unsubscribeUrl:
+      publicUrl && input.unsubscribeToken
+        ? `${publicUrl}/api/notifications/unsubscribe/${encodeURIComponent(input.unsubscribeToken)}`
+        : null,
+    accentColor: settings?.themePrimaryColor ?? "",
+    footerNote: input.footerNote ?? null
+  });
+  return {
+    from: { name: appName, address: from.address },
+    to: input.to,
+    subject: rendered.subject,
+    text: rendered.text,
+    html: rendered.html,
+    date: new Date(),
+    headers: rendered.headers,
+    attachments: input.attachments
+  };
+}
+
+export async function sendEventInfoMail(context: DatabaseContext | null, input: EventInfoMailInput) {
+  const mode = readEnv("MAIL_MODE") ?? "console";
+  if (mode === "console") {
+    console.log(`[Matchdesk] Event info for ${input.username} <${input.to}>: ${input.subject}`);
+    return;
+  }
+  const transporter = createSmtpTransport();
+  await transporter.sendMail(buildEventInfoMail(context, input));
 }

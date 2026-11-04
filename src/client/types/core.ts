@@ -1,3 +1,4 @@
+import type { PermissionSummary } from "../permissions";
 import type { BrandMark } from "../../shared/brand-mark";
 import type { AppLocale } from "../../shared/locale";
 import type { ProjectTemplateId } from "../../shared/project-template";
@@ -16,6 +17,41 @@ export type User = {
   /** Explizite UI-Sprache; fehlt → Browser + Admin-Fallback */
   locale?: AppLocale | null;
   deletedAt?: string | null;
+  /** Nur in der Admin-Userliste: über welches Event (Einladungscode pro Event) registriert. */
+  registeredViaMainEventId?: string | null;
+  registeredViaMainEventName?: string | null;
+  /** Nur am eigenen Benutzer: wirksame Rechte (Grundrolle plus Vergaben). */
+  permissions?: PermissionSummary;
+  /** Nur in der Admin-Userliste: aktive Vergaben (Rollen oder Rechte, global oder pro Event). */
+  grants?: UserGrant[];
+};
+
+export type UserGrant = {
+  id: string;
+  userId: string;
+  roleKey: string | null;
+  roleLabel: string | null;
+  permissionKey: string | null;
+  permissionLabel: string | null;
+  mainEventId: string | null;
+  mainEventName: string | null;
+  createdAt: string;
+};
+
+export type PermissionDefinition = {
+  key: string;
+  moduleId: string | null;
+  label: string;
+  description: string | null;
+  scopable: boolean;
+};
+
+export type RoleDefinition = {
+  id: string;
+  key: string;
+  label: string;
+  builtin: boolean;
+  permissions: string[];
 };
 
 export type AppSettings = {
@@ -312,6 +348,8 @@ export type MainEvent = {
   /** Plätze, null = unbegrenzt. */
   maxParticipants: number | null;
   registrationDeadline: string | null;
+  /** 0031: geplante Erinnerungen (7 Tage, 1 Tag, Anmeldeschluss) an/aus. */
+  remindersEnabled?: boolean;
   /** Anmeldeschluss vorbei (nur für geplante Events). */
   registrationClosed: boolean;
   myParticipation: MainEventParticipation | null;
@@ -392,6 +430,9 @@ export type InviteCode = {
   revokedAt: string | null;
   createdAt: string;
   usedCount: number;
+  /** Einladungscode pro Event (null = allgemeiner Code). */
+  mainEventId?: string | null;
+  mainEventName?: string | null;
 };
 
 export type RateLimitEntry = {

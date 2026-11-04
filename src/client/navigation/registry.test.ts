@@ -68,4 +68,16 @@ describe("navigation registry", () => {
       "tokens"
     ]);
   });
+
+  it("resolves module pages with multi-part hashes, longest match first", () => {
+    const base = appPages[0];
+    const moduleStart = { ...base, id: "m-demo", hash: "m/demo" };
+    const moduleAdmin = { ...base, id: "m-demo-verwaltung", hash: "m/demo/verwaltung" };
+    const pages = [...appPages, moduleStart, moduleAdmin];
+    expect(resolvePage(pages, ctx(), "#m/demo")).toEqual({ page: moduleStart, subPath: "" });
+    expect(resolvePage(pages, ctx(), "#m/demo/liste/7")).toEqual({ page: moduleStart, subPath: "liste/7" });
+    expect(resolvePage(pages, ctx(), "#m/demo/verwaltung/x")).toEqual({ page: moduleAdmin, subPath: "x" });
+    expect(resolvePage(pages, ctx(), "#m/demox").page.id).toBe("events");
+    expect(resolvePage(pages, ctx(), "#m/andere").page.id).toBe("events");
+  });
 });

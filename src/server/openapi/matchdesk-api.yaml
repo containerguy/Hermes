@@ -507,6 +507,7 @@ paths:
     get:
       tags: [admin]
       summary: Benutzerliste
+      description: Jeder Eintrag enthält `grants`, die aktiven zusätzlichen Vergaben (global oder pro Event).
       responses:
         "200":
           description: OK
@@ -540,6 +541,207 @@ paths:
       responses:
         "204":
           description: OK
+
+  /api/notifications/channels:
+    get:
+      tags: [notifications]
+      summary: Kanalwahl für Event-Infos
+      description: >-
+        Alle Kanäle (eingebaut mail und push, dazu Kanäle aus Modulen) mit `enabled` (Wahl oder Vorgabe)
+        und `available` (Kanal erreicht den Benutzer). `unsubscribed` = über den Abmeldelink abbestellt.
+      responses:
+        "200":
+          description: OK
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+
+  /api/notifications/channels/{id}:
+    put:
+      tags: [notifications]
+      summary: Kanal ein- oder ausschalten
+      description: "Body: `{ enabled }`. Einschalten hebt eine Abmeldung über den Link auf."
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: OK, liefert die Kanalwahl
+        "404":
+          description: kanal_unbekannt
+
+  /api/notifications/unsubscribe/{token}:
+    get:
+      tags: [notifications]
+      summary: Abmeldelink (Bestätigungsseite, ohne Anmeldung)
+      parameters:
+        - name: token
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: HTML-Seite mit Knopf
+    post:
+      tags: [notifications]
+      summary: Von Event-Infos abmelden (auch RFC-8058-Ein-Klick)
+      parameters:
+        - name: token
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: HTML-Bestätigung
+        "404":
+          description: Link ungültig
+
+  /api/notifications/calendar-feed:
+    get:
+      tags: [notifications]
+      summary: Pfad des persönlichen Kalender-Links
+      responses:
+        "200":
+          description: "`{ path }`, abrufbar ohne Anmeldung"
+
+  /api/notifications/calendar-feed/renew:
+    post:
+      tags: [notifications]
+      summary: Neuen Kalender-Link erzeugen (alter wird ungültig)
+      responses:
+        "200":
+          description: "`{ path }`"
+
+  /api/notifications/calendar/{file}:
+    get:
+      tags: [notifications]
+      summary: Persönlicher Kalender (iCalendar)
+      description: Events, bei denen der Benutzer zugesagt hat, interessiert ist oder nachrückt.
+      parameters:
+        - name: file
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: text/calendar
+        "404":
+          description: kalender_nicht_gefunden
+
+  /api/main-events/{id}/broadcasts:
+    get:
+      tags: [main-events]
+      summary: Bisherige Rundnachrichten mit Zustellung je Kanal
+      responses:
+        "200":
+          description: OK
+    post:
+      tags: [main-events]
+      summary: Rundnachricht an Teilnehmer
+      description: >-
+        Body: `{ subject, body, audience }` mit audience aus joined, interested, waitlisted, declined,
+        no_response. Versand im Hintergrund über die Kanäle, die jede Person gewählt hat.
+        Recht `main_events.manage` (global oder für das Event).
+      responses:
+        "202":
+          description: Angenommen, `broadcast.recipientCount`
+        "400":
+          description: ungueltige_rundnachricht
+        "409":
+          description: rundnachricht_ohne_empfaenger
+
+  /api/main-events/{id}/calendar.ics:
+    get:
+      tags: [main-events]
+      summary: Kalendereintrag des Events
+      responses:
+        "200":
+          description: text/calendar
+        "409":
+          description: hauptevent_ohne_termin
+
+  /api/admin/rbac:
+    get:
+      tags: [admin]
+      summary: Rechte und Rollen (Katalog)
+      description: >-
+        Alle Rechte (Kern und Module, `moduleId` null = Kern; `scopable` = auch pro Event vergebbar)
+        und alle Rollen mit ihren Rechten. Die Admin-Rolle hat immer alle Rechte.
+      responses:
+        "200":
+          description: OK
+        "403":
+          $ref: "#/components/responses/Forbidden"
+
+  /api/admin/roles:
+    post:
+      tags: [admin]
+      summary: Eigene Rolle anlegen
+      description: "Body: `{ key, label, permissions: string[] }`. `admin.access` ist nur in der Admin-Rolle erlaubt."
+      responses:
+        "201":
+          description: OK, liefert den Katalog wie `GET /api/admin/rbac`
+        "400":
+          description: ungueltige_rolle, recht_unbekannt, admin_recht_nur_admin_rolle
+        "409":
+          description: rolle_existiert
+
+  /api/admin/roles/{id}:
+    patch:
+      tags: [admin]
+      summary: Rolle ändern (Name, Rechte)
+      description: Die Admin-Rolle ist fest (admin_rolle_fest). Änderungen wirken sofort für alle mit der Rolle.
+      responses:
+        "200":
+          description: OK, liefert den Katalog
+    delete:
+      tags: [admin]
+      summary: Eigene Rolle löschen (samt Vergaben)
+      responses:
+        "204":
+          description: OK
+        "409":
+          description: rolle_mitgeliefert
+
+  /api/admin/users/{id}/grants:
+    post:
+      tags: [admin]
+      summary: Rolle oder Recht zusätzlich vergeben
+      description: >-
+        Body: `{ roleKey }` oder `{ permissionKey }`, dazu `mainEventId` (null oder fehlend = global).
+        Vergaben für ein Event gelten nur, solange das Event nicht beendet ist, und werden beim
+        Beenden zurückgenommen. Die Grundrolle (`role` am Benutzer) bleibt unverändert.
+      parameters:
+        - $ref: "#/components/parameters/UserId"
+      responses:
+        "201":
+          description: OK, `grants` = aktive Vergaben des Benutzers
+        "400":
+          description: ungueltige_vergabe, admin_nur_global, recht_nicht_pro_event, recht_unbekannt
+        "409":
+          description: vergabe_existiert, hauptevent_beendet
+
+  /api/admin/users/{id}/grants/{grantId}:
+    delete:
+      tags: [admin]
+      summary: Vergabe zurücknehmen
+      parameters:
+        - $ref: "#/components/parameters/UserId"
+        - name: grantId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: OK, `grants` = verbleibende aktive Vergaben
+        "404":
+          description: vergabe_nicht_gefunden
 
   /api/admin/sessions/revoke-others:
     post:
@@ -576,9 +778,16 @@ paths:
     post:
       tags: [admin]
       summary: Invite-Code anlegen
+      description: >-
+        Optional `mainEventId`: Einladungscode pro Event (nur nicht beendete Events, sonst 400 invite_event_ungueltig).
+        Wer sich damit registriert, wird beim Event als „interested“ eingetragen (vor dem Anmeldeschluss),
+        bei privaten Events auch eingeladen. Am Benutzer werden Event (registeredViaMainEventId/-Name) und Code vermerkt;
+        die Admin-Userliste liefert diese Felder mit.
       responses:
         "201":
           description: OK
+        "400":
+          description: Ungültige Eingabe oder Event (invite_event_ungueltig)
 
   /api/admin/invite-codes/{id}/deactivate:
     post:
