@@ -49,12 +49,12 @@
     "@types/supertest": "^7.2.0",
     "@types/web-push": "^3.6.4",
     "@vitejs/plugin-react": "^5.1.1",
-    "esbuild": "^0.28.0",
+    "esbuild": "^0.28.2",
     "jsdom": "^29.0.2",
     "supertest": "^7.2.2",
-    "tsx": "^4.21.0",
+    "tsx": "^4.23.15",
     "typescript": "^5.9.3",
-    "vite": "^7.3.0",
-    "vitest": "^4.1.4"
+    "vite": "^7.3.7",
+    "vitest": "^4.1.12"
   }
 }
