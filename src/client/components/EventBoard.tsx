@@ -12,6 +12,7 @@ import type { ServerAction } from "../gameservers/ServerPanel";
 import { publishServerStatus } from "../gameservers/server-status-bus";
 import { useServerStatus } from "../gameservers/use-server-status";
 import { parseEventsChangedReason, publishEventsChanged } from "../realtime/events-changed-bus";
+import { hasPermission, hasPermissionAnywhere, isAdministrator } from "../permissions";
 
 export function EventBoard({
   currentUser,
@@ -66,12 +67,10 @@ export function EventBoard({
     ampIntegrationEnabled,
     currentUser?.id
   );
-  const canManageServers = currentUser?.role === "admin" || currentUser?.role === "manager";
+  const canManageServers = hasPermission(currentUser, "servers.manage");
 
-  const canCreate =
-    currentUser?.role === "manager" ||
-    currentUser?.role === "organizer" ||
-    currentUser?.role === "admin";
+  // Auch wer Runden nur für ein Event anlegen darf, sieht das Formular; der Server prüft das Event.
+  const canCreate = hasPermissionAnywhere(currentUser, "rounds.create");
   const showCreateForm = canCreate && mode === "manager";
   const bindingFormVisible = ampIntegrationEnabled && showCreateForm;
 
@@ -379,15 +378,13 @@ export function EventBoard({
 
   function canManage(event: GameEvent) {
     return (
-      currentUser?.role === "admin" ||
-      currentUser?.role === "manager" ||
-      currentUser?.id === event.createdByUserId
+      currentUser?.id === event.createdByUserId || hasPermission(currentUser, "rounds.manage", event.mainEventId)
     );
   }
 
   function canSoftDelete(event: GameEvent) {
     return (
-      currentUser?.role === "admin" &&
+      isAdministrator(currentUser) &&
       (event.status === "archived" || event.status === "cancelled")
     );
   }

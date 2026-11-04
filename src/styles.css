@@ -3006,3 +3006,75 @@ dd {
   margin: 0.2rem 0 0.6rem;
   padding-left: 1.2rem;
 }
+
+/* Rechte und Rollen pro Benutzer (Adminbereich) */
+.admin-list-row > .admin-user-permissions {
+  grid-column: 1 / -1;
+}
+
+.admin-user-permissions,
+.admin-role-editor {
+  display: grid;
+  gap: 10px;
+}
+
+.admin-user-permissions > summary,
+.admin-role-editor > summary {
+  cursor: pointer;
+  font-weight: 600;
+}
+
+.admin-user-permissions fieldset,
+.admin-role-editor fieldset {
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 10px 12px;
+  display: grid;
+  gap: 8px;
+  min-width: 0;
+}
+
+.admin-user-permissions label,
+.admin-role-editor label {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.admin-permission-group {
+  display: grid;
+  gap: 4px;
+}
+
+.admin-permission-group > p {
+  margin: 4px 0 0;
+  font-size: 0.82rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.admin-list-row .admin-permission-group span,
+.admin-list-row .admin-user-permissions label span {
+  font-size: 0.82rem;
+}
+
+.admin-grant-list {
+  display: grid;
+  gap: 6px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.admin-grant-list li {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+}
+
+.admin-role-editor {
+  margin-bottom: 12px;
+}

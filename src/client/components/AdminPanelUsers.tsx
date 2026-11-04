@@ -1,6 +1,8 @@
-import React, { FormEvent, RefObject, useState } from "react";
-import type { BulkImportFormat, BulkImportResult, User } from "../types/core";
+import React, { FormEvent, RefObject, useEffect, useState } from "react";
+import { requestJson } from "../api/request";
+import type { BulkImportFormat, BulkImportResult, MainEvent, User } from "../types/core";
 import { useI18n } from "../i18n/I18nContext";
+import { AdminRoleEditor, AdminUserPermissions, type PermissionCatalog } from "./AdminPanelPermissions";
 
 interface NewUserDraft {
   username: string;
@@ -33,6 +35,8 @@ interface AdminPanelUsersProps {
   onRunUsersExportImport: (file: File) => void;
   onPreviewBulkImport: (event: FormEvent<HTMLFormElement>) => void;
   onCommitBulkImport: () => void;
+  onPermissionMessage?: (message: string) => void;
+  onPermissionError?: (message: string) => void;
 }
 
 export function AdminPanelUsers({
@@ -54,9 +58,22 @@ export function AdminPanelUsers({
   onDownloadJsonAttachment,
   onRunUsersExportImport,
   onPreviewBulkImport,
-  onCommitBulkImport
+  onCommitBulkImport,
+  onPermissionMessage = () => undefined,
+  onPermissionError = () => undefined
 }: AdminPanelUsersProps) {
   const { t } = useI18n();
+  // Rechte und Rollen: Katalog (inkl. Modulrechte) und offene Events für Vergaben pro Event.
+  const [catalog, setCatalog] = useState<PermissionCatalog | null>(null);
+  const [openEvents, setOpenEvents] = useState<MainEvent[]>([]);
+  useEffect(() => {
+    requestJson<PermissionCatalog>("/api/admin/rbac")
+      .then((result) => setCatalog(result ?? null))
+      .catch(() => undefined);
+    requestJson<{ mainEvents: MainEvent[] }>("/api/main-events")
+      .then((result) => setOpenEvents((result?.mainEvents ?? []).filter((entry) => entry.status !== "ended")))
+      .catch(() => undefined);
+  }, []);
   // Filter nach dem Event, über das sich jemand registriert hat (Name, bleibt auch nach Löschen des Events).
   const [eventFilter, setEventFilter] = useState("");
   const registrationEvents = Array.from(
@@ -270,6 +287,14 @@ export function AdminPanelUsers({
           </select>
         </label>
       ) : null}
+      {catalog ? (
+        <AdminRoleEditor
+          catalog={catalog}
+          onCatalogChange={setCatalog}
+          onError={onPermissionError}
+          onSaved={onPermissionMessage}
+        />
+      ) : null}
       <div className="admin-list" aria-label={t("admin.user.listAria")}>
         {visibleUsers.map((user) => (
           <div className="admin-list-row" key={user.id}>
@@ -297,6 +322,17 @@ export function AdminPanelUsers({
             >
               {t("admin.user.delete")}
             </button>
+            {catalog ? (
+              <AdminUserPermissions
+                // Neu aufbauen, wenn sich Vergaben von außen ändern (z. B. nach dem Neuladen).
+                key={`${user.id}-${user.role}-${(user.grants ?? []).map((grant) => grant.id).join(",")}`}
+                user={user}
+                catalog={catalog}
+                openEvents={openEvents}
+                onError={onPermissionError}
+                onSaved={onPermissionMessage}
+              />
+            ) : null}
           </div>
         ))}
       </div>

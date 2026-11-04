@@ -135,7 +135,9 @@ describe("Vergaben", () => {
 
     expect(can(context, user, "admin.access")).toBe(false);
     expect(effectivePermissions(context, user).isAdmin).toBe(false);
-    expect(can(context, user, "servers.bind", { mainEventId: eventId })).toBe(true);
+    // Nicht pro Event gedachte Rechte wirken über eine Event-Vergabe nicht.
+    expect(can(context, user, "servers.bind", { mainEventId: eventId })).toBe(false);
+    expect(can(context, user, "rounds.manage", { mainEventId: eventId })).toBe(true);
   });
 
   it("Einzelrecht global und widerrufene Vergaben", () => {

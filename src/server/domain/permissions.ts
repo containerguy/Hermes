@@ -81,9 +81,23 @@ export function effectivePermissions(context: DatabaseContext, actor: Actor): Ef
       target.add(key);
     }
   }
-  // Administration wird nur global wirksam, nie über ein einzelnes Event.
-  for (const scoped of events.values()) {
-    scoped.delete("admin.access");
+  // Pro Event wirken nur Rechte, die dafür gedacht sind (scopable); Administration nie.
+  if (events.size > 0) {
+    const scopable = new Set(
+      context.db
+        .select({ key: permissions.key })
+        .from(permissions)
+        .where(eq(permissions.scopable, true))
+        .all()
+        .map((row) => row.key)
+    );
+    for (const scoped of events.values()) {
+      for (const key of scoped) {
+        if (!scopable.has(key)) {
+          scoped.delete(key);
+        }
+      }
+    }
   }
 
   return { isAdmin: global.has("admin.access"), global, events };

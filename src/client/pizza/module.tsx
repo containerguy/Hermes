@@ -3,6 +3,7 @@ import type { AppModule } from "../navigation/registry";
 import { LoginRequired } from "../navigation/LoginRequired";
 import { NAV_ICONS } from "../navigation/icons";
 import { PizzaPanel } from "./PizzaPanel";
+import { hasPermission } from "../permissions";
 
 /** Modul Pizzabestellung: eigener Menüpunkt, sichtbar sobald im Adminbereich eingeschaltet. */
 export const pizzaModule: AppModule = {
@@ -26,6 +27,7 @@ export const pizzaModule: AppModule = {
           <PizzaPanel
             currentUserId={ctx.currentUser.id}
             currentUserRole={ctx.currentUser.role}
+            canManagePizza={hasPermission(ctx.currentUser, "pizza.manage")}
             paypalHandle={ctx.settings.pizzaPaypalHandle}
             paypalName={ctx.settings.pizzaPaypalName}
             cashRecipient={ctx.settings.pizzaCashRecipient}
