@@ -683,8 +683,17 @@ function ModuleDetail({ module, currentUser, onBack }: { module: InstalledModule
     }
   }
 
+  // Übersetzungen und Rechte des laufenden Moduls für seine eigene Admin-Ansicht
+  const [runtime, setRuntime] = useState<RuntimeModuleInfo | null>(null);
+  useEffect(() => {
+    if (!module.running) return;
+    requestJson<{ modules: RuntimeModuleInfo[] }>("/api/modules")
+      .then((result) => setRuntime(result.modules.find((entry) => entry.id === module.id) ?? null))
+      .catch(() => setRuntime(null));
+  }, [module.id, module.version, module.running]);
+
   const properties = Object.entries(module.settingsSchema?.properties ?? {});
-  const runtimeInfo: RuntimeModuleInfo = {
+  const runtimeInfo: RuntimeModuleInfo = runtime ?? {
     id: module.id,
     version: module.version,
     name: loc(module.name),
@@ -735,7 +744,7 @@ function ModuleDetail({ module, currentUser, onBack }: { module: InstalledModule
         <p className="muted">…</p>
       )}
 
-      {module.adminPage && module.running && module.clientUrl ? (
+      {module.adminPage && module.running && module.clientUrl && runtime ? (
         <>
           <h3>{tx("moduleAdmin")}</h3>
           <ModuleSlot
@@ -765,8 +774,9 @@ export function SettingField({
   value: unknown;
   onChange: (value: unknown) => void;
 }) {
-  const label = schema.title ?? name;
-  const help = schema.description ? <small className="muted">{schema.description}</small> : null;
+  // Ohne title dient die Beschreibung (zod: .describe()) als Beschriftung.
+  const label = schema.title ?? schema.description ?? name;
+  const help = schema.title && schema.description ? <small className="muted">{schema.description}</small> : null;
   if (schema.enum) {
     return (
       <label>
