@@ -20,6 +20,8 @@ export type User = {
   /** Nur in der Admin-Userliste: über welches Event (Einladungscode pro Event) registriert. */
   registeredViaMainEventId?: string | null;
   registeredViaMainEventName?: string | null;
+  /** Nur am eigenen Benutzer: gewähltes aktuelles Event (globaler Umschalter); null = alle Events. */
+  currentMainEventId?: string | null;
   /** Nur am eigenen Benutzer: wirksame Rechte (Grundrolle plus Vergaben). */
   permissions?: PermissionSummary;
   /** Nur in der Admin-Userliste: aktive Vergaben (Rollen oder Rechte, global oder pro Event). */
@@ -62,6 +64,8 @@ export type AppSettings = {
   projectTemplate: ProjectTemplateId;
   defaultNotificationsEnabled: boolean;
   eventAutoArchiveHours: number;
+  /** Höchstzahl gleichzeitig laufender Events. */
+  maxRunningMainEvents: number;
   publicRegistrationEnabled: boolean;
   /** Leer = Client-Standardtext für den Start-Hero */
   shellStartTitle: string;
@@ -93,8 +97,12 @@ export type AppSettings = {
   kioskStreamPath: string;
   /** Geheimer Zugriffsschlüssel; nur in Admin-API sichtbar, nicht in /api/settings/public */
   kioskStreamSecret: string;
+  /** Kiosk zeigt nur dieses Event (leer = alle laufenden Events gruppiert). */
+  kioskMainEventId: string;
   /** Pizzabestellung als optionales Feature; Standard `false` (Admin opt-in). */
   featuresPizzaEnabled: boolean;
+  /** „Spielt gerade“ (Windows-Agent meldet laufende Spiele); Standard `false`. */
+  featuresGamePresenceEnabled: boolean;
   /** PayPal-Handle (paypal.me/<handle>) für die Pizzabestellungs-Kassenliste. */
   pizzaPaypalHandle: string;
   /** Anzeigename für PayPal-Empfänger im Anteilsbildschirm. */
@@ -215,6 +223,7 @@ export type PublicAppSettings = Pick<
   | "kioskStreamEnabled"
   | "kioskStreamPath"
   | "featuresPizzaEnabled"
+  | "featuresGamePresenceEnabled"
   | "pizzaPaypalHandle"
   | "pizzaPaypalName"
   | "pizzaCashRecipient"
@@ -325,6 +334,10 @@ export type MainEvent = {
   id: string;
   name: string;
   description: string | null;
+  /** Infos zum Event (Markdown), zusätzlich zu den allgemeinen Infos. */
+  infosMarkdown?: string | null;
+  /** Gameserver (Bindungs-IDs), die das Event anbietet; leer = alle. */
+  serverBindingIds?: string[];
   status: "planned" | "running" | "ended";
   /** Private Events sehen nur Eingeladene sowie Manager und Admins. */
   visibility: "public" | "private";

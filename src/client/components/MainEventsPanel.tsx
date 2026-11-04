@@ -1,6 +1,11 @@
 import React, { FormEvent, useEffect, useState } from "react";
 import type { MainEvent } from "../types/core";
-import { MainEventParticipantList, MainEventRegistrationEditor } from "./MainEventRegistration";
+import {
+  MainEventInfosEditor,
+  MainEventParticipantList,
+  MainEventRegistrationEditor,
+  MainEventServersEditor
+} from "./MainEventRegistration";
 import { eventShareText, MainEventBroadcast, whatsappShareUrl } from "./MainEventBroadcast";
 import { requestJson } from "../api/request";
 import { getErrorMessage } from "../errors/errors";
@@ -195,6 +200,28 @@ export function MainEventsPanel({
     );
   }
 
+  async function saveInfos(mainEvent: MainEvent, infosMarkdown: string | null) {
+    await run(
+      () =>
+        requestJson<{ mainEvent: MainEvent }>(`/api/main-events/${mainEvent.id}`, {
+          method: "PATCH",
+          body: JSON.stringify({ infosMarkdown })
+        }),
+      "mainEvents.msg.infos"
+    );
+  }
+
+  async function saveServers(mainEvent: MainEvent, bindingIds: string[]) {
+    await run(
+      () =>
+        requestJson<{ mainEvent: MainEvent }>(`/api/main-events/${mainEvent.id}/servers`, {
+          method: "PUT",
+          body: JSON.stringify({ bindingIds })
+        }),
+      "mainEvents.msg.servers"
+    );
+  }
+
   /** Text zum eigenen Anmeldestatus; Nachrücker sehen ihren Platz in der Liste. */
   function participationText(mainEvent: MainEvent) {
     switch (mainEvent.myParticipation) {
@@ -237,8 +264,7 @@ export function MainEventsPanel({
     }
   }
 
-  const running = mainEvents.find((entry) => entry.status === "running");
-  // Laufendes zuerst, dann geplante, beendete zuletzt — innerhalb gleicher Reihenfolge wie vom Server.
+  // Laufende zuerst, dann geplante, beendete zuletzt — innerhalb gleicher Reihenfolge wie vom Server.
   const statusOrder: Record<MainEvent["status"], number> = { running: 0, planned: 1, ended: 2 };
   const sorted = [...mainEvents].sort((a, b) => statusOrder[a.status] - statusOrder[b.status]);
 
@@ -384,6 +410,22 @@ export function MainEventsPanel({
                   onSave={(changes) => saveRegistration(mainEvent, changes)}
                 />
               ) : null}
+              {manages(mainEvent.id) && mainEvent.status !== "ended" ? (
+                <MainEventInfosEditor
+                  key={`${mainEvent.id}-infos-${mainEvent.infosMarkdown ?? ""}`}
+                  mainEvent={mainEvent}
+                  busy={busy}
+                  onSave={(infosMarkdown) => saveInfos(mainEvent, infosMarkdown)}
+                />
+              ) : null}
+              {manages(mainEvent.id) && mainEvent.status !== "ended" ? (
+                <MainEventServersEditor
+                  key={`${mainEvent.id}-servers-${(mainEvent.serverBindingIds ?? []).join(",")}`}
+                  mainEvent={mainEvent}
+                  busy={busy}
+                  onSave={(bindingIds) => saveServers(mainEvent, bindingIds)}
+                />
+              ) : null}
               {manages(mainEvent.id) ? <MainEventParticipantList mainEvent={mainEvent} /> : null}
               {manages(mainEvent.id) ? <MainEventBroadcast mainEvent={mainEvent} /> : null}
               {mainEvent.plannedStartAt && mainEvent.status !== "ended" ? (
@@ -407,7 +449,7 @@ export function MainEventsPanel({
                   <>
                     <button
                       type="button"
-                      disabled={busy || Boolean(running)}
+                      disabled={busy}
                       onClick={() => changeStatus(mainEvent, "start")}
                     >
                       {t("mainEvents.action.start")}

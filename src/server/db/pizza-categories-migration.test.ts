@@ -134,7 +134,13 @@ describe("0024_pizza_categories_extras migration", () => {
 
     // Varianten, Runden, Bestellungen, Zeilen unverändert
     expect(rows(sqlite, "SELECT * FROM pizza_menu_variants ORDER BY id")).toEqual(variantsBefore);
-    expect(rows(sqlite, "SELECT * FROM pizza_sessions ORDER BY id")).toEqual(sessionsBefore);
+    // 0036 ergänzt später main_event_id (Runden ohne Event: null).
+    expect(
+      rows(sqlite, "SELECT * FROM pizza_sessions ORDER BY id").map(({ main_event_id: mainEventId, ...rest }) => {
+        expect(mainEventId).toBeNull();
+        return rest;
+      })
+    ).toEqual(sessionsBefore);
     expect(rows(sqlite, "SELECT * FROM pizza_orders ORDER BY id")).toEqual(ordersBefore);
     expect(rows(sqlite, "SELECT * FROM pizza_order_lines ORDER BY id")).toEqual(linesBefore);
 

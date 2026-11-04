@@ -195,18 +195,148 @@ describe("events with start and end (main events)", () => {
     expect(auditActions).toEqual(expect.arrayContaining(["main_event.create", "main_event.start", "main_event.end"]));
   });
 
-  it("allows only one running event at a time", async () => {
-    const { managerAgent } = await createManagerAndLogin();
+  it("runs several events in parallel up to the configured limit", async () => {
+    const { adminAgent, managerAgent } = await createManagerAndLogin();
     const first = await createMainEvent(managerAgent, "Tag 1");
     const second = await createMainEvent(managerAgent, "Tag 2");
+    const third = await createMainEvent(managerAgent, "Tag 3");
 
     expect((await action(managerAgent, first.id, "start")).status).toBe(200);
-    const blocked = await action(managerAgent, second.id, "start");
+    expect((await action(managerAgent, second.id, "start")).status).toBe(200);
+
+    const adminCsrf = await fetchCsrf(adminAgent);
+    await adminAgent
+      .put("/api/admin/settings")
+      .set(CSRF_HEADER, adminCsrf)
+      .send({ maxRunningMainEvents: 2 })
+      .expect(200);
+
+    const blocked = await action(managerAgent, third.id, "start");
     expect(blocked.status).toBe(409);
-    expect(blocked.body).toMatchObject({ error: "anderes_hauptevent_laeuft", runningMainEventId: first.id });
+    expect(blocked.body).toMatchObject({ error: "zu_viele_laufende_events", limit: 2 });
 
     expect((await action(managerAgent, first.id, "end")).status).toBe(200);
-    expect((await action(managerAgent, second.id, "start")).status).toBe(200);
+    expect((await action(managerAgent, third.id, "start")).status).toBe(200);
+  });
+
+  it("asks which event a new round belongs to when several run and none is clear", async () => {
+    const { managerAgent } = await createManagerAndLogin();
+    const lan = await createMainEvent(managerAgent, "LAN Herbst");
+    const cup = await createMainEvent(managerAgent, "Turnier");
+    await action(managerAgent, lan.id, "start");
+    await action(managerAgent, cup.id, "start");
+
+    const unclear = await managerAgent.post("/api/events").send(round("Quake"));
+    expect(unclear.status).toBe(409);
+    expect(unclear.body.error).toBe("event_angeben");
+
+    const csrf = await fetchCsrf(managerAgent);
+    await managerAgent
+      .post(`/api/main-events/${cup.id}/participation`)
+      .set(CSRF_HEADER, csrf)
+      .send({ status: "joined" })
+      .expect(200);
+
+    const linked = await managerAgent.post("/api/events").send(round("Quake")).expect(201);
+    expect(linked.body.event.mainEventId).toBe(cup.id);
+
+    const explicit = await managerAgent.post("/api/events").send(round("CS", { mainEventId: lan.id })).expect(201);
+    expect(explicit.body.event.mainEventId).toBe(lan.id);
+  });
+
+  it("stores the current event per user and uses it for new rounds", async () => {
+    const { adminAgent, managerAgent } = await createManagerAndLogin();
+    const lan = await createMainEvent(managerAgent, "LAN Herbst");
+    const cup = await createMainEvent(managerAgent, "Turnier");
+    await action(managerAgent, lan.id, "start");
+    await action(managerAgent, cup.id, "start");
+
+    const userAgent = await createUser(adminAgent, "spieler");
+    const userCsrf = await fetchCsrf(userAgent);
+    const chosen = await userAgent
+      .put("/api/main-events/current")
+      .set(CSRF_HEADER, userCsrf)
+      .send({ mainEventId: cup.id })
+      .expect(200);
+    expect(chosen.body.user.currentMainEventId).toBe(cup.id);
+    expect((await userAgent.get("/api/auth/me").expect(200)).body.user.currentMainEventId).toBe(cup.id);
+
+    await userAgent
+      .put("/api/main-events/current")
+      .set(CSRF_HEADER, userCsrf)
+      .send({ mainEventId: "gibt-es-nicht" })
+      .expect(404);
+
+    const csrf = await fetchCsrf(managerAgent);
+    await managerAgent
+      .put("/api/main-events/current")
+      .set(CSRF_HEADER, csrf)
+      .send({ mainEventId: lan.id })
+      .expect(200);
+    const linked = await managerAgent.post("/api/events").send(round("Quake")).expect(201);
+    expect(linked.body.event.mainEventId).toBe(lan.id);
+
+    // Nach dem Ende gilt wieder „alle Events“.
+    await action(managerAgent, lan.id, "end");
+    expect((await managerAgent.get("/api/auth/me").expect(200)).body.user.currentMainEventId).toBeNull();
+    const ended = await managerAgent
+      .put("/api/main-events/current")
+      .set(CSRF_HEADER, await fetchCsrf(managerAgent))
+      .send({ mainEventId: lan.id });
+    expect(ended.status).toBe(409);
+
+    await managerAgent
+      .put("/api/main-events/current")
+      .set(CSRF_HEADER, await fetchCsrf(managerAgent))
+      .send({ mainEventId: null })
+      .expect(200);
+  });
+
+  it("stores event infos as markdown and shows them to everyone who sees the event", async () => {
+    const { adminAgent, managerAgent } = await createManagerAndLogin();
+    const lan = await createMainEvent(managerAgent, "LAN Herbst");
+    const csrf = await fetchCsrf(managerAgent);
+    const infos = "## Anfahrt\n\n  Halle 3, Tor B\n\nWLAN: lan-herbst";
+    const patched = await managerAgent
+      .patch(`/api/main-events/${lan.id}`)
+      .set(CSRF_HEADER, csrf)
+      .send({ infosMarkdown: infos })
+      .expect(200);
+    expect(patched.body.mainEvent.infosMarkdown).toBe(infos);
+
+    const userAgent = await createUser(adminAgent, "spieler");
+    const list = (await userAgent.get("/api/main-events").expect(200)).body.mainEvents as Array<{
+      id: string;
+      infosMarkdown: string | null;
+    }>;
+    expect(list.find((entry) => entry.id === lan.id)?.infosMarkdown).toBe(infos);
+
+    const userCsrf = await fetchCsrf(userAgent);
+    await userAgent
+      .patch(`/api/main-events/${lan.id}`)
+      .set(CSRF_HEADER, userCsrf)
+      .send({ infosMarkdown: "gehackt" })
+      .expect(403);
+
+    const cleared = await managerAgent
+      .patch(`/api/main-events/${lan.id}`)
+      .set(CSRF_HEADER, await fetchCsrf(managerAgent))
+      .send({ infosMarkdown: "   " })
+      .expect(200);
+    expect(cleared.body.mainEvent.infosMarkdown).toBeNull();
+  });
+
+  it("does not notify everyone about rounds without an event unless asked to", async () => {
+    const { managerAgent } = await createManagerAndLogin();
+
+    await managerAgent.post("/api/events").send(round("Leise", { mainEventId: null })).expect(201);
+    expect(sendPushToEnabledUsers).not.toHaveBeenCalled();
+
+    await managerAgent.post("/api/events").send(round("Laut", { mainEventId: null, notifyAll: true })).expect(201);
+    expect(sendPushToEnabledUsers).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({ title: "Neue Runde", body: "manager: Laut" })
+    );
   });
 
   it("links new rounds to the running event and labels their notifications", async () => {

@@ -164,6 +164,18 @@ Beide Schalter sind standardmäßig aus (Admin → Betrieb → CubeCoders AMP):
 
 Nach einem Neustart von Matchdesk übernimmt der erste Durchlauf nur den aktuellen Stand: Es gehen keine Pushes raus, und Server bereits bereiter Events werden nicht automatisch gestartet. Die Automatik prüft alle 30 Sekunden; Auto-Start und Auto-Stopp stehen im Audit-Log als `amp.auto_start` bzw. `amp.auto_stop` (ohne Benutzer).
 
+## Spielt gerade (Windows-Agent)
+
+Optionales Modul: Ein kleiner Windows-Agent auf den Spieler-PCs erkennt, welches Spiel läuft, und meldet es an Matchdesk. Unter dem Menüpunkt **Spielt gerade** sieht man dann, wer in welchem Spiel ist, nach Spiel gruppiert.
+
+- **Aktivieren:** Admin → Betrieb → „Spielt gerade“ aktivieren. Ausgeschaltet liefern die Routen 404 und der Menüpunkt fehlt.
+- **Agent:** Quellcode und Bauanleitung in [`tools/game-agent`](tools/game-agent/README.md). Erkennt Spiele aus Steam, Epic, GOG, Ubisoft Connect, EA app und Battle.net über die Installationsordner der Launcher und die Steam-Registry. Prozesse werden nur gelesen, kein Speicherzugriff, daher kein Konflikt mit Anti-Cheat.
+- **Mitmachen ist freiwillig:** Auf der Seite „Spielt gerade“ unter „Selbst mitmachen“ den Agenten herunterladen (das Docker-Image baut ihn mit, er kommt also auch ohne Internet direkt von Matchdesk) und „Agent einrichten“ klicken. Das legt einen persönlichen Agent-Schlüssel an, der nur Spiele melden darf (Tabelle `game_agent_keys`, Migration 0032; ein Schlüssel pro Person, neu einrichten macht den alten ungültig), und bietet eine Startdatei `spielt-gerade-starten.cmd` an, die neben die .exe gehört und per Doppelklick startet.
+- **Windows-Warnung:** Der Agent ist nicht signiert, Windows SmartScreen warnt beim ersten Start („Weitere Informationen“ → „Trotzdem ausführen“). Ein Zertifikat würde daran wenig ändern, weil SmartScreen seit 2024 jeder neuen Datei erst über viele Downloads vertraut.
+- **Datenschutz:** Der Agent schickt nur Titel, Launcher und ggf. Steam-App-ID der erkannten Spiele, nie die Prozessliste oder den Rechnernamen. Matchdesk hält die Daten nur im Speicher, ohne Verlauf; zwei Minuten nach der letzten Meldung (oder sofort beim Beenden mit Strg+C) ist der Eintrag weg.
+- **Spielkonten:** Profil → „Spielkonten“ (Steam, EA, BattleTag, Epic, Ubisoft; Tabellen `user_game_accounts` und `user_game_account_prefs`, Migration 0035). Wer den Agenten nutzt, stimmt der Übernahme zu: Der Agent meldet das angemeldete Steam-Konto (SteamID64 und Anzeigename aus `loginusers.vdf`, nie den Login-Namen). Ist noch kein Steam-Konto hinterlegt, wird es übernommen, ein abweichendes erscheint als Vorschlag mit „Übernehmen“. Die anderen Konten trägt man selbst ein; solange eins fehlt, fragt Matchdesk nach dem Login nach („Später“ / „Nicht mehr fragen“). Auf „Spielt gerade“ zeigt „Spielkonten der Teilnehmer“ alle Konten mit Steam-Profil- und Freundschaftslink. Battle.net-Konfigurationsdateien (enthalten Login-Mails) liest der Agent nie. `-no-account` schaltet die Steam-Übernahme am Agenten ab.
+- **API:** `POST`/`DELETE /api/presence/game`, `POST`/`DELETE /api/presence/agent-key`, `GET /api/presence`, `GET /api/presence/accounts`, `GET`/`PUT /api/presence/accounts/me` (+ `/steam/accept`, `/steam/dismiss`, `/prompt-dismiss`), siehe `/api/docs`. Ausschalten leert die Liste sofort (beim nächsten 30-Sekunden-Takt).
+
 ## Lokal Starten
 
 ```bash

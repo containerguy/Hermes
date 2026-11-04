@@ -30,6 +30,10 @@ export const users = sqliteTable(
     ),
     /** 0031: von allen Event-Infos abgemeldet (Abmeldelink); Login-Mails kommen weiter. */
     eventInfoUnsubscribedAt: text("event_info_unsubscribed_at"),
+    /** 0034: gewähltes aktuelles Event (globaler Umschalter); NULL = alle Events. */
+    currentMainEventId: text("current_main_event_id").references((): AnySQLiteColumn => mainEvents.id, {
+      onDelete: "set null"
+    }),
     deletedAt: text("deleted_at"),
     createdAt: text("created_at").notNull(),
     updatedAt: text("updated_at").notNull()
@@ -225,6 +229,8 @@ export const mainEvents = sqliteTable(
     /** 0027: Plätze (null = unbegrenzt); ist das Event voll, wird man Nachrücker. */
     maxParticipants: integer("max_participants"),
     /** 0027: Anmeldeschluss (null = keiner); gilt nur, solange das Event geplant ist. */
+    /** 0035: Infos zum Event (Markdown), zusätzlich zu den allgemeinen Infos. */
+    infosMarkdown: text("infos_markdown"),
     registrationDeadline: text("registration_deadline"),
     /** 0031: geplante Erinnerungen an Teilnehmer verschicken. */
     remindersEnabled: integer("reminders_enabled", { mode: "boolean" }).notNull().default(true),
@@ -406,6 +412,21 @@ export const mainEventParticipants = sqliteTable(
   (table) => [uniqueIndex("main_event_participants_event_user_unique").on(table.mainEventId, table.userId)]
 );
 
+/** 0037: Gameserver, die ein Event anbietet; keine Zeile = alle Server. */
+export const mainEventServers = sqliteTable(
+  "main_event_servers",
+  {
+    mainEventId: text("main_event_id")
+      .notNull()
+      .references(() => mainEvents.id, { onDelete: "cascade" }),
+    bindingId: text("binding_id")
+      .notNull()
+      .references(() => gameServerBindings.id, { onDelete: "cascade" }),
+    createdAt: text("created_at").notNull()
+  },
+  (table) => [primaryKey({ columns: [table.mainEventId, table.bindingId] })]
+);
+
 export const gameEvents = sqliteTable("game_events", {
   id: text("id").primaryKey(),
   /** 0025: zugeordnetes Event (null = keinem Event zugeordnet). */
@@ -547,6 +568,45 @@ export const inviteCodeUses = sqliteTable(
   (table) => [uniqueIndex("invite_code_uses_user_unique").on(table.userId)]
 );
 
+/** 0035: Spielkonten pro Benutzer (Steam vom Agenten, Rest manuell). */
+export const userGameAccounts = sqliteTable(
+  "user_game_accounts",
+  {
+    userId: text("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    platform: text("platform", { enum: ["steam", "ea", "battlenet", "epic", "ubisoft"] }).notNull(),
+    accountId: text("account_id").notNull(),
+    displayName: text("display_name"),
+    source: text("source", { enum: ["agent", "manual"] }).notNull(),
+    pendingAccountId: text("pending_account_id"),
+    pendingDisplayName: text("pending_display_name"),
+    updatedAt: text("updated_at").notNull()
+  },
+  (table) => [primaryKey({ columns: [table.userId, table.platform] })]
+);
+
+export const userGameAccountPrefs = sqliteTable("user_game_account_prefs", {
+  userId: text("user_id")
+    .primaryKey()
+    .references(() => users.id, { onDelete: "cascade" }),
+  promptDismissedAt: text("prompt_dismissed_at")
+});
+
+/** 0032: „Spielt gerade“ – ein Agent-Schlüssel pro Benutzer, darf nur Spiele melden. */
+export const gameAgentKeys = sqliteTable(
+  "game_agent_keys",
+  {
+    userId: text("user_id")
+      .primaryKey()
+      .references(() => users.id, { onDelete: "cascade" }),
+    keyHash: text("key_hash").notNull(),
+    createdAt: text("created_at").notNull(),
+    lastUsedAt: text("last_used_at")
+  },
+  (table) => [uniqueIndex("game_agent_keys_key_hash_unique").on(table.keyHash)]
+);
+
 export const pairingTokens = sqliteTable(
   "pairing_tokens",
   {
@@ -653,6 +713,8 @@ export const pizzaSessions = sqliteTable(
     state: text("state", { enum: ["draft", "open", "locked", "delivered"] })
       .notNull()
       .default("draft"),
+    /** 0036: Event der Bestellrunde (null = Runde ohne Event). */
+    mainEventId: text("main_event_id").references(() => mainEvents.id, { onDelete: "set null" }),
     label: text("label"),
     openedAt: text("opened_at"),
     openedByUserId: text("opened_by_user_id").references(() => users.id, { onDelete: "set null" }),

@@ -2,8 +2,8 @@ import { and, eq, inArray, isNull, sql } from "drizzle-orm";
 import { timingSafeEqual } from "node:crypto";
 import { Router } from "express";
 import type { DatabaseContext } from "../db/client";
-import { gameEvents, users } from "../db/schema";
-import { hiddenMainEventIds } from "./main-event-routes";
+import { gameEvents, mainEvents, users } from "../db/schema";
+import { getMainEvent, hiddenMainEventIds } from "./main-event-routes";
 import { getServerStatus } from "../integrations/amp/amp-status";
 import { readSettings } from "../settings";
 import { refreshEventStatuses } from "./event-routes";
@@ -58,6 +58,8 @@ function serializeKioskEvent(context: DatabaseContext, event: typeof gameEvents.
     createdByUsername: creator?.username ?? "unbekannt",
     joinedCount,
     myParticipation: null,
+    mainEventId: event.mainEventId ?? null,
+    mainEventName: event.mainEventId ? (getMainEvent(context, event.mainEventId)?.name ?? null) : null,
     server: serializeKioskServer(event.serverBindingId ?? null),
     cancelledAt: event.cancelledAt,
     archivedAt: event.archivedAt,
@@ -103,9 +105,33 @@ export function createKioskRouter(context: DatabaseContext) {
       .orderBy(sql`datetime(${gameEvents.startsAt}) ASC`)
       .all();
 
+    // Ein Event: `&event=<id>` in der URL, sonst die Einstellung; leer = alle laufenden Events.
+    const eventRaw = typeof request.query.event === "string" ? request.query.event.trim() : "";
+    const chosenId = eventRaw || settings.kioskMainEventId;
+    const chosen = chosenId ? getMainEvent(context, chosenId) : undefined;
+    if (chosen) {
+      // Bewusst gewähltes Event: auch ein privates zeigen (die Adresse ist durch den Schlüssel geschützt).
+      response.json({
+        mainEvent: { id: chosen.id, name: chosen.name, status: chosen.status },
+        mainEvents: [{ id: chosen.id, name: chosen.name, status: chosen.status }],
+        events: events
+          .filter((event) => event.mainEventId === chosen.id)
+          .map((event) => serializeKioskEvent(context, event))
+      });
+      return;
+    }
+
     // Die Kiosk-Anzeige ist ohne Login sichtbar: Runden privater Events bleiben draußen.
     const hidden = hiddenMainEventIds(context, null);
+    const running = context.db
+      .select({ id: mainEvents.id, name: mainEvents.name, status: mainEvents.status })
+      .from(mainEvents)
+      .where(eq(mainEvents.status, "running"))
+      .all()
+      .filter((entry) => !hidden.has(entry.id));
     response.json({
+      mainEvent: null,
+      mainEvents: running,
       events: events
         .filter((event) => !event.mainEventId || !hidden.has(event.mainEventId))
         .map((event) => serializeKioskEvent(context, event))

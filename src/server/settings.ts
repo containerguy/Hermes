@@ -28,6 +28,8 @@ const settingsObjectSchema = z.object({
   projectTemplate: projectTemplateSchema,
   defaultNotificationsEnabled: z.boolean(),
   eventAutoArchiveHours: z.number().int().min(1).max(72),
+  /** Höchstzahl gleichzeitig laufender Events (LAN-Party, Turniertag). */
+  maxRunningMainEvents: z.number().int().min(1).max(100),
   publicRegistrationEnabled: z.boolean(),
   /** Leer = eingebaute Start-Hero-Überschrift aus dem Client */
   shellStartTitle: z.string().max(240),
@@ -64,12 +66,19 @@ const settingsObjectSchema = z.object({
   kioskStreamPath: kioskPathSegmentSchema,
   /** Geheimer Zugriffsschlüssel (Query id), min. 12 Zeichen wenn Kiosk aktiv */
   kioskStreamSecret: z.string().max(128),
+  /** Kiosk zeigt nur dieses Event (leer = alle laufenden Events gruppiert); `&event=` in der URL hat Vorrang. */
+  kioskMainEventId: z.string().max(64),
   /**
    * Pizzabestellung als optionales Feature.
    * Standard `false`: Modul nicht aktiv, Routen liefern 404, UI bleibt verborgen.
    * Admin muss das Feature explizit aktivieren.
    */
   featuresPizzaEnabled: z.boolean(),
+  /**
+   * „Spielt gerade“: Spieler-PCs melden über den Windows-Agenten (tools/game-agent), welches
+   * Spiel läuft. Standard `false`: Routen liefern 404, Menüpunkt bleibt verborgen.
+   */
+  featuresGamePresenceEnabled: z.boolean(),
   /** PayPal-Handle für Pizzabestellungs-Kassenliste (paypal.me/<handle>). Leer = kein Link. */
   pizzaPaypalHandle: z.string().trim().max(80),
   /** Anzeigename für PayPal-Empfänger in Kassenliste. Leer = kein Hinweis. */
@@ -163,6 +172,7 @@ export type PublicMatchdeskSettings = Pick<
   | "kioskStreamEnabled"
   | "kioskStreamPath"
   | "featuresPizzaEnabled"
+  | "featuresGamePresenceEnabled"
   | "pizzaPaypalHandle"
   | "pizzaPaypalName"
   | "pizzaCashRecipient"
@@ -192,6 +202,7 @@ export function pickPublicSettings(full: MatchdeskSettings): PublicMatchdeskSett
     kioskStreamEnabled: full.kioskStreamEnabled,
     kioskStreamPath: full.kioskStreamPath,
     featuresPizzaEnabled: full.featuresPizzaEnabled,
+    featuresGamePresenceEnabled: full.featuresGamePresenceEnabled,
     pizzaPaypalHandle: full.pizzaPaypalHandle,
     pizzaPaypalName: full.pizzaPaypalName,
     pizzaCashRecipient: full.pizzaCashRecipient,
@@ -206,6 +217,7 @@ export const defaultSettings: MatchdeskSettings = {
   projectTemplate: "lan_party",
   defaultNotificationsEnabled: true,
   eventAutoArchiveHours: 8,
+  maxRunningMainEvents: 10,
   publicRegistrationEnabled: false,
   shellStartTitle: "",
   shellStartDescription: "",
@@ -224,7 +236,9 @@ export const defaultSettings: MatchdeskSettings = {
   kioskStreamEnabled: false,
   kioskStreamPath: "stream",
   kioskStreamSecret: "",
+  kioskMainEventId: "",
   featuresPizzaEnabled: false,
+  featuresGamePresenceEnabled: false,
   pizzaPaypalHandle: "",
   pizzaPaypalName: "",
   pizzaCashRecipient: "",

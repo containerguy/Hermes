@@ -8,6 +8,7 @@ import type {
 import { useI18n } from "../i18n/I18nContext";
 import { PizzaMenuJsonAdmin } from "../pizza/PizzaMenuJsonAdmin";
 import { BindingsAdmin } from "../gameservers/BindingsAdmin";
+import { KioskEventSelect } from "./KioskEventSelect";
 
 function generateKioskStreamSecret(): string {
   const bytes = new Uint8Array(16);
@@ -103,6 +104,22 @@ export function AdminPanelBetrieb({
               onSettingsChange({
                 ...settings,
                 eventAutoArchiveHours: Number(event.target.value)
+              })
+            }
+            required
+          />
+        </label>
+        <label>
+          {t("admin.label.maxRunningMainEvents")}
+          <input
+            type="number"
+            min={1}
+            max={100}
+            value={settings.maxRunningMainEvents}
+            onChange={(event) =>
+              onSettingsChange({
+                ...settings,
+                maxRunningMainEvents: Number(event.target.value)
               })
             }
             required
@@ -223,6 +240,10 @@ export function AdminPanelBetrieb({
             placeholder={t("admin.kiosk.secretPlaceholder")}
           />
         </label>
+        <KioskEventSelect
+          value={settings.kioskMainEventId ?? ""}
+          onChange={(kioskMainEventId) => onSettingsChange({ ...settings, kioskMainEventId })}
+        />
         <div className="action-row">
           <button
             type="button"
@@ -328,6 +349,20 @@ export function AdminPanelBetrieb({
             />
           </div>
         </section>
+        <fieldset className="admin-fieldset">
+          <legend>{t("admin.features.presence.legend")}</legend>
+          <label className="checkbox-label">
+            <input
+              type="checkbox"
+              checked={settings.featuresGamePresenceEnabled}
+              onChange={(event) =>
+                onSettingsChange({ ...settings, featuresGamePresenceEnabled: event.target.checked })
+              }
+            />
+            {t("admin.features.presence.enable")}
+          </label>
+          <p className="muted">{t("admin.features.presence.help")}</p>
+        </fieldset>
         <fieldset className="admin-fieldset">
           <legend>{t("admin.features.pizza.legend")}</legend>
           <label className="checkbox-label">

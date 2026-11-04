@@ -28,6 +28,7 @@ export const pizzaModule: AppModule = {
             currentUserId={ctx.currentUser.id}
             currentUserRole={ctx.currentUser.role}
             canManagePizza={hasPermission(ctx.currentUser, "pizza.manage")}
+            currentMainEventId={ctx.currentUser.currentMainEventId ?? null}
             paypalHandle={ctx.settings.pizzaPaypalHandle}
             paypalName={ctx.settings.pizzaPaypalName}
             cashRecipient={ctx.settings.pizzaCashRecipient}

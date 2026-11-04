@@ -9,12 +9,27 @@ import { pickAppDisplayName } from "../../shared/app-display-name";
 const KIOSK_PRIMARY_VIEW_MS = 8000;
 const KIOSK_OVERFLOW_VIEW_MS = 5000;
 
-async function fetchKioskEvents(id: string): Promise<GameEvent[]> {
-  const response = await fetch(`/api/kiosk/events?${new URLSearchParams({ id })}`, {
+type KioskMainEvent = { id: string; name: string; status: string };
+type KioskData = { events: GameEvent[]; mainEvent: KioskMainEvent | null; mainEvents: KioskMainEvent[] };
+
+/** `&event=<id>` in der Kiosk-Adresse zeigt nur dieses Event (sonst gilt die Einstellung). */
+function kioskEventParam() {
+  return new URLSearchParams(window.location.search).get("event") ?? "";
+}
+
+async function fetchKioskEvents(id: string): Promise<KioskData> {
+  const event = kioskEventParam();
+  const params = new URLSearchParams(event ? { id, event } : { id });
+  const response = await fetch(`/api/kiosk/events?${params}`, {
     credentials: "omit",
     headers: { Accept: "application/json" }
   });
-  const body = (await response.json().catch(() => ({}))) as { error?: string; events?: GameEvent[] };
+  const body = (await response.json().catch(() => ({}))) as {
+    error?: string;
+    events?: GameEvent[];
+    mainEvent?: KioskMainEvent | null;
+    mainEvents?: KioskMainEvent[];
+  };
   if (!response.ok) {
     throw new ApiError({
       code: body.error ?? "request_failed",
@@ -22,7 +37,18 @@ async function fetchKioskEvents(id: string): Promise<GameEvent[]> {
       body
     });
   }
-  return body.events ?? [];
+  return { events: body.events ?? [], mainEvent: body.mainEvent ?? null, mainEvents: body.mainEvents ?? [] };
+}
+
+/** Runden nach Event: laufende Events in Server-Reihenfolge, zuletzt „ohne Event“. */
+function groupByMainEvent(events: GameEvent[], mainEvents: KioskMainEvent[]) {
+  const groups = mainEvents
+    .map((entry) => ({ key: entry.id, name: entry.name as string | null, events: events.filter((e) => e.mainEventId === entry.id) }))
+    .filter((group) => group.events.length > 0);
+  const known = new Set(groups.map((group) => group.key));
+  const rest = events.filter((event) => !event.mainEventId || !known.has(event.mainEventId));
+  if (rest.length > 0) groups.push({ key: "none", name: null, events: rest });
+  return groups;
 }
 
 function getEventStatusClass(event: GameEvent) {
@@ -77,6 +103,8 @@ export function KioskStreamPage({
   const markSrc = useBrandIconSrc();
   const dateTag = locale === "en" ? "en-US" : "de-DE";
   const [events, setEvents] = useState<GameEvent[]>([]);
+  const [chosenMainEvent, setChosenMainEvent] = useState<KioskMainEvent | null>(null);
+  const [runningMainEvents, setRunningMainEvents] = useState<KioskMainEvent[]>([]);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(true);
   const [overflowPx, setOverflowPx] = useState(0);
@@ -94,6 +122,15 @@ export function KioskStreamPage({
 
   const displayAppName = pickAppDisplayName(appSettings.appName, t("brand.displayName"));
 
+  // Mehrere Events: je Event ein Abschnitt mit Spalten pro Spiel; ein Event oder keins: wie bisher.
+  const eventGroups = useMemo(
+    () =>
+      groupByMainEvent(events, runningMainEvents).map((group) => ({
+        ...group,
+        gameGroups: groupEventsByGameTitle(group.events)
+      })),
+    [events, runningMainEvents]
+  );
   const gameGroups = useMemo(() => groupEventsByGameTitle(events), [events]);
 
   useEffect(() => {
@@ -226,7 +263,9 @@ export function KioskStreamPage({
     setError("");
     try {
       const next = await fetchKioskEvents(streamId);
-      setEvents(next);
+      setEvents(next.events);
+      setChosenMainEvent(next.mainEvent);
+      setRunningMainEvents(next.mainEvents);
     } catch (caught) {
       setEvents([]);
       setError(getErrorMessage(caught, locale));
@@ -301,6 +340,23 @@ export function KioskStreamPage({
     );
   }
 
+  function renderGameBoard(groups: Array<{ gameTitle: string; events: GameEvent[] }>) {
+    return (
+      <section className="kiosk-game-board" aria-label={t("kiosk.listAria")}>
+        {groups.map((group) => (
+          <section key={group.gameTitle} className="kiosk-game-column">
+            <h2 className="kiosk-game-heading">{group.gameTitle}</h2>
+            <ul className="kiosk-game-events">
+              {group.events.map((event) => (
+                <li key={event.id}>{renderEventCard(event)}</li>
+              ))}
+            </ul>
+          </section>
+        ))}
+      </section>
+    );
+  }
+
   if (!streamId) {
     return (
       <div className="kiosk-stream-shell">
@@ -329,7 +385,7 @@ export function KioskStreamPage({
         <img src={markSrc} alt="" width={48} height={48} />
         <div>
           <p className="kiosk-stream-eyebrow">{displayAppName}</p>
-          <h1>{t("kiosk.pageTitle")}</h1>
+          <h1>{chosenMainEvent ? `${t("kiosk.pageTitle")} · ${chosenMainEvent.name}` : t("kiosk.pageTitle")}</h1>
         </div>
       </header>
 
@@ -362,18 +418,16 @@ export function KioskStreamPage({
               transition: allowManualScroll || instantTransform ? "none" : "transform 0.75s ease-in-out"
             }}
           >
-            <section className="kiosk-game-board" aria-label={t("kiosk.listAria")}>
-              {gameGroups.map((group) => (
-                <section key={group.gameTitle} className="kiosk-game-column">
-                  <h2 className="kiosk-game-heading">{group.gameTitle}</h2>
-                  <ul className="kiosk-game-events">
-                    {group.events.map((event) => (
-                      <li key={event.id}>{renderEventCard(event)}</li>
-                    ))}
-                  </ul>
+            {eventGroups.length > 1 ? (
+              eventGroups.map((eventGroup) => (
+                <section key={eventGroup.key} className="kiosk-event-section" aria-label={eventGroup.name ?? t("kiosk.group.none")}>
+                  <h2 className="kiosk-event-heading">{eventGroup.name ?? t("kiosk.group.none")}</h2>
+                  {renderGameBoard(eventGroup.gameGroups)}
                 </section>
-              ))}
-            </section>
+              ))
+            ) : (
+              renderGameBoard(gameGroups)
+            )}
           </div>
         </div>
       ) : null}

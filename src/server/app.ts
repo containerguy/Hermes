@@ -14,6 +14,8 @@ import { createRealtimeRouter } from "./http/realtime-routes";
 import { createKioskRouter } from "./http/kiosk-routes";
 import { createPizzaRouter } from "./http/pizza-routes";
 import { createAmpIntegrationRouter } from "./http/amp-routes";
+import { createPresenceRouter } from "./http/presence-routes";
+import { createPresenceStore } from "./domain/presence/game-presence";
 import { startAmpStatusService, stopAmpStatusService } from "./integrations/amp/amp-status";
 import { startAmpAutomation, stopAmpAutomation } from "./integrations/amp/amp-automation";
 import { createDb } from "./db/client";
@@ -123,6 +125,8 @@ export async function createMatchdeskApp(options: CreateMatchdeskAppOptions = {}
   app.use("/api/kiosk", createKioskRouter(context));
   app.use("/api/pizza", createPizzaRouter(context));
   app.use("/api/integrations/amp", createAmpIntegrationRouter(context));
+  const presenceStore = createPresenceStore();
+  app.use("/api/presence", createPresenceRouter(context, presenceStore));
   app.use("/api/modules", createPublicModulesRouter(context, modules));
   app.use("/api/m/:moduleId", modules.dispatch);
   app.get("/modules/:moduleId/:version/*file", modules.serveClientFile);
@@ -137,6 +141,13 @@ export async function createMatchdeskApp(options: CreateMatchdeskAppOptions = {}
   const statusInterval = setInterval(() => {
     if (refreshEventStatuses(context)) {
       broadcastEventsChanged("status_refreshed");
+    }
+    // „Spielt gerade“: Agent meldet sich nicht mehr (PC aus, Agent beendet) → Eintrag verschwindet.
+    // Abgeschaltet: nichts aufheben, damit beim Wiedereinschalten keine alten Einträge auftauchen.
+    if (readSettings(context).featuresGamePresenceEnabled) {
+      presenceStore.sweep();
+    } else {
+      presenceStore.clearAll();
     }
   }, 30_000);
 

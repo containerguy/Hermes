@@ -6,6 +6,7 @@ import { InfosPage } from "../components/InfosPage";
 import { LoginPage } from "../components/LoginPage";
 import { MainEventPrompt } from "../components/MainEventPrompt";
 import { MainEventsPanel } from "../components/MainEventsPanel";
+import { GameAccountsPrompt } from "../presence/GameAccountsPrompt";
 import { type ProfileSectionId, profileSectionIds } from "../components/LoginPanel";
 import { LoginRequired } from "./LoginRequired";
 import { NAV_ICONS } from "./icons";
@@ -47,6 +48,7 @@ const adminGroupLabelKeys = {
 
 const profileLabelKeys = {
   konto: "main.profile.nav.account",
+  spielkonten: "main.profile.nav.gameAccounts",
   benachrichtigungen: "main.profile.nav.notifications",
   geraete: "main.profile.nav.devices",
   tokens: "main.profile.nav.tokens"
@@ -97,6 +99,9 @@ export function createCoreModule(moduleAdminSections: AdminNavEntry[]): AppModul
         render: (ctx) => (
           <>
             {ctx.currentUser ? <MainEventPrompt currentUserId={ctx.currentUser.id} /> : null}
+            {ctx.currentUser && ctx.settings.featuresGamePresenceEnabled ? (
+              <GameAccountsPrompt currentUserId={ctx.currentUser.id} />
+            ) : null}
             <EventBoard
               currentUser={ctx.currentUser}
               mode={canOrganizeRounds(ctx) ? "manager" : "events"}
@@ -144,7 +149,11 @@ export function createCoreModule(moduleAdminSections: AdminNavEntry[]): AppModul
         }),
         render: (ctx) =>
           ctx.currentUser ? (
-            <InfosPage markdown={ctx.settings.infosMarkdown} enabled={ctx.settings.infosEnabled} />
+            <InfosPage
+              markdown={ctx.settings.infosMarkdown}
+              enabled={ctx.settings.infosEnabled}
+              currentMainEventId={ctx.currentUser.currentMainEventId ?? null}
+            />
           ) : (
             <LoginRequired eyebrowKey="main.route.infos.eyebrow" />
           )
@@ -222,10 +231,15 @@ export function createCoreModule(moduleAdminSections: AdminNavEntry[]): AppModul
               },
         subnavLabel: (t) => t("main.profile.subnav"),
         subnav: (t, ctx) =>
-          ctx.currentUser ? profileSectionIds.map((slug) => ({ slug, label: t(profileLabelKeys[slug]) })) : [],
+          ctx.currentUser
+            ? profileSectionIds
+                .filter((slug) => slug !== "spielkonten" || ctx.settings.featuresGamePresenceEnabled)
+                .map((slug) => ({ slug, label: t(profileLabelKeys[slug]) }))
+            : [],
         render: (ctx) => {
           const slug = firstSegment(ctx.subPath);
-          const section: ProfileSectionId = (profileSectionIds as readonly string[]).includes(slug)
+          const available = slug !== "spielkonten" || ctx.settings.featuresGamePresenceEnabled;
+          const section: ProfileSectionId = available && (profileSectionIds as readonly string[]).includes(slug)
             ? (slug as ProfileSectionId)
             : "konto";
           return (
