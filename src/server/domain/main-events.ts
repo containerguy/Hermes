@@ -56,7 +56,9 @@ export const mainEventUpdateSchema = z.object({
   plannedStartAt: optionalIso,
   plannedEndAt: optionalIso,
   maxParticipants: optionalCapacity,
-  registrationDeadline: optionalIso
+  registrationDeadline: optionalIso,
+  /** 0031: geplante Erinnerungen ein/aus. */
+  remindersEnabled: z.boolean().optional()
 });
 
 export const mainEventInviteSchema = z.object({

@@ -14,7 +14,11 @@ export function MainEventRegistrationEditor({
 }: {
   mainEvent: MainEvent;
   busy: boolean;
-  onSave: (changes: { maxParticipants: number | null; registrationDeadline: string | null }) => void;
+  onSave: (changes: {
+    maxParticipants: number | null;
+    registrationDeadline: string | null;
+    remindersEnabled: boolean;
+  }) => void;
 }) {
   const { t } = useI18n();
   const [maxParticipants, setMaxParticipants] = useState(
@@ -23,6 +27,7 @@ export function MainEventRegistrationEditor({
   const [deadline, setDeadline] = useState(
     mainEvent.registrationDeadline ? toDatetimeLocal(mainEvent.registrationDeadline) : ""
   );
+  const [reminders, setReminders] = useState(mainEvent.remindersEnabled !== false);
 
   return (
     <details className="main-event-registration">
@@ -33,7 +38,8 @@ export function MainEventRegistrationEditor({
           event.preventDefault();
           onSave({
             maxParticipants: maxParticipants.trim() ? Number(maxParticipants) : null,
-            registrationDeadline: deadline ? fromDatetimeLocal(deadline) : null
+            registrationDeadline: deadline ? fromDatetimeLocal(deadline) : null,
+            remindersEnabled: reminders
           });
         }}
       >
@@ -50,6 +56,10 @@ export function MainEventRegistrationEditor({
         <label>
           {t("mainEvents.form.registrationDeadline")}
           <input type="datetime-local" value={deadline} onChange={(event) => setDeadline(event.target.value)} />
+        </label>
+        <label className="checkbox-row">
+          <input type="checkbox" checked={reminders} onChange={(event) => setReminders(event.target.checked)} />
+          {t("mainEvents.form.reminders")}
         </label>
         <button type="submit" className="secondary" disabled={busy}>
           {t("mainEvents.registration.save")}

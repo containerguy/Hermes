@@ -1,4 +1,6 @@
 import { can } from "./domain/permissions";
+import { createNotificationRouter } from "./http/notification-routes";
+import { runEventReminders } from "./notifications/reminders";
 import cookieParser from "cookie-parser";
 import express from "express";
 import fs from "node:fs";
@@ -107,10 +109,18 @@ export async function createMatchdeskApp() {
   app.use("/api/events", createEventRouter(context));
   app.use("/api/main-events", createMainEventRouter(context));
   app.use("/api/push", createPushRouter(context));
+  app.use("/api/notifications", createNotificationRouter(context));
   app.use("/api/realtime", createRealtimeRouter(context));
   app.use("/api/kiosk", createKioskRouter(context));
   app.use("/api/pizza", createPizzaRouter(context));
   app.use("/api/integrations/amp", createAmpIntegrationRouter(context));
+
+  // Geplante Erinnerungen zu Events (7 Tage, 1 Tag, Anmeldeschluss). Unter Vitest ohne Takt.
+  const reminderInterval = process.env.VITEST
+    ? null
+    : setInterval(() => {
+        runEventReminders(context).catch((error) => console.error("[Matchdesk] Event reminders failed", error));
+      }, 10 * 60 * 1000);
 
   const statusInterval = setInterval(() => {
     if (refreshEventStatuses(context)) {
@@ -141,6 +151,9 @@ export async function createMatchdeskApp() {
     app,
     close: async () => {
       clearInterval(statusInterval);
+      if (reminderInterval) {
+        clearInterval(reminderInterval);
+      }
       stopAmpAutomation();
       stopAmpStatusService();
       await flushDatabaseSnapshot(context.sqlite);

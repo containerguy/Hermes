@@ -79,6 +79,13 @@ export const restorableTables = [
   "roles",
   "role_permissions",
   "user_grants",
+  // Benachrichtigungen: Kanalwahl, Abmeldelinks, Rundnachrichten (nach Benutzern und Events)
+  "notification_channel_preferences",
+  "notification_unsubscribe_tokens",
+  "main_event_broadcasts",
+  "main_event_broadcast_deliveries",
+  "main_event_reminders_sent",
+  "calendar_feed_tokens",
   "game_events",
   "participations",
   // Pizza in FK-Reihenfolge: Kategorien → Menü → Varianten, Extras → Zuordnung,
