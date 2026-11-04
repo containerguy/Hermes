@@ -76,6 +76,25 @@ func SteamRunningAppID() string {
 	return fmt.Sprint(v)
 }
 
+// CurrentSteamAccount returns the Steam account signed in on this PC, or nil.
+// Sources: ActiveProcess\ActiveUser (32-bit account ID while Steam runs) and
+// config\loginusers.vdf for the display name. Login names are not read out.
+func CurrentSteamAccount() *SteamAccount {
+	activeID := ""
+	if k, err := registry.OpenKey(registry.CURRENT_USER, `Software\Valve\Steam\ActiveProcess`, registry.QUERY_VALUE); err == nil {
+		if v, _, err := k.GetIntegerValue("ActiveUser"); err == nil {
+			activeID = SteamIDFromAccountID(v)
+		}
+		k.Close()
+	}
+	root := regString(registry.CURRENT_USER, `Software\Valve\Steam`, "SteamPath")
+	if root == "" {
+		return nil
+	}
+	b, _ := os.ReadFile(filepath.Join(root, "config", "loginusers.vdf"))
+	return PickSteamAccount(string(b), activeID)
+}
+
 // InstalledGames collects install folders from all launchers it finds.
 func InstalledGames() ([]InstalledGame, []string) {
 	var games []InstalledGame

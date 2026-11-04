@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useState } from "react";
 import { requestJson } from "../api/request";
 import { useI18n } from "../i18n/I18nContext";
+import { GameAccountsOverview } from "./GameAccountsOverview";
 import { groupByGame, LAUNCHER_LABELS, type PresencePlayer } from "./presence-model";
 
 /** Agent meldet alle 30 s; die Seite fragt etwas häufiger nach. */
@@ -132,6 +133,7 @@ export function PresencePanel() {
           ))}
         </ul>
       ) : null}
+      <GameAccountsOverview />
       <details className="presence-setup">
         <summary>{t("presence.setup.title")}</summary>
         <p className="muted">{t("presence.setup.privacy")}</p>

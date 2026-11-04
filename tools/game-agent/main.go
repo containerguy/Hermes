@@ -19,10 +19,11 @@ import (
 )
 
 type Report struct {
-	Host     string      `json:"host"`
-	Time     time.Time   `json:"time"`
-	Playing  []Detection `json:"playing"`
-	Launcher []string    `json:"launchersFound"`
+	Host     string        `json:"host"`
+	Time     time.Time     `json:"time"`
+	Playing  []Detection   `json:"playing"`
+	Launcher []string      `json:"launchersFound"`
+	Steam    *SteamAccount `json:"steamAccount,omitempty"`
 }
 
 func main() {
@@ -30,6 +31,7 @@ func main() {
 	server := flag.String("server", "", "Matchdesk base URL to report to (POST /api/presence/game)")
 	token := flag.String("token", os.Getenv("MATCHDESK_AGENT_KEY"), "agent key from the \"Spielt gerade\" page (default: env MATCHDESK_AGENT_KEY)")
 	knownFile := flag.String("known", "", "optional JSON file [{\"exe\":\"factorio.exe\",\"title\":\"Factorio\"}]")
+	noAccount := flag.Bool("no-account", false, "do not send the signed-in Steam account (SteamID64 + display name)")
 	verbose := flag.Bool("v", false, "also print installed games found per launcher (local only, never sent)")
 	flag.Parse()
 	// Double-clicked without arguments: show one detection and keep the window open.
@@ -73,6 +75,9 @@ func main() {
 		}
 		host, _ := os.Hostname()
 		r := Report{Host: host, Time: time.Now().UTC(), Playing: Detect(procs, installed, known, appID, steamNames), Launcher: launchers}
+		if !*noAccount {
+			r.Steam = CurrentSteamAccount()
+		}
 		if r.Playing == nil {
 			r.Playing = []Detection{}
 		}
@@ -104,8 +109,9 @@ func main() {
 	}
 }
 
-// post sends only the detected games to Matchdesk: no host name, no launcher
-// list, no exe names.
+// post sends only the detected games and the public Steam account (SteamID64,
+// display name) to Matchdesk: no host name, no launcher list, no exe names,
+// no login names.
 func post(server, token string, r Report) error {
 	type game struct {
 		Title    string `json:"title"`
@@ -116,7 +122,11 @@ func post(server, token string, r Report) error {
 	for _, d := range r.Playing {
 		playing = append(playing, game{Title: d.Title, Launcher: d.Launcher, AppID: d.AppID})
 	}
-	body, _ := json.Marshal(map[string]any{"playing": playing})
+	payload := map[string]any{"playing": playing}
+	if r.Steam != nil {
+		payload["steamAccount"] = r.Steam
+	}
+	body, _ := json.Marshal(payload)
 	return send(server, token, http.MethodPost, body)
 }
 

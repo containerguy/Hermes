@@ -940,6 +940,15 @@ paths:
                       title: { type: string, maxLength: 160 }
                       launcher: { type: string, enum: [steam, epic, gog, ubisoft, ea, battlenet, other] }
                       appId: { type: string, maxLength: 64 }
+                steamAccount:
+                  type: object
+                  description: >
+                    Auf dem PC angemeldetes Steam-Konto. Ohne hinterlegtes Steam-Konto wird es in die
+                    Spielkonten übernommen, sonst als Vorschlag abgelegt. Ungültig → ignoriert.
+                  required: [steamId]
+                  properties:
+                    steamId: { type: string, pattern: "^7656119\\d{10}$" }
+                    personaName: { type: string, maxLength: 64 }
       responses:
         "204":
           description: Übernommen
@@ -957,6 +966,71 @@ paths:
       responses:
         "204":
           description: Entfernt
+  /api/presence/accounts:
+    get:
+      tags: [presence]
+      summary: Spielkonten aller Teilnehmer
+      description: Nur Benutzer mit mindestens einem Konto; ohne Vorschläge des Agenten.
+      responses:
+        "200":
+          description: "`{ users: [{ userId, username, displayName, accounts: { steam?: { accountId, displayName } , ... } }] }`"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          description: Funktion ausgeschaltet
+  /api/presence/accounts/me:
+    get:
+      tags: [presence]
+      summary: Eigene Spielkonten
+      responses:
+        "200":
+          description: "`{ accounts, missing: [platform], promptDismissed }`; `accounts.steam.pending` ist ein vom Agenten erkanntes, abweichendes Konto."
+    put:
+      tags: [presence]
+      summary: Eigene Spielkonten pflegen
+      description: >
+        Plattformen steam, ea, battlenet, epic, ubisoft. Fehlendes Feld bleibt, `null` oder leer löscht.
+        Steam als SteamID64 oder Link `steamcommunity.com/profiles/<id>`. Sitzung + CSRF.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                steam: { type: string, nullable: true, maxLength: 200 }
+                ea: { type: string, nullable: true, maxLength: 64 }
+                battlenet: { type: string, nullable: true, maxLength: 64 }
+                epic: { type: string, nullable: true, maxLength: 64 }
+                ubisoft: { type: string, nullable: true, maxLength: 64 }
+      responses:
+        "200":
+          description: Neuer Stand wie bei GET
+        "400":
+          description: "`steam_id_ungueltig` oder `ungueltige_eingabe`"
+  /api/presence/accounts/me/steam/accept:
+    post:
+      tags: [presence]
+      summary: Vom Agenten vorgeschlagenes Steam-Konto übernehmen
+      responses:
+        "200":
+          description: Neuer Stand
+        "404":
+          description: Kein Vorschlag vorhanden
+  /api/presence/accounts/me/steam/dismiss:
+    post:
+      tags: [presence]
+      summary: Steam-Vorschlag verwerfen
+      responses:
+        "200":
+          description: Neuer Stand
+  /api/presence/accounts/me/prompt-dismiss:
+    post:
+      tags: [presence]
+      summary: „Nicht mehr fragen“ für die Nachfrage nach dem Login
+      responses:
+        "204":
+          description: Gespeichert
 
 components:
   securitySchemes:

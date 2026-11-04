@@ -17,7 +17,7 @@ Launcher, Overlays, Crash-Handler und Anti-Cheat-Dienste werden ignoriert. Proze
 
 ## Datenschutz
 
-An Matchdesk gehen nur Titel, Launcher und ggf. Steam-App-ID der erkannten Spiele. Nie die Prozessliste, nie der Rechnername, nie die Liste installierter Spiele. `-v` zeigt die gefundenen installierten Spiele nur lokal an. Beim Beenden mit Strg+C löscht der Agent seinen Eintrag sofort, sonst verschwindet er nach zwei Minuten.
+An Matchdesk gehen nur Titel, Launcher und ggf. Steam-App-ID der erkannten Spiele, dazu das angemeldete Steam-Konto (SteamID64 aus `HKCU\Software\Valve\Steam\ActiveProcess\ActiveUser`, Anzeigename aus `config\loginusers.vdf`; nie der Login-Name). Matchdesk trägt es in die Spielkonten ein. `-no-account` schaltet das ab. Konfigurationsdateien von Battle.net & Co. werden nicht gelesen. Nie die Prozessliste, nie der Rechnername, nie die Liste installierter Spiele. `-v` zeigt die gefundenen installierten Spiele nur lokal an. Beim Beenden mit Strg+C löscht der Agent seinen Eintrag sofort, sonst verschwindet er nach zwei Minuten.
 
 ## Auslieferung
 

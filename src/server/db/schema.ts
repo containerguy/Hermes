@@ -547,6 +547,31 @@ export const inviteCodeUses = sqliteTable(
   (table) => [uniqueIndex("invite_code_uses_user_unique").on(table.userId)]
 );
 
+/** 0033: Spielkonten pro Benutzer (Steam vom Agenten, Rest manuell). */
+export const userGameAccounts = sqliteTable(
+  "user_game_accounts",
+  {
+    userId: text("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    platform: text("platform", { enum: ["steam", "ea", "battlenet", "epic", "ubisoft"] }).notNull(),
+    accountId: text("account_id").notNull(),
+    displayName: text("display_name"),
+    source: text("source", { enum: ["agent", "manual"] }).notNull(),
+    pendingAccountId: text("pending_account_id"),
+    pendingDisplayName: text("pending_display_name"),
+    updatedAt: text("updated_at").notNull()
+  },
+  (table) => [primaryKey({ columns: [table.userId, table.platform] })]
+);
+
+export const userGameAccountPrefs = sqliteTable("user_game_account_prefs", {
+  userId: text("user_id")
+    .primaryKey()
+    .references(() => users.id, { onDelete: "cascade" }),
+  promptDismissedAt: text("prompt_dismissed_at")
+});
+
 /** 0032: „Spielt gerade“ – ein Agent-Schlüssel pro Benutzer, darf nur Spiele melden. */
 export const gameAgentKeys = sqliteTable(
   "game_agent_keys",

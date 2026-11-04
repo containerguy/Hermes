@@ -14,6 +14,16 @@ import {
   resolveAgentKey,
   revokeAgentKey
 } from "../domain/presence/agent-keys";
+import {
+  acceptPendingSteam,
+  dismissGameAccountPrompt,
+  dismissPendingSteam,
+  gameAccountsUpdateSchema,
+  getGameAccounts,
+  listAllGameAccounts,
+  reportSteamAccount,
+  updateGameAccounts
+} from "../domain/presence/game-accounts";
 import { presenceReportSchema, type PresenceStore } from "../domain/presence/game-presence";
 import { readSettings } from "../settings";
 
@@ -26,6 +36,14 @@ import { readSettings } from "../settings";
  * - POST   /api/presence/agent-key       Agent-Schlüssel (neu) anlegen, alter wird ungültig
  * - DELETE /api/presence/agent-key       Agent-Schlüssel widerrufen
  * - GET    /api/presence/agent/download  Windows-Agent (im Docker-Image unter agent/ mitgebaut)
+ * - GET    /api/presence/accounts        Spielkonten aller Teilnehmer
+ * - GET    /api/presence/accounts/me     eigene Spielkonten (+ fehlende, Steam-Vorschlag)
+ * - PUT    /api/presence/accounts/me     eigene Spielkonten pflegen
+ * - POST   /api/presence/accounts/me/steam/accept|dismiss   Steam-Vorschlag des Agenten
+ * - POST   /api/presence/accounts/me/prompt-dismiss          „Nicht mehr fragen“
+ *
+ * Steam-Konto: Wer den Agenten nutzt, stimmt zu. Der Bericht kann `steamAccount` enthalten;
+ * ohne hinterlegtes Steam-Konto wird es übernommen, sonst als Vorschlag abgelegt.
  *
  * Der Agent meldet sich mit seinem Schlüssel (`Bearer md_ga_…`). Der Schlüssel taugt nur für
  * `/game`; Sitzung + CSRF oder ein API-Token mit Vollzugriff gehen dort ebenfalls.
@@ -132,6 +150,9 @@ export function createPresenceRouter(
       return;
     }
     store.report(userId, parsed.data.playing);
+    if (parsed.data.steamAccount) {
+      reportSteamAccount(context, userId, parsed.data.steamAccount);
+    }
     response.status(204).end();
   });
 
@@ -159,6 +180,66 @@ export function createPresenceRouter(
     }
     revokeAgentKey(context, userId);
     store.clear(userId);
+    response.status(204).end();
+  });
+
+  router.get("/accounts", (request, response) => {
+    if (!guard(request, response)) {
+      return;
+    }
+    response.json({ users: listAllGameAccounts(context) });
+  });
+
+  router.get("/accounts/me", (request, response) => {
+    const user = guard(request, response);
+    if (!user) {
+      return;
+    }
+    response.json(getGameAccounts(context, user.id));
+  });
+
+  router.put("/accounts/me", (request, response) => {
+    const userId = guardWrite(request, response);
+    if (!userId) {
+      return;
+    }
+    const parsed = gameAccountsUpdateSchema.safeParse(request.body);
+    if (!parsed.success) {
+      const steamInvalid = parsed.error.issues.some((issue) => issue.message === "steam_id_ungueltig");
+      response.status(400).json({ error: steamInvalid ? "steam_id_ungueltig" : "ungueltige_eingabe" });
+      return;
+    }
+    updateGameAccounts(context, userId, parsed.data);
+    response.json(getGameAccounts(context, userId));
+  });
+
+  router.post("/accounts/me/steam/accept", (request, response) => {
+    const userId = guardWrite(request, response);
+    if (!userId) {
+      return;
+    }
+    if (!acceptPendingSteam(context, userId)) {
+      response.status(404).json({ error: "kein_vorschlag" });
+      return;
+    }
+    response.json(getGameAccounts(context, userId));
+  });
+
+  router.post("/accounts/me/steam/dismiss", (request, response) => {
+    const userId = guardWrite(request, response);
+    if (!userId) {
+      return;
+    }
+    dismissPendingSteam(context, userId);
+    response.json(getGameAccounts(context, userId));
+  });
+
+  router.post("/accounts/me/prompt-dismiss", (request, response) => {
+    const userId = guardWrite(request, response);
+    if (!userId) {
+      return;
+    }
+    dismissGameAccountPrompt(context, userId);
     response.status(204).end();
   });
 

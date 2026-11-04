@@ -199,6 +199,69 @@ describe("Spielt gerade (presence)", () => {
       .send({ playing: [] })
       .expect(404);
   });
+
+  it("takes over the Steam account from the agent and lets users maintain the rest", async () => {
+    const admin = request.agent(started!.app);
+    await login(admin, "hauptadmin");
+    const csrf = await fetchCsrf(admin);
+    await enablePresence(admin, csrf, true);
+    const { body } = await admin.post("/api/presence/agent-key").set(CSRF_HEADER, csrf).expect(201);
+    const report = (steamAccount: unknown) =>
+      request(started!.app)
+        .post("/api/presence/game")
+        .set("Authorization", `Bearer ${body.key}`)
+        .send({ playing: [], steamAccount })
+        .expect(204);
+
+    const empty = await admin.get("/api/presence/accounts/me").expect(200);
+    expect(empty.body.missing).toEqual(["steam", "ea", "battlenet", "epic", "ubisoft"]);
+    expect(empty.body.promptDismissed).toBe(false);
+
+    // Kein Steam-Konto hinterlegt: automatisch übernommen. Ungültige Angaben stören den Bericht nicht.
+    await report({ steamId: "nope" });
+    await report({ steamId: "76561198000000001", personaName: "René" });
+    let me = await admin.get("/api/presence/accounts/me").expect(200);
+    expect(me.body.accounts.steam).toEqual({ accountId: "76561198000000001", displayName: "René", source: "agent" });
+
+    // Anderes Konto auf dem PC: nur Vorschlag, bis man „übernehmen“ drückt.
+    await report({ steamId: "76561198000000002", personaName: "Zweitkonto" });
+    me = await admin.get("/api/presence/accounts/me").expect(200);
+    expect(me.body.accounts.steam.accountId).toBe("76561198000000001");
+    expect(me.body.accounts.steam.pending).toEqual({ accountId: "76561198000000002", displayName: "Zweitkonto" });
+    await admin.post("/api/presence/accounts/me/steam/accept").expect(403);
+    me = await admin.post("/api/presence/accounts/me/steam/accept").set(CSRF_HEADER, csrf).expect(200);
+    expect(me.body.accounts.steam).toEqual({ accountId: "76561198000000002", displayName: "Zweitkonto", source: "agent" });
+    await admin.post("/api/presence/accounts/me/steam/accept").set(CSRF_HEADER, csrf).expect(404);
+
+    // Rest manuell; Steam auch als Profil-Link.
+    await admin
+      .put("/api/presence/accounts/me")
+      .set(CSRF_HEADER, csrf)
+      .send({ steam: "kein-link" })
+      .expect(400, { error: "steam_id_ungueltig" });
+    me = await admin
+      .put("/api/presence/accounts/me")
+      .set(CSRF_HEADER, csrf)
+      .send({ steam: "https://steamcommunity.com/profiles/76561198000000003/", battlenet: "Rene#2345", ea: "  " })
+      .expect(200);
+    expect(me.body.accounts.steam).toEqual({ accountId: "76561198000000003", displayName: null, source: "manual" });
+    expect(me.body.accounts.battlenet.accountId).toBe("Rene#2345");
+    expect(me.body.missing).toEqual(["ea", "epic", "ubisoft"]);
+
+    await admin.post("/api/presence/accounts/me/prompt-dismiss").set(CSRF_HEADER, csrf).expect(204);
+    me = await admin.get("/api/presence/accounts/me").expect(200);
+    expect(me.body.promptDismissed).toBe(true);
+
+    const all = await admin.get("/api/presence/accounts").expect(200);
+    expect(all.body.users).toHaveLength(1);
+    expect(all.body.users[0].username).toBe("hauptadmin");
+    expect(all.body.users[0].accounts.battlenet).toEqual({ accountId: "Rene#2345", displayName: null });
+
+    // Der Agent-Schlüssel reicht nicht für die Spielkonten.
+    await request(started!.app).get("/api/presence/accounts/me").set("Authorization", `Bearer ${body.key}`).expect(401);
+    await enablePresence(admin, csrf, false);
+    await admin.get("/api/presence/accounts").expect(404);
+  });
 });
 
 describe("Spielt gerade: Agent-Download", () => {
