@@ -149,3 +149,43 @@ func TestDetectIgnoresBroadInstallFolders(t *testing.T) {
 		}
 	}
 }
+
+func TestSteamAccountFromLoginUsers(t *testing.T) {
+	vdf := `"users"
+{
+	"76561198000000001"
+	{
+		"AccountName"		"rene_login"
+		"PersonaName"		"René"
+		"RememberPassword"		"1"
+		"MostRecent"		"0"
+	}
+	"76561198000000002"
+	{
+		"AccountName"		"zweit"
+		"PersonaName"		"Zweitkonto"
+		"MostRecent"		"1"
+	}
+}`
+	if id := SteamIDFromAccountID(39734273); id != "76561198000000001" {
+		t.Fatalf("id: %s", id)
+	}
+	if SteamIDFromAccountID(0) != "" {
+		t.Fatal("0 means not signed in")
+	}
+	got := PickSteamAccount(vdf, "76561198000000001")
+	if got == nil || got.SteamID != "76561198000000001" || got.PersonaName != "René" {
+		t.Fatalf("active: %+v", got)
+	}
+	got = PickSteamAccount(vdf, "")
+	if got == nil || got.SteamID != "76561198000000002" || got.PersonaName != "Zweitkonto" {
+		t.Fatalf("most recent: %+v", got)
+	}
+	got = PickSteamAccount("", "76561198000000009")
+	if got == nil || got.SteamID != "76561198000000009" || got.PersonaName != "" {
+		t.Fatalf("active without file: %+v", got)
+	}
+	if PickSteamAccount("", "") != nil {
+		t.Fatal("nothing known")
+	}
+}

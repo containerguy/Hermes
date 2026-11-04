@@ -23,6 +23,7 @@ import { RegisterStep } from "./RegisterStep";
 import { SessionsSection } from "./SessionsSection";
 import { getPushSupport, urlBase64ToUint8Array } from "../lib/push-support";
 import { EventInfoChannels } from "./EventInfoChannels";
+import { GameAccountsSection } from "../presence/GameAccountsSection";
 
 type LoginDevice = { name: string; recognized: boolean };
 
@@ -44,7 +45,7 @@ type BeforeInstallPromptChrome = Event & {
 };
 
 /** Unterseiten des Profils (#login/<id>). */
-export const profileSectionIds = ["konto", "benachrichtigungen", "geraete", "tokens"] as const;
+export const profileSectionIds = ["konto", "spielkonten", "benachrichtigungen", "geraete", "tokens"] as const;
 export type ProfileSectionId = (typeof profileSectionIds)[number];
 
 export function LoginPanel({
@@ -644,6 +645,7 @@ export function LoginPanel({
           </section>
           </>
         ) : null}
+        {show("spielkonten") && settings.featuresGamePresenceEnabled ? <GameAccountsSection /> : null}
         {show("benachrichtigungen") ? (
           <>
           <PushNotificationsSection

@@ -3041,6 +3041,23 @@ dd {
   background: var(--surface-strong);
 }
 
+.game-accounts-list {
+  display: grid;
+  grid-template-columns: max-content 1fr;
+  gap: 2px 12px;
+  margin: 6px 0 0;
+}
+.game-accounts-list > div {
+  display: contents;
+}
+.game-accounts-list dd {
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+.game-accounts-pending {
+  margin-bottom: 12px;
+}
+
 /* Anmeldung zum Event: Anmeldeschluss, Plätze und Übersicht für Manager */
 .main-event-deadline.closed {
   color: var(--color-danger, #b91c1c);

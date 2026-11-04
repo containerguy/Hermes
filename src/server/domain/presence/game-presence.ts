@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { steamAccountSchema } from "./game-accounts";
 import { normalizeGameTitle } from "../../../shared/game-title";
 
 export { normalizeGameTitle };
@@ -35,7 +36,9 @@ export const presenceReportSchema = z.object({
         const parsed = reportedGameSchema.safeParse(item);
         return parsed.success ? [parsed.data] : [];
       })
-    )
+    ),
+  /** Angemeldetes Steam-Konto auf dem PC (optional). Ungültig → ignoriert, nicht abgelehnt. */
+  steamAccount: steamAccountSchema.optional().catch(undefined)
 });
 
 export type PresenceGame = {

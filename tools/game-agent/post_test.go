@@ -41,3 +41,20 @@ func TestPostSendsOnlyGames(t *testing.T) {
 		t.Fatalf("clear: %v %s", err, gotMethod)
 	}
 }
+
+func TestPostIncludesSteamAccount(t *testing.T) {
+	var raw []byte
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		raw, _ = io.ReadAll(r.Body)
+		w.WriteHeader(http.StatusNoContent)
+	}))
+	defer srv.Close()
+	r := Report{Steam: &SteamAccount{SteamID: "76561198000000001", PersonaName: "René"}}
+	if err := post(srv.URL, "k", r); err != nil {
+		t.Fatal(err)
+	}
+	want := `{"playing":[],"steamAccount":{"steamId":"76561198000000001","personaName":"René"}}`
+	if string(raw) != want {
+		t.Fatalf("body:\n got %s\nwant %s", raw, want)
+	}
+}
