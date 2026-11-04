@@ -179,6 +179,12 @@ describe("Modulrechte", () => {
     expect(context.sqlite.prepare("SELECT COUNT(*) AS n FROM user_grants").get()).toEqual({ n: 0 });
   });
 
+  it("Standardrolle user gibt das Recht jedem Benutzer", () => {
+    const user = addUser("user");
+    registerModulePermissions(context, "pizza2", [{ key: "pizza2.order", label: "Bestellen", defaultRoles: ["user"] }]);
+    expect(can(context, user, "pizza2.order")).toBe(true);
+  });
+
   it("lehnt Schlüssel ohne Modul-Präfix ab", () => {
     expect(() => registerModulePermissions(context, "polls", [{ key: "rounds.manage", label: "x" }])).toThrow();
   });

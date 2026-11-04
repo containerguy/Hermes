@@ -148,8 +148,8 @@ export type ModulePermissionDefinition = {
   label: string;
   description?: string;
   scopable?: boolean;
-  /** Mitgelieferte Rollen, die das Recht beim Anmelden bekommen (Admin hat immer alles). */
-  defaultRoles?: Array<"organizer" | "manager">;
+  /** Mitgelieferte Rollen, die das Recht beim Anmelden bekommen (Admin hat immer alles; "user" = jeder). */
+  defaultRoles?: Array<"user" | "organizer" | "manager">;
 };
 
 /** Rechte eines Moduls anmelden (beim Installieren oder Start). Bestehende Rechte bleiben unverändert. */
