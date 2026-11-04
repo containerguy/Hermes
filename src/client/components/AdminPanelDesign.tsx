@@ -1,14 +1,16 @@
 import React, { FormEvent } from "react";
 import type { AppSettings } from "../types/core";
 import { useI18n } from "../i18n/I18nContext";
+import { SaveBar } from "./SaveBar";
 
 interface AdminPanelDesignProps {
   settings: AppSettings;
   onSettingsChange: (next: AppSettings) => void;
   onSubmit: (event: FormEvent<HTMLFormElement>) => void;
+  dirty?: boolean;
 }
 
-export function AdminPanelDesign({ settings, onSettingsChange, onSubmit }: AdminPanelDesignProps) {
+export function AdminPanelDesign({ settings, onSettingsChange, onSubmit, dirty = false }: AdminPanelDesignProps) {
   const { t } = useI18n();
 
   const colorFields: Array<{ key: keyof AppSettings; label: string }> = [
@@ -42,7 +44,7 @@ export function AdminPanelDesign({ settings, onSettingsChange, onSubmit }: Admin
             </label>
           ))}
         </div>
-        <button type="submit">{t("admin.settings.save")}</button>
+        <SaveBar dirty={dirty} />
       </form>
     </>
   );

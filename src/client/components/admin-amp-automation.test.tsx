@@ -63,7 +63,9 @@ afterEach(async () => {
 async function render(
   onSettingsChange: (next: AppSettings) => void,
   overrides: Partial<AppSettings> = {},
-  savedOverrides: Partial<AppSettings> = overrides
+  savedOverrides: Partial<AppSettings> = overrides,
+  part: "betrieb" | "texte" | "kiosk" | "integrationen" | "backup" = "integrationen",
+  dirty = false
 ) {
   container = document.createElement("div");
   document.body.appendChild(container);
@@ -72,6 +74,8 @@ async function render(
     root!.render(
       <I18nProvider locale="de">
         <AdminPanelBetrieb
+          part={part}
+          dirty={dirty}
           settings={{ ...settings, ...overrides }}
           savedSettings={{ ...settings, ...savedOverrides }}
           gameCatalogDraft=""
@@ -181,5 +185,23 @@ describe("AdminPanelBetrieb AMP automation", () => {
     expect(instanceCalls).toHaveLength(2);
     requestMock.mockReset();
     requestMock.mockResolvedValue({ bindings: [], suggestions: [], instances: [] });
+  });
+});
+
+describe("Betrieb-Unterseiten", () => {
+  it("zeigt nur die Felder der Unterseite und meldet ungespeicherte Änderungen", async () => {
+    const view = await render(vi.fn(), {}, {}, "kiosk", true);
+    expect(view.querySelector("h2")?.textContent).toBe("Kiosk- und Stream-Anzeige");
+    expect(findLabel(view, "Kiosk-Ansicht aktivieren")).toBeTruthy();
+    expect(findLabel(view, "AMP-Anbindung aktivieren")).toBeUndefined();
+    expect(findLabel(view, "Name in der Oberfläche")).toBeUndefined();
+    expect(view.querySelector(".save-bar--dirty")?.textContent).toContain("Ungespeicherte Änderungen");
+  });
+
+  it("zeigt ohne Änderungen nur den Speichern-Knopf", async () => {
+    const view = await render(vi.fn(), {}, {}, "betrieb", false);
+    expect(findLabel(view, "Name in der Oberfläche")).toBeTruthy();
+    expect(view.querySelector(".save-bar--dirty")).toBeNull();
+    expect(view.querySelector('.save-bar button[type="submit"]')?.textContent).toBe("Einstellungen speichern");
   });
 });

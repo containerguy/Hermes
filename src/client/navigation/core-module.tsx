@@ -13,12 +13,29 @@ import { NAV_ICONS } from "./icons";
 import type { AdminNavEntry, AdminNavGroup, AppModule, NavContext, NavPageRenderContext, SubnavEntry } from "./registry";
 import { hasPermission, hasPermissionAnywhere, isAdministrator } from "../permissions";
 
-export const coreAdminSections: AdminSection[] = ["users", "import", "betrieb", "design", "infos", "sicherheit", "invites", "audit"];
+export const coreAdminSections: AdminSection[] = [
+  "users",
+  "import",
+  "betrieb",
+  "texte",
+  "design",
+  "infos",
+  "kiosk",
+  "integrationen",
+  "sicherheit",
+  "backup",
+  "invites",
+  "audit"
+];
 
 const coreAdminLabelKeys = {
   users: "main.admin.nav.users",
   import: "main.admin.nav.import",
   betrieb: "main.admin.nav.ops",
+  texte: "main.admin.nav.texts",
+  kiosk: "main.admin.nav.kiosk",
+  integrationen: "main.admin.nav.integrations",
+  backup: "main.admin.nav.backup",
   design: "main.admin.nav.design",
   infos: "main.admin.nav.infos",
   sicherheit: "main.admin.nav.security",
@@ -31,6 +48,10 @@ const coreAdminGroups: Record<AdminSection, AdminNavGroup> = {
   import: "people",
   invites: "people",
   betrieb: "system",
+  texte: "system",
+  kiosk: "system",
+  integrationen: "system",
+  backup: "system",
   design: "system",
   infos: "system",
   sicherheit: "system",
