@@ -165,7 +165,7 @@ describe("Events mit Start und Ende – Oberfläche", () => {
     await rendered.cleanup();
   });
 
-  it("leaves mainEventId to the server by default and sends null for 'Kein Event'", async () => {
+  it("preselects the running event and sends null for 'Kein Event'", async () => {
     const posted = installRequests([mainEvent({})]);
     const rendered = await render(<EventBoard currentUser={manager} mode="manager" />);
 
@@ -179,7 +179,8 @@ describe("Events mit Start und Ende – Oberfläche", () => {
       form.dispatchEvent(new Event("submit", { bubbles: true, cancelable: true }));
       await flush();
     });
-    expect(posted.at(-1)?.body).not.toHaveProperty("mainEventId");
+    expect(posted.at(-1)?.body).toMatchObject({ gameTitle: "Quake", mainEventId: "m-1" });
+    expect(posted.at(-1)?.body).not.toHaveProperty("notifyAll");
 
     const mainEventSelect = Array.from(rendered.container.querySelectorAll("form.event-form select")).find((select) =>
       Array.from((select as HTMLSelectElement).options).some((option) => option.value === "m-1")
@@ -194,11 +195,69 @@ describe("Events mit Start und Ende – Oberfläche", () => {
       form.dispatchEvent(new Event("submit", { bubbles: true, cancelable: true }));
       await flush();
     });
-    expect(posted.at(-1)?.body).toMatchObject({ gameTitle: "Solo", mainEventId: null });
+    expect(posted.at(-1)?.body).toMatchObject({ gameTitle: "Solo", mainEventId: null, notifyAll: false });
+
+    const notifyAll = Array.from(rendered.container.querySelectorAll("form.event-form label")).find((label) =>
+      label.textContent?.includes("Alle benachrichtigen")
+    )?.querySelector("input") as HTMLInputElement;
+    await act(async () => {
+      notifyAll.click();
+      setInputValue(title, "Laut");
+      await flush();
+    });
+    await act(async () => {
+      form.dispatchEvent(new Event("submit", { bubbles: true, cancelable: true }));
+      await flush();
+    });
+    expect(posted.at(-1)?.body).toMatchObject({ gameTitle: "Laut", mainEventId: null, notifyAll: true });
     await rendered.cleanup();
   });
 
-  it("starts a planned event and blocks starting while another one runs", async () => {
+  it("makes you choose the event when several run and you joined none or several", async () => {
+    const posted = installRequests([mainEvent({}), mainEvent({ id: "m-2", name: "Turnier" })]);
+    const rendered = await render(<EventBoard currentUser={manager} mode="manager" />);
+
+    const title = rendered.container.querySelector("form.event-form input") as HTMLInputElement;
+    const form = rendered.container.querySelector("form.event-form") as HTMLFormElement;
+    const mainEventSelect = Array.from(rendered.container.querySelectorAll("form.event-form select")).find((select) =>
+      Array.from((select as HTMLSelectElement).options).some((option) => option.value === "m-2")
+    ) as HTMLSelectElement;
+    expect(mainEventSelect.selectedOptions[0]?.textContent).toBe("Bitte Event wählen");
+
+    await act(async () => {
+      setInputValue(title, "Quake");
+      await flush();
+    });
+    await act(async () => {
+      form.dispatchEvent(new Event("submit", { bubbles: true, cancelable: true }));
+      await flush();
+    });
+    expect(posted).toEqual([]);
+    expect(rendered.container.textContent).toContain("Es laufen mehrere Events");
+
+    await act(async () => {
+      setInputValue(mainEventSelect, "m-2");
+      await flush();
+    });
+    await act(async () => {
+      form.dispatchEvent(new Event("submit", { bubbles: true, cancelable: true }));
+      await flush();
+    });
+    expect(posted.at(-1)?.body).toMatchObject({ gameTitle: "Quake", mainEventId: "m-2" });
+    await rendered.cleanup();
+  });
+
+  it("preselects the one running event you joined", async () => {
+    installRequests([mainEvent({}), mainEvent({ id: "m-2", name: "Turnier", myParticipation: "joined" })]);
+    const rendered = await render(<EventBoard currentUser={manager} mode="manager" />);
+    const mainEventSelect = Array.from(rendered.container.querySelectorAll("form.event-form select")).find((select) =>
+      Array.from((select as HTMLSelectElement).options).some((option) => option.value === "m-2")
+    ) as HTMLSelectElement;
+    expect(mainEventSelect.value).toBe("m-2");
+    await rendered.cleanup();
+  });
+
+  it("starts a planned event, also while another one runs", async () => {
     vi.spyOn(window, "confirm").mockReturnValue(true);
     const posted = installRequests([mainEvent({ id: "m-2", name: "Tag 2", status: "planned", roundCount: 0 })]);
     const rendered = await render(<MainEventsPanel />);
@@ -216,10 +275,10 @@ describe("Events mit Start und Ende – Oberfläche", () => {
 
     installRequests([mainEvent({}), mainEvent({ id: "m-2", name: "Tag 2", status: "planned" })]);
     const second = await render(<MainEventsPanel />);
-    const blocked = Array.from(second.container.querySelectorAll("button")).find(
+    const parallel = Array.from(second.container.querySelectorAll("button")).find(
       (button) => button.textContent === "Starten"
     ) as HTMLButtonElement;
-    expect(blocked.disabled).toBe(true);
+    expect(parallel.disabled).toBe(false);
     expect(second.container.textContent).toContain("Beenden");
     await second.cleanup();
   });
@@ -246,6 +305,22 @@ describe("Events mit Start und Ende – Oberfläche", () => {
     });
     expect(posted.at(-1)).toEqual({ url: "/api/main-events/m-1/participation", body: { status: "joined" } });
     expect(rendered.container.textContent).toBe("");
+    await rendered.cleanup();
+  });
+
+  it("asks about several running events one after another", async () => {
+    window.sessionStorage.clear();
+    installRequests([mainEvent({}), mainEvent({ id: "m-2", name: "Turnier" })]);
+    const rendered = await render(<MainEventPrompt currentUserId="u-mgr" />);
+    expect(rendered.container.textContent).toContain("Bist du bei LAN Herbst dabei?");
+    const later = Array.from(rendered.container.querySelectorAll("button")).find(
+      (button) => button.textContent === "Später"
+    ) as HTMLButtonElement;
+    await act(async () => {
+      later.click();
+      await flush();
+    });
+    expect(rendered.container.textContent).toContain("Bist du bei Turnier dabei?");
     await rendered.cleanup();
   });
 

@@ -148,6 +148,7 @@ describe("ui correctness structure contracts", () => {
       projectTemplate: "lan_party",
       defaultNotificationsEnabled: true,
       eventAutoArchiveHours: 8,
+      maxRunningMainEvents: 10,
       publicRegistrationEnabled: false,
       shellStartTitle: "",
       shellStartDescription: "",

@@ -14,6 +14,9 @@ import { useServerStatus } from "../gameservers/use-server-status";
 import { parseEventsChangedReason, publishEventsChanged } from "../realtime/events-changed-bus";
 import { hasPermission, hasPermissionAnywhere, isAdministrator } from "../permissions";
 
+/** Platzhalter im Event-Auswahlfeld, wenn mehrere Events laufen und keins eindeutig ist. */
+const CHOOSE_MAIN_EVENT = "__choose__";
+
 export function EventBoard({
   currentUser,
   mode = "events",
@@ -40,6 +43,8 @@ export function EventBoard({
   const [mainEventFilter, setMainEventFilter] = useState<string>("auto");
   /** Event für neue Runden: "auto" = laufendes Event, "" = keins, sonst eine Event-ID */
   const [draftMainEventId, setDraftMainEventId] = useState<string>("auto");
+  /** Runde ohne Event: trotzdem alle benachrichtigen (Standard: nur die Mitspieler der Runde). */
+  const [notifyAll, setNotifyAll] = useState(false);
   const [eventDraft, setEventDraft] = useState({
     gameTitle: "",
     startMode: "scheduled" as "now" | "scheduled",
@@ -234,6 +239,11 @@ export function EventBoard({
     setError("");
     setMessage("");
 
+    if (resolvedDraftMainEventId === CHOOSE_MAIN_EVENT) {
+      setError(getErrorMessage(new Error("event_angeben"), locale));
+      return;
+    }
+
     try {
       await requestJson<{ event: GameEvent }>("/api/events", {
         method: "POST",
@@ -245,7 +255,8 @@ export function EventBoard({
               : undefined,
           details: eventDraft.details.trim() || undefined,
           serverBindingId: matchedBinding ? (linkServer ? matchedBinding.id : null) : undefined,
-          mainEventId: draftMainEventId === "auto" ? undefined : draftMainEventId || null
+          mainEventId: resolvedDraftMainEventId || null,
+          notifyAll: resolvedDraftMainEventId === "" ? notifyAll : undefined
         })
       });
       setEventDraft({
@@ -254,6 +265,7 @@ export function EventBoard({
         details: ""
       });
       setLinkServer(true);
+      setNotifyAll(false);
       await loadEvents();
       setMessage(t("events.msg.saved"));
       setCreateFlowOpen(false);
@@ -437,7 +449,16 @@ export function EventBoard({
     return alreadyJoined || fullForOthers;
   }
 
-  const runningMainEvent = mainEvents.find((entry) => entry.status === "running");
+  // Mehrere Events können gleichzeitig laufen. Vorgabe ist das einzige laufende Event,
+  // sonst das einzige laufende, bei dem man dabei ist; ist das nicht eindeutig, muss man wählen.
+  const runningMainEvents = mainEvents.filter((entry) => entry.status === "running");
+  const joinedRunningMainEvents = runningMainEvents.filter((entry) => entry.myParticipation === "joined");
+  const runningMainEvent =
+    runningMainEvents.length === 1
+      ? runningMainEvents[0]
+      : joinedRunningMainEvents.length === 1
+        ? joinedRunningMainEvents[0]
+        : undefined;
   const openMainEvents = mainEvents.filter((entry) => entry.status !== "ended");
   const resolvedFilter =
     mainEventFilter === "auto"
@@ -453,7 +474,7 @@ export function EventBoard({
         );
   const resolvedDraftMainEventId =
     draftMainEventId === "auto"
-      ? (runningMainEvent?.id ?? "")
+      ? (runningMainEvent?.id ?? (runningMainEvents.length > 1 ? CHOOSE_MAIN_EVENT : ""))
       : openMainEvents.some((entry) => entry.id === draftMainEventId)
         ? draftMainEventId
         : "";
@@ -612,6 +633,11 @@ export function EventBoard({
             value={resolvedDraftMainEventId}
             onChange={(ev) => setDraftMainEventId(ev.target.value)}
           >
+            {resolvedDraftMainEventId === CHOOSE_MAIN_EVENT ? (
+              <option value={CHOOSE_MAIN_EVENT} disabled>
+                {t("events.form.mainEventChoose")}
+              </option>
+            ) : null}
             <option value="">{t("events.form.mainEventNone")}</option>
             {openMainEvents.map((entry) => (
               <option key={entry.id} value={entry.id}>
@@ -619,6 +645,12 @@ export function EventBoard({
               </option>
             ))}
           </select>
+        </label>
+      ) : null}
+      {resolvedDraftMainEventId === "" ? (
+        <label className="checkbox-label">
+          <input type="checkbox" checked={notifyAll} onChange={(ev) => setNotifyAll(ev.target.checked)} />
+          {t("events.form.notifyAll")}
         </label>
       ) : null}
       <label>

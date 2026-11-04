@@ -6,6 +6,7 @@ import { requireUser } from "../auth/current-user";
 import { requireCsrf } from "../auth/csrf";
 import { enforceApiTokenWriteAccess } from "../auth/matchdesk-auth";
 import { tryWriteAuditLog, writeAuditLog } from "../audit-log";
+import { readSettings } from "../settings";
 import type { DatabaseContext } from "../db/client";
 import {
   gameEvents,
@@ -66,8 +67,9 @@ export function getMainEvent(context: DatabaseContext, id: string) {
   return context.db.select().from(mainEvents).where(eq(mainEvents.id, id)).get();
 }
 
-export function getRunningMainEvent(context: DatabaseContext) {
-  return context.db.select().from(mainEvents).where(eq(mainEvents.status, "running")).get();
+/** Mehrere Events dürfen gleichzeitig laufen (Obergrenze: Einstellung maxRunningMainEvents). */
+export function getRunningMainEvents(context: DatabaseContext) {
+  return context.db.select().from(mainEvents).where(eq(mainEvents.status, "running")).all();
 }
 
 export function isInvited(context: DatabaseContext, mainEventId: string, userId: string) {
@@ -185,7 +187,7 @@ function waitlistPosition(context: DatabaseContext, mainEventId: string, userId:
   return index === -1 ? null : index + 1;
 }
 
-function findParticipation(context: DatabaseContext, mainEventId: string, userId: string) {
+export function findParticipation(context: DatabaseContext, mainEventId: string, userId: string) {
   return context.db
     .select()
     .from(mainEventParticipants)
@@ -565,9 +567,9 @@ export function createMainEventRouter(context: DatabaseContext) {
       return;
     }
 
-    const running = getRunningMainEvent(context);
-    if (running) {
-      response.status(409).json({ error: "anderes_hauptevent_laeuft", runningMainEventId: running.id });
+    const limit = readSettings(context).maxRunningMainEvents;
+    if (getRunningMainEvents(context).length >= limit) {
+      response.status(409).json({ error: "zu_viele_laufende_events", limit });
       return;
     }
 

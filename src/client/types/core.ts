@@ -62,6 +62,8 @@ export type AppSettings = {
   projectTemplate: ProjectTemplateId;
   defaultNotificationsEnabled: boolean;
   eventAutoArchiveHours: number;
+  /** Höchstzahl gleichzeitig laufender Events. */
+  maxRunningMainEvents: number;
   publicRegistrationEnabled: boolean;
   /** Leer = Client-Standardtext für den Start-Hero */
   shellStartTitle: string;

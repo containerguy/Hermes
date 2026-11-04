@@ -18,8 +18,10 @@ export const eventInputSchema = z
     details: z.string().trim().max(4000).optional(),
     /** Phase 15: explizite Bindung (null = bewusst keine); fehlt der Key, wird per Titel zugeordnet. */
     serverBindingId: z.string().min(1).max(64).nullable().optional(),
-    /** 0025: Event der Runde (null = keinem Event); fehlt der Key, gilt das laufende Event. */
-    mainEventId: z.string().min(1).max(64).nullable().optional()
+    /** 0025: Event der Runde (null = keinem Event); fehlt der Key, gilt das laufende Event (bei mehreren: das, bei dem der Anleger dabei ist). */
+    mainEventId: z.string().min(1).max(64).nullable().optional(),
+    /** Runde ohne Event: trotzdem alle per Push benachrichtigen (Standard: nein). */
+    notifyAll: z.boolean().optional()
   })
   .superRefine((value, context) => {
     if (value.maxPlayers < value.minPlayers) {

@@ -1152,6 +1152,7 @@ describe("app flow", () => {
       projectTemplate: "lan_party" as const,
       defaultNotificationsEnabled: false,
       eventAutoArchiveHours: 12,
+      maxRunningMainEvents: 5,
       publicRegistrationEnabled: true,
       shellStartTitle: "Willkommen zur LAN",
       shellStartDescription: "Passe den Hero-Text zentral an.",

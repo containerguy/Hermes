@@ -108,6 +108,22 @@ export function AdminPanelBetrieb({
             required
           />
         </label>
+        <label>
+          {t("admin.label.maxRunningMainEvents")}
+          <input
+            type="number"
+            min={1}
+            max={100}
+            value={settings.maxRunningMainEvents}
+            onChange={(event) =>
+              onSettingsChange({
+                ...settings,
+                maxRunningMainEvents: Number(event.target.value)
+              })
+            }
+            required
+          />
+        </label>
         <label className="checkbox-label">
           <input
             type="checkbox"

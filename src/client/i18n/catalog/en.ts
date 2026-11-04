@@ -482,6 +482,8 @@ export const enMessages: { [K in keyof typeof deMessages]: string } = {
   "events.filter.none": "Without event",
   "events.form.mainEvent": "Event",
   "events.form.mainEventNone": "No event",
+  "events.form.mainEventChoose": "Please choose an event",
+  "events.form.notifyAll": "Notify everyone (otherwise only players of this round)",
   "events.refresh": "Refresh",
   "events.count.one": "1 round on the board",
   "events.count.many": "{n} rounds on the board",
@@ -563,6 +565,7 @@ export const enMessages: { [K in keyof typeof deMessages]: string } = {
   "admin.help.appName":
     "Optional. Leave empty for the built-in name “Mitspielzentrale” (German UI) or “Matchdesk” (English UI). A custom value replaces it in the shell and document title.",
   "admin.label.archiveHours": "Auto-archive after hours",
+  "admin.label.maxRunningMainEvents": "Maximum events running at once",
   "admin.label.notifyDefault": "Notifications on by default",
   "admin.label.publicReg": "Allow public registration with invite code",
   "admin.label.s3snap":

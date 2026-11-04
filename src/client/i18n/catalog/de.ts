@@ -481,6 +481,8 @@ export const deMessages = {
   "events.filter.none": "Ohne Event",
   "events.form.mainEvent": "Event",
   "events.form.mainEventNone": "Kein Event",
+  "events.form.mainEventChoose": "Bitte Event wählen",
+  "events.form.notifyAll": "Alle benachrichtigen (sonst nur die Mitspieler dieser Runde)",
   "events.refresh": "Aktualisieren",
   "events.count.one": "1 Runde im Board",
   "events.count.many": "{n} Runden im Board",
@@ -562,6 +564,7 @@ export const deMessages = {
   "admin.help.appName":
     "Optional. Leer lassen für den eingebauten Namen „Mitspielzentrale“ (deutsche Oberfläche) bzw. „Matchdesk“ (englische Oberfläche). Eigener Text ersetzt das in Menü und Titelzeile.",
   "admin.label.archiveHours": "Auto-Archiv nach Stunden",
+  "admin.label.maxRunningMainEvents": "Höchstens gleichzeitig laufende Events",
   "admin.label.notifyDefault": "Notifications standardmäßig aktiv",
   "admin.label.publicReg": "Öffentliche Registrierung per Invite-Code erlauben",
   "admin.label.s3snap": "S3-Snapshots und Restore in der laufenden Instanz erlauben (Standard: an, nur wirksam wenn die Umgebung S3 nutzt)",
