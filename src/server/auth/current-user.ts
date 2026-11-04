@@ -1,3 +1,4 @@
+import { can, effectivePermissions } from "../domain/permissions";
 import type { Request } from "express";
 import type { DatabaseContext } from "../db/client";
 import { users } from "../db/schema";
@@ -17,6 +18,23 @@ export function publicUser(user: typeof users.$inferSelect) {
   };
 }
 
+/** Wirksame Rechte für die Oberfläche: global und je Event (nur laufende oder geplante Events). */
+export function permissionSummary(context: DatabaseContext, user: { id: string; role: string }) {
+  const effective = effectivePermissions(context, user);
+  return {
+    isAdmin: effective.isAdmin,
+    global: Array.from(effective.global).sort(),
+    events: Object.fromEntries(
+      Array.from(effective.events.entries()).map(([eventId, keys]) => [eventId, Array.from(keys).sort()])
+    )
+  };
+}
+
+/** Der eigene Benutzer mit seinen wirksamen Rechten (für die Oberfläche). */
+export function selfUser(context: DatabaseContext, user: typeof users.$inferSelect) {
+  return { ...publicUser(user), permissions: permissionSummary(context, user) };
+}
+
 export function getCurrentSession(context: DatabaseContext, request: Request) {
   resolveMatchdeskAuth(context, request);
   const auth = request.matchdeskAuth;
@@ -34,7 +52,7 @@ export function requireUser(context: DatabaseContext, request: Request) {
 export function requireAdmin(context: DatabaseContext, request: Request) {
   const user = requireUser(context, request);
 
-  if (!user || user.role !== "admin") {
+  if (!user || !can(context, user, "admin.access")) {
     return undefined;
   }
 

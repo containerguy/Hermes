@@ -2,6 +2,7 @@ import { z } from "zod";
 import { and, eq, isNull, ne } from "drizzle-orm";
 import type { DatabaseContext } from "../db/client";
 import { users } from "../db/schema";
+import { can, scopedEventIds } from "./permissions";
 
 export const userRoleSchema = z.enum(["user", "organizer", "manager", "admin"]);
 
@@ -136,32 +137,62 @@ export function ensureActiveIdentityAvailable(
   return { ok: true as const };
 }
 
+/*
+ * Rechteprüfungen laufen über das Rechtemodell (domain/permissions.ts): Grundrolle des Benutzers
+ * plus Vergaben, global oder nur für ein Event. Die Funktionen hier bleiben als sprechende Namen.
+ */
+type Actor = { id: string; role: UserRole };
+
+/** Eigene Runden verwalten darf der Ersteller, fremde nur mit `rounds.manage` (global oder fürs Event). */
 export function canManageEvent(
-  actor: { id: string; role: UserRole },
-  event: { createdByUserId: string }
+  context: DatabaseContext,
+  actor: Actor,
+  event: { createdByUserId: string; mainEventId?: string | null }
 ) {
-  return actor.role === "admin" || actor.role === "manager" || actor.id === event.createdByUserId;
+  return (
+    actor.id === event.createdByUserId ||
+    can(context, actor, "rounds.manage", { mainEventId: event.mainEventId ?? null })
+  );
 }
 
-export function canCreateEvent(actor: { role: UserRole }) {
-  return actor.role === "admin" || actor.role === "manager" || actor.role === "organizer";
+export function canCreateEvent(context: DatabaseContext, actor: Actor, mainEventId?: string | null) {
+  return can(context, actor, "rounds.create", { mainEventId: mainEventId ?? null });
 }
 
-export function canAssignRoles(actor: { role: UserRole }) {
-  return actor.role === "admin";
+/** Darf Runden anlegen, global oder für mindestens ein Event (Vorprüfung vor der Event-Auswahl). */
+export function canCreateEventSomewhere(context: DatabaseContext, actor: Actor) {
+  return canCreateEvent(context, actor) || scopedEventIds(context, actor, "rounds.create").length > 0;
 }
 
-/** Phase 15 (D-09): Gameserver starten/stoppen/updaten und Konsole nutzen — ab manager. */
-export function canManageServers(actor: { role: UserRole }) {
-  return actor.role === "admin" || actor.role === "manager";
+/** Spiele mit Gameserver-Instanzen verknüpfen (bisher nur Admin). */
+export function canBindServers(context: DatabaseContext, actor: Actor) {
+  return can(context, actor, "servers.bind");
 }
 
-/** Pizzabestellung verwalten (Runden, Menü, Archiv, Zahlungen) — ab manager. */
-export function canManagePizza(actor: { role: UserRole }) {
-  return actor.role === "admin" || actor.role === "manager";
+/** Gameserver-Instanzen sehen (Auswahl beim Anlegen von Runden). */
+export function canListServers(context: DatabaseContext, actor: Actor) {
+  return can(context, actor, "servers.view");
 }
 
-/** Events anlegen, bearbeiten, starten und beenden — ab manager. */
-export function canManageMainEvents(actor: { role: UserRole }) {
-  return actor.role === "admin" || actor.role === "manager";
+/** Phase 15 (D-09): Gameserver starten/stoppen/updaten und Konsole nutzen. */
+export function canManageServers(context: DatabaseContext, actor: Actor) {
+  return can(context, actor, "servers.manage");
+}
+
+/** Pizzabestellung verwalten (Runden, Menü, Archiv, Zahlungen). */
+export function canManagePizza(context: DatabaseContext, actor: Actor) {
+  return can(context, actor, "pizza.manage");
+}
+
+/**
+ * Events verwalten. Ohne `mainEventId` nur global (z. B. neues Event anlegen),
+ * mit `mainEventId` zählt auch ein Recht nur für dieses Event.
+ */
+export function canManageMainEvents(context: DatabaseContext, actor: Actor, mainEventId?: string | null) {
+  return can(context, actor, "main_events.manage", { mainEventId: mainEventId ?? null });
+}
+
+/** Zugang zur Administration (nur global vergebbar). */
+export function isAdministrator(context: DatabaseContext, actor: Actor) {
+  return can(context, actor, "admin.access");
 }

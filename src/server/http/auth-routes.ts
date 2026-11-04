@@ -3,7 +3,7 @@ import { Router } from "express";
 import { randomBytes, randomUUID } from "node:crypto";
 import { z } from "zod";
 import { createCsrfToken, CSRF_HEADER, requireCsrf } from "../auth/csrf";
-import { getCurrentSession, publicUser, requireUser } from "../auth/current-user";
+import { getCurrentSession, publicUser, selfUser, requireUser } from "../auth/current-user";
 import { maskInviteCode, tryWriteAuditLog } from "../audit-log";
 import { createPairingToken, hashPairingToken, PAIR_TOKEN_TTL_MS } from "../auth/pairing-tokens";
 import { checkRateLimit, recordRateLimitFailure } from "../auth/rate-limits";
@@ -699,7 +699,7 @@ export function createAuthRouter(context: DatabaseContext) {
     setSessionCookie(response, issued.sessionToken);
     setDeviceCookie(response, issued.deviceKey);
     response.json({
-      user: publicUser(user),
+      user: selfUser(context, user),
       device: { name: issued.deviceName, recognized: issued.recognized }
     });
   });
@@ -712,7 +712,7 @@ export function createAuthRouter(context: DatabaseContext) {
       return;
     }
 
-    response.json({ user: publicUser(current.user) });
+    response.json({ user: selfUser(context, current.user) });
   });
 
   router.patch("/profile", (request, response) => {
@@ -727,7 +727,7 @@ export function createAuthRouter(context: DatabaseContext) {
       return;
     }
     const updated = updateProfile(context, current, parsed.data);
-    response.json({ user: publicUser(updated) });
+    response.json({ user: selfUser(context, updated) });
   });
 
   router.post("/email-change", async (request, response) => {
@@ -767,7 +767,7 @@ export function createAuthRouter(context: DatabaseContext) {
       response.status(result.status).json({ error: result.error });
       return;
     }
-    response.json({ user: publicUser(result.user) });
+    response.json({ user: selfUser(context, result.user) });
   });
 
   router.get("/sessions", (request, response) => {
@@ -1005,7 +1005,7 @@ export function createAuthRouter(context: DatabaseContext) {
     setSessionCookie(response, consumed.sessionToken);
     setDeviceCookie(response, consumed.deviceKey);
     response.status(201).json({
-      user: publicUser(user),
+      user: selfUser(context, user),
       device: { name: consumed.deviceName, recognized: consumed.recognized }
     });
   });

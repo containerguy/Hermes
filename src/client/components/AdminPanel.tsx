@@ -26,6 +26,7 @@ import { AdminPanelInfos } from "./AdminPanelInfos";
 import { AdminPanelInvites } from "./AdminPanelInvites";
 import { AdminPanelSicherheit } from "./AdminPanelSicherheit";
 import { AdminPanelUsers } from "./AdminPanelUsers";
+import { isAdministrator } from "../permissions";
 
 function toDatetimeLocal(value: string) {
   const date = new Date(value);
@@ -138,7 +139,7 @@ export function AdminPanel({
     return t("admin.bulk.summaryBlocking", { count: result.blockingIssueCount });
   }
 
-  const isAdmin = currentUser?.role === "admin";
+  const isAdmin = isAdministrator(currentUser);
 
   async function downloadJsonAttachment(path: string, fallbackName: string) {
     setError("");
@@ -761,6 +762,14 @@ export function AdminPanel({
           onClearBulkImportPreview={() => setBulkImportPreview(null)}
           onCreateUser={createUser}
           onUpdateRole={updateRole}
+          onPermissionMessage={(text) => {
+            setError("");
+            setMessage(text);
+          }}
+          onPermissionError={(text) => {
+            setMessage("");
+            setError(text);
+          }}
           onDeleteUser={deleteUser}
           onDownloadJsonAttachment={(p, n) => void downloadJsonAttachment(p, n)}
           onRunUsersExportImport={(f) => void runUsersExportImport(f)}

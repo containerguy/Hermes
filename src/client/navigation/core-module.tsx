@@ -10,6 +10,7 @@ import { type ProfileSectionId, profileSectionIds } from "../components/LoginPan
 import { LoginRequired } from "./LoginRequired";
 import { NAV_ICONS } from "./icons";
 import type { AdminNavEntry, AppModule, NavContext, NavPageRenderContext } from "./registry";
+import { hasPermission, hasPermissionAnywhere, isAdministrator } from "../permissions";
 
 export const coreAdminSections: AdminSection[] = ["users", "betrieb", "design", "infos", "sicherheit", "invites", "audit"];
 
@@ -30,9 +31,14 @@ const profileLabelKeys = {
   tokens: "main.profile.nav.tokens"
 } as const;
 
-function isManager(ctx: NavContext) {
-  const role = ctx.currentUser?.role;
-  return role === "manager" || role === "organizer" || role === "admin";
+function canOrganizeRounds(ctx: NavContext) {
+  return (
+    hasPermissionAnywhere(ctx.currentUser, "rounds.create") || hasPermissionAnywhere(ctx.currentUser, "rounds.manage")
+  );
+}
+
+function canManageAnyMainEvent(ctx: NavContext) {
+  return hasPermissionAnywhere(ctx.currentUser, "main_events.manage");
 }
 
 function firstSegment(subPath: string) {
@@ -72,7 +78,7 @@ export function createCoreModule(moduleAdminSections: AdminNavEntry[]): AppModul
             {ctx.currentUser ? <MainEventPrompt currentUserId={ctx.currentUser.id} /> : null}
             <EventBoard
               currentUser={ctx.currentUser}
-              mode={isManager(ctx) ? "manager" : "events"}
+              mode={canOrganizeRounds(ctx) ? "manager" : "events"}
               emptyBoardTitle={ctx.settings.shellEventsEmptyTitle}
               emptyBoardBody={ctx.settings.shellEventsEmptyBody}
               gameCatalog={ctx.settings.gameCatalog}
@@ -91,11 +97,14 @@ export function createCoreModule(moduleAdminSections: AdminNavEntry[]): AppModul
         hero: (t, ctx) => ({
           eyebrow: t("main.route.mainEvents.eyebrow"),
           title: t("main.route.mainEvents.title"),
-          description: isManager(ctx) ? t("main.route.mainEvents.descriptionManager") : ""
+          description: canManageAnyMainEvent(ctx) ? t("main.route.mainEvents.descriptionManager") : ""
         }),
         render: (ctx) =>
           ctx.currentUser ? (
-            <MainEventsPanel canManage={isManager(ctx)} />
+            <MainEventsPanel
+              canManage={hasPermission(ctx.currentUser, "main_events.manage")}
+              canManageEvent={(mainEventId) => hasPermission(ctx.currentUser, "main_events.manage", mainEventId)}
+            />
           ) : (
             <LoginRequired eyebrowKey="main.nav.mainEvents" />
           )
@@ -125,7 +134,7 @@ export function createCoreModule(moduleAdminSections: AdminNavEntry[]): AppModul
         order: 90,
         label: (t) => t("main.nav.admin"),
         icon: NAV_ICONS.admin,
-        inMenu: (ctx) => ctx.currentUser?.role === "admin",
+        inMenu: (ctx) => isAdministrator(ctx.currentUser),
         hero: (t) => ({
           eyebrow: t("main.route.admin.eyebrow"),
           title: t("main.route.admin.title"),
@@ -133,7 +142,7 @@ export function createCoreModule(moduleAdminSections: AdminNavEntry[]): AppModul
         }),
         subnavLabel: (t) => t("main.admin.subnav"),
         subnav: (t, ctx) =>
-          ctx.currentUser?.role === "admin"
+          isAdministrator(ctx.currentUser)
             ? [
                 ...coreAdminSections.map((slug) => ({ slug, label: t(coreAdminLabelKeys[slug]) })),
                 ...enabledModuleAdmin(ctx).map((entry) => ({ slug: entry.slug, label: entry.label(t) }))
@@ -142,7 +151,7 @@ export function createCoreModule(moduleAdminSections: AdminNavEntry[]): AppModul
         render: (ctx: NavPageRenderContext) => {
           const slug = firstSegment(ctx.subPath);
           const moduleSection =
-            ctx.currentUser?.role === "admin" ? enabledModuleAdmin(ctx).find((entry) => entry.slug === slug) : undefined;
+            isAdministrator(ctx.currentUser) ? enabledModuleAdmin(ctx).find((entry) => entry.slug === slug) : undefined;
           if (moduleSection) {
             return <section className="admin-stage">{moduleSection.render(ctx)}</section>;
           }
