@@ -48,3 +48,11 @@ export function broadcastEventsChanged(reason: string) {
     send(client, "events_changed", payload);
   }
 }
+
+/** Ereignis eines Moduls (`ctx.realtime.broadcast`); der Client verteilt es nach Modulkennung. */
+export function broadcastModuleEvent(moduleId: string, event: string, data?: unknown) {
+  const payload = { module: moduleId, event, data: data ?? null, at: new Date().toISOString() };
+  for (const client of clients.keys()) {
+    send(client, "module_event", payload);
+  }
+}
