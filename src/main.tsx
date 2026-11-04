@@ -8,7 +8,15 @@ import { clearCsrfToken, primeCsrfToken } from "./client/api/csrf";
 import { KioskStreamPage } from "./client/components/KioskStreamPage";
 import { appPages } from "./client/navigation/modules";
 import { buildRuntimeAppModules, useRuntimeModules } from "./client/modules/runtime";
-import { collectPages, menuPages, resolvePage, type NavContext, type NavPage, type PageHero } from "./client/navigation/registry";
+import {
+  collectPages,
+  menuPages,
+  resolvePage,
+  type NavContext,
+  type NavPage,
+  type PageHero,
+  type SubnavEntry
+} from "./client/navigation/registry";
 import { I18nProvider, useI18n } from "./client/i18n/I18nContext";
 import { BrandingProvider, useBrandIconSrc } from "./client/lib/BrandingContext";
 import { brandIconSrc } from "./client/lib/brand-icon";
@@ -129,6 +137,56 @@ function PageHeader({
         </aside>
       )}
     </section>
+  );
+}
+
+/**
+ * Seitenleiste für Bereiche mit Unterseiten (Admin, Profil). Auf dem Desktop links neben dem
+ * Inhalt; auf schmalen Bildschirmen zeigt `#admin` nur diese Liste und eine Unterseite nur den
+ * Inhalt mit Zurück-Link (per CSS, siehe `.side-layout`).
+ */
+function SideNav({
+  label,
+  pageHash,
+  entries,
+  activeSlug
+}: {
+  label: string;
+  pageHash: string;
+  entries: SubnavEntry[];
+  activeSlug: string;
+}) {
+  const groups: Array<{ name: string; entries: SubnavEntry[] }> = [];
+  for (const entry of entries) {
+    const name = entry.group ?? "";
+    const last = groups.at(-1);
+    if (last && last.name === name) {
+      last.entries.push(entry);
+    } else {
+      groups.push({ name, entries: [entry] });
+    }
+  }
+  return (
+    <nav className="side-nav" aria-label={label}>
+      {groups.map((group) => (
+        <div className="side-nav__group" key={group.name || "default"}>
+          {group.name ? <p className="side-nav__heading">{group.name}</p> : null}
+          <ul>
+            {group.entries.map((entry) => (
+              <li key={entry.slug}>
+                <a
+                  href={`#${pageHash}/${entry.slug}`}
+                  className={activeSlug === entry.slug ? "active" : undefined}
+                  aria-current={activeSlug === entry.slug ? "page" : undefined}
+                >
+                  {entry.label}
+                </a>
+              </li>
+            ))}
+          </ul>
+        </div>
+      ))}
+    </nav>
   );
 }
 
@@ -329,6 +387,16 @@ function AppShell({
     return activePage.id === page.id;
   }
 
+  const pageContent = activePage.render({
+    ...navContext,
+    subPath,
+    setCurrentUser,
+    applySettings: (settings) => {
+      setAppSettings(settings);
+      applyTheme(settings);
+    }
+  });
+
   return (
     <BrandingProvider iconSrc={shellIconSrc}>
     <main className={`app-shell page-${activePage.id}${menu.length > 1 ? " app-shell--tabbar" : ""}`}>
@@ -381,42 +449,32 @@ function AppShell({
         </div>
       </header>
       {subnav.length > 0 ? (
-        <div className="admin-nav-bar sub-nav-bar">
-          <nav
-            className="admin-top-subnav"
-            aria-label={activePage.subnavLabel ? activePage.subnavLabel(t) : activePage.label(t)}
-          >
-            {subnav.map((entry) => (
-              <a
-                key={entry.slug}
-                href={`#${activePage.hash}/${entry.slug}`}
-                className={activeSubSlug === entry.slug ? "active" : undefined}
-                aria-current={activeSubSlug === entry.slug ? "page" : undefined}
-              >
-                {entry.label}
-              </a>
-            ))}
-          </nav>
+        <div className={`page-shell side-layout${subPath ? "" : " side-layout--index"}`}>
+          <SideNav
+            label={activePage.subnavLabel ? activePage.subnavLabel(t) : activePage.label(t)}
+            pageHash={activePage.hash}
+            entries={subnav}
+            activeSlug={activeSubSlug}
+          />
+          <div className="side-content">
+            <a className="side-back" href={`#${activePage.hash}`}>
+              <span aria-hidden="true">‹</span> {t("main.subnav.back")}
+            </a>
+            {pageContent}
+          </div>
         </div>
-      ) : null}
-      <div className="page-shell">
-        <PageHeader
-          pageId={activePage.id}
-          hero={hero}
-          currentUser={currentUser}
-          omitSessionAside={omitHeroSessionAside}
-          collapsed={heroCollapsed}
-        />
-        {activePage.render({
-          ...navContext,
-          subPath,
-          setCurrentUser,
-          applySettings: (settings) => {
-            setAppSettings(settings);
-            applyTheme(settings);
-          }
-        })}
-      </div>
+      ) : (
+        <div className="page-shell">
+          <PageHeader
+            pageId={activePage.id}
+            hero={hero}
+            currentUser={currentUser}
+            omitSessionAside={omitHeroSessionAside}
+            collapsed={heroCollapsed}
+          />
+          {pageContent}
+        </div>
+      )}
       {menu.length > 1 ? (
         <nav className="tab-bar" aria-label={t("main.nav.mobileAria")}>
           {menu.map((page) => (

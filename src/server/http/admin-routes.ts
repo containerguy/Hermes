@@ -255,17 +255,9 @@ export function createAdminRouter(context: DatabaseContext) {
   });
 
   router.get("/rate-limits", (request, response) => {
-    const admin = requireAdmin(context, request);
-    const entries = listRateLimitEntries(context);
-    tryWriteAuditLog(context, {
-      actor: admin,
-      action: "rate_limits.list",
-      entityType: "rate_limit_entries",
-      entityId: null,
-      summary: `${admin?.username ?? "Admin"} hat Rate-Limits angezeigt.`,
-      metadata: { count: entries.length }
-    });
-    response.json({ rateLimits: entries });
+    // Reines Anzeigen wird nicht protokolliert, nur Änderungen (Löschen, Allowlist).
+    requireAdmin(context, request);
+    response.json({ rateLimits: listRateLimitEntries(context) });
   });
 
   router.delete("/rate-limits/:id", (request, response) => {
@@ -282,17 +274,8 @@ export function createAdminRouter(context: DatabaseContext) {
   });
 
   router.get("/rate-limits/allowlist", (request, response) => {
-    const admin = requireAdmin(context, request);
-    const allowlist = listRateLimitAllowlist(context);
-    tryWriteAuditLog(context, {
-      actor: admin,
-      action: "rate_limits.allowlist_list",
-      entityType: "rate_limit_allowlist",
-      entityId: null,
-      summary: `${admin?.username ?? "Admin"} hat die Rate-Limit-Allowlist angezeigt.`,
-      metadata: { count: allowlist.length }
-    });
-    response.json({ allowlist });
+    requireAdmin(context, request);
+    response.json({ allowlist: listRateLimitAllowlist(context) });
   });
 
   router.post("/rate-limits/allowlist", (request, response) => {

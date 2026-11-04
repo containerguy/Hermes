@@ -25,6 +25,8 @@ async function login(page: Page, username: string) {
     await deviceName.fill("Browser");
   }
   await page.getByRole("button", { name: "Einloggen" }).click();
+  // Auf dem Handy zeigt `#login` nach dem Login nur die Bereichsliste; das Konto liegt unter `#login/konto`.
+  await page.goto(`${baseUrl}/#login/konto`);
   await expect(page.getByRole("region", { name: "Aktuelle Anmeldung" })).toContainText(username);
 }
 
@@ -161,12 +163,19 @@ test("responsive shell and profile guidance regions stay visible", async ({ page
   await expect(page.locator(".page-shell")).toBeVisible();
 
   await login(page, "hauptadmin");
+  // Auf dem Handy zeigt das Profil zuerst die Liste seiner Bereiche, eine Unterseite dann nur ihren Inhalt.
   await page.goto(`${baseUrl}/#login`);
+  const profileNav = page.getByRole("navigation", { name: "Profil Unterseiten" });
+  await expect(profileNav).toBeVisible();
+  await expect(page.getByRole("region", { name: "Aktuelle Anmeldung" })).toBeHidden();
+  await profileNav.getByRole("link", { name: "Konto" }).click();
   await expect(page.getByRole("region", { name: "Aktuelle Anmeldung" })).toBeVisible();
+  await expect(profileNav).toBeHidden();
   // Auf dem Handy führt die Tab-Leiste unten durch die Bereiche.
   await expect(page.locator(".tab-bar")).toBeVisible();
   await expect(page.locator(".nav-links")).toBeHidden();
-  await page.getByRole("navigation", { name: "Profil Unterseiten" }).getByRole("link", { name: "Benachrichtigungen" }).click();
+  await page.getByRole("link", { name: "Alle Bereiche" }).click();
+  await profileNav.getByRole("link", { name: "Benachrichtigungen" }).click();
   await expect(page.locator(".runtime-callout")).toBeVisible();
   await expect(page.locator(".install-hint-card")).toBeVisible();
 
