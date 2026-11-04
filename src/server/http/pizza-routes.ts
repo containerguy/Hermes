@@ -1,12 +1,12 @@
-import { eq } from "drizzle-orm";
+import { and, eq } from "drizzle-orm";
 import { Router, type Request, type Response } from "express";
 import { z } from "zod";
 import { tryWriteAuditLog } from "../audit-log";
 import { requireCsrf } from "../auth/csrf";
-import { requireUser } from "../auth/current-user";
+import { currentMainEventIdOf, requireUser } from "../auth/current-user";
 import { enforceApiTokenWriteAccess } from "../auth/matchdesk-auth";
 import type { DatabaseContext } from "../db/client";
-import { pizzaMenuItems, pizzaMenuVariants, users } from "../db/schema";
+import { mainEventParticipants, pizzaMenuItems, pizzaMenuVariants, pizzaOrders, users } from "../db/schema";
 import {
   deleteCategory,
   findCategoryByName,
@@ -65,14 +65,17 @@ import {
   archiveSession,
   deleteArchivedSession,
   getActiveSession,
+  listActiveSessions,
   getSessionById,
   listArchivedSessions,
   transitionSession
 } from "../domain/pizza/sessions";
 import { guestTotals, lineTotalCents } from "../domain/pizza/totals";
 import { canManagePizza } from "../domain/users";
+import { can, scopedEventIds } from "../domain/permissions";
+import { canSeeMainEvent, getMainEvent } from "./main-event-routes";
 import { buildKassenlistePdf, buildPizzeriaPdf } from "../pdf/pizza-print";
-import { sendPushToEnabledUsers } from "../push/push-service";
+import { sendPushToEnabledUsers, sendPushToMainEventParticipants } from "../push/push-service";
 import { broadcastEventsChanged } from "../realtime/event-bus";
 import { readSettings, writeSettings } from "../settings";
 import { handleDomainError } from "./errors";
@@ -281,9 +284,10 @@ function loadUsers(context: DatabaseContext, userIds: string[]) {
   return byId;
 }
 
-function loadSerializedState(context: DatabaseContext, currentUserId: string) {
+function loadSerializedState(context: DatabaseContext, actor: PizzaActor, scope: PizzaScope) {
+  const currentUserId = actor.id;
   const settings = readSettings(context);
-  const session = getActiveSession(context);
+  const session = getActiveSession(context, scope.mainEventId);
   const menu = listActiveMenu(context);
   const categories = listActiveCategories(context);
   const activeCategoryIds = new Set(categories.map((category) => category.id));
@@ -296,6 +300,15 @@ function loadSerializedState(context: DatabaseContext, currentUserId: string) {
   );
 
   return {
+    /** Event der angezeigten Bestellrunde (null = Runde ohne Event). */
+    mainEventId: scope.mainEventId,
+    mainEventName: scope.mainEventName,
+    /** Darf bestellen: bei Event-Runden nur Teilnehmer („dabei“) und Pizza-Verwalter des Events. */
+    canOrder: canOrderInScope(context, actor, scope),
+    /** Darf diese Bestellrunde verwalten (global oder per Event-Vergabe). */
+    canManage: can(context, actor, "pizza.manage", { mainEventId: scope.mainEventId }),
+    /** Darf Speisekarte und Bezahlarten pflegen (nur global). */
+    canManageMenu: canManagePizza(context, actor),
     session: session ?? null,
     /** Aktive Kategorien in Sortierreihenfolge; inaktive sind für Gäste unsichtbar. */
     categories: categories.map(({ id, name, sortOrder }) => ({ id, name, sortOrder })),
@@ -325,6 +338,78 @@ function loadSerializedState(context: DatabaseContext, currentUserId: string) {
   };
 }
 
+type PizzaActor = NonNullable<ReturnType<typeof requireUser>>;
+
+/** Bestellrunden-Bereich: ein Event oder die Runde ohne Event (`mainEventId` null). */
+type PizzaScope = { mainEventId: string | null; mainEventName: string | null; ended: boolean };
+
+/**
+ * Bereich aus `?mainEventId=<id>` bzw. `?mainEventId=none`; ohne Angabe gilt das aktuelle Event
+ * des Benutzers (globaler Umschalter), sonst die Runde ohne Event.
+ */
+function resolveScope(
+  context: DatabaseContext,
+  request: Request,
+  actor: PizzaActor
+): { ok: true; scope: PizzaScope } | { ok: false; status: number; error: string } {
+  const raw = typeof request.query.mainEventId === "string" ? request.query.mainEventId : undefined;
+  const requested =
+    raw === undefined ? currentMainEventIdOf(context, actor) : raw === "none" || raw === "" ? null : raw;
+  if (!requested) {
+    return { ok: true, scope: { mainEventId: null, mainEventName: null, ended: false } };
+  }
+  const event = getMainEvent(context, requested);
+  if (!event || !canSeeMainEvent(context, actor, event)) {
+    return { ok: false, status: 404, error: "hauptevent_nicht_gefunden" };
+  }
+  return { ok: true, scope: { mainEventId: event.id, mainEventName: event.name, ended: event.status === "ended" } };
+}
+
+function requireScope(context: DatabaseContext, request: Request, response: Response, actor: PizzaActor) {
+  const resolved = resolveScope(context, request, actor);
+  if (!resolved.ok) {
+    response.status(resolved.status).json({ error: resolved.error });
+    return null;
+  }
+  return resolved.scope;
+}
+
+/** Event-Runden: bestellen dürfen Teilnehmer („dabei“) und wer die Pizza des Events verwaltet. */
+function canOrderInScope(context: DatabaseContext, actor: PizzaActor, scope: PizzaScope) {
+  if (!scope.mainEventId) return true;
+  if (scope.ended) return false;
+  if (can(context, actor, "pizza.manage", { mainEventId: scope.mainEventId })) return true;
+  const participation = context.db
+    .select({ status: mainEventParticipants.status })
+    .from(mainEventParticipants)
+    .where(
+      and(eq(mainEventParticipants.mainEventId, scope.mainEventId), eq(mainEventParticipants.userId, actor.id))
+    )
+    .get();
+  return participation?.status === "joined";
+}
+
+/** Pizza-Verwalter für eine Bestellrunde (mit Event: auch per Vergabe nur für dieses Event). */
+function requireScopedPizzaManager(
+  context: DatabaseContext,
+  request: Request,
+  response: Response,
+  mainEventId: string | null
+) {
+  const actor = requireUser(context, request)!;
+  if (!can(context, actor, "pizza.manage", { mainEventId })) {
+    response.status(403).json({ error: "pizza_manager_erforderlich" });
+    return null;
+  }
+  return actor;
+}
+
+/** Pizza-Verwaltung global oder für mindestens ein Event. */
+function canManagePizzaSomewhere(context: DatabaseContext, actor: PizzaActor) {
+  return canManagePizza(context, actor) || scopedEventIds(context, actor, "pizza.manage").length > 0;
+}
+
+/** Speisekarte und Bezahlarten: nur mit globalem Recht. */
 function requirePizzaManager(context: DatabaseContext, request: Request, response: Response) {
   const actor = requireUser(context, request)!;
   if (!canManagePizza(context, actor)) {
@@ -341,10 +426,34 @@ function respondDomainError(error: unknown, response: Response, logLabel: string
   }
 }
 
-/** Druck-Routen: Standard ist die aktuelle Runde, `?sessionId=` erlaubt archivierte Runden. */
-function resolvePrintSession(context: DatabaseContext, request: Request) {
+/**
+ * Druck-Routen: Standard ist die aktuelle Runde des Bereichs, `?sessionId=` erlaubt archivierte
+ * Runden. Verwalten muss man die Runde (global oder für ihr Event).
+ */
+function resolvePrintSession(context: DatabaseContext, request: Request, response: Response) {
+  const actor = requireUser(context, request)!;
   const requested = typeof request.query.sessionId === "string" ? request.query.sessionId : "";
-  return requested ? getSessionById(context, requested) : getActiveSession(context);
+  let session;
+  if (requested) {
+    session = getSessionById(context, requested);
+  } else {
+    const scope = requireScope(context, request, response, actor);
+    if (!scope) return undefined;
+    if (!requireScopedPizzaManager(context, request, response, scope.mainEventId)) return undefined;
+    session = getActiveSession(context, scope.mainEventId);
+  }
+  if (!session) {
+    response.status(404).json({ error: "keine_session" });
+    return undefined;
+  }
+  if (!requireScopedPizzaManager(context, request, response, session.mainEventId)) return undefined;
+  return session;
+}
+
+/** Event einer Bestellung (über ihre Runde) für die Rechteprüfung. */
+function mainEventIdOfOrder(context: DatabaseContext, orderId: string) {
+  const order = context.db.select({ sessionId: pizzaOrders.sessionId }).from(pizzaOrders).where(eq(pizzaOrders.id, orderId)).get();
+  return order ? (getSessionById(context, order.sessionId)?.mainEventId ?? null) : null;
 }
 
 export function createPizzaRouter(context: DatabaseContext) {
@@ -376,34 +485,55 @@ export function createPizzaRouter(context: DatabaseContext) {
 
   router.get("/state", (request, response) => {
     const actor = requireUser(context, request)!;
-    response.json(loadSerializedState(context, actor.id));
+    const scope = requireScope(context, request, response, actor);
+    if (!scope) return;
+    response.json(loadSerializedState(context, actor, scope));
   });
 
   router.post("/transitions", (request, response) => {
-    const actor = requirePizzaManager(context, request, response);
+    const user = requireUser(context, request)!;
+    const scope = requireScope(context, request, response, user);
+    if (!scope) return;
+    const actor = requireScopedPizzaManager(context, request, response, scope.mainEventId);
     if (!actor) return;
     const parsed = transitionSchema.safeParse(request.body);
     if (!parsed.success) {
       response.status(400).json({ error: "ungueltiger_uebergang" });
       return;
     }
+    if (scope.ended && parsed.data.transition === "open") {
+      response.status(409).json({ error: "hauptevent_beendet" });
+      return;
+    }
     try {
-      const session = transitionSession(context, parsed.data.transition, actor, parsed.data.label);
+      const session = transitionSession(
+        context,
+        parsed.data.transition,
+        actor,
+        parsed.data.label,
+        scope.mainEventId
+      );
       tryWriteAuditLog(context, {
         actor,
         action: `pizza.session.${parsed.data.transition}`,
         entityType: "pizza_session",
         entityId: session.id,
-        summary: `Pizzabestellung: ${parsed.data.transition}`
+        summary: `Pizzabestellung: ${parsed.data.transition}${scope.mainEventName ? ` (${scope.mainEventName})` : ""}`,
+        metadata: { mainEventId: scope.mainEventId }
       });
       broadcastEventsChanged(`pizza_session_${parsed.data.transition}`);
 
       if (parsed.data.transition === "open") {
-        sendPushToEnabledUsers(context, {
-          title: "Pizzabestellung offen",
+        const payload = {
+          title: scope.mainEventName ? `Pizzabestellung offen · ${scope.mainEventName}` : "Pizzabestellung offen",
           body: `Bestelle jetzt — Admin schließt manuell.`,
-          url: `/#start`
-        }).catch(() => undefined);
+          url: `/#pizza`
+        };
+        // Event-Runden benachrichtigen nur die Teilnehmer des Events.
+        (scope.mainEventId
+          ? sendPushToMainEventParticipants(context, scope.mainEventId, payload)
+          : sendPushToEnabledUsers(context, payload)
+        ).catch(() => undefined);
       }
 
       response.json({ session });
@@ -427,8 +557,8 @@ export function createPizzaRouter(context: DatabaseContext) {
     // Offene Bestellungen der aktuellen Runde mit einer nicht mehr angebotenen Bezahlart neu setzen
     // (eine verbleibende Bezahlart wird vorausgewählt, sonst wählt der Gast neu).
     const offered = offeredPaymentMethods(readSettings(context));
-    const active = getActiveSession(context);
-    if (active) {
+    // Alle aktuellen Runden (je Event und ohne Event) anpassen.
+    for (const active of listActiveSessions(context)) {
       resetUnofferedPaymentMethods(context, active.id, offered, defaultPaymentMethod(offered));
     }
     tryWriteAuditLog(context, {
@@ -444,12 +574,30 @@ export function createPizzaRouter(context: DatabaseContext) {
   });
 
   router.get("/sessions/archived", (request, response) => {
-    if (!requirePizzaManager(context, request, response)) return;
-    response.json({ sessions: listArchivedSessions(context) });
+    const actor = requireUser(context, request)!;
+    // Wer Pizza nur für einzelne Events verwaltet, sieht nur deren archivierte Runden.
+    const sessions = listArchivedSessions(context).filter((session) =>
+      can(context, actor, "pizza.manage", { mainEventId: session.mainEventId })
+    );
+    if (sessions.length === 0 && !canManagePizzaSomewhere(context, actor)) {
+      response.status(403).json({ error: "pizza_manager_erforderlich" });
+      return;
+    }
+    response.json({
+      sessions: sessions.map((session) => ({
+        ...session,
+        mainEventName: session.mainEventId ? (getMainEvent(context, session.mainEventId)?.name ?? null) : null
+      }))
+    });
   });
 
   router.post("/sessions/:id/archive", (request, response) => {
-    const actor = requirePizzaManager(context, request, response);
+    const actor = requireScopedPizzaManager(
+      context,
+      request,
+      response,
+      getSessionById(context, request.params.id)?.mainEventId ?? null
+    );
     if (!actor) return;
     try {
       const session = archiveSession(context, request.params.id, actor);
@@ -469,7 +617,12 @@ export function createPizzaRouter(context: DatabaseContext) {
   });
 
   router.delete("/sessions/:id", (request, response) => {
-    const actor = requirePizzaManager(context, request, response);
+    const actor = requireScopedPizzaManager(
+      context,
+      request,
+      response,
+      getSessionById(context, request.params.id)?.mainEventId ?? null
+    );
     if (!actor) return;
     try {
       const { session, orderCount } = deleteArchivedSession(context, request.params.id);
@@ -489,7 +642,13 @@ export function createPizzaRouter(context: DatabaseContext) {
 
   router.post("/lines", (request, response) => {
     const actor = requireUser(context, request)!;
-    const session = getActiveSession(context);
+    const scope = requireScope(context, request, response, actor);
+    if (!scope) return;
+    if (!canOrderInScope(context, actor, scope)) {
+      response.status(403).json({ error: "pizza_nur_teilnehmer" });
+      return;
+    }
+    const session = getActiveSession(context, scope.mainEventId);
     if (!session) {
       response.status(404).json({ error: "session_nicht_offen" });
       return;
@@ -556,7 +715,9 @@ export function createPizzaRouter(context: DatabaseContext) {
       response.status(400).json({ error: "ungueltige_methode" });
       return;
     }
-    const session = getActiveSession(context);
+    const scope = requireScope(context, request, response, actor);
+    if (!scope) return;
+    const session = getActiveSession(context, scope.mainEventId);
     if (!session) {
       response.status(404).json({ error: "keine_session" });
       return;
@@ -581,7 +742,12 @@ export function createPizzaRouter(context: DatabaseContext) {
       response.status(400).json({ error: "ungueltige_methode" });
       return;
     }
-    const actor = requirePizzaManager(context, request, response);
+    const actor = requireScopedPizzaManager(
+      context,
+      request,
+      response,
+      mainEventIdOfOrder(context, request.params.orderId)
+    );
     if (!actor) return;
     try {
       markPayment(context, {
@@ -1141,12 +1307,8 @@ export function createPizzaRouter(context: DatabaseContext) {
   // --- Druck (ab manager) --------------------------------------------------------------------
 
   router.get("/print/pizzeria.pdf", async (request, response) => {
-    if (!requirePizzaManager(context, request, response)) return;
-    const session = resolvePrintSession(context, request);
-    if (!session) {
-      response.status(404).json({ error: "keine_session" });
-      return;
-    }
+    const session = resolvePrintSession(context, request, response);
+    if (!session) return;
     const orders = listOrdersForSession(context, session.id);
     const settings = readSettings(context);
     const menu = listAllMenu(context);
@@ -1221,12 +1383,8 @@ export function createPizzaRouter(context: DatabaseContext) {
   });
 
   router.get("/print/kassenliste.pdf", async (request, response) => {
-    if (!requirePizzaManager(context, request, response)) return;
-    const session = resolvePrintSession(context, request);
-    if (!session) {
-      response.status(404).json({ error: "keine_session" });
-      return;
-    }
+    const session = resolvePrintSession(context, request, response);
+    if (!session) return;
     const orders = listOrdersForSession(context, session.id);
     const settings = readSettings(context);
     const labels = buildLineLabels(listAllMenu(context));

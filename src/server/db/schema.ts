@@ -229,6 +229,8 @@ export const mainEvents = sqliteTable(
     /** 0027: Plätze (null = unbegrenzt); ist das Event voll, wird man Nachrücker. */
     maxParticipants: integer("max_participants"),
     /** 0027: Anmeldeschluss (null = keiner); gilt nur, solange das Event geplant ist. */
+    /** 0035: Infos zum Event (Markdown), zusätzlich zu den allgemeinen Infos. */
+    infosMarkdown: text("infos_markdown"),
     registrationDeadline: text("registration_deadline"),
     /** 0031: geplante Erinnerungen an Teilnehmer verschicken. */
     remindersEnabled: integer("reminders_enabled", { mode: "boolean" }).notNull().default(true),
@@ -408,6 +410,21 @@ export const mainEventParticipants = sqliteTable(
     updatedAt: text("updated_at").notNull()
   },
   (table) => [uniqueIndex("main_event_participants_event_user_unique").on(table.mainEventId, table.userId)]
+);
+
+/** 0037: Gameserver, die ein Event anbietet; keine Zeile = alle Server. */
+export const mainEventServers = sqliteTable(
+  "main_event_servers",
+  {
+    mainEventId: text("main_event_id")
+      .notNull()
+      .references(() => mainEvents.id, { onDelete: "cascade" }),
+    bindingId: text("binding_id")
+      .notNull()
+      .references(() => gameServerBindings.id, { onDelete: "cascade" }),
+    createdAt: text("created_at").notNull()
+  },
+  (table) => [primaryKey({ columns: [table.mainEventId, table.bindingId] })]
 );
 
 export const gameEvents = sqliteTable("game_events", {
@@ -696,6 +713,8 @@ export const pizzaSessions = sqliteTable(
     state: text("state", { enum: ["draft", "open", "locked", "delivered"] })
       .notNull()
       .default("draft"),
+    /** 0036: Event der Bestellrunde (null = Runde ohne Event). */
+    mainEventId: text("main_event_id").references(() => mainEvents.id, { onDelete: "set null" }),
     label: text("label"),
     openedAt: text("opened_at"),
     openedByUserId: text("opened_by_user_id").references(() => users.id, { onDelete: "set null" }),

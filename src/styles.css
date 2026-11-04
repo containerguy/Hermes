@@ -3309,3 +3309,13 @@ dd {
 .event-group--running .event-group-status {
   border-color: var(--green);
 }
+
+/* Kiosk mit mehreren laufenden Events: je Event ein Abschnitt mit den Spiel-Spalten. */
+.kiosk-event-section + .kiosk-event-section {
+  margin-top: clamp(20px, 3vw, 40px);
+}
+
+.kiosk-event-heading {
+  margin: 0 0 clamp(10px, 1.4vw, 16px);
+  font-size: clamp(1.3rem, 2.2vw, 2rem);
+}

@@ -1,5 +1,5 @@
-import React, { useState } from "react";
-import type { MainEvent, MainEventParticipantOverview, MainEventParticipation } from "../types/core";
+import React, { useEffect, useState } from "react";
+import type { GameServerBinding, MainEvent, MainEventParticipantOverview, MainEventParticipation } from "../types/core";
 import { requestJson } from "../api/request";
 import { getErrorMessage } from "../errors/errors";
 import { useI18n } from "../i18n/I18nContext";
@@ -147,6 +147,103 @@ export function MainEventParticipantList({ mainEvent }: { mainEvent: MainEvent }
           </a>
         </div>
       ) : null}
+    </details>
+  );
+}
+
+/** Infos zum Event (Anfahrt, WLAN, Ablauf …) als Markdown; erscheinen auf der Seite „Infos“. */
+export function MainEventInfosEditor({
+  mainEvent,
+  busy,
+  onSave
+}: {
+  mainEvent: MainEvent;
+  busy: boolean;
+  onSave: (infosMarkdown: string | null) => void;
+}) {
+  const { t } = useI18n();
+  const [markdown, setMarkdown] = useState(mainEvent.infosMarkdown ?? "");
+
+  return (
+    <details className="main-event-infos-editor">
+      <summary>{t("mainEvents.infos.toggle")}</summary>
+      <form
+        className="form-grid"
+        onSubmit={(event) => {
+          event.preventDefault();
+          onSave(markdown.trim() ? markdown : null);
+        }}
+      >
+        <label>
+          {t("mainEvents.infos.label")}
+          <textarea rows={8} value={markdown} onChange={(ev) => setMarkdown(ev.target.value)} />
+        </label>
+        <p className="muted">{t("mainEvents.infos.help")}</p>
+        <button type="submit" disabled={busy}>
+          {t("mainEvents.infos.save")}
+        </button>
+      </form>
+    </details>
+  );
+}
+
+/** Gameserver, die das Event anbietet (keiner angekreuzt = alle). Nur sichtbar, wenn es Server gibt. */
+export function MainEventServersEditor({
+  mainEvent,
+  busy,
+  onSave
+}: {
+  mainEvent: MainEvent;
+  busy: boolean;
+  onSave: (bindingIds: string[]) => void;
+}) {
+  const { t } = useI18n();
+  const [bindings, setBindings] = useState<GameServerBinding[]>([]);
+  const [selected, setSelected] = useState<string[]>(mainEvent.serverBindingIds ?? []);
+
+  useEffect(() => {
+    let cancelled = false;
+    requestJson<{ bindings: GameServerBinding[] }>("/api/integrations/amp/bindings")
+      .then((result) => {
+        if (!cancelled) setBindings(result?.bindings ?? []);
+      })
+      .catch(() => undefined);
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  if (bindings.length === 0) return null;
+
+  return (
+    <details className="main-event-servers">
+      <summary>{t("mainEvents.servers.toggle")}</summary>
+      <form
+        className="form-grid"
+        onSubmit={(event) => {
+          event.preventDefault();
+          onSave(selected);
+        }}
+      >
+        <p className="muted">{t("mainEvents.servers.help")}</p>
+        {bindings.map((binding) => (
+          <label key={binding.id} className="checkbox-label">
+            <input
+              type="checkbox"
+              checked={selected.includes(binding.id)}
+              onChange={(ev) =>
+                setSelected(
+                  ev.target.checked ? [...selected, binding.id] : selected.filter((id) => id !== binding.id)
+                )
+              }
+            />
+            {binding.displayTitle} ({binding.ampInstanceName})
+          </label>
+        ))}
+        <button type="submit" disabled={busy}>
+          {t("mainEvents.servers.save")}
+        </button>
+      </form>
     </details>
   );
 }

@@ -292,6 +292,40 @@ describe("events with start and end (main events)", () => {
       .expect(200);
   });
 
+  it("stores event infos as markdown and shows them to everyone who sees the event", async () => {
+    const { adminAgent, managerAgent } = await createManagerAndLogin();
+    const lan = await createMainEvent(managerAgent, "LAN Herbst");
+    const csrf = await fetchCsrf(managerAgent);
+    const infos = "## Anfahrt\n\n  Halle 3, Tor B\n\nWLAN: lan-herbst";
+    const patched = await managerAgent
+      .patch(`/api/main-events/${lan.id}`)
+      .set(CSRF_HEADER, csrf)
+      .send({ infosMarkdown: infos })
+      .expect(200);
+    expect(patched.body.mainEvent.infosMarkdown).toBe(infos);
+
+    const userAgent = await createUser(adminAgent, "spieler");
+    const list = (await userAgent.get("/api/main-events").expect(200)).body.mainEvents as Array<{
+      id: string;
+      infosMarkdown: string | null;
+    }>;
+    expect(list.find((entry) => entry.id === lan.id)?.infosMarkdown).toBe(infos);
+
+    const userCsrf = await fetchCsrf(userAgent);
+    await userAgent
+      .patch(`/api/main-events/${lan.id}`)
+      .set(CSRF_HEADER, userCsrf)
+      .send({ infosMarkdown: "gehackt" })
+      .expect(403);
+
+    const cleared = await managerAgent
+      .patch(`/api/main-events/${lan.id}`)
+      .set(CSRF_HEADER, await fetchCsrf(managerAgent))
+      .send({ infosMarkdown: "   " })
+      .expect(200);
+    expect(cleared.body.mainEvent.infosMarkdown).toBeNull();
+  });
+
   it("does not notify everyone about rounds without an event unless asked to", async () => {
     const { managerAgent } = await createManagerAndLogin();
 

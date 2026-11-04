@@ -8,6 +8,7 @@ import type {
 import { useI18n } from "../i18n/I18nContext";
 import { PizzaMenuJsonAdmin } from "../pizza/PizzaMenuJsonAdmin";
 import { BindingsAdmin } from "../gameservers/BindingsAdmin";
+import { KioskEventSelect } from "./KioskEventSelect";
 
 function generateKioskStreamSecret(): string {
   const bytes = new Uint8Array(16);
@@ -239,6 +240,10 @@ export function AdminPanelBetrieb({
             placeholder={t("admin.kiosk.secretPlaceholder")}
           />
         </label>
+        <KioskEventSelect
+          value={settings.kioskMainEventId ?? ""}
+          onChange={(kioskMainEventId) => onSettingsChange({ ...settings, kioskMainEventId })}
+        />
         <div className="action-row">
           <button
             type="button"

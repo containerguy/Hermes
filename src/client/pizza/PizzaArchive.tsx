@@ -31,7 +31,8 @@ export function PizzaArchive() {
 
   function titleFor(session: PizzaArchivedSession) {
     const date = dateFormat.format(new Date(session.openedAt ?? session.createdAt));
-    return `${session.label ?? t("pizza.archive.untitled")} · ${date}`;
+    const event = session.mainEventName ? ` · ${session.mainEventName}` : "";
+    return `${session.label ?? t("pizza.archive.untitled")}${event} · ${date}`;
   }
 
   async function remove(session: PizzaArchivedSession) {

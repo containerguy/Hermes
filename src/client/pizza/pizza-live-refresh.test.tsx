@@ -475,4 +475,42 @@ describe("PizzaPanel – Live-Aktualisierung", () => {
     });
     expect(count("GET", "/api/pizza/state")).toBe(2);
   });
+
+  it("wählt die Bestellrunde pro Event und sperrt Bestellen für Nicht-Teilnehmer", async () => {
+    routes["GET /api/main-events"] = () => ({
+      mainEvents: [
+        { id: "m-1", name: "LAN Herbst", status: "running" },
+        { id: "m-2", name: "Alt", status: "ended" }
+      ]
+    });
+    routes["GET /api/pizza/state"] = () => ({ ...openState([margherita]), mainEventId: "m-1", canOrder: true });
+    routes["GET /api/pizza/state?mainEventId=none"] = () => ({
+      ...openState([margherita]),
+      mainEventId: null,
+      canOrder: true
+    });
+    const container = await render(<PizzaPanel {...props} currentUserRole="user" currentMainEventId="m-1" />);
+    const picker = container.querySelector<HTMLSelectElement>(".pizza-panel__scope select")!;
+    expect(Array.from(picker.options).map((option) => option.textContent)).toEqual(["Ohne Event", "LAN Herbst"]);
+    expect(picker.value).toBe("m-1");
+    expect(count("GET", "/api/pizza/state")).toBe(1);
+
+    await act(async () => {
+      const setter = Object.getOwnPropertyDescriptor(HTMLSelectElement.prototype, "value")?.set;
+      setter?.call(picker, "");
+      picker.dispatchEvent(new Event("change", { bubbles: true }));
+      await flushMicrotasks();
+    });
+    expect(count("GET", "/api/pizza/state?mainEventId=none")).toBe(1);
+
+    routes["GET /api/pizza/state?mainEventId=none"] = () => ({
+      ...openState([margherita]),
+      myOrder: null,
+      mainEventId: "m-1",
+      mainEventName: "LAN Herbst",
+      canOrder: false
+    });
+    await liveSignal("pizza_session_open");
+    expect(container.textContent).toContain("Bestellen können nur Teilnehmer von LAN Herbst");
+  });
 });

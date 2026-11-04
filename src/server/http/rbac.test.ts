@@ -159,7 +159,7 @@ describe("Rechte und Rollen über die Admin-Schnittstelle", () => {
   it("lehnt unsinnige Vergaben ab", async () => {
     const { admin, helperId, eventA } = await setup();
     expect((await send(admin, "post", `/api/admin/users/${helperId}/grants`, { roleKey: "admin", mainEventId: eventA })).body.error).toBe("admin_nur_global");
-    expect((await send(admin, "post", `/api/admin/users/${helperId}/grants`, { permissionKey: "pizza.manage", mainEventId: eventA })).body.error).toBe("recht_nicht_pro_event");
+    expect((await send(admin, "post", `/api/admin/users/${helperId}/grants`, { permissionKey: "servers.manage", mainEventId: eventA })).body.error).toBe("recht_nicht_pro_event");
     expect((await send(admin, "post", `/api/admin/users/${helperId}/grants`, { permissionKey: "gibt.esnicht" })).body.error).toBe("recht_unbekannt");
     expect((await send(admin, "post", `/api/admin/users/${helperId}/grants`, {})).status).toBe(400);
   });

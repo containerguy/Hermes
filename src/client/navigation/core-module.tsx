@@ -128,7 +128,11 @@ export function createCoreModule(moduleAdminSections: AdminNavEntry[]): AppModul
         }),
         render: (ctx) =>
           ctx.currentUser ? (
-            <InfosPage markdown={ctx.settings.infosMarkdown} enabled={ctx.settings.infosEnabled} />
+            <InfosPage
+              markdown={ctx.settings.infosMarkdown}
+              enabled={ctx.settings.infosEnabled}
+              currentMainEventId={ctx.currentUser.currentMainEventId ?? null}
+            />
           ) : (
             <LoginRequired eyebrowKey="main.route.infos.eyebrow" />
           )

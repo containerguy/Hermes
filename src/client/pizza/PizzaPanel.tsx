@@ -1,5 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { getErrorMessage } from "../errors/errors";
+import { requestJson } from "../api/request";
+import type { MainEvent } from "../types/core";
 import { useI18n, type TFunction } from "../i18n/I18nContext";
 import { isPizzaReason } from "../realtime/events-changed-bus";
 import { useEventsChanged } from "../realtime/use-events-changed";
@@ -10,6 +12,8 @@ import {
   setPizzaPaymentMode,
   deletePizzaLine,
   fetchPizzaState,
+  pizzaScopeQuery,
+  setPizzaScope,
   markPizzaPayment,
   transitionPizzaSession,
   updatePizzaLine
@@ -37,6 +41,8 @@ interface PizzaPanelProps {
   currentUserRole: "user" | "organizer" | "manager" | "admin";
   /** Recht `pizza.manage`; fehlt es, gilt die Grundrolle. */
   canManagePizza?: boolean;
+  /** Aktuelles Event aus dem globalen Umschalter (Vorauswahl der Bestellrunde). */
+  currentMainEventId?: string | null;
   paypalHandle: string;
   paypalName: string;
   cashRecipient: string;
@@ -91,12 +97,18 @@ export function PizzaPanel({
   currentUserId,
   currentUserRole,
   canManagePizza,
+  currentMainEventId,
   paypalHandle,
   paypalName,
   cashRecipient
 }: PizzaPanelProps) {
   const { t, locale } = useI18n();
   const [state, setState] = useState<PizzaPanelState | null>(null);
+  /** Gewählte Bestellrunde: Event-ID oder "" (ohne Event); folgt dem globalen Umschalter. */
+  const [scope, setScope] = useState<string>(currentMainEventId ?? "");
+  const [openMainEvents, setOpenMainEvents] = useState<MainEvent[]>([]);
+  // Ohne Abweichung vom globalen Umschalter nimmt der Server dessen Event (keine Angabe nötig).
+  setPizzaScope(scope === (currentMainEventId ?? "") ? undefined : scope || null);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [showMenu, setShowMenu] = useState(false);
@@ -172,7 +184,17 @@ export function PizzaPanel({
   }
 
   useEffect(() => {
+    setScope(currentMainEventId ?? "");
+  }, [currentMainEventId]);
+
+  useEffect(() => {
     void reload(true);
+  }, [scope]);
+
+  useEffect(() => {
+    requestJson<{ mainEvents: MainEvent[] }>("/api/main-events")
+      .then((result) => setOpenMainEvents((result?.mainEvents ?? []).filter((entry) => entry.status !== "ended")))
+      .catch(() => undefined);
   }, []);
 
   // Live: `events_changed` mit Grund `pizza_*` (oder ohne Grund) → stiller Abgleich.
@@ -184,7 +206,10 @@ export function PizzaPanel({
     void reload(false);
   }, isPizzaReason);
 
-  const isManager = canManagePizza ?? (currentUserRole === "admin" || currentUserRole === "manager");
+  const isManager =
+    state?.canManage ?? canManagePizza ?? (currentUserRole === "admin" || currentUserRole === "manager");
+  const canManageMenu = state?.canManageMenu ?? isManager;
+  const canOrder = state?.canOrder !== false;
   const myTotalCents = useMemo(() => orderTotal(state?.myOrder ?? null), [state]);
 
   if (loading) return <p className="muted pizza-loading">{t("pizza.panel.loading")}</p>;
@@ -194,8 +219,28 @@ export function PizzaPanel({
   const sessionState: PizzaSessionState = session?.state ?? "draft";
   const offered = state.paymentMethods ?? ["cash"];
 
+  const scopePicker =
+    openMainEvents.length > 0 ? (
+      <label className="pizza-panel__scope">
+        {t("pizza.scope.label")}
+        <select value={scope} onChange={(event) => setScope(event.target.value)}>
+          <option value="">{t("pizza.scope.none")}</option>
+          {openMainEvents.map((entry) => (
+            <option key={entry.id} value={entry.id}>
+              {entry.name}
+            </option>
+          ))}
+        </select>
+      </label>
+    ) : null;
+
   if (!isManager && sessionState === "draft") {
-    return null;
+    return scopePicker ? (
+      <section className="pizza-panel" aria-label={t("pizza.panel.aria")}>
+        {scopePicker}
+        <p className="muted">{t("pizza.scope.noRound")}</p>
+      </section>
+    ) : null;
   }
 
   return (
@@ -210,6 +255,7 @@ export function PizzaPanel({
           {t(`pizza.state.${sessionState}`)}
         </span>
       </header>
+      {scopePicker}
 
       {error ? (
         <p className="pizza-panel__error" role="alert">
@@ -229,10 +275,17 @@ export function PizzaPanel({
           onArchive={(sessionId) => run(() => archivePizzaSession(sessionId))}
           onPaymentMode={(mode) => run(() => setPizzaPaymentMode(mode))}
           onMenuChanged={reload}
+          canManageMenu={canManageMenu}
         />
       ) : null}
 
-      {sessionState === "open" ? (
+      {sessionState === "open" && !canOrder ? (
+        <p className="muted pizza-panel__participants-only">
+          {t("pizza.scope.participantsOnly", { name: state.mainEventName ?? "" })}
+        </p>
+      ) : null}
+
+      {sessionState === "open" && canOrder ? (
         <PizzaOrderEditor
           state={state}
           showMenu={showMenu}
@@ -279,11 +332,20 @@ interface ManagerControlsProps {
   onArchive: (sessionId: string) => Promise<unknown>;
   onPaymentMode: (mode: PizzaPaymentMode) => Promise<unknown>;
   onMenuChanged: () => Promise<void>;
+  /** Speisekarte und Bezahlarten nur mit globalem Recht. */
+  canManageMenu: boolean;
 }
 
 const PAYMENT_MODES: PizzaPaymentMode[] = ["cash_and_paypal", "cash_only", "paypal_only"];
 
-function PizzaManagerControls({ state, onTransition, onArchive, onPaymentMode, onMenuChanged }: ManagerControlsProps) {
+function PizzaManagerControls({
+  state,
+  onTransition,
+  onArchive,
+  onPaymentMode,
+  onMenuChanged,
+  canManageMenu
+}: ManagerControlsProps) {
   const { t } = useI18n();
   const [panel, setPanel] = useState<"none" | "menu" | "archive">("none");
   const session = state.session;
@@ -325,7 +387,7 @@ function PizzaManagerControls({ state, onTransition, onArchive, onPaymentMode, o
             </button>
             <a
               className="secondary pizza-panel__pdf-link"
-              href={`/api/pizza/print/pizzeria.pdf`}
+              href={`/api/pizza/print/pizzeria.pdf${pizzaScopeQuery()}`}
               target="_blank"
               rel="noreferrer"
             >
@@ -336,7 +398,7 @@ function PizzaManagerControls({ state, onTransition, onArchive, onPaymentMode, o
         {sessionState === "locked" || sessionState === "delivered" ? (
           <a
             className="secondary pizza-panel__pdf-link"
-            href={`/api/pizza/print/kassenliste.pdf`}
+            href={`/api/pizza/print/kassenliste.pdf${pizzaScopeQuery()}`}
             target="_blank"
             rel="noreferrer"
           >
@@ -353,14 +415,16 @@ function PizzaManagerControls({ state, onTransition, onArchive, onPaymentMode, o
             {t("pizza.admin.archive")}
           </button>
         ) : null}
-        <button
-          type="button"
-          className="secondary"
-          aria-expanded={panel === "menu"}
-          onClick={() => setPanel((current) => (current === "menu" ? "none" : "menu"))}
-        >
-          {panel === "menu" ? t("pizza.admin.hideMenuEditor") : t("pizza.admin.manageMenu")}
-        </button>
+        {canManageMenu ? (
+          <button
+            type="button"
+            className="secondary"
+            aria-expanded={panel === "menu"}
+            onClick={() => setPanel((current) => (current === "menu" ? "none" : "menu"))}
+          >
+            {panel === "menu" ? t("pizza.admin.hideMenuEditor") : t("pizza.admin.manageMenu")}
+          </button>
+        ) : null}
         <button
           type="button"
           className="secondary"
@@ -370,7 +434,7 @@ function PizzaManagerControls({ state, onTransition, onArchive, onPaymentMode, o
           {panel === "archive" ? t("pizza.admin.hideArchive") : t("pizza.admin.showArchive")}
         </button>
       </div>
-      {state.paymentMode ? (
+      {state.paymentMode && canManageMenu ? (
         <label className="pizza-panel__payment-mode">
           {t("pizza.admin.paymentMode")}
           <select
@@ -388,7 +452,7 @@ function PizzaManagerControls({ state, onTransition, onArchive, onPaymentMode, o
       {state.paymentMode && state.paymentMode !== "cash_only" && !state.paymentMethods.includes("paypal") ? (
         <p className="muted">{t("pizza.admin.paymentModeNoPaypal")}</p>
       ) : null}
-      {panel === "menu" ? <PizzaMenuEditor onChanged={onMenuChanged} /> : null}
+      {panel === "menu" && canManageMenu ? <PizzaMenuEditor onChanged={onMenuChanged} /> : null}
       {panel === "archive" ? <PizzaArchive /> : null}
     </>
   );

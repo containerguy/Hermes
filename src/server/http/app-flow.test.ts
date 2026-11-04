@@ -1171,6 +1171,7 @@ describe("app flow", () => {
       kioskStreamEnabled: false,
       kioskStreamPath: "stream",
       kioskStreamSecret: "",
+      kioskMainEventId: "",
       featuresPizzaEnabled: false,
       featuresGamePresenceEnabled: false,
       pizzaPaypalHandle: "",

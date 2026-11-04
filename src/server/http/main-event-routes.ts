@@ -7,6 +7,8 @@ import { requireCsrf } from "../auth/csrf";
 import { enforceApiTokenWriteAccess } from "../auth/matchdesk-auth";
 import { tryWriteAuditLog, writeAuditLog } from "../audit-log";
 import { readSettings } from "../settings";
+import { listEventServerIds, setEventServers } from "../domain/gameservers/event-servers";
+import { getBinding } from "../domain/gameservers/bindings";
 import type { DatabaseContext } from "../db/client";
 import {
   gameEvents,
@@ -57,6 +59,11 @@ export let lastBroadcastDelivery: Promise<void> = Promise.resolve();
 
 function nowIso() {
   return new Date().toISOString();
+}
+
+/** Markdown bleibt wie eingegeben (Zeilenumbrüche, Einrückung); nur leer wird zu null. */
+function normalizeMarkdown(value: string | null | undefined) {
+  return value?.trim() ? value : null;
 }
 
 function normalizeText(value: string | null | undefined) {
@@ -312,6 +319,9 @@ function serializeMainEvent(context: DatabaseContext, event: MainEventRow, viewe
     id: event.id,
     name: event.name,
     description: event.description,
+    infosMarkdown: event.infosMarkdown,
+    /** 0037: angebotene Gameserver (Bindungs-IDs); leer = alle. */
+    serverBindingIds: listEventServerIds(context, event.id),
     status: event.status,
     visibility: event.visibility,
     ...(invites ? { invites } : {}),
@@ -427,6 +437,7 @@ export function createMainEventRouter(context: DatabaseContext) {
         id,
         name: parsed.data.name,
         description: normalizeText(parsed.data.description),
+        infosMarkdown: normalizeMarkdown(parsed.data.infosMarkdown),
         status: "planned",
         visibility: parsed.data.visibility ?? "public",
         plannedStartAt: parsed.data.plannedStartAt ?? null,
@@ -515,6 +526,8 @@ export function createMainEventRouter(context: DatabaseContext) {
           visibility,
           description:
             parsed.data.description === undefined ? event.description : normalizeText(parsed.data.description),
+          infosMarkdown:
+            parsed.data.infosMarkdown === undefined ? event.infosMarkdown : normalizeMarkdown(parsed.data.infosMarkdown),
           plannedStartAt,
           plannedEndAt,
           maxParticipants:
@@ -676,6 +689,36 @@ export function createMainEventRouter(context: DatabaseContext) {
       vibrate: [120]
     });
     response.json({ mainEvent: serializeMainEvent(context, updated, actor), archivedRounds });
+  });
+
+  /** 0037: Gameserver, die das Event anbietet (leere Liste = alle). Event-Verwaltung. */
+  router.put("/:id/servers", (request, response) => {
+    const actor = requireUser(context, request)!;
+    const event = getMainEvent(context, request.params.id);
+    if (!event) {
+      response.status(404).json({ error: "hauptevent_nicht_gefunden" });
+      return;
+    }
+    const parsed = z.object({ bindingIds: z.array(z.string().min(1).max(64)).max(200) }).safeParse(request.body);
+    if (!parsed.success) {
+      response.status(400).json({ error: "ungueltige_server" });
+      return;
+    }
+    if (parsed.data.bindingIds.some((id) => !getBinding(context, id))) {
+      response.status(400).json({ error: "binding_nicht_gefunden" });
+      return;
+    }
+    setEventServers(context, event.id, parsed.data.bindingIds);
+    writeAuditLog(context, {
+      actor,
+      action: "main_event.servers",
+      entityType: "main_event",
+      entityId: event.id,
+      summary: `${actor.username} hat die Gameserver von ${event.name} festgelegt.`,
+      metadata: { bindingIds: parsed.data.bindingIds }
+    });
+    broadcastEventsChanged("main_event_updated");
+    response.json({ mainEvent: serializeMainEvent(context, event, actor) });
   });
 
   /** Aktuelles Event des Benutzers setzen (null = alle Events); gilt auf allen Seiten und Geräten. */

@@ -63,6 +63,8 @@ export interface PizzaArchivedSession {
   id: string;
   state: PizzaSessionState;
   label: string | null;
+  mainEventId?: string | null;
+  mainEventName?: string | null;
   createdAt: string;
   openedAt: string | null;
   deliveredAt: string | null;
@@ -114,6 +116,15 @@ export interface PizzaGuestTotal {
 export type PizzaPaymentMode = "cash_and_paypal" | "cash_only" | "paypal_only";
 
 export interface PizzaPanelState {
+  /** Event der angezeigten Bestellrunde (null = Runde ohne Event). */
+  mainEventId?: string | null;
+  mainEventName?: string | null;
+  /** Darf in dieser Runde bestellen (Event-Runden: nur Teilnehmer). */
+  canOrder?: boolean;
+  /** Darf diese Bestellrunde verwalten (global oder per Event-Vergabe). */
+  canManage?: boolean;
+  /** Darf Speisekarte und Bezahlarten pflegen (nur global). */
+  canManageMenu?: boolean;
   session: PizzaSession | null;
   /** Aktive Kategorien in Sortierreihenfolge. */
   categories?: PizzaCategory[];
