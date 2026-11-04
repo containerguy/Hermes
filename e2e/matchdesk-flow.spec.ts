@@ -25,6 +25,8 @@ async function login(page: Page, username: string) {
     await deviceName.fill("Browser");
   }
   await page.getByRole("button", { name: "Einloggen" }).click();
+  // Auf dem Handy zeigt `#login` nach dem Login nur die Bereichsliste; das Konto liegt unter `#login/konto`.
+  await page.goto(`${baseUrl}/#login/konto`);
   await expect(page.getByRole("region", { name: "Aktuelle Anmeldung" })).toContainText(username);
 }
 
@@ -136,7 +138,7 @@ test("admin creates users, manager creates an event, user joins", async ({ page 
   await page.goto(`${baseUrl}/#manager`);
 
   const eventForm = page.locator("form.event-form");
-  await eventForm.getByLabel("Spiel").fill("Browser Game");
+  await eventForm.getByRole("textbox", { name: "Spieltitel" }).fill("Browser Game");
   await eventForm.locator("select").first().selectOption("scheduled");
   await eventForm.getByLabel("Startzeit").fill("2027-06-01T18:00");
   await eventForm.getByLabel("Min").fill("1");
@@ -161,12 +163,19 @@ test("responsive shell and profile guidance regions stay visible", async ({ page
   await expect(page.locator(".page-shell")).toBeVisible();
 
   await login(page, "hauptadmin");
+  // Auf dem Handy zeigt das Profil zuerst die Liste seiner Bereiche, eine Unterseite dann nur ihren Inhalt.
   await page.goto(`${baseUrl}/#login`);
+  const profileNav = page.getByRole("navigation", { name: "Profil Unterseiten" });
+  await expect(profileNav).toBeVisible();
+  await expect(page.getByRole("region", { name: "Aktuelle Anmeldung" })).toBeHidden();
+  await profileNav.getByRole("link", { name: "Konto" }).click();
   await expect(page.getByRole("region", { name: "Aktuelle Anmeldung" })).toBeVisible();
+  await expect(profileNav).toBeHidden();
   // Auf dem Handy führt die Tab-Leiste unten durch die Bereiche.
   await expect(page.locator(".tab-bar")).toBeVisible();
   await expect(page.locator(".nav-links")).toBeHidden();
-  await page.getByRole("navigation", { name: "Profil Unterseiten" }).getByRole("link", { name: "Benachrichtigungen" }).click();
+  await page.getByRole("link", { name: "Alle Bereiche" }).click();
+  await profileNav.getByRole("link", { name: "Benachrichtigungen" }).click();
   await expect(page.locator(".runtime-callout")).toBeVisible();
   await expect(page.locator(".install-hint-card")).toBeVisible();
 
@@ -221,7 +230,7 @@ test("gameserver: admin binds Minecraft, manager's event shows the server panel,
   await login(page, "srvmanager");
   await page.goto(`${baseUrl}/#manager`);
   const eventForm = page.locator("form.event-form");
-  await eventForm.getByLabel("Spiel").fill("Minecraft");
+  await eventForm.getByRole("textbox", { name: "Spieltitel" }).fill("Minecraft");
   await expect(eventForm.getByText("Server für „Minecraft“")).toBeVisible();
   await expect(eventForm.getByLabel("Server mit dieser Runde verknüpfen")).toBeChecked();
   await eventForm.locator("select").first().selectOption("scheduled");

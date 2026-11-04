@@ -30,16 +30,26 @@ export function AdminUserPermissions({
   catalog,
   openEvents,
   onError,
-  onSaved
+  onSaved,
+  embedded = false,
+  onGrantsChange
 }: {
   user: User;
   catalog: PermissionCatalog;
   openEvents: MainEvent[];
   onError: (message: string) => void;
   onSaved: (message: string) => void;
+  /** Im Seitenpanel: immer offen, ohne Aufklapp-Zeile. */
+  embedded?: boolean;
+  /** Meldet geänderte Vergaben, z. B. für die Zählung in der Benutzertabelle. */
+  onGrantsChange?: (grants: UserGrant[]) => void;
 }) {
   const { t, locale } = useI18n();
-  const [grants, setGrants] = useState<UserGrant[]>(user.grants ?? []);
+  const [grants, setGrantsState] = useState<UserGrant[]>(user.grants ?? []);
+  const setGrants = (next: UserGrant[]) => {
+    setGrantsState(next);
+    onGrantsChange?.(next);
+  };
   const [scope, setScope] = useState("");
   const [busy, setBusy] = useState(false);
 
@@ -87,11 +97,14 @@ export function AdminUserPermissions({
 
   const assignableRoles = catalog.roles.filter((role) => role.key !== "user" && !(scopeEventId && role.key === "admin"));
 
+  const Wrapper = embedded ? "div" : "details";
   return (
-    <details className="admin-user-permissions">
-      <summary>
-        {grants.length > 0 ? t("admin.perm.toggleCount", { count: grants.length }) : t("admin.perm.toggle")}
-      </summary>
+    <Wrapper className={`admin-user-permissions${embedded ? " admin-user-permissions--embedded" : ""}`}>
+      {embedded ? null : (
+        <summary>
+          {grants.length > 0 ? t("admin.perm.toggleCount", { count: grants.length }) : t("admin.perm.toggle")}
+        </summary>
+      )}
       <p className="muted">{t("admin.perm.baseRole", { role: t(`admin.role.${user.role}` as MessageKey) })}</p>
       <label>
         {t("admin.perm.scope")}
@@ -181,7 +194,7 @@ export function AdminUserPermissions({
           ))}
         </ul>
       )}
-    </details>
+    </Wrapper>
   );
 }
 

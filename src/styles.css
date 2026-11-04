@@ -117,6 +117,29 @@ label {
   font-weight: 800;
 }
 
+/*
+ * Checkboxen und Radios nie auf Feldbreite/-höhe ziehen (die Regel für input oben gilt sonst
+ * auch für sie). Label mit Checkbox: Kästchen und Text in einer Zeile.
+ */
+input[type="checkbox"],
+input[type="radio"] {
+  width: 18px;
+  height: 18px;
+  min-height: 0;
+  margin: 0;
+  padding: 0;
+  flex: none;
+  accent-color: var(--teal);
+}
+
+label:has(> input[type="checkbox"]),
+label:has(> input[type="radio"]) {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 4px 8px;
+}
+
 .app-shell {
   min-height: 100vh;
   display: flex;
@@ -1385,7 +1408,7 @@ dd {
 }
 
 .admin-panel--users {
-  grid-template-columns: minmax(280px, 400px) minmax(0, 1fr);
+  grid-template-columns: minmax(0, 1fr);
 }
 
 .admin-panel--single {
@@ -1416,8 +1439,7 @@ dd {
 
 .admin-panel--users .admin-list {
   display: grid;
-  grid-column: 2;
-  grid-row: 2 / span 20;
+  grid-column: 1;
   gap: 10px;
   align-content: start;
   align-self: start;
@@ -3176,10 +3198,22 @@ dd {
 
 .admin-permission-group {
   display: grid;
-  gap: 4px;
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 230px), 1fr));
+  gap: 6px 18px;
+}
+
+.admin-user-permissions fieldset:not(:has(.admin-permission-group)),
+.admin-role-editor fieldset:not(:has(.admin-permission-group)) {
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 230px), 1fr));
+}
+
+.admin-user-permissions fieldset > legend,
+.admin-role-editor fieldset > legend {
+  font-weight: 700;
 }
 
 .admin-permission-group > p {
+  grid-column: 1 / -1;
   margin: 4px 0 0;
   font-size: 0.82rem;
   text-transform: uppercase;
@@ -3263,6 +3297,459 @@ dd {
 }
 .event-info-calendar input {
   width: 100%;
+}
+
+/*
+ * Seitenleiste für Bereiche mit Unterseiten (Admin, Profil). Desktop: Leiste links, Inhalt
+ * rechts, kein Seitenkopf. Schmal: `#admin` zeigt nur die Liste (side-layout--index), eine
+ * Unterseite nur den Inhalt mit Zurück-Link.
+ */
+.side-layout {
+  display: grid;
+  grid-template-columns: 220px minmax(0, 1fr);
+  gap: clamp(20px, 3vw, 32px);
+  align-items: start;
+}
+
+.side-nav {
+  position: sticky;
+  top: calc(var(--topbar-height, 0px) + 16px);
+  display: grid;
+  gap: 18px;
+  max-height: calc(100vh - var(--topbar-height, 0px) - 32px);
+  overflow-y: auto;
+}
+
+.side-nav__heading {
+  margin: 0 0 6px;
+  padding: 0 12px;
+  color: var(--muted);
+  font-size: 0.74rem;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.side-nav ul {
+  display: grid;
+  gap: 2px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.side-nav a {
+  display: block;
+  padding: 8px 12px;
+  border-radius: var(--radius-sm);
+  color: var(--ink);
+  font-weight: 700;
+  font-size: 0.95rem;
+  text-decoration: none;
+}
+
+.side-nav a:hover {
+  background: var(--surface-strong);
+}
+
+.side-nav a.active {
+  background: var(--ink);
+  color: #ffffff;
+}
+
+.side-content {
+  display: grid;
+  gap: 18px;
+  min-width: 0;
+}
+
+.side-back {
+  display: none;
+}
+
+/* Im Seitenleisten-Layout braucht der Inhalt keine farbige Oberkante mehr als Bereichsmarke. */
+.side-content .admin-panel {
+  border-top-width: 0;
+}
+
+@media (max-width: 768px) {
+  .side-layout {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .side-nav {
+    position: static;
+    max-height: none;
+    overflow: visible;
+  }
+
+  .side-layout:not(.side-layout--index) .side-nav,
+  .side-layout--index .side-content {
+    display: none;
+  }
+
+  .side-layout--index .side-nav ul {
+    gap: 0;
+    border: 1px solid var(--line);
+    border-radius: var(--radius);
+    background: var(--paper);
+    overflow: hidden;
+  }
+
+  .side-layout--index .side-nav li + li {
+    border-top: 1px solid var(--line);
+  }
+
+  .side-layout--index .side-nav a,
+  .side-layout--index .side-nav a.active {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 14px 16px;
+    border-radius: 0;
+    background: transparent;
+    color: var(--ink);
+  }
+
+  .side-layout--index .side-nav a::after {
+    content: "›";
+    color: var(--muted);
+    font-size: 1.2rem;
+  }
+
+  .side-back {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    justify-self: start;
+    color: var(--teal);
+    font-weight: 800;
+    text-decoration: none;
+  }
+}
+
+/* Benutzer anlegen: auf breiten Bildschirmen eine Zeile über der Liste. */
+.admin-panel--users .admin-user-create-form {
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 180px), 1fr));
+  align-items: end;
+}
+
+/* Hilfsklassen */
+.visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+}
+
+.pill {
+  display: inline-block;
+  padding: 2px 10px;
+  border-radius: 999px;
+  background: var(--surface-strong);
+  color: var(--teal);
+  font-size: 0.82rem;
+  font-weight: 800;
+  white-space: nowrap;
+}
+
+button.link-button {
+  width: auto;
+  min-height: 0;
+  padding: 0;
+  border: 0;
+  background: none;
+  box-shadow: none;
+  color: var(--teal);
+  font: inherit;
+  font-weight: 800;
+  text-decoration: underline;
+  cursor: pointer;
+}
+
+/* Benutzertabelle mit Suche und Filtern */
+.admin-user-table {
+  display: grid;
+  gap: 12px;
+  min-width: 0;
+}
+
+.data-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px 12px;
+  align-items: center;
+}
+
+.data-toolbar__search {
+  flex: 1 1 260px;
+}
+
+.data-toolbar select {
+  flex: 0 1 200px;
+  width: auto;
+}
+
+.data-toolbar__check {
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.data-toolbar__count {
+  flex-basis: 100%;
+  display: flex;
+  gap: 12px;
+  align-items: baseline;
+  margin: 0;
+  color: var(--muted);
+  font-size: 0.9rem;
+}
+
+.data-table__scroll {
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--paper);
+  overflow-x: auto;
+}
+
+.data-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.94rem;
+}
+
+.data-table th,
+.data-table td {
+  padding: 8px 12px;
+  border-bottom: 1px solid var(--line);
+  text-align: left;
+  vertical-align: middle;
+}
+
+.data-table tbody tr:last-child td {
+  border-bottom: 0;
+}
+
+.data-table thead th {
+  position: sticky;
+  top: 0;
+  background: var(--surface);
+  color: var(--muted);
+  font-size: 0.78rem;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+.data-table tbody tr:hover,
+.data-table tbody tr.is-selected {
+  background: var(--surface);
+}
+
+button.data-table__sort {
+  width: auto;
+  min-height: 0;
+  padding: 0;
+  border: 0;
+  background: none;
+  box-shadow: none;
+  color: inherit;
+  font: inherit;
+  letter-spacing: inherit;
+  text-transform: inherit;
+  cursor: pointer;
+}
+
+button.data-table__sort.active {
+  color: var(--ink);
+}
+
+.data-table td select {
+  width: auto;
+  min-width: 140px;
+  min-height: 36px;
+}
+
+.data-table__sub {
+  display: block;
+  color: var(--muted);
+  font-size: 0.85rem;
+}
+
+.data-table__sub {
+  overflow-wrap: anywhere;
+}
+
+.data-table__actions {
+  white-space: nowrap;
+  text-align: right;
+}
+
+.data-table__actions button {
+  width: auto;
+  min-height: 36px;
+  padding: 0 12px;
+}
+
+.data-table__actions button + button {
+  margin-left: 6px;
+}
+
+.data-table__empty {
+  margin: 0;
+  padding: 16px;
+}
+
+/* Handy: jede Zeile als kompakte Karte mit Beschriftung pro Feld */
+@media (max-width: 760px) {
+  .data-table__scroll {
+    border: 0;
+    background: none;
+  }
+
+  .data-table thead {
+    display: none;
+  }
+
+  .data-table,
+  .data-table tbody,
+  .data-table tr,
+  .data-table td {
+    display: block;
+  }
+
+  .data-table tbody {
+    display: grid;
+    gap: 10px;
+  }
+
+  .data-table tbody tr {
+    border: 1px solid var(--line);
+    border-radius: var(--radius);
+    background: var(--paper);
+    padding: 6px 0;
+  }
+
+  .data-table td {
+    display: grid;
+    grid-template-columns: 110px minmax(0, 1fr);
+    gap: 8px;
+    align-items: center;
+    padding: 6px 14px;
+    border-bottom: 0;
+  }
+
+  .data-table td[data-label]::before {
+    content: attr(data-label);
+    color: var(--muted);
+    font-size: 0.78rem;
+    font-weight: 800;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+  }
+
+  .data-table td select {
+    width: 100%;
+    min-width: 0;
+  }
+
+  .data-table td.data-table__primary {
+    display: block;
+    padding-bottom: 2px;
+  }
+
+  .data-table td.is-empty {
+    display: none;
+  }
+
+  .data-table__actions {
+    display: flex !important;
+    gap: 8px;
+    justify-content: flex-end;
+  }
+
+  .data-table__actions button + button {
+    margin-left: 0;
+  }
+}
+
+/* Seitenpanel von rechts (Handy: Vollbild) */
+body.side-panel-open {
+  overflow: hidden;
+}
+
+.side-panel-layer {
+  position: fixed;
+  inset: 0;
+  z-index: 50;
+}
+
+.side-panel-backdrop {
+  position: absolute;
+  inset: 0;
+  background: rgba(32, 33, 36, 0.35);
+}
+
+.side-panel {
+  position: absolute;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  display: flex;
+  flex-direction: column;
+  width: min(520px, 100%);
+  background: var(--paper);
+  box-shadow: var(--shadow);
+  animation: side-panel-in 160ms ease-out;
+}
+
+.side-panel__head {
+  display: flex;
+  gap: 12px;
+  align-items: flex-start;
+  justify-content: space-between;
+  padding: 18px 20px 12px;
+  border-bottom: 1px solid var(--line);
+}
+
+.side-panel__head h2 {
+  margin: 0;
+  font-size: 1.2rem;
+}
+
+.side-panel__head p {
+  margin: 2px 0 0;
+}
+
+button.side-panel__close {
+  width: auto;
+  flex: none;
+}
+
+.side-panel__body {
+  flex: 1 1 auto;
+  overflow-y: auto;
+  padding: 16px 20px 24px;
+}
+
+@keyframes side-panel-in {
+  from {
+    transform: translateX(24px);
+    opacity: 0;
+  }
+  to {
+    transform: none;
+    opacity: 1;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .side-panel {
+    animation: none;
+  }
 }
 
 /* Rundenübersicht gruppiert nach Event: Gruppe übernimmt das Raster der Liste. */

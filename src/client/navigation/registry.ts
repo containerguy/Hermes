@@ -48,16 +48,21 @@ export type NavPage = {
   render: (ctx: NavPageRenderContext) => ReactNode;
 };
 
-export type SubnavEntry = { slug: string; label: string };
+/** `group` = Überschrift in der Seitenleiste; Einträge mit gleicher Gruppe stehen zusammen. */
+export type SubnavEntry = { slug: string; label: string; group?: string };
 
 /** Unterpunkte im Adminbereich, die Module beisteuern können. */
 export type AdminNavEntry = {
   slug: string;
   order: number;
   label: (t: TFunction) => string;
+  /** Gruppe in der Admin-Seitenleiste; ohne Angabe landet der Eintrag unter „Module“. */
+  group?: AdminNavGroup;
   enabled?: (ctx: NavContext) => boolean;
   render: (ctx: NavPageRenderContext) => ReactNode;
 };
+
+export type AdminNavGroup = "people" | "system" | "modules" | "log";
 
 export type AppModule = {
   id: string;

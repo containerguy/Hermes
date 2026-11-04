@@ -10,19 +10,40 @@ import { GameAccountsPrompt } from "../presence/GameAccountsPrompt";
 import { type ProfileSectionId, profileSectionIds } from "../components/LoginPanel";
 import { LoginRequired } from "./LoginRequired";
 import { NAV_ICONS } from "./icons";
-import type { AdminNavEntry, AppModule, NavContext, NavPageRenderContext } from "./registry";
+import type { AdminNavEntry, AdminNavGroup, AppModule, NavContext, NavPageRenderContext, SubnavEntry } from "./registry";
 import { hasPermission, hasPermissionAnywhere, isAdministrator } from "../permissions";
 
-export const coreAdminSections: AdminSection[] = ["users", "betrieb", "design", "infos", "sicherheit", "invites", "audit"];
+export const coreAdminSections: AdminSection[] = ["users", "import", "betrieb", "design", "infos", "sicherheit", "invites", "audit"];
 
 const coreAdminLabelKeys = {
   users: "main.admin.nav.users",
+  import: "main.admin.nav.import",
   betrieb: "main.admin.nav.ops",
   design: "main.admin.nav.design",
   infos: "main.admin.nav.infos",
   sicherheit: "main.admin.nav.security",
   invites: "main.admin.nav.invites",
   audit: "main.admin.nav.audit"
+} as const;
+
+const coreAdminGroups: Record<AdminSection, AdminNavGroup> = {
+  users: "people",
+  import: "people",
+  invites: "people",
+  betrieb: "system",
+  design: "system",
+  infos: "system",
+  sicherheit: "system",
+  audit: "log"
+};
+
+const adminGroupOrder: AdminNavGroup[] = ["people", "system", "modules", "log"];
+
+const adminGroupLabelKeys = {
+  people: "main.admin.group.people",
+  system: "main.admin.group.system",
+  modules: "main.admin.group.modules",
+  log: "main.admin.group.log"
 } as const;
 
 const profileLabelKeys = {
@@ -150,13 +171,29 @@ export function createCoreModule(moduleAdminSections: AdminNavEntry[]): AppModul
           description: t("main.route.admin.description")
         }),
         subnavLabel: (t) => t("main.admin.subnav"),
-        subnav: (t, ctx) =>
-          isAdministrator(ctx.currentUser)
-            ? [
-                ...coreAdminSections.map((slug) => ({ slug, label: t(coreAdminLabelKeys[slug]) })),
-                ...enabledModuleAdmin(ctx).map((entry) => ({ slug: entry.slug, label: entry.label(t) }))
-              ]
-            : [],
+        subnav: (t, ctx) => {
+          if (!isAdministrator(ctx.currentUser)) {
+            return [];
+          }
+          const entries: Array<SubnavEntry & { groupKey: AdminNavGroup }> = [
+            ...coreAdminSections.map((slug) => ({
+              slug,
+              label: t(coreAdminLabelKeys[slug]),
+              groupKey: coreAdminGroups[slug]
+            })),
+            ...enabledModuleAdmin(ctx).map((entry) => ({
+              slug: entry.slug,
+              label: entry.label(t),
+              groupKey: entry.group ?? "modules"
+            }))
+          ];
+          // Nach Gruppen sortiert (stabil), damit die Seitenleiste zusammenhängende Blöcke zeigt.
+          return adminGroupOrder.flatMap((groupKey) =>
+            entries
+              .filter((entry) => entry.groupKey === groupKey)
+              .map(({ slug, label }) => ({ slug, label, group: t(adminGroupLabelKeys[groupKey]) }))
+          );
+        },
         render: (ctx: NavPageRenderContext) => {
           const slug = firstSegment(ctx.subPath);
           const moduleSection =

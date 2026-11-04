@@ -233,6 +233,7 @@ export type PublicAppSettings = Pick<
 
 export type AdminSection =
   | "users"
+  | "import"
   | "betrieb"
   | "design"
   | "infos"

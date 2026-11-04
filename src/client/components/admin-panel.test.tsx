@@ -185,7 +185,7 @@ describe("AdminPanel bulk import UX", () => {
     const rendered = await renderIntoDocument(
       <AdminPanel
         currentUser={adminUser}
-        adminSection="users"
+        adminSection="import"
         onSettingsChanged={() => undefined}
       />
     );
@@ -216,7 +216,7 @@ describe("AdminPanel bulk import UX", () => {
     const rendered = await renderIntoDocument(
       <AdminPanel
         currentUser={adminUser}
-        adminSection="users"
+        adminSection="import"
         onSettingsChanged={() => undefined}
       />
     );
@@ -278,7 +278,7 @@ describe("AdminPanel bulk import UX", () => {
     const rendered = await renderIntoDocument(
       <AdminPanel
         currentUser={adminUser}
-        adminSection="users"
+        adminSection="import"
         onSettingsChanged={() => undefined}
       />
     );
@@ -410,7 +410,7 @@ describe("AdminPanel bulk import UX", () => {
     const rendered = await renderIntoDocument(
       <AdminPanel
         currentUser={adminUser}
-        adminSection="users"
+        adminSection="import"
         onSettingsChanged={() => undefined}
       />
     );
