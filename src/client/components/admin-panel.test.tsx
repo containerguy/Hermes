@@ -186,7 +186,7 @@ describe("AdminPanel bulk import UX", () => {
 
     expect(rendered.container.textContent || "").toContain("User aus CSV oder JSON importieren");
     expect(
-      rendered.container.querySelector('section[aria-label="User aus CSV oder JSON importieren."]')
+      rendered.container.querySelector('section[aria-label="User aus CSV oder JSON importieren"]')
     ).toBeTruthy();
     expect(rendered.container.querySelector('select[aria-label="Importformat"]')).toBeTruthy();
     expect(rendered.container.querySelector('textarea[aria-label="Importdaten"]')).toBeTruthy();

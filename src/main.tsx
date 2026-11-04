@@ -124,7 +124,7 @@ function PageHeader({
       aria-labelledby={`${pageId}-title`}
     >
       <div className="hero-copy">
-        <p className="eyebrow">{hero.eyebrow}</p>
+        {hero.eyebrow ? <p className="eyebrow">{hero.eyebrow}</p> : null}
         <h1 id={`${pageId}-title`}>{hero.title}</h1>
         {hasHeroDescription ? <p>{hero.description}</p> : null}
       </div>

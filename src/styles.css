@@ -2607,15 +2607,7 @@ dd {
   border-radius: 6px;
   background: rgba(0, 0, 0, 0.06);
 }
-.button-link {
-  display: inline-block;
-  padding: 0.45rem 0.9rem;
-  border-radius: 8px;
-  background: var(--color-primary, #0f766e);
-  color: #fff;
-  text-decoration: none;
-  font-weight: 600;
-}
+
 .server-actions {
   display: flex;
   gap: 0.4rem;
@@ -3084,34 +3076,6 @@ dd {
 .module-row,
 .module-source {
   flex-wrap: wrap;
-}
-.module-state,
-.module-trust {
-  display: inline-block;
-  width: fit-content;
-  justify-self: start;
-  margin-left: 6px;
-  padding: 1px 8px;
-  border-radius: 999px;
-  font-size: 0.8rem;
-  font-weight: 700;
-  background: rgba(0, 0, 0, 0.07);
-}
-.module-state--enabled {
-  background: #dff5e8;
-  color: var(--green);
-}
-.module-state--error,
-.module-trust--third_party {
-  background: #ffe2e7;
-  color: var(--rose);
-}
-.module-available {
-  flex-basis: 100%;
-  display: grid;
-  gap: 6px;
-  margin: 8px 0 0;
-  padding-left: 18px;
 }
 .module-manifest {
   display: grid;
@@ -4131,4 +4095,328 @@ ul.device-list {
 .push-panel .install-hint-card {
   margin-top: 0;
   padding: 10px 14px;
+}
+
+
+/*
+ * Bausteine für ein einheitliches Bild:
+ * - Knöpfe: Hauptaktion (Standard), .secondary, .secondary.danger. Links mit .button-link sehen
+ *   genauso aus wie Knöpfe. In Listenzeilen (.device-actions) sind alle Knöpfe kompakt.
+ * - Badges: .badge mit --ok, --warn, --danger für Zustände.
+ * - Listenzeilen: .item-title (Name, Version, Badges), .item-sub (graue Zusatzzeile).
+ */
+.button-link {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: fit-content;
+  min-height: 44px;
+  padding: 0 18px;
+  border: 0;
+  border-radius: var(--radius-sm);
+  background: var(--teal);
+  color: #ffffff;
+  font: inherit;
+  font-weight: 800;
+  text-decoration: none;
+  cursor: pointer;
+}
+
+.button-link.secondary {
+  background: var(--paper);
+  color: var(--ink);
+  border: 1px solid var(--line);
+}
+
+.button-link:hover {
+  filter: brightness(0.95);
+}
+
+.device-actions button,
+.device-actions .button-link {
+  min-height: 38px;
+  padding: 0 14px;
+  font-size: 0.92rem;
+}
+
+.badge,
+.pill {
+  display: inline-flex;
+  align-items: center;
+  width: fit-content;
+  margin: 0;
+  padding: 2px 10px;
+  border-radius: 999px;
+  background: var(--surface-strong);
+  color: var(--muted);
+  font-size: 0.78rem;
+  font-weight: 800;
+  line-height: 1.5;
+  white-space: nowrap;
+}
+
+/* Status-Pillen (Runden, Events) behalten ihre Farben, aber dieselbe Größe wie Badges. */
+.status-pill {
+  padding: 2px 10px;
+  font-size: 0.78rem;
+  font-weight: 800;
+  line-height: 1.5;
+  white-space: nowrap;
+}
+
+.badge--ok {
+  background: #dff5e8;
+  color: var(--green);
+}
+
+.badge--warn {
+  background: #fff1d6;
+  color: #8a5a00;
+}
+
+.badge--danger {
+  background: #ffe2e7;
+  color: var(--rose);
+}
+
+.item-title {
+  display: flex !important;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 10px;
+  margin: 0;
+}
+
+.item-meta {
+  color: var(--muted);
+  font-size: 0.88rem;
+  font-weight: 700;
+}
+
+.item-sub {
+  margin: 0;
+  color: var(--muted);
+  font-size: 0.88rem;
+  overflow-wrap: anywhere;
+}
+
+.item-sub code {
+  font-size: 0.82rem;
+}
+
+/* Module einer Quelle: eigene Zeilen unter der Quelle, gleiche Form wie installierte Module */
+.module-source > .module-available,
+.module-source > .error,
+.module-source > .muted {
+  flex-basis: 100%;
+}
+
+.module-available {
+  margin: 4px 0 0;
+  padding: 0;
+}
+
+.module-available .device-row {
+  background: var(--paper);
+}
+
+.badge:not([class*="badge--"]) {
+  background: rgba(0, 0, 0, 0.07);
+}
+
+/* „Mehr“-Menü für seltene Aktionen in Listenzeilen */
+.more-menu {
+  position: relative;
+}
+
+.more-menu > summary {
+  list-style: none;
+  min-height: 38px;
+  padding: 0 14px;
+  font-size: 0.92rem;
+}
+
+.more-menu > summary::-webkit-details-marker {
+  display: none;
+}
+
+.more-menu__list {
+  position: absolute;
+  right: 0;
+  top: calc(100% + 4px);
+  z-index: 20;
+  display: grid;
+  gap: 4px;
+  min-width: 200px;
+  padding: 6px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  background: var(--paper);
+  box-shadow: var(--shadow);
+}
+
+.more-menu__list button,
+.more-menu__list a {
+  justify-content: flex-start;
+  width: 100%;
+  min-height: 36px;
+  border: 0;
+  text-align: left;
+}
+
+.admin-modules .section-title-row h3 {
+  margin: 0;
+}
+
+/* Erster Abschnitt einer Karte braucht keine Trennlinie über sich. */
+.admin-panel > :first-child,
+.login-panel > :first-child,
+.admin-panel--module > :first-child > :first-child {
+  margin-top: 0;
+  padding-top: 0;
+  border-top: 0;
+}
+
+.admin-panel--module {
+  display: block;
+}
+
+/* Gruppen in Formularen: gleiche Karte wie Listenzeilen statt Browser-Standardrahmen */
+fieldset {
+  display: grid;
+  gap: 12px;
+  min-width: 0;
+  margin: 0;
+  padding: 12px 16px 16px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--surface);
+}
+
+legend {
+  padding: 0 6px;
+  color: var(--ink);
+  font-weight: 800;
+}
+
+/* Kurze Formulare (Invite, Allowlist, Rolle): Felder nebeneinander, Knopf darunter links */
+.admin-form.inline-form {
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  align-items: end;
+}
+
+.admin-form.inline-form > :not(label) {
+  grid-column: 1 / -1;
+  justify-self: start;
+}
+
+.admin-modules > .section-title-row {
+  margin-top: 16px;
+}
+
+/* Handy: Aktionen stehen immer in einer eigenen Zeile unter den Infos, linksbündig. */
+@media (max-width: 760px) {
+  .device-row > .device-actions {
+    flex-basis: 100%;
+    justify-content: flex-start;
+  }
+
+  .more-menu__list {
+    left: 0;
+    right: auto;
+  }
+}
+
+/*
+ * Inhaltskarte für Seiten ohne eigenen Rahmen (vor allem Modulseiten). Module bekommen damit
+ * dieselbe Karte wie Admin und Profil; Bausteine darin (für Module stabil, siehe SDK-README):
+ *   .empty-state   Leerzustand
+ *   details        aufklappbarer Abschnitt (Trennlinie, fette Überschrift, Pfeil)
+ *   .device-list / .device-row / .item-title / .item-sub / .device-actions   Listenzeilen
+ *   .badge(--ok|--warn|--danger), .button-link(.secondary), button(.secondary|.danger)
+ */
+.page-card {
+  display: grid;
+  gap: 16px;
+  padding: 24px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--paper);
+  box-shadow: var(--shadow);
+}
+
+.page-card > section,
+.page-card > div > section {
+  display: grid;
+  gap: 16px;
+  min-width: 0;
+}
+
+.empty-state {
+  margin: 0;
+  padding: 18px;
+  border: 1px dashed var(--line);
+  border-radius: var(--radius);
+  color: var(--muted);
+  text-align: center;
+}
+
+.page-card details {
+  border-top: 1px solid var(--line);
+  padding-top: 12px;
+}
+
+.page-card details > summary,
+details.collapsible > summary {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 36px;
+  font-weight: 800;
+  cursor: pointer;
+  list-style: none;
+}
+
+.page-card details > summary::-webkit-details-marker,
+details.collapsible > summary::-webkit-details-marker {
+  display: none;
+}
+
+.page-card details > summary::before,
+details.collapsible > summary::before {
+  content: "›";
+  display: inline-block;
+  width: 1em;
+  color: var(--muted);
+  font-size: 1.2em;
+  line-height: 1;
+  transition: transform 120ms ease;
+}
+
+.page-card details[open] > summary::before,
+details.collapsible[open] > summary::before {
+  transform: rotate(90deg);
+}
+
+.page-card details[open] > summary {
+  margin-bottom: 8px;
+}
+
+@media (max-width: 760px) {
+  .page-card {
+    padding: 16px;
+  }
+}
+
+/* Knopfreihen in Karten: Knöpfe und Knopf-Links so breit wie ihr Text (Handy: untereinander, volle Breite). */
+.page-card .action-row > button,
+.page-card .action-row > .button-link {
+  flex: 0 0 auto;
+}
+
+@media (max-width: 760px) {
+  .page-card .action-row > button,
+  .page-card .action-row > .button-link {
+    width: 100%;
+  }
 }

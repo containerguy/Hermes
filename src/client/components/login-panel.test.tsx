@@ -173,16 +173,16 @@ describe("LoginPanel pairing redemption", () => {
     );
 
     const text = rendered.container.textContent || "";
-    expect(text).toContain("Profil und E-Mail aktuell halten.");
-    expect(text).toContain("Push vor dem Match testen.");
+    expect(text).toContain("Profil und E-Mail aktuell halten");
+    expect(text).toContain("Push vor dem Match testen");
     expect(text).toContain("Die Mitspielzentrale sendet Standard-Browser-Benachrichtigungen.");
     expect(text).toContain("Klingeltöne und garantiertes Audio kann sie nicht erzwingen.");
     expect(text).toMatch(/HTTPS|sicheren Kontext|Lokal|HTTP/);
     expect(rendered.container.querySelector(".runtime-callout")).toBeTruthy();
     expect(text).toContain("Mitspielzentrale wie eine App nutzen");
-    expect(text).toContain("Weiteres Gerät verbinden.");
-    expect(text).toContain("Angemeldete Geräte im Blick behalten.");
-    expect(text).toContain("Keine Geräte geladen.");
+    expect(text).toContain("Weiteres Gerät verbinden");
+    expect(text).toContain("Angemeldete Geräte im Blick behalten");
+    expect(text).toContain("Keine Geräte geladen");
     expect(text).toContain("Aktualisieren lädt deine aktiven Sessions.");
 
     await rendered.cleanup();
