@@ -168,7 +168,6 @@ describe("ui correctness structure contracts", () => {
       kioskStreamPath: "stream",
       kioskStreamSecret: "",
       kioskMainEventId: "",
-      featuresGamePresenceEnabled: false,
       ampIntegrationEnabled: false,
       ampBaseUrl: "",
       ampAutoStartOnReady: false,

@@ -315,20 +315,6 @@ export function AdminPanelBetrieb({
         <>
           <form id="admin-betrieb" onSubmit={onSaveSettings} className="admin-form">
             <fieldset className="admin-fieldset">
-              <legend>{t("admin.features.presence.legend")}</legend>
-              <label className="checkbox-label">
-                <input
-                  type="checkbox"
-                  checked={settings.featuresGamePresenceEnabled}
-                  onChange={(event) =>
-                    onSettingsChange({ ...settings, featuresGamePresenceEnabled: event.target.checked })
-                  }
-                />
-                {t("admin.features.presence.enable")}
-              </label>
-              <p className="muted">{t("admin.features.presence.help")}</p>
-            </fieldset>
-            <fieldset className="admin-fieldset">
               <legend>{t("admin.amp.title")}</legend>
               <label className="checkbox-label">
                 <input

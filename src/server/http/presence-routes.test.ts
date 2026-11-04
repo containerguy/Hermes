@@ -3,15 +3,17 @@ import os from "node:os";
 import path from "node:path";
 import { randomUUID } from "node:crypto";
 import request from "supertest";
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { CSRF_HEADER } from "../auth/csrf";
 import { bootstrapAdmin } from "../db/bootstrap-admin";
 import { createMatchdeskApp } from "../app";
+import { bundledModulesDir } from "../modules/bundled";
 
 type StartedApp = Awaited<ReturnType<typeof createMatchdeskApp>>;
 
 let started: StartedApp | undefined;
 let databasePath: string;
+let modulesDir: string;
 
 async function login(agent: ReturnType<typeof request.agent>, username: string) {
   await agent.post("/api/auth/request-code").send({ username }).expect(202);
@@ -42,7 +44,8 @@ describe("Spielt gerade (presence)", () => {
       delete process.env.MATCHDESK_VAPID_PUBLIC_KEY;
       delete process.env.MATCHDESK_VAPID_PRIVATE_KEY;
       await bootstrapAdmin();
-      started = await createMatchdeskApp();
+      modulesDir = fs.mkdtempSync(path.join(os.tmpdir(), "matchdesk-modules-"));
+      started = await createMatchdeskApp({ modules: { modulesDir } });
     },
     30_000
   );
@@ -50,18 +53,26 @@ describe("Spielt gerade (presence)", () => {
   afterEach(async () => {
     await started?.close();
     started = undefined;
+    fs.rmSync(modulesDir, { recursive: true, force: true });
 
     for (const suffix of ["", "-wal", "-shm"]) {
       fs.rmSync(`${databasePath}${suffix}`, { force: true });
     }
   });
 
+  /**
+   * „Spielt gerade“ ist seit 0.17 ein Modul: einschalten = aus dem eingebauten Startpaket
+   * installieren bzw. wieder einschalten, ausschalten = Modul abschalten. Die Tests laufen über die
+   * alten Pfade /api/presence, die der Kern auf /api/m/presence umschreibt.
+   */
   async function enablePresence(agent: ReturnType<typeof request.agent>, csrf: string, enabled: boolean) {
-    const current = await agent.get("/api/admin/settings").expect(200);
+    if (enabled && !started!.modules.getModule("presence")) {
+      await started!.modules.installBundled(fs.readFileSync(path.join(bundledModulesDir(), "presence-1.0.0.tgz")));
+      return;
+    }
     await agent
-      .put("/api/admin/settings")
+      .post(`/api/admin/modules/presence/${enabled ? "enable" : "disable"}`)
       .set(CSRF_HEADER, csrf)
-      .send({ ...current.body.settings, featuresGamePresenceEnabled: enabled })
       .expect(200);
   }
 
@@ -69,8 +80,7 @@ describe("Spielt gerade (presence)", () => {
     const admin = request.agent(started!.app);
     await login(admin, "hauptadmin");
     await admin.get("/api/presence").expect(404);
-    const settings = await request(started!.app).get("/api/settings/public").expect(200);
-    expect(settings.body.settings.featuresGamePresenceEnabled).toBe(false);
+    await admin.get("/api/m/presence").expect(404);
   });
 
   it("accepts agent reports with a full API token and lists them for logged-in users", async () => {
@@ -115,9 +125,10 @@ describe("Spielt gerade (presence)", () => {
     await request(started!.app).delete("/api/presence/game").set("Authorization", `Bearer ${token}`).expect(204);
     const after = await admin.get("/api/presence").expect(200);
     expect(after.body.players).toEqual([]);
-    // Im Testlauf gibt es kein mitgebautes agent/-Verzeichnis.
-    expect(after.body.agentAvailable).toBe(false);
-    await admin.get("/api/presence/agent/download").expect(404);
+    // Das Startpaket bringt den Windows-Agenten mit.
+    expect(after.body.agentAvailable).toBe(true);
+    const download = await admin.get("/api/presence/agent/download").expect(200);
+    expect(download.headers["content-disposition"]).toContain("matchdesk-game-agent.exe");
   });
 
   it("rejects read-only tokens and session writes without CSRF", async () => {
@@ -261,43 +272,5 @@ describe("Spielt gerade (presence)", () => {
     await request(started!.app).get("/api/presence/accounts/me").set("Authorization", `Bearer ${body.key}`).expect(401);
     await enablePresence(admin, csrf, false);
     await admin.get("/api/presence/accounts").expect(404);
-  });
-});
-
-describe("Spielt gerade: Agent-Download", () => {
-  it("serves the bundled agent to logged-in users only while enabled", async () => {
-    const express = (await import("express")).default;
-    const { createPresenceRouter } = await import("./presence-routes");
-    const { createPresenceStore } = await import("../domain/presence/game-presence");
-    const dir = fs.mkdtempSync(path.join(os.tmpdir(), "matchdesk-agent-"));
-    const agentPath = path.join(dir, "matchdesk-game-agent.exe");
-    fs.writeFileSync(agentPath, "MZ-test");
-
-    let enabled = true;
-    let loggedIn = true;
-    const fakeContext = {} as never;
-    const settingsModule = await import("../settings");
-    const authModule = await import("../auth/current-user");
-    const settingsSpy = vi
-      .spyOn(settingsModule, "readSettings")
-      .mockImplementation(() => ({ ...settingsModule.defaultSettings, featuresGamePresenceEnabled: enabled }));
-    const userSpy = vi
-      .spyOn(authModule, "requireUser")
-      .mockImplementation(() => (loggedIn ? ({ id: "u1" } as never) : undefined));
-
-    const app = express();
-    app.use("/api/presence", createPresenceRouter(fakeContext, createPresenceStore(), { agentPath }));
-
-    const ok = await request(app).get("/api/presence/agent/download").expect(200);
-    expect(ok.headers["content-disposition"]).toContain("matchdesk-game-agent.exe");
-    loggedIn = false;
-    await request(app).get("/api/presence/agent/download").expect(401);
-    loggedIn = true;
-    enabled = false;
-    await request(app).get("/api/presence/agent/download").expect(404);
-
-    settingsSpy.mockRestore();
-    userSpy.mockRestore();
-    fs.rmSync(dir, { recursive: true, force: true });
   });
 });

@@ -13,8 +13,6 @@ import { createPushRouter } from "./http/push-routes";
 import { createRealtimeRouter } from "./http/realtime-routes";
 import { createKioskRouter } from "./http/kiosk-routes";
 import { createAmpIntegrationRouter } from "./http/amp-routes";
-import { createPresenceRouter } from "./http/presence-routes";
-import { createPresenceStore } from "./domain/presence/game-presence";
 import { startAmpStatusService, stopAmpStatusService } from "./integrations/amp/amp-status";
 import { startAmpAutomation, stopAmpAutomation } from "./integrations/amp/amp-automation";
 import { createDb } from "./db/client";
@@ -125,14 +123,20 @@ export async function createMatchdeskApp(options: CreateMatchdeskAppOptions = {}
   app.use("/api/realtime", createRealtimeRouter(context));
   app.use("/api/kiosk", createKioskRouter(context));
   app.use("/api/integrations/amp", createAmpIntegrationRouter(context));
-  const presenceStore = createPresenceStore();
-  app.use("/api/presence", createPresenceRouter(context, presenceStore));
   app.use("/api/modules", createPublicModulesRouter(context, modules));
   // Übergang für eine Version: Pizza war bis 0.16 unter /api/pizza eingebaut. Die alten Pfade werden
   // intern auf das Modul umgeschrieben (keine HTTP-Weiterleitung, damit POST-Bodies erhalten bleiben).
+  // Ebenso „Spielt gerade“ unter /api/presence (ältere Windows-Agenten melden noch dorthin).
   app.use((request, _response, next) => {
-    if (request.url === "/api/pizza" || request.url.startsWith("/api/pizza/") || request.url.startsWith("/api/pizza?")) {
-      request.url = `/api/m/pizza${request.url.slice("/api/pizza".length)}`;
+    for (const [legacy, moduleId] of [
+      ["/api/pizza", "pizza"],
+      ["/api/presence", "presence"]
+    ] as const) {
+      const rest = request.url.slice(legacy.length);
+      if (request.url.startsWith(legacy) && (rest === "" || rest.startsWith("/") || rest.startsWith("?"))) {
+        request.url = `/api/m/${moduleId}${rest}`;
+        break;
+      }
     }
     next();
   });
@@ -149,13 +153,6 @@ export async function createMatchdeskApp(options: CreateMatchdeskAppOptions = {}
   const statusInterval = setInterval(() => {
     if (refreshEventStatuses(context)) {
       broadcastEventsChanged("status_refreshed");
-    }
-    // „Spielt gerade“: Agent meldet sich nicht mehr (PC aus, Agent beendet) → Eintrag verschwindet.
-    // Abgeschaltet: nichts aufheben, damit beim Wiedereinschalten keine alten Einträge auftauchen.
-    if (readSettings(context).featuresGamePresenceEnabled) {
-      presenceStore.sweep();
-    } else {
-      presenceStore.clearAll();
     }
   }, 30_000);
 

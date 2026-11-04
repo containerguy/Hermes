@@ -51,7 +51,6 @@ const defaultSettings: AppSettings = {
   kioskStreamPath: "stream",
   kioskStreamSecret: "",
   kioskMainEventId: "",
-  featuresGamePresenceEnabled: false,
   ampIntegrationEnabled: false,
   ampBaseUrl: "",
   ampAutoStartOnReady: false,
@@ -79,13 +78,15 @@ function profileInitials(user: User): string {
 
 /**
  * Alte Hashes umbiegen: Admin (#admin-design → #admin/design) und bis 0.16 eingebaute Funktionen,
- * die jetzt Module sind (#pizza → #m/pizza, z. B. aus alten Push-Benachrichtigungen).
+ * die jetzt Module sind (#pizza → #m/pizza, #playing → #m/presence, z. B. aus alten Push-Benachrichtigungen).
  */
 function normalizeLegacyHash(rawHash: string): string {
   const legacy = rawHash.match(/^#admin-([a-z]+)(.*)$/);
   if (legacy) return `#admin/${legacy[1]}${legacy[2]}`;
-  const moved = rawHash.match(/^#(pizza)(\/.*)?$/);
-  return moved ? `#m/${moved[1]}${moved[2] ?? ""}` : rawHash;
+  const moved = rawHash.match(/^#(pizza|playing)(\/.*)?$/);
+  if (moved) return `#m/${moved[1] === "playing" ? "presence" : moved[1]}${moved[2] ?? ""}`;
+  // Spielkonten liegen jetzt im Profilbereich des Moduls.
+  return rawHash.replace(/^#login\/spielkonten\b/, "#login/m-presence");
 }
 
 function normalizeDocumentPath(path: string) {
@@ -328,12 +329,12 @@ function AppShell({
     return () => window.removeEventListener("hashchange", syncHash);
   }, []);
 
-  const navContext: NavContext = useMemo(
-    () => ({ currentUser, settings: appSettings }),
-    [currentUser, appSettings]
-  );
   const { locale } = useI18n();
-  const runtimeModules = useRuntimeModules(currentUser);
+  const runtimeModules = useRuntimeModules(currentUser, locale);
+  const navContext: NavContext = useMemo(
+    () => ({ currentUser, settings: appSettings, runtimeModules, locale }),
+    [currentUser, appSettings, runtimeModules, locale]
+  );
   // Kernseiten plus Menüpunkte der aktiven Laufzeit-Module (GET /api/modules).
   const pages = useMemo(
     () =>

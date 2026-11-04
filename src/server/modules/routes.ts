@@ -149,7 +149,11 @@ export function createPublicModulesRouter(context: DatabaseContext, manager: Mod
   const router = Router();
   router.get("/", (request, response) => {
     const user = requireUser(context, request);
-    response.json({ matchdeskApi: MATCHDESK_MODULE_API, modules: manager.publicModules(user) });
+    const locale = typeof request.query.locale === "string" && /^(de|en)/.test(request.query.locale) ? request.query.locale : undefined;
+    response.json({
+      matchdeskApi: MATCHDESK_MODULE_API,
+      modules: manager.publicModules(user && locale ? { ...user, locale } : user)
+    });
   });
   return router;
 }

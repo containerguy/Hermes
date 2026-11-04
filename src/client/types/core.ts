@@ -99,8 +99,6 @@ export type AppSettings = {
   kioskStreamSecret: string;
   /** Kiosk zeigt nur dieses Event (leer = alle laufenden Events gruppiert). */
   kioskMainEventId: string;
-  /** „Spielt gerade“ (Windows-Agent meldet laufende Spiele); Standard `false`. */
-  featuresGamePresenceEnabled: boolean;
   /** CubeCoders AMP: Instanzen beim Event-Anlegen auswählbar (serverseitig konfiguriert). */
   ampIntegrationEnabled: boolean;
   /** Basis-URL des AMP-Controllers ohne /API, z. B. https://amp-ctl.lanparty.example */
@@ -212,7 +210,6 @@ export type PublicAppSettings = Pick<
   | "defaultLocale"
   | "kioskStreamEnabled"
   | "kioskStreamPath"
-  | "featuresGamePresenceEnabled"
   | "ampIntegrationEnabled"
 >;
 

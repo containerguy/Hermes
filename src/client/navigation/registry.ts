@@ -1,6 +1,7 @@
 import type { ReactNode } from "react";
 import type { AppSettings, User } from "../types/core";
 import type { TFunction } from "../i18n/I18nContext";
+import type { RuntimeModuleInfo } from "../modules/types";
 
 /**
  * Zentrale Menüliste der App.
@@ -14,6 +15,9 @@ import type { TFunction } from "../i18n/I18nContext";
 export type NavContext = {
   currentUser: User | null;
   settings: AppSettings;
+  /** Aktive Laufzeit-Module (GET /api/modules) für Profilbereiche und Startseiten-Hinweise. */
+  runtimeModules?: RuntimeModuleInfo[];
+  locale?: string;
 };
 
 export type PageHero = {

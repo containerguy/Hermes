@@ -40,8 +40,10 @@ describe("restorable tables", () => {
       "pizza_orders",
       "pizza_order_lines",
       "pizza_order_line_extras",
-      // „Spielt gerade“: Agent-Schlüssel wie API-Tokens nicht im Restore; neu einrichten genügt.
-      "game_agent_keys",
+      // Ebenso „Spielt gerade“ (Modul presence).
+      "presence_agent_keys",
+      "presence_game_accounts",
+      "presence_game_account_prefs",
       "pairing_tokens",
       "rate_limit_allowlist",
       "rate_limit_entries",

@@ -83,7 +83,6 @@ const defaultSettings: AppSettings = {
   kioskStreamPath: "stream",
   kioskStreamSecret: "",
   kioskMainEventId: "",
-  featuresGamePresenceEnabled: false,
   ampIntegrationEnabled: false,
   ampBaseUrl: "",
   ampAutoStartOnReady: false,

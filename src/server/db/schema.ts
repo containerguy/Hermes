@@ -568,44 +568,8 @@ export const inviteCodeUses = sqliteTable(
   (table) => [uniqueIndex("invite_code_uses_user_unique").on(table.userId)]
 );
 
-/** 0035: Spielkonten pro Benutzer (Steam vom Agenten, Rest manuell). */
-export const userGameAccounts = sqliteTable(
-  "user_game_accounts",
-  {
-    userId: text("user_id")
-      .notNull()
-      .references(() => users.id, { onDelete: "cascade" }),
-    platform: text("platform", { enum: ["steam", "ea", "battlenet", "epic", "ubisoft"] }).notNull(),
-    accountId: text("account_id").notNull(),
-    displayName: text("display_name"),
-    source: text("source", { enum: ["agent", "manual"] }).notNull(),
-    pendingAccountId: text("pending_account_id"),
-    pendingDisplayName: text("pending_display_name"),
-    updatedAt: text("updated_at").notNull()
-  },
-  (table) => [primaryKey({ columns: [table.userId, table.platform] })]
-);
-
-export const userGameAccountPrefs = sqliteTable("user_game_account_prefs", {
-  userId: text("user_id")
-    .primaryKey()
-    .references(() => users.id, { onDelete: "cascade" }),
-  promptDismissedAt: text("prompt_dismissed_at")
-});
-
-/** 0032: „Spielt gerade“ – ein Agent-Schlüssel pro Benutzer, darf nur Spiele melden. */
-export const gameAgentKeys = sqliteTable(
-  "game_agent_keys",
-  {
-    userId: text("user_id")
-      .primaryKey()
-      .references(() => users.id, { onDelete: "cascade" }),
-    keyHash: text("key_hash").notNull(),
-    createdAt: text("created_at").notNull(),
-    lastUsedAt: text("last_used_at")
-  },
-  (table) => [uniqueIndex("game_agent_keys_key_hash_unique").on(table.keyHash)]
-);
+/* Die Tabellen presence_* (bis 0.16 user_game_accounts, user_game_account_prefs, game_agent_keys)
+ * gehören seit 0.17 dem Modul „presence“ (matchdesk-modules). */
 
 export const pairingTokens = sqliteTable(
   "pairing_tokens",

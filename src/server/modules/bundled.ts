@@ -8,7 +8,7 @@ import type { ModuleManager } from "./manager";
 /**
  * Umstieg von fest eingebauten Funktionen auf Module (Matchdesk 0.17).
  *
- * Pizza (und später „Spielt gerade“) waren bis 0.16 Teil des Kerns und ließen sich in den
+ * Pizza und „Spielt gerade“ waren bis 0.16 Teil des Kerns und ließen sich in den
  * Einstellungen einschalten. Beim ersten Start nach dem Update installiert der Kern das Modul aus
  * einem mitgelieferten Paket, wenn die Funktion eingeschaltet war – auch ohne Internet. Daten
  * bleiben in ihren Tabellen, die alten Einstellungen wandern in die Modul-Einstellungen. Danach
@@ -37,6 +37,12 @@ export const BUNDLED_TRANSITIONS: BundledTransition[] = [
       pizzaPaypalName: "paypalName",
       pizzaCashRecipient: "cashRecipient"
     }
+  },
+  {
+    moduleId: "presence",
+    file: "presence-1.0.0.tgz",
+    featureKey: "featuresGamePresenceEnabled",
+    settings: {}
   }
 ];
 

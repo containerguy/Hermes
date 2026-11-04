@@ -64,9 +64,6 @@ let snapshotTimer: NodeJS.Timeout | undefined;
 
 export const restorableTables = [
   "users",
-  // Spielkonten hängen nur am Benutzer
-  "user_game_accounts",
-  "user_game_account_prefs",
   "login_challenges",
   "devices",
   "sessions",

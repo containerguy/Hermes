@@ -6,7 +6,7 @@ import { InfosPage } from "../components/InfosPage";
 import { LoginPage } from "../components/LoginPage";
 import { MainEventPrompt } from "../components/MainEventPrompt";
 import { MainEventsPanel } from "../components/MainEventsPanel";
-import { GameAccountsPrompt } from "../presence/GameAccountsPrompt";
+import { ModuleNotices, ModuleProfileSection } from "../modules/runtime";
 import { type ProfileSectionId, profileSectionIds } from "../components/LoginPanel";
 import { LoginRequired } from "./LoginRequired";
 import { NAV_ICONS } from "./icons";
@@ -69,7 +69,6 @@ const adminGroupLabelKeys = {
 
 const profileLabelKeys = {
   konto: "main.profile.nav.account",
-  spielkonten: "main.profile.nav.gameAccounts",
   benachrichtigungen: "main.profile.nav.notifications",
   geraete: "main.profile.nav.devices",
   tokens: "main.profile.nav.tokens"
@@ -83,6 +82,12 @@ function canOrganizeRounds(ctx: NavContext) {
 
 function canManageAnyMainEvent(ctx: NavContext) {
   return hasPermissionAnywhere(ctx.currentUser, "main_events.manage");
+}
+
+function profileModules(ctx: NavContext) {
+  return (ctx.runtimeModules ?? [])
+    .filter((info) => info.profile && info.clientUrl)
+    .sort((a, b) => a.profile!.order - b.profile!.order || a.id.localeCompare(b.id));
 }
 
 function firstSegment(subPath: string) {
@@ -120,8 +125,8 @@ export function createCoreModule(moduleAdminSections: AdminNavEntry[]): AppModul
         render: (ctx) => (
           <>
             {ctx.currentUser ? <MainEventPrompt currentUserId={ctx.currentUser.id} /> : null}
-            {ctx.currentUser && ctx.settings.featuresGamePresenceEnabled ? (
-              <GameAccountsPrompt currentUserId={ctx.currentUser.id} />
+            {ctx.currentUser && ctx.runtimeModules ? (
+              <ModuleNotices modules={ctx.runtimeModules} locale={ctx.locale ?? "de"} user={ctx.currentUser} />
             ) : null}
             <EventBoard
               currentUser={ctx.currentUser}
@@ -253,14 +258,22 @@ export function createCoreModule(moduleAdminSections: AdminNavEntry[]): AppModul
         subnavLabel: (t) => t("main.profile.subnav"),
         subnav: (t, ctx) =>
           ctx.currentUser
-            ? profileSectionIds
-                .filter((slug) => slug !== "spielkonten" || ctx.settings.featuresGamePresenceEnabled)
-                .map((slug) => ({ slug, label: t(profileLabelKeys[slug]) }))
+            ? [
+                ...profileSectionIds.slice(0, 1).map((slug) => ({ slug, label: t(profileLabelKeys[slug]) })),
+                // Profilbereiche der Module direkt nach „Konto“ (z. B. Spielkonten aus „Spielt gerade“).
+                ...profileModules(ctx).map((info) => ({ slug: `m-${info.id}`, label: info.profile!.label })),
+                ...profileSectionIds.slice(1).map((slug) => ({ slug, label: t(profileLabelKeys[slug]) }))
+              ]
             : [],
         render: (ctx) => {
           const slug = firstSegment(ctx.subPath);
-          const available = slug !== "spielkonten" || ctx.settings.featuresGamePresenceEnabled;
-          const section: ProfileSectionId = available && (profileSectionIds as readonly string[]).includes(slug)
+          const moduleSection = slug.startsWith("m-")
+            ? profileModules(ctx).find((info) => `m-${info.id}` === slug)
+            : undefined;
+          if (moduleSection && ctx.currentUser) {
+            return <ModuleProfileSection info={moduleSection} locale={ctx.locale ?? "de"} user={ctx.currentUser} />;
+          }
+          const section: ProfileSectionId = (profileSectionIds as readonly string[]).includes(slug)
             ? (slug as ProfileSectionId)
             : "konto";
           return (

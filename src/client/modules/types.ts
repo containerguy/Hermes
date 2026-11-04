@@ -8,6 +8,10 @@ export type RuntimeModuleInfo = {
   name: string;
   clientUrl: string | null;
   adminPage: boolean;
+  /** Eigener Profilbereich (`#login/m-<id>`), falls das Modul einen hat. */
+  profile?: { label: string; order: number } | null;
+  /** Zeigt `Notice` oben auf der Startseite. */
+  startNotice?: boolean;
   permissions: string[];
   menu: Array<{ path: string; label: string; icon: string | null; order: number }>;
   i18n: { de: Record<string, string>; en: Record<string, string> };
@@ -48,9 +52,17 @@ export type ModuleAdminProps = {
   reloadSettings: () => void;
 };
 
+export type ModuleProfileProps = { user: User };
+
+export type ModuleNoticeProps = { user: User };
+
 export type ModuleClientDefinition = {
   Page?: React.ComponentType<ModulePageProps>;
   Admin?: React.ComponentType<ModuleAdminProps>;
+  /** Bereich im Profil (Manifest `profile`). */
+  Profile?: React.ComponentType<ModuleProfileProps>;
+  /** Hinweis auf der Startseite (Manifest `startNotice`); rendert `null`, wenn nichts zu sagen ist. */
+  Notice?: React.ComponentType<ModuleNoticeProps>;
 };
 
 export type ModuleClientFactory = (host: ModuleClientHost) => ModuleClientDefinition;

@@ -36,7 +36,6 @@ const settings: AppSettings = {
   kioskStreamPath: "stream",
   kioskStreamSecret: "",
   kioskMainEventId: "",
-  featuresGamePresenceEnabled: false,
   ampIntegrationEnabled: true,
   ampBaseUrl: "https://amp-ctl.example.test",
   ampAutoStartOnReady: false,

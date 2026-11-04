@@ -69,11 +69,6 @@ const settingsObjectSchema = z.object({
   /** Kiosk zeigt nur dieses Event (leer = alle laufenden Events gruppiert); `&event=` in der URL hat Vorrang. */
   kioskMainEventId: z.string().max(64),
   /**
-   * „Spielt gerade“: Spieler-PCs melden über den Windows-Agenten (tools/game-agent), welches
-   * Spiel läuft. Standard `false`: Routen liefern 404, Menüpunkt bleibt verborgen.
-   */
-  featuresGamePresenceEnabled: z.boolean(),
-  /**
    * CubeCoders AMP: Gameserver-Modul. Zugangsdaten und CA kommen ausschließlich aus der Umgebung
    * (MATCHDESK_AMP_USERNAME, MATCHDESK_AMP_PASSWORD, MATCHDESK_AMP_CA_FILE), nie aus app_settings.
    */
@@ -154,7 +149,6 @@ export type PublicMatchdeskSettings = Pick<
   | "defaultLocale"
   | "kioskStreamEnabled"
   | "kioskStreamPath"
-  | "featuresGamePresenceEnabled"
   | "ampIntegrationEnabled"
 >;
 
@@ -179,7 +173,6 @@ export function pickPublicSettings(full: MatchdeskSettings): PublicMatchdeskSett
     defaultLocale: full.defaultLocale,
     kioskStreamEnabled: full.kioskStreamEnabled,
     kioskStreamPath: full.kioskStreamPath,
-    featuresGamePresenceEnabled: full.featuresGamePresenceEnabled,
     ampIntegrationEnabled: full.ampIntegrationEnabled
   };
 }
@@ -210,7 +203,6 @@ export const defaultSettings: MatchdeskSettings = {
   kioskStreamPath: "stream",
   kioskStreamSecret: "",
   kioskMainEventId: "",
-  featuresGamePresenceEnabled: false,
   ampIntegrationEnabled: false,
   ampBaseUrl: "",
   ampAutoStartOnReady: false,

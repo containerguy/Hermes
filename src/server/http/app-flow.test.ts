@@ -1172,7 +1172,6 @@ describe("app flow", () => {
       kioskStreamPath: "stream",
       kioskStreamSecret: "",
       kioskMainEventId: "",
-      featuresGamePresenceEnabled: false,
       ampIntegrationEnabled: false,
       ampBaseUrl: "",
       ampAutoStartOnReady: true,
