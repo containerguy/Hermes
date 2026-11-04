@@ -5,7 +5,7 @@ import { z } from "zod";
 import { requireCsrf } from "../auth/csrf";
 import { publicUser, requireAdmin, requireUser } from "../auth/current-user";
 import { enforceApiTokenWriteAccess } from "../auth/matchdesk-auth";
-import { listAuditLogs, tryWriteAuditLog } from "../audit-log";
+import { auditLogFacets, countAuditLogs, listAuditLogs, tryWriteAuditLog, type AuditLogQuery } from "../audit-log";
 import {
   addRateLimitAllowlist,
   clearRateLimitBlock,
@@ -250,8 +250,19 @@ export function createAdminRouter(context: DatabaseContext) {
   });
 
   router.get("/audit-log", (request, response) => {
-    const limit = Number(request.query.limit ?? "100");
-    response.json({ auditLogs: listAuditLogs(context, limit) });
+    const text = (key: string) => (typeof request.query[key] === "string" ? (request.query[key] as string) : undefined);
+    const query: AuditLogQuery = {
+      limit: Number(text("limit") ?? "100"),
+      offset: Number(text("offset") ?? "0"),
+      q: text("q")?.slice(0, 200),
+      action: text("action"),
+      actor: text("actor")
+    };
+    response.json({
+      auditLogs: listAuditLogs(context, query),
+      total: countAuditLogs(context, query),
+      ...auditLogFacets(context)
+    });
   });
 
   router.get("/rate-limits", (request, response) => {

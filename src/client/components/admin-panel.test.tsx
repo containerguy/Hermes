@@ -446,7 +446,6 @@ describe("AdminPanel bulk import UX", () => {
     expect(text).toContain("1 User per Bulk-Import angelegt.");
     expect(text).toContain("anna@example.test");
     expect(usersLoadCount).toBeGreaterThanOrEqual(2);
-    expect(auditLoadCount).toBeGreaterThanOrEqual(2);
 
     await rendered.cleanup();
   });

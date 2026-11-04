@@ -2,7 +2,6 @@ import React, { FormEvent, useEffect, useRef, useState } from "react";
 import type {
   AdminSection,
   AppSettings,
-  AuditLogEntry,
   BulkImportCommitResponse,
   BulkImportFormat,
   BulkImportPreviewResponse,
@@ -93,7 +92,6 @@ export function AdminPanel({
   onSettingsChanged: (settings: AppSettings) => void;
 }) {
   const [users, setUsers] = useState<User[]>([]);
-  const [auditLogs, setAuditLogs] = useState<AuditLogEntry[]>([]);
   const [inviteCodes, setInviteCodes] = useState<InviteCode[]>([]);
   const [rateLimits, setRateLimits] = useState<RateLimitEntry[]>([]);
   const [rateLimitAllowlist, setRateLimitAllowlist] = useState<RateLimitAllowlistEntry[]>([]);
@@ -254,14 +252,12 @@ export function AdminPanel({
     const [
       userResult,
       settingsResult,
-      auditResult,
       inviteResult,
       rateLimitResult,
       allowlistResult
     ] = await Promise.all([
       requestJson<{ users: User[] }>("/api/admin/users"),
       requestJson<{ settings: AppSettings; storage?: StorageInfo }>("/api/admin/settings"),
-      requestJson<{ auditLogs: AuditLogEntry[] }>("/api/admin/audit-log?limit=80"),
       requestJson<{ inviteCodes: InviteCode[] }>("/api/admin/invite-codes"),
       requestJson<{ rateLimits: RateLimitEntry[] }>("/api/admin/rate-limits"),
       requestJson<{ allowlist: RateLimitAllowlistEntry[] }>("/api/admin/rate-limits/allowlist")
@@ -271,7 +267,6 @@ export function AdminPanel({
     setSavedSettings(settingsResult.settings);
     setGameCatalogDraft(settingsResult.settings.gameCatalog.join("\n"));
     setStorage(settingsResult.storage ?? null);
-    setAuditLogs(auditResult.auditLogs);
     setInviteCodes(inviteResult.inviteCodes);
     setRateLimits(rateLimitResult.rateLimits);
     setRateLimitAllowlist(allowlistResult.allowlist);
@@ -868,7 +863,13 @@ export function AdminPanel({
       ) : null}
 
       {adminSection === "audit" ? (
-        <AdminPanelAudit auditLogs={auditLogs} dateTag={dateTag} onRefresh={() => loadAdminData()} />
+        <AdminPanelAudit
+          dateTag={dateTag}
+          onError={(text) => {
+            setMessage("");
+            setError(text);
+          }}
+        />
       ) : null}
     </section>
   );

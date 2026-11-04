@@ -1580,29 +1580,6 @@ dd {
   min-width: 0;
 }
 
-.audit-list {
-  display: grid;
-  gap: 10px;
-  min-height: 0;
-}
-
-.audit-row {
-  display: grid;
-  gap: 5px;
-  border: 1px solid var(--line);
-  border-radius: 8px;
-  padding: 12px;
-  background: linear-gradient(180deg, var(--paper) 0%, var(--surface) 100%);
-}
-
-.audit-row time,
-.audit-row span {
-  color: var(--muted);
-  font-size: 0.84rem;
-  font-weight: 800;
-  overflow-wrap: anywhere;
-}
-
 .color-grid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -1791,15 +1768,6 @@ dd {
     grid-column: 1 / -1;
   }
 
-  .audit-panel {
-    grid-template-rows: auto minmax(0, 1fr);
-    max-height: calc(100vh - 220px);
-  }
-
-  .audit-list {
-    overflow: auto;
-    overscroll-behavior: contain;
-  }
 }
 
 @media (max-width: 680px) {
@@ -1912,10 +1880,6 @@ dd {
 
   h2 {
     font-size: 1.2rem;
-  }
-
-  .audit-panel {
-    max-height: calc(100vh - 200px);
   }
 }
 
@@ -3846,5 +3810,85 @@ button.side-panel__close {
   .save-bar button {
     flex: 1 1 auto;
     min-width: 0;
+  }
+}
+
+/* Audit-Log als Tabelle mit Seiten */
+.audit-table__time {
+  white-space: nowrap;
+  color: var(--muted);
+}
+
+.audit-table__action {
+  font-size: 0.82rem;
+  overflow-wrap: anywhere;
+}
+
+.audit-table__details summary {
+  cursor: pointer;
+  color: var(--muted);
+  font-size: 0.85rem;
+  font-weight: 700;
+}
+
+.audit-table__details pre {
+  margin: 6px 0 0;
+  max-height: 240px;
+  overflow: auto;
+  padding: 8px;
+  border-radius: 6px;
+  background: var(--surface);
+  font-size: 0.8rem;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.data-pager {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  justify-content: center;
+}
+
+.data-pager button {
+  width: auto;
+}
+
+.data-pager span {
+  color: var(--muted);
+  font-weight: 700;
+}
+
+/* Handy: Audit-Zeilen kompakt, Zeit · Wer · Aktion in einer Zeile unter der Beschreibung */
+@media (max-width: 760px) {
+  .audit-table tbody tr {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    column-gap: 10px;
+    padding: 8px 14px;
+  }
+
+  .audit-table td,
+  .audit-table td.data-table__primary {
+    display: block;
+    padding: 0;
+    color: var(--muted);
+    font-size: 0.84rem;
+  }
+
+  .audit-table td.data-table__primary {
+    flex-basis: 100%;
+    padding-bottom: 4px;
+    color: inherit;
+    font-size: 0.94rem;
+  }
+
+  .audit-table td[data-label]::before {
+    content: none;
+  }
+
+  .audit-panel .data-toolbar select {
+    flex: 1 1 140px;
   }
 }
