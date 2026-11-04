@@ -162,6 +162,24 @@ label {
   margin-left: auto;
 }
 
+.main-event-switcher select {
+  min-height: 38px;
+  max-width: 14rem;
+  padding: 0 10px;
+  border-radius: 999px;
+  border: 1px solid var(--line);
+  background: var(--paper);
+  color: var(--ink);
+  font: inherit;
+  text-overflow: ellipsis;
+}
+
+@media (max-width: 768px) {
+  .main-event-switcher select {
+    max-width: 9rem;
+  }
+}
+
 .profile-nav-trigger {
   display: inline-flex;
   align-items: center;
@@ -3228,4 +3246,49 @@ dd {
 }
 .event-info-calendar input {
   width: 100%;
+}
+
+/* Rundenübersicht gruppiert nach Event: Gruppe übernimmt das Raster der Liste. */
+.event-group {
+  grid-column: 1 / -1;
+  display: grid;
+  grid-template-columns: inherit;
+  gap: inherit;
+  align-content: start;
+  min-width: 0;
+}
+
+.event-group-head {
+  grid-column: 1 / -1;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 12px;
+  padding-bottom: 6px;
+  border-bottom: 1px solid var(--line);
+}
+
+.event-group-head h3 {
+  margin: 0;
+  font-size: 1.05rem;
+}
+
+.event-group-head button {
+  min-height: 32px;
+  padding: 0 10px;
+}
+
+.event-group-head button:last-child {
+  margin-left: auto;
+}
+
+.event-group-status {
+  padding: 2px 8px;
+  border-radius: 999px;
+  border: 1px solid var(--line);
+  font-size: 0.8rem;
+}
+
+.event-group--running .event-group-status {
+  border-color: var(--green);
 }

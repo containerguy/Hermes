@@ -20,6 +20,8 @@ export type User = {
   /** Nur in der Admin-Userliste: über welches Event (Einladungscode pro Event) registriert. */
   registeredViaMainEventId?: string | null;
   registeredViaMainEventName?: string | null;
+  /** Nur am eigenen Benutzer: gewähltes aktuelles Event (globaler Umschalter); null = alle Events. */
+  currentMainEventId?: string | null;
   /** Nur am eigenen Benutzer: wirksame Rechte (Grundrolle plus Vergaben). */
   permissions?: PermissionSummary;
   /** Nur in der Admin-Userliste: aktive Vergaben (Rollen oder Rechte, global oder pro Event). */

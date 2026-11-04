@@ -385,6 +385,34 @@ paths:
         "409":
           description: Nicht geplant (hauptevent_nicht_geplant) oder Obergrenze gleichzeitig laufender Events erreicht (zu_viele_laufende_events, mit limit)
 
+  /api/main-events/current:
+    put:
+      tags: [main-events]
+      summary: Aktuelles Event des eigenen Benutzers setzen (globaler Umschalter)
+      description: >-
+        Gilt als Vorauswahl und Filter auf allen Seiten und Geräten. null = alle Events.
+        Neue Runden ohne mainEventId landen im aktuellen Event, solange es nicht beendet ist.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [mainEventId]
+              properties:
+                mainEventId:
+                  type: string
+                  nullable: true
+      responses:
+        "200":
+          description: Eigener Benutzer mit currentMainEventId
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "404":
+          description: Event nicht gefunden oder nicht sichtbar (hauptevent_nicht_gefunden)
+        "409":
+          description: Event beendet (hauptevent_beendet)
+
   /api/main-events/{id}/participation:
     post:
       tags: [main-events]

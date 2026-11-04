@@ -6,6 +6,7 @@ import { act } from "react-dom/test-utils";
 import { EventBoard } from "./EventBoard";
 import { MainEventsPanel } from "./MainEventsPanel";
 import { MainEventPrompt } from "./MainEventPrompt";
+import { MainEventSwitcher } from "./MainEventSwitcher";
 import { I18nProvider } from "../i18n/I18nContext";
 import { requestJson } from "../api/request";
 import type { GameEvent, MainEvent, User } from "../types/core";
@@ -141,27 +142,86 @@ afterEach(() => {
 });
 
 describe("Events mit Start und Ende – Oberfläche", () => {
-  it("shows only rounds of the running event by default and can switch to all rounds", async () => {
+  it("groups rounds by event and narrows to the current event from the global switcher", async () => {
     installRequests([mainEvent({})]);
     const rendered = await render(<EventBoard currentUser={manager} mode="events" />);
 
     expect(rendered.container.textContent).toContain("Läuft gerade: LAN Herbst");
-    expect(rendered.container.textContent).toContain("Quake");
-    expect(rendered.container.textContent).not.toContain("Solo");
+    const groups = Array.from(rendered.container.querySelectorAll(".event-group")).map((group) =>
+      group.getAttribute("aria-label")
+    );
+    expect(groups).toEqual(["LAN Herbst", "Ohne Event"]);
+    expect(rendered.container.querySelector('.event-group[aria-label="LAN Herbst"]')?.textContent).toContain("Quake");
+    expect(rendered.container.querySelector('.event-group[aria-label="Ohne Event"]')?.textContent).toContain("Solo");
 
-    const filter = rendered.container.querySelector(".board-filter select") as HTMLSelectElement;
+    const collapse = rendered.container.querySelector('.event-group[aria-label="Ohne Event"] button') as HTMLButtonElement;
     await act(async () => {
-      setInputValue(filter, "all");
+      collapse.click();
       await flush();
     });
-    expect(rendered.container.textContent).toContain("Solo");
+    expect(rendered.container.textContent).not.toContain("Solo");
+    await rendered.cleanup();
 
+    installRequests([mainEvent({})]);
+    const narrowed = await render(
+      <EventBoard currentUser={{ ...manager, currentMainEventId: "m-1" }} mode="events" />
+    );
+    expect(narrowed.container.querySelector(".event-group")).toBeNull();
+    expect(narrowed.container.textContent).toContain("Quake");
+    expect(narrowed.container.textContent).not.toContain("Solo");
+
+    const filter = narrowed.container.querySelector(".board-filter select") as HTMLSelectElement;
     await act(async () => {
       setInputValue(filter, "none");
       await flush();
     });
-    expect(rendered.container.textContent).toContain("Solo");
-    expect(rendered.container.textContent).not.toContain("Quake");
+    expect(narrowed.container.textContent).toContain("Solo");
+    expect(narrowed.container.textContent).not.toContain("Quake");
+    await narrowed.cleanup();
+  });
+
+  it("preselects the current event for new rounds, even a planned one", async () => {
+    installRequests([mainEvent({}), mainEvent({ id: "m-2", name: "Turnier", status: "planned" })]);
+    const rendered = await render(
+      <EventBoard currentUser={{ ...manager, currentMainEventId: "m-2" }} mode="manager" />
+    );
+    const mainEventSelect = Array.from(rendered.container.querySelectorAll("form.event-form select")).find((select) =>
+      Array.from((select as HTMLSelectElement).options).some((option) => option.value === "m-2")
+    ) as HTMLSelectElement;
+    expect(mainEventSelect.value).toBe("m-2");
+    await rendered.cleanup();
+  });
+
+  it("switches the current event globally and stores it at the user", async () => {
+    const calls: Array<{ url: string; body: unknown }> = [];
+    requestMock.mockImplementation(async (url: string, options?: RequestInit) => {
+      if (options?.method === "PUT") {
+        calls.push({ url, body: JSON.parse(String(options.body)) });
+        return { user: { ...manager, currentMainEventId: "m-2" } };
+      }
+      return {
+        mainEvents: [
+          mainEvent({ id: "m-2", name: "Turnier", status: "planned" }),
+          mainEvent({}),
+          mainEvent({ id: "m-3", name: "Alt", status: "ended" })
+        ]
+      };
+    });
+    const changed: User[] = [];
+    const rendered = await render(<MainEventSwitcher currentUser={manager} onUserChange={(user) => changed.push(user)} />);
+    const select = rendered.container.querySelector(".main-event-switcher select") as HTMLSelectElement;
+    expect(Array.from(select.options).map((option) => option.textContent)).toEqual([
+      "Alle Events",
+      "● LAN Herbst",
+      "Turnier"
+    ]);
+    expect(select.value).toBe("");
+    await act(async () => {
+      setInputValue(select, "m-2");
+      await flush();
+    });
+    expect(calls).toEqual([{ url: "/api/main-events/current", body: { mainEventId: "m-2" } }]);
+    expect(changed.at(-1)?.currentMainEventId).toBe("m-2");
     await rendered.cleanup();
   });
 

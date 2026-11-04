@@ -2,7 +2,7 @@ import { and, asc, desc, eq, inArray, isNull } from "drizzle-orm";
 import { z } from "zod";
 import { Router, type Request, type Response } from "express";
 import { randomUUID } from "node:crypto";
-import { requireUser } from "../auth/current-user";
+import { requireUser, selfUser } from "../auth/current-user";
 import { requireCsrf } from "../auth/csrf";
 import { enforceApiTokenWriteAccess } from "../auth/matchdesk-auth";
 import { tryWriteAuditLog, writeAuditLog } from "../audit-log";
@@ -384,9 +384,11 @@ export function createMainEventRouter(context: DatabaseContext) {
       }
       // Teilnahme zu- oder absagen darf jeder; alles andere ist Verwaltung.
       const isParticipation = request.method === "POST" && /^\/[^/]+\/participation$/.test(request.path);
+      // Das eigene aktuelle Event (globaler Umschalter) wählt jeder für sich.
+      const isCurrentChoice = request.method === "PUT" && request.path === "/current";
       // Anlegen nur mit globalem Recht; ein bestehendes Event auch mit Vergabe nur für dieses Event.
       const eventId = request.path === "/" ? null : (/^\/([^/]+)/.exec(request.path)?.[1] ?? null);
-      if (!isParticipation && !canManageMainEvents(context, user, eventId)) {
+      if (!isParticipation && !isCurrentChoice && !canManageMainEvents(context, user, eventId)) {
         response.status(403).json({ error: "hauptevent_manager_erforderlich" });
         return;
       }
@@ -674,6 +676,34 @@ export function createMainEventRouter(context: DatabaseContext) {
       vibrate: [120]
     });
     response.json({ mainEvent: serializeMainEvent(context, updated, actor), archivedRounds });
+  });
+
+  /** Aktuelles Event des Benutzers setzen (null = alle Events); gilt auf allen Seiten und Geräten. */
+  router.put("/current", (request, response) => {
+    const actor = requireUser(context, request)!;
+    const parsed = z.object({ mainEventId: z.string().min(1).max(64).nullable() }).safeParse(request.body);
+    if (!parsed.success) {
+      response.status(400).json({ error: "ungueltiges_aktuelles_event" });
+      return;
+    }
+    if (parsed.data.mainEventId !== null) {
+      const event = getMainEvent(context, parsed.data.mainEventId);
+      if (!event || !canSeeMainEvent(context, actor, event)) {
+        response.status(404).json({ error: "hauptevent_nicht_gefunden" });
+        return;
+      }
+      if (event.status === "ended") {
+        response.status(409).json({ error: "hauptevent_beendet" });
+        return;
+      }
+    }
+    context.db
+      .update(users)
+      .set({ currentMainEventId: parsed.data.mainEventId, updatedAt: nowIso() })
+      .where(eq(users.id, actor.id))
+      .run();
+    const updated = context.db.select().from(users).where(eq(users.id, actor.id)).get()!;
+    response.json({ user: selfUser(context, updated) });
   });
 
   router.post("/:id/participation", (request, response) => {

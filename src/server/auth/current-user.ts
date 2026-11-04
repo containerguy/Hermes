@@ -1,7 +1,8 @@
 import { can, effectivePermissions } from "../domain/permissions";
 import type { Request } from "express";
 import type { DatabaseContext } from "../db/client";
-import { users } from "../db/schema";
+import { eq } from "drizzle-orm";
+import { mainEvents, users } from "../db/schema";
 import { resolveMatchdeskAuth } from "./matchdesk-auth";
 
 export function publicUser(user: typeof users.$inferSelect) {
@@ -32,7 +33,25 @@ export function permissionSummary(context: DatabaseContext, user: { id: string; 
 
 /** Der eigene Benutzer mit seinen wirksamen Rechten (für die Oberfläche). */
 export function selfUser(context: DatabaseContext, user: typeof users.$inferSelect) {
-  return { ...publicUser(user), permissions: permissionSummary(context, user) };
+  return {
+    ...publicUser(user),
+    permissions: permissionSummary(context, user),
+    currentMainEventId: currentMainEventIdOf(context, user)
+  };
+}
+
+/** Gewähltes aktuelles Event, solange es noch nicht beendet ist; sonst null (= alle Events). */
+export function currentMainEventIdOf(
+  context: DatabaseContext,
+  user: Pick<typeof users.$inferSelect, "currentMainEventId">
+) {
+  if (!user.currentMainEventId) return null;
+  const event = context.db
+    .select({ id: mainEvents.id, status: mainEvents.status })
+    .from(mainEvents)
+    .where(eq(mainEvents.id, user.currentMainEventId))
+    .get();
+  return event && event.status !== "ended" ? event.id : null;
 }
 
 export function getCurrentSession(context: DatabaseContext, request: Request) {
