@@ -74,6 +74,11 @@ export const restorableTables = [
   "main_events",
   "main_event_participants",
   "main_event_invites",
+  // Rechte und Rollen: Vergaben verweisen auf Benutzer, Events, Rollen und Rechte
+  "permissions",
+  "roles",
+  "role_permissions",
+  "user_grants",
   "game_events",
   "participations",
   // Pizza in FK-Reihenfolge: Kategorien → Menü → Varianten, Extras → Zuordnung,

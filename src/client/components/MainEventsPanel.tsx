@@ -35,7 +35,16 @@ const emptyDraft = {
  * Seite „Events“: alle sichtbaren Events mit eigener Teilnahme. Manager und Admins legen hier
  * außerdem Events an, starten und beenden sie und verwalten Einladungen.
  */
-export function MainEventsPanel({ canManage = true }: { canManage?: boolean }) {
+export function MainEventsPanel({
+  canManage = true,
+  canManageEvent
+}: {
+  /** Globales Recht: Events anlegen und alle verwalten. */
+  canManage?: boolean;
+  /** Recht für ein einzelnes Event (auch per Event-Vergabe). */
+  canManageEvent?: (mainEventId: string) => boolean;
+}) {
+  const manages = (mainEventId: string) => canManage || Boolean(canManageEvent?.(mainEventId));
   const { t, locale } = useI18n();
   const dateFormatter = new Intl.DateTimeFormat(locale === "en" ? "en-US" : "de-DE", {
     dateStyle: "medium",
@@ -56,14 +65,16 @@ export function MainEventsPanel({ canManage = true }: { canManage?: boolean }) {
 
   const hasPrivate = mainEvents.some((entry) => entry.visibility === "private" && entry.status !== "ended");
 
+  const managesAny = mainEvents.some((entry) => manages(entry.id));
+
   useEffect(() => {
-    if (!canManage || !hasPrivate || candidates.length > 0) {
+    if (!managesAny || !hasPrivate || candidates.length > 0) {
       return;
     }
     requestJson<{ users: Array<{ id: string; username: string }> }>("/api/main-events/invite-candidates")
       .then((result) => setCandidates(result?.users ?? []))
       .catch(() => undefined);
-  }, [hasPrivate]);
+  }, [hasPrivate, managesAny]);
 
   useEffect(() => {
     load().catch(() => undefined);
@@ -318,7 +329,7 @@ export function MainEventsPanel({ canManage = true }: { canManage?: boolean }) {
                   ) : null}
                 </div>
               ) : null}
-              {canManage && mainEvent.visibility === "private" && mainEvent.status !== "ended" ? (
+              {manages(mainEvent.id) && mainEvent.visibility === "private" && mainEvent.status !== "ended" ? (
                 <div className="main-event-invites">
                   <p className="muted">{t("mainEvents.invites.title")}</p>
                   <ul>
@@ -364,7 +375,7 @@ export function MainEventsPanel({ canManage = true }: { canManage?: boolean }) {
                   </div>
                 </div>
               ) : null}
-              {canManage && mainEvent.status !== "ended" ? (
+              {manages(mainEvent.id) && mainEvent.status !== "ended" ? (
                 <MainEventRegistrationEditor
                   key={`${mainEvent.id}-${mainEvent.maxParticipants}-${mainEvent.registrationDeadline}`}
                   mainEvent={mainEvent}
@@ -372,8 +383,8 @@ export function MainEventsPanel({ canManage = true }: { canManage?: boolean }) {
                   onSave={(changes) => saveRegistration(mainEvent, changes)}
                 />
               ) : null}
-              {canManage ? <MainEventParticipantList mainEvent={mainEvent} /> : null}
-              {canManage ? (
+              {manages(mainEvent.id) ? <MainEventParticipantList mainEvent={mainEvent} /> : null}
+              {manages(mainEvent.id) ? (
               <div className="action-row">
                 {mainEvent.status === "planned" ? (
                   <>

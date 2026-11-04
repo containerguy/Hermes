@@ -2,7 +2,7 @@ import { and, eq } from "drizzle-orm";
 import { Router } from "express";
 import { randomUUID } from "node:crypto";
 import { z } from "zod";
-import { getCurrentSession, publicUser, requireUser } from "../auth/current-user";
+import { getCurrentSession, selfUser, requireUser } from "../auth/current-user";
 import { enforceApiTokenWriteAccess } from "../auth/matchdesk-auth";
 import type { DatabaseContext } from "../db/client";
 import { pushSubscriptions, users } from "../db/schema";
@@ -150,7 +150,7 @@ export function createPushRouter(context: DatabaseContext) {
       .run();
 
     const updated = context.db.select().from(users).where(eq(users.id, user.id)).get();
-    response.json({ user: updated ? publicUser(updated) : undefined });
+    response.json({ user: updated ? selfUser(context, updated) : undefined });
   });
 
   return router;

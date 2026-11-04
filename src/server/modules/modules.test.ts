@@ -9,7 +9,6 @@ import { bootstrapAdmin } from "../db/bootstrap-admin";
 import { createMatchdeskApp } from "../app";
 import { sha256, type ModuleFetch } from "./source-fetch";
 import { createTarGz } from "./tar";
-import { resetModulePermissions } from "./permissions";
 
 type StartedApp = Awaited<ReturnType<typeof createMatchdeskApp>>;
 
@@ -182,7 +181,6 @@ describe("Modulverwaltung", () => {
     delete process.env.MATCHDESK_STORAGE_BACKEND;
     files.clear();
     fetchCalls = [];
-    resetModulePermissions();
     await bootstrapAdmin();
   }, 30_000);
 
@@ -293,6 +291,24 @@ describe("Modulverwaltung", () => {
     ]);
     expect((await request(app.app).get("/api/modules").expect(200)).body.modules).toEqual([]);
 
+    // Modulrechte stehen im Rechtesystem des Kerns und lassen sich pro Benutzer vergeben
+    const catalog = await admin.agent.get("/api/admin/rbac").expect(200);
+    expect(catalog.body.permissions).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ key: "demo.manage", moduleId: "demo", scopable: true }),
+        expect.objectContaining({ key: "demo.write", moduleId: "demo" })
+      ])
+    );
+    expect((await player.agent.get("/api/m/demo/hello").expect(200)).body.canManage).toBe(false);
+    const playerId = (await player.agent.get("/api/auth/me").expect(200)).body.user.id as string;
+    await admin.agent
+      .post(`/api/admin/users/${playerId}/grants`)
+      .set(CSRF_HEADER, admin.csrf)
+      .send({ permissionKey: "demo.manage" })
+      .expect((response) => expect(response.status).toBeLessThan(300));
+    expect((await player.agent.get("/api/m/demo/hello").expect(200)).body.canManage).toBe(true);
+    expect((await player.agent.get("/api/modules").expect(200)).body.modules[0].menu).toHaveLength(2);
+
     // Client-Datei gleiche Herkunft; Server-Code wird nicht ausgeliefert
     const client = await request(app.app).get("/modules/demo/1.0.0/client.mjs").expect(200);
     expect(client.headers["content-type"]).toContain("text/javascript");
@@ -341,6 +357,8 @@ describe("Modulverwaltung", () => {
       ])
     );
     expect(fs.existsSync(path.join(modulesDir, "demo"))).toBe(false);
+    const catalogAfter = await admin.agent.get("/api/admin/rbac").expect(200);
+    expect(catalogAfter.body.permissions.filter((entry: { moduleId: string | null }) => entry.moduleId === "demo")).toEqual([]);
   });
 
   it("lehnt Pakete mit falscher Prüfsumme, falscher Schnittstelle oder fremden Tabellen ab", async () => {

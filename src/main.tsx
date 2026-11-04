@@ -14,6 +14,7 @@ import { BrandingProvider, useBrandIconSrc } from "./client/lib/BrandingContext"
 import { brandIconSrc } from "./client/lib/brand-icon";
 import { resolveEffectiveLocale } from "./client/lib/locale-display";
 import { pickAppDisplayName } from "./shared/app-display-name";
+import { isAdministrator } from "./client/permissions";
 
 const defaultSettings: AppSettings = {
   appName: "",
@@ -243,7 +244,7 @@ function AppShell({
   }, [documentPath, isKioskDocumentEntry, publicSettingsReady]);
 
   useEffect(() => {
-    if (currentUser?.role !== "admin") {
+    if (!isAdministrator(currentUser)) {
       return;
     }
 
@@ -253,7 +254,7 @@ function AppShell({
         applyTheme(result.settings);
       })
       .catch(() => {});
-  }, [currentUser?.id, currentUser?.role, setAppSettings]);
+  }, [currentUser?.id, currentUser?.role, currentUser?.permissions?.isAdmin, setAppSettings]);
 
   useEffect(() => {
     function syncHash() {

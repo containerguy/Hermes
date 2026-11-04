@@ -505,6 +505,7 @@ paths:
     get:
       tags: [admin]
       summary: Benutzerliste
+      description: Jeder Eintrag enthält `grants`, die aktiven zusätzlichen Vergaben (global oder pro Event).
       responses:
         "200":
           description: OK
@@ -538,6 +539,84 @@ paths:
       responses:
         "204":
           description: OK
+
+  /api/admin/rbac:
+    get:
+      tags: [admin]
+      summary: Rechte und Rollen (Katalog)
+      description: >-
+        Alle Rechte (Kern und Module, `moduleId` null = Kern; `scopable` = auch pro Event vergebbar)
+        und alle Rollen mit ihren Rechten. Die Admin-Rolle hat immer alle Rechte.
+      responses:
+        "200":
+          description: OK
+        "403":
+          $ref: "#/components/responses/Forbidden"
+
+  /api/admin/roles:
+    post:
+      tags: [admin]
+      summary: Eigene Rolle anlegen
+      description: "Body: `{ key, label, permissions: string[] }`. `admin.access` ist nur in der Admin-Rolle erlaubt."
+      responses:
+        "201":
+          description: OK, liefert den Katalog wie `GET /api/admin/rbac`
+        "400":
+          description: ungueltige_rolle, recht_unbekannt, admin_recht_nur_admin_rolle
+        "409":
+          description: rolle_existiert
+
+  /api/admin/roles/{id}:
+    patch:
+      tags: [admin]
+      summary: Rolle ändern (Name, Rechte)
+      description: Die Admin-Rolle ist fest (admin_rolle_fest). Änderungen wirken sofort für alle mit der Rolle.
+      responses:
+        "200":
+          description: OK, liefert den Katalog
+    delete:
+      tags: [admin]
+      summary: Eigene Rolle löschen (samt Vergaben)
+      responses:
+        "204":
+          description: OK
+        "409":
+          description: rolle_mitgeliefert
+
+  /api/admin/users/{id}/grants:
+    post:
+      tags: [admin]
+      summary: Rolle oder Recht zusätzlich vergeben
+      description: >-
+        Body: `{ roleKey }` oder `{ permissionKey }`, dazu `mainEventId` (null oder fehlend = global).
+        Vergaben für ein Event gelten nur, solange das Event nicht beendet ist, und werden beim
+        Beenden zurückgenommen. Die Grundrolle (`role` am Benutzer) bleibt unverändert.
+      parameters:
+        - $ref: "#/components/parameters/UserId"
+      responses:
+        "201":
+          description: OK, `grants` = aktive Vergaben des Benutzers
+        "400":
+          description: ungueltige_vergabe, admin_nur_global, recht_nicht_pro_event, recht_unbekannt
+        "409":
+          description: vergabe_existiert, hauptevent_beendet
+
+  /api/admin/users/{id}/grants/{grantId}:
+    delete:
+      tags: [admin]
+      summary: Vergabe zurücknehmen
+      parameters:
+        - $ref: "#/components/parameters/UserId"
+        - name: grantId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: OK, `grants` = verbleibende aktive Vergaben
+        "404":
+          description: vergabe_nicht_gefunden
 
   /api/admin/sessions/revoke-others:
     post:
