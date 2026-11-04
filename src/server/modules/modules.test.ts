@@ -9,6 +9,8 @@ import { bootstrapAdmin } from "../db/bootstrap-admin";
 import { createMatchdeskApp } from "../app";
 import { sha256, type ModuleFetch } from "./source-fetch";
 import { createTarGz } from "./tar";
+import { createDb } from "../db/client";
+import { listNotificationChannels, notifyUsers } from "../notifications/dispatcher";
 
 type StartedApp = Awaited<ReturnType<typeof createMatchdeskApp>>;
 
@@ -53,6 +55,15 @@ export function register(ctx) {
   });
   ctx.router.get("/boom", () => { throw new Error("kaputt"); });
   ctx.router.post("/ohne-pruefung", (_request, response) => { response.json({ ok: true }); });
+  ctx.notifications.registerChannel({
+    id: "demo",
+    label: { de: "Demo-Kanal", en: "Demo channel" },
+    isAvailable: (user) => Boolean(user.phoneNumber),
+    unavailableHint: { de: "Telefonnummer fehlt", en: "Phone number missing" },
+    send: async (user, message) => {
+      globalThis.__demoSent = [...(globalThis.__demoSent ?? []), { user: user.username, message }];
+    }
+  });
   globalThis.__demoStarts = (globalThis.__demoStarts ?? 0) + 1;
   ctx.onStop(() => { globalThis.__demoStops = (globalThis.__demoStops ?? 0) + 1; });
 }
@@ -359,6 +370,44 @@ describe("Modulverwaltung", () => {
     expect(fs.existsSync(path.join(modulesDir, "demo"))).toBe(false);
     const catalogAfter = await admin.agent.get("/api/admin/rbac").expect(200);
     expect(catalogAfter.body.permissions.filter((entry: { moduleId: string | null }) => entry.moduleId === "demo")).toEqual([]);
+  });
+
+  it("meldet Benachrichtigungskanäle von Modulen an und beim Ausschalten wieder ab", async () => {
+    publish([{ version: "1.0.0", pkg: buildPackage("1.0.0") }]);
+    const app = await start();
+    const admin = await adminSession(app);
+    const sourceId = await addDemoSource(admin);
+    await installAndEnable(admin, sourceId);
+    (globalThis as { __demoSent?: unknown[] }).__demoSent = [];
+
+    expect(listNotificationChannels().find((channel) => channel.id === "demo")).toEqual(
+      expect.objectContaining({ moduleId: "demo", defaultEnabled: false })
+    );
+    const choices = (await admin.agent.get("/api/notifications/channels").expect(200)).body.channels;
+    expect(choices).toEqual(expect.arrayContaining([expect.objectContaining({ id: "demo", enabled: false, available: true })]));
+    await admin.agent.put("/api/notifications/channels/demo").set(CSRF_HEADER, admin.csrf).send({ enabled: true }).expect(200);
+
+    const context = createDb();
+    try {
+      const adminId = context.sqlite.prepare("SELECT id FROM users WHERE username = 'hauptadmin'").get() as { id: string };
+      const message = { mainEventId: "e1", eventName: "LAN", subject: "Pizza", body: "Um 20 Uhr", path: "#main-events" };
+      const deliveries = await notifyUsers(context, [adminId.id], message, { onlyChannels: ["demo"] });
+      expect(deliveries).toEqual([expect.objectContaining({ channelId: "demo", status: "sent" })]);
+      expect((globalThis as { __demoSent?: unknown[] }).__demoSent).toEqual([
+        {
+          user: "hauptadmin",
+          message: expect.objectContaining({ subject: "Pizza", body: "Um 20 Uhr", eventName: "LAN", path: "#main-events" })
+        }
+      ]);
+
+      await admin.agent.post("/api/admin/modules/demo/disable").set(CSRF_HEADER, admin.csrf).send({}).expect(200);
+      expect(listNotificationChannels().some((channel) => channel.id === "demo")).toBe(false);
+      expect(await notifyUsers(context, [adminId.id], message, { onlyChannels: ["demo"] })).toEqual([
+        expect.objectContaining({ status: "skipped", error: "kein_kanal" })
+      ]);
+    } finally {
+      context.sqlite.close();
+    }
   });
 
   it("lehnt Pakete mit falscher Prüfsumme, falscher Schnittstelle oder fremden Tabellen ab", async () => {
