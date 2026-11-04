@@ -1,4 +1,4 @@
-import { desc } from "drizzle-orm";
+import { and, count, desc, eq, or, sql, type SQL } from "drizzle-orm";
 import { randomUUID } from "node:crypto";
 import type { DatabaseContext } from "./db/client";
 import { auditLogs, users } from "./db/schema";
@@ -48,15 +48,79 @@ export function tryWriteAuditLog(context: DatabaseContext, input: AuditLogInput)
   }
 }
 
-export function listAuditLogs(context: DatabaseContext, limit = 100) {
+export type AuditLogQuery = {
+  limit?: number;
+  offset?: number;
+  /** Freitext in Beschreibung, Aktion und Benutzername. */
+  q?: string;
+  action?: string;
+  actor?: string;
+};
+
+function escapeLike(value: string) {
+  return value.replace(/[\\%_]/g, (char) => `\\${char}`);
+}
+
+function auditFilter(query: AuditLogQuery) {
+  const conditions: SQL[] = [];
+  const text = query.q?.trim();
+  if (text) {
+    const pattern = `%${escapeLike(text)}%`;
+    conditions.push(
+      or(
+        sql`${auditLogs.summary} LIKE ${pattern} ESCAPE '\\'`,
+        sql`${auditLogs.action} LIKE ${pattern} ESCAPE '\\'`,
+        sql`${auditLogs.actorUsername} LIKE ${pattern} ESCAPE '\\'`
+      )!
+    );
+  }
+  if (query.action) {
+    conditions.push(eq(auditLogs.action, query.action));
+  }
+  if (query.actor === "__system") {
+    conditions.push(sql`${auditLogs.actorUsername} IS NULL`);
+  } else if (query.actor) {
+    conditions.push(eq(auditLogs.actorUsername, query.actor));
+  }
+  return conditions.length > 0 ? and(...conditions) : undefined;
+}
+
+export function listAuditLogs(context: DatabaseContext, limitOrQuery: number | AuditLogQuery = 100) {
+  const query = typeof limitOrQuery === "number" ? { limit: limitOrQuery } : limitOrQuery;
+  const limit = Math.max(1, Math.min(Number.isFinite(query.limit) ? Number(query.limit) : 100, 500));
+  const offset = Math.max(0, Number.isFinite(query.offset) ? Math.floor(Number(query.offset)) : 0);
   return context.db
     .select()
     .from(auditLogs)
-    .orderBy(desc(auditLogs.createdAt))
-    .limit(Math.max(1, Math.min(limit, 500)))
+    .where(auditFilter(query))
+    .orderBy(desc(auditLogs.createdAt), desc(auditLogs.id))
+    .limit(limit)
+    .offset(offset)
     .all()
     .map((entry) => ({
       ...entry,
       metadata: entry.metadata ? (JSON.parse(entry.metadata) as unknown) : null
     }));
+}
+
+export function countAuditLogs(context: DatabaseContext, query: AuditLogQuery = {}) {
+  return context.db.select({ total: count() }).from(auditLogs).where(auditFilter(query)).get()?.total ?? 0;
+}
+
+/** Vorhandene Aktionen und Benutzer für die Filter-Auswahl. */
+export function auditLogFacets(context: DatabaseContext) {
+  const actions = context.db
+    .selectDistinct({ action: auditLogs.action })
+    .from(auditLogs)
+    .orderBy(auditLogs.action)
+    .all()
+    .map((row) => row.action);
+  const actors = context.db
+    .selectDistinct({ actor: auditLogs.actorUsername })
+    .from(auditLogs)
+    .orderBy(auditLogs.actorUsername)
+    .all()
+    .map((row) => row.actor)
+    .filter((actor): actor is string => Boolean(actor));
+  return { actions, actors };
 }

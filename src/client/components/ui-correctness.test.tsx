@@ -237,7 +237,7 @@ describe("ui correctness structure contracts", () => {
     const auditPanel = rendered.container.querySelector('section[aria-label="Audit-Log"]');
     expect(auditPanel).toBeTruthy();
     expect(auditPanel?.querySelector(".section-title-row")).toBeTruthy();
-    expect(auditPanel?.querySelector(".audit-list")).toBeTruthy();
+    expect(auditPanel?.querySelector(".audit-list table")).toBeTruthy();
 
     expect(rendered.container.textContent).toContain(
       "Das Audit-Log hilft dir beim Nachvollziehen von Änderungen"
