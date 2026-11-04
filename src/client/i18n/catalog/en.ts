@@ -258,6 +258,8 @@ export const enMessages: { [K in keyof typeof deMessages]: string } = {
     "Generate a code on this device and scan it on the new device. The code is short-lived.",
   "loginProfile.pairNewCode": "Generate new code",
   "loginProfile.pairGenerate": "Generate pairing code",
+  "loginProfile.emailChangeTitle": "Change email address",
+  "loginProfile.pushMoreInfo": "How do notifications work?",
   "loginProfile.accountEyebrow": "Account",
   "loginProfile.accountTitle": "Signed in as {name}",
   "loginProfile.account.login": "Login",

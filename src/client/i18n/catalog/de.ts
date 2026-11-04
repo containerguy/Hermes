@@ -257,6 +257,8 @@ export const deMessages = {
     "Erzeuge einen Code auf diesem Gerät und scanne ihn auf dem neuen Gerät. Der Code ist kurz gültig.",
   "loginProfile.pairNewCode": "Neuen Code erzeugen",
   "loginProfile.pairGenerate": "Pairing-Code erzeugen",
+  "loginProfile.emailChangeTitle": "E-Mail-Adresse ändern",
+  "loginProfile.pushMoreInfo": "Wie funktionieren Benachrichtigungen?",
   "loginProfile.accountEyebrow": "Konto",
   "loginProfile.accountTitle": "Angemeldet als {name}",
   "loginProfile.account.login": "Login",

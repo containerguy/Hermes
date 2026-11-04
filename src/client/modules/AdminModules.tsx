@@ -601,51 +601,53 @@ function Sources({
         })}
       </ul>
 
-      <form className="admin-form module-source-form" onSubmit={submit}>
-        <h4>{tx("addSource")}</h4>
-        <div className="form-grid">
-          <label>
-            {tx("sourceName")}
-            <input required value={draft.name} onChange={(event) => setDraft({ ...draft, name: event.target.value })} />
+      <details className="module-source-add">
+        <summary>{tx("addSource")}</summary>
+        <form className="admin-form module-source-form" onSubmit={submit}>
+          <div className="form-grid">
+            <label>
+              {tx("sourceName")}
+              <input required value={draft.name} onChange={(event) => setDraft({ ...draft, name: event.target.value })} />
+            </label>
+            <label>
+              {tx("sourceUrl")}
+              <input
+                required
+                value={draft.url}
+                placeholder="https://github.com/…/…"
+                onChange={(event) => setDraft({ ...draft, url: event.target.value })}
+              />
+            </label>
+            <label>
+              {tx("sourceRef")}
+              <input value={draft.ref} onChange={(event) => setDraft({ ...draft, ref: event.target.value })} />
+            </label>
+            <label>
+              {tx("sourceToken")}
+              <input
+                value={draft.tokenEnv}
+                placeholder="MATCHDESK_SOURCE_TOKEN_…"
+                onChange={(event) => setDraft({ ...draft, tokenEnv: event.target.value })}
+              />
+            </label>
+            <label>
+              {tx("sourceTrust")}
+              <select value={draft.trust} onChange={(event) => setDraft({ ...draft, trust: event.target.value as Source["trust"] })}>
+                <option value="third_party">{tx("trust_third_party")}</option>
+                <option value="official">{tx("trust_official")}</option>
+              </select>
+            </label>
+          </div>
+          <p className="muted">{tx("sourceTokenHelp")}</p>
+          <label className="checkbox-label">
+            <input type="checkbox" checked={thirdPartyAccepted} onChange={(event) => setThirdPartyAccepted(event.target.checked)} />
+            {tx("acceptSource")}
           </label>
-          <label>
-            {tx("sourceUrl")}
-            <input
-              required
-              value={draft.url}
-              placeholder="https://github.com/…/…"
-              onChange={(event) => setDraft({ ...draft, url: event.target.value })}
-            />
-          </label>
-          <label>
-            {tx("sourceRef")}
-            <input value={draft.ref} onChange={(event) => setDraft({ ...draft, ref: event.target.value })} />
-          </label>
-          <label>
-            {tx("sourceToken")}
-            <input
-              value={draft.tokenEnv}
-              placeholder="MATCHDESK_SOURCE_TOKEN_…"
-              onChange={(event) => setDraft({ ...draft, tokenEnv: event.target.value })}
-            />
-          </label>
-          <label>
-            {tx("sourceTrust")}
-            <select value={draft.trust} onChange={(event) => setDraft({ ...draft, trust: event.target.value as Source["trust"] })}>
-              <option value="third_party">{tx("trust_third_party")}</option>
-              <option value="official">{tx("trust_official")}</option>
-            </select>
-          </label>
-        </div>
-        <p className="muted">{tx("sourceTokenHelp")}</p>
-        <label className="checkbox-label">
-          <input type="checkbox" checked={thirdPartyAccepted} onChange={(event) => setThirdPartyAccepted(event.target.checked)} />
-          {tx("acceptSource")}
-        </label>
-        <button type="submit" disabled={busy || !thirdPartyAccepted}>
-          {tx("addSource")}
-        </button>
-      </form>
+          <button type="submit" disabled={busy || !thirdPartyAccepted}>
+            {tx("addSource")}
+          </button>
+        </form>
+      </details>
     </>
   );
 }

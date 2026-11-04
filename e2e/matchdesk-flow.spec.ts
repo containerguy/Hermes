@@ -176,8 +176,11 @@ test("responsive shell and profile guidance regions stay visible", async ({ page
   await expect(page.locator(".nav-links")).toBeHidden();
   await page.getByRole("link", { name: "Alle Bereiche" }).click();
   await profileNav.getByRole("link", { name: "Benachrichtigungen" }).click();
-  await expect(page.locator(".runtime-callout")).toBeVisible();
+  // Status steht oben, Erklärungen und Installationshilfe sind aufklappbar.
+  await expect(page.locator(".status-grid")).toBeVisible();
   await expect(page.locator(".install-hint-card")).toBeVisible();
+  await page.getByText("Wie funktionieren Benachrichtigungen?").click();
+  await expect(page.locator(".runtime-callout")).toBeVisible();
 
   await page.setViewportSize({ width: 1280, height: 800 });
   await page.goto(`${baseUrl}/#events`);
