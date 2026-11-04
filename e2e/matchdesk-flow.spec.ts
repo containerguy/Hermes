@@ -138,7 +138,7 @@ test("admin creates users, manager creates an event, user joins", async ({ page 
   await page.goto(`${baseUrl}/#manager`);
 
   const eventForm = page.locator("form.event-form");
-  await eventForm.getByLabel("Spiel").fill("Browser Game");
+  await eventForm.getByRole("textbox", { name: "Spieltitel" }).fill("Browser Game");
   await eventForm.locator("select").first().selectOption("scheduled");
   await eventForm.getByLabel("Startzeit").fill("2027-06-01T18:00");
   await eventForm.getByLabel("Min").fill("1");
@@ -230,7 +230,7 @@ test("gameserver: admin binds Minecraft, manager's event shows the server panel,
   await login(page, "srvmanager");
   await page.goto(`${baseUrl}/#manager`);
   const eventForm = page.locator("form.event-form");
-  await eventForm.getByLabel("Spiel").fill("Minecraft");
+  await eventForm.getByRole("textbox", { name: "Spieltitel" }).fill("Minecraft");
   await expect(eventForm.getByText("Server für „Minecraft“")).toBeVisible();
   await expect(eventForm.getByLabel("Server mit dieser Runde verknüpfen")).toBeChecked();
   await eventForm.locator("select").first().selectOption("scheduled");
