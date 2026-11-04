@@ -1,3 +1,4 @@
+import { can } from "../domain/permissions";
 import type { Request } from "express";
 import type { DatabaseContext } from "../db/client";
 import { users } from "../db/schema";
@@ -34,7 +35,7 @@ export function requireUser(context: DatabaseContext, request: Request) {
 export function requireAdmin(context: DatabaseContext, request: Request) {
   const user = requireUser(context, request);
 
-  if (!user || user.role !== "admin") {
+  if (!user || !can(context, user, "admin.access")) {
     return undefined;
   }
 

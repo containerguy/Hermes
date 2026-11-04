@@ -1,3 +1,4 @@
+import { can } from "./domain/permissions";
 import cookieParser from "cookie-parser";
 import express from "express";
 import fs from "node:fs";
@@ -93,7 +94,7 @@ export async function createMatchdeskApp() {
       return;
     }
 
-    if (user.role !== "admin") {
+    if (!can(context, user, "admin.access")) {
       response.status(403).json({ error: "admin_erforderlich" });
       return;
     }

@@ -1,3 +1,4 @@
+import { can } from "../domain/permissions";
 import { asc, eq, isNull } from "drizzle-orm";
 import { Router } from "express";
 import { z } from "zod";
@@ -80,7 +81,7 @@ export function createAdminRouter(context: DatabaseContext) {
       return;
     }
 
-    if (user.role !== "admin") {
+    if (!can(context, user, "admin.access")) {
       response.status(403).json({ error: "admin_erforderlich" });
       return;
     }

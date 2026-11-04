@@ -19,6 +19,7 @@ import {
   type RequestedMainEventParticipation
 } from "../domain/main-events";
 import { canManageMainEvents, type UserRole } from "../domain/users";
+import { revokeEventGrants, scopedEventIds } from "../domain/permissions";
 import {
   sendPushToEnabledUsers,
   sendPushToMainEventParticipants,
@@ -70,14 +71,20 @@ export function canSeeMainEvent(
   viewer: Viewer,
   event: Pick<MainEventRow, "id" | "visibility">
 ) {
-  return event.visibility === "public" || canManageMainEvents(viewer) || isInvited(context, event.id, viewer.id);
+  return (
+    event.visibility === "public" ||
+    canManageMainEvents(context, viewer, event.id) ||
+    isInvited(context, event.id, viewer.id)
+  );
 }
 
 /** IDs der Events, deren Runden der Betrachter nicht sehen darf (ohne Betrachter, z. B. Kiosk: alle privaten). */
 export function hiddenMainEventIds(context: DatabaseContext, viewer: Viewer | null) {
-  if (viewer && canManageMainEvents(viewer)) {
+  if (viewer && canManageMainEvents(context, viewer)) {
     return new Set<string>();
   }
+  // Wer ein Event nur per Event-Vergabe verwaltet, sieht dessen Runden auch ohne Einladung.
+  const managed = new Set(viewer ? scopedEventIds(context, viewer, "main_events.manage") : []);
   const privateEvents = context.db
     .select({ id: mainEvents.id, visibility: mainEvents.visibility })
     .from(mainEvents)
@@ -85,7 +92,7 @@ export function hiddenMainEventIds(context: DatabaseContext, viewer: Viewer | nu
     .all();
   return new Set(
     privateEvents
-      .filter((event) => !viewer || !isInvited(context, event.id, viewer.id))
+      .filter((event) => !viewer || (!managed.has(event.id) && !isInvited(context, event.id, viewer.id)))
       .map((event) => event.id)
   );
 }
@@ -262,7 +269,7 @@ function serializeMainEvent(context: DatabaseContext, event: MainEventRow, viewe
   const creator = context.db.select().from(users).where(eq(users.id, event.createdByUserId)).get();
   // Die Gästeliste privater Events sehen nur Manager und Admins.
   const invites =
-    event.visibility === "private" && canManageMainEvents(viewer)
+    event.visibility === "private" && canManageMainEvents(context, viewer, event.id)
       ? invitedUserIds(context, event.id).map((userId) => ({
           userId,
           username: context.db.select().from(users).where(eq(users.id, userId)).get()?.username ?? "unbekannt"
@@ -344,7 +351,9 @@ export function createMainEventRouter(context: DatabaseContext) {
       }
       // Teilnahme zu- oder absagen darf jeder; alles andere ist Verwaltung.
       const isParticipation = request.method === "POST" && /^\/[^/]+\/participation$/.test(request.path);
-      if (!isParticipation && !canManageMainEvents(user)) {
+      // Anlegen nur mit globalem Recht; ein bestehendes Event auch mit Vergabe nur für dieses Event.
+      const eventId = request.path === "/" ? null : (/^\/([^/]+)/.exec(request.path)?.[1] ?? null);
+      if (!isParticipation && !canManageMainEvents(context, user, eventId)) {
         response.status(403).json({ error: "hauptevent_manager_erforderlich" });
         return;
       }
@@ -569,7 +578,7 @@ export function createMainEventRouter(context: DatabaseContext) {
     const timestamp = nowIso();
     // Mit dem Event enden auch seine offenen Runden: sie werden archiviert, damit keine
     // Benachrichtigungen mehr zu einem beendeten Event verschickt werden.
-    const archivedRounds = context.sqlite.transaction(() => {
+    const { archivedRounds, revokedGrants } = context.sqlite.transaction(() => {
       const activeRounds = context.db
         .select({ id: gameEvents.id })
         .from(gameEvents)
@@ -601,7 +610,10 @@ export function createMainEventRouter(context: DatabaseContext) {
         .where(eq(mainEvents.id, event.id))
         .run();
 
-      return activeRounds.length;
+      // Rechte, die nur für dieses Event vergeben waren, erlöschen mit dem Ende.
+      const revokedGrants = revokeEventGrants(context, event.id, timestamp);
+
+      return { archivedRounds: activeRounds.length, revokedGrants };
     })();
 
     const updated = getMainEvent(context, event.id)!;
@@ -611,7 +623,7 @@ export function createMainEventRouter(context: DatabaseContext) {
       entityType: "main_event",
       entityId: event.id,
       summary: `${actor.username} hat das Event ${event.name} beendet.`,
-      metadata: { archivedRounds }
+      metadata: { archivedRounds, revokedGrants }
     });
     broadcastEventsChanged("main_event_ended");
     void sendPushToMainEventParticipants(context, event.id, {
@@ -732,7 +744,7 @@ export function createMainEventRouter(context: DatabaseContext) {
 
   function requireManagedEvent(request: Request, response: Response) {
     const actor = requireUser(context, request)!;
-    if (!canManageMainEvents(actor)) {
+    if (!canManageMainEvents(context, actor, String(request.params.id))) {
       response.status(403).json({ error: "hauptevent_manager_erforderlich" });
       return null;
     }
@@ -774,7 +786,7 @@ export function createMainEventRouter(context: DatabaseContext) {
 
   router.get("/invite-candidates", (request, response) => {
     const actor = requireUser(context, request)!;
-    if (!canManageMainEvents(actor)) {
+    if (!canManageMainEvents(context, actor) && scopedEventIds(context, actor, "main_events.manage").length === 0) {
       response.status(403).json({ error: "hauptevent_manager_erforderlich" });
       return;
     }

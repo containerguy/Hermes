@@ -257,6 +257,57 @@ export const mainEventInvites = sqliteTable(
  * 0025: Teilnahme am Event; „joined" bekommt die Benachrichtigungen zu dessen Runden.
  * 0027: „interested" (Interessentenliste) und „waitlisted" (Nachrücker, Event voll).
  */
+/** 0029: Rechte (Kern und Module). */
+export const permissions = sqliteTable("permissions", {
+  key: text("key").primaryKey(),
+  moduleId: text("module_id"),
+  label: text("label").notNull(),
+  description: text("description"),
+  scopable: integer("scopable", { mode: "boolean" }).notNull().default(false),
+  createdAt: text("created_at").notNull()
+});
+
+/** 0029: Rollen als Bündel von Rechten; builtin = user, organizer, manager, admin. */
+export const roles = sqliteTable(
+  "roles",
+  {
+    id: text("id").primaryKey(),
+    key: text("key").notNull(),
+    label: text("label").notNull(),
+    builtin: integer("builtin", { mode: "boolean" }).notNull().default(false),
+    createdAt: text("created_at").notNull(),
+    updatedAt: text("updated_at").notNull()
+  },
+  (table) => [uniqueIndex("roles_key_unique").on(table.key)]
+);
+
+export const rolePermissions = sqliteTable(
+  "role_permissions",
+  {
+    roleId: text("role_id")
+      .notNull()
+      .references(() => roles.id, { onDelete: "cascade" }),
+    permissionKey: text("permission_key")
+      .notNull()
+      .references(() => permissions.key, { onDelete: "cascade" })
+  },
+  (table) => [primaryKey({ columns: [table.roleId, table.permissionKey] })]
+);
+
+/** 0029: Vergabe einer Rolle oder eines Rechts an einen Benutzer, global oder nur für ein Event. */
+export const userGrants = sqliteTable("user_grants", {
+  id: text("id").primaryKey(),
+  userId: text("user_id")
+    .notNull()
+    .references(() => users.id, { onDelete: "cascade" }),
+  roleId: text("role_id").references(() => roles.id, { onDelete: "cascade" }),
+  permissionKey: text("permission_key").references(() => permissions.key, { onDelete: "cascade" }),
+  mainEventId: text("main_event_id").references(() => mainEvents.id, { onDelete: "cascade" }),
+  grantedByUserId: text("granted_by_user_id").references(() => users.id, { onDelete: "set null" }),
+  createdAt: text("created_at").notNull(),
+  revokedAt: text("revoked_at")
+});
+
 export const mainEventParticipants = sqliteTable(
   "main_event_participants",
   {

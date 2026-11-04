@@ -1,7 +1,8 @@
-import { and, eq, inArray, isNull } from "drizzle-orm";
+import { and, eq, isNull } from "drizzle-orm";
 import webpush from "web-push";
 import type { DatabaseContext } from "../db/client";
 import { mainEventParticipants, participations, pushSubscriptions, users } from "../db/schema";
+import { can } from "../domain/permissions";
 import { readEnv } from "../env";
 
 export type PushPayload = {
@@ -137,23 +138,22 @@ export async function sendPushToEnabledUsers(context: DatabaseContext, payload: 
   await Promise.all(targets.map((target) => sendPushToUser(context, target.id, payload)));
 }
 
+/**
+ * An alle mit dem Recht `notifications.operator` (global oder für das Event der Runde).
+ * 0026: optional nur an Operatoren, die das (private) Event sehen dürfen.
+ */
 export async function sendPushToOperators(
   context: DatabaseContext,
   payload: PushPayload,
-  /** 0026: optional nur an Operatoren, die das (private) Event sehen dürfen */
-  canSee?: (user: typeof users.$inferSelect) => boolean
+  options?: { mainEventId?: string | null; canSee?: (user: typeof users.$inferSelect) => boolean }
 ) {
   const targets = context.db
     .select()
     .from(users)
-    .where(
-      and(
-        eq(users.notificationsEnabled, true),
-        inArray(users.role, ["admin", "manager", "organizer"])
-      )
-    )
+    .where(and(eq(users.notificationsEnabled, true), isNull(users.deletedAt)))
     .all()
-    .filter((target) => !canSee || canSee(target));
+    .filter((target) => can(context, target, "notifications.operator", { mainEventId: options?.mainEventId }))
+    .filter((target) => !options?.canSee || options.canSee(target));
 
   await Promise.all(targets.map((target) => sendPushToUser(context, target.id, payload)));
 }
