@@ -438,6 +438,14 @@ export const enMessages: { [K in keyof typeof deMessages]: string } = {
   "mainEvents.prompt.aria": "Event participation",
   "mainEvents.prompt.eyebrow": "Event running",
   "mainEvents.prompt.title": "Are you joining {name}?",
+  "mainEvents.switcher.label": "Current event",
+  "mainEvents.switcher.all": "All events",
+  "events.group.none": "Without event",
+  "events.group.collapse": "Collapse",
+  "events.group.expand": "Expand",
+  "events.group.count": "{n} rounds",
+  "events.group.countOne": "1 round",
+  "events.group.add": "Add round here",
   "mainEvents.prompt.body":
     "Participants get the notifications for this event's rounds. You can change this any time at the top of the board.",
   "mainEvents.prompt.later": "Later",
@@ -482,6 +490,8 @@ export const enMessages: { [K in keyof typeof deMessages]: string } = {
   "events.filter.none": "Without event",
   "events.form.mainEvent": "Event",
   "events.form.mainEventNone": "No event",
+  "events.form.mainEventChoose": "Please choose an event",
+  "events.form.notifyAll": "Notify everyone (otherwise only players of this round)",
   "events.refresh": "Refresh",
   "events.count.one": "1 round on the board",
   "events.count.many": "{n} rounds on the board",
@@ -563,6 +573,7 @@ export const enMessages: { [K in keyof typeof deMessages]: string } = {
   "admin.help.appName":
     "Optional. Leave empty for the built-in name “Mitspielzentrale” (German UI) or “Matchdesk” (English UI). A custom value replaces it in the shell and document title.",
   "admin.label.archiveHours": "Auto-archive after hours",
+  "admin.label.maxRunningMainEvents": "Maximum events running at once",
   "admin.label.notifyDefault": "Notifications on by default",
   "admin.label.publicReg": "Allow public registration with invite code",
   "admin.label.s3snap":

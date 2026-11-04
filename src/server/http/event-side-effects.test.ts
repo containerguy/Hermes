@@ -19,14 +19,15 @@ vi.mock("../push/push-service", async () => {
   return {
     ...actual,
     sendPushToOperators: vi.fn(actual.sendPushToOperators),
-    sendPushToEnabledUsers: vi.fn(actual.sendPushToEnabledUsers)
+    sendPushToEnabledUsers: vi.fn(actual.sendPushToEnabledUsers),
+    sendPushToEventParticipants: vi.fn(actual.sendPushToEventParticipants)
   };
 });
 
 import { createMatchdeskApp } from "../app";
 import { bootstrapAdmin } from "../db/bootstrap-admin";
 import { broadcastEventsChanged } from "../realtime/event-bus";
-import { sendPushToEnabledUsers, sendPushToOperators } from "../push/push-service";
+import { sendPushToEnabledUsers, sendPushToEventParticipants, sendPushToOperators } from "../push/push-service";
 
 type StartedApp = Awaited<ReturnType<typeof createMatchdeskApp>>;
 
@@ -124,7 +125,9 @@ describe("event side effects (EVT-02) and lifecycle regression (EVT-03)", () => 
         startMode: "scheduled",
         startsAt,
         minPlayers: 2,
-        maxPlayers: 4
+        maxPlayers: 4,
+        // Runde ohne Event: alle nur auf Wunsch, Folgemeldungen gehen an die Mitspieler.
+        notifyAll: true
       })
       .expect(201);
 
@@ -168,9 +171,10 @@ describe("event side effects (EVT-02) and lifecycle regression (EVT-03)", () => 
       .send({ status: "joined" })
       .expect(200);
 
-    expect(sendPushToEnabledUsers).toHaveBeenNthCalledWith(
-      2,
+    expect(sendPushToEventParticipants).toHaveBeenNthCalledWith(
+      1,
       expect.anything(),
+      eventId,
       expect.objectContaining({
         title: "Runde aktualisiert",
         body: "Payload Proof ist startbereit.",
@@ -181,9 +185,10 @@ describe("event side effects (EVT-02) and lifecycle regression (EVT-03)", () => 
 
     await managerAgent.post(`/api/events/${eventId}/cancel`).expect(200);
 
-    expect(sendPushToEnabledUsers).toHaveBeenNthCalledWith(
-      3,
+    expect(sendPushToEventParticipants).toHaveBeenNthCalledWith(
+      2,
       expect.anything(),
+      eventId,
       expect.objectContaining({
         title: "Runde storniert",
         body: "Payload Proof wurde storniert.",
@@ -199,7 +204,8 @@ describe("event side effects (EVT-02) and lifecycle regression (EVT-03)", () => 
         startMode: "scheduled",
         startsAt,
         minPlayers: 1,
-        maxPlayers: 4
+        maxPlayers: 4,
+        notifyAll: true
       })
       .expect(201);
 
@@ -207,8 +213,14 @@ describe("event side effects (EVT-02) and lifecycle regression (EVT-03)", () => 
     await managerAgent.post(`/api/events/${archiveId}/archive`).expect(200);
 
     expect(sendPushToEnabledUsers).toHaveBeenNthCalledWith(
-      5,
+      2,
       expect.anything(),
+      expect.objectContaining({ title: "Neue Runde", body: `${manager.username}: Archive Proof` })
+    );
+    expect(sendPushToEventParticipants).toHaveBeenNthCalledWith(
+      3,
+      expect.anything(),
+      archiveId,
       expect.objectContaining({
         title: "Runde archiviert",
         body: "Archive Proof wurde archiviert.",

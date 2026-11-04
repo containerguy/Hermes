@@ -6,6 +6,7 @@ import type { AppReleaseInfo, AppSettings, PublicAppSettings, User } from "./cli
 import { requestJson } from "./client/api/request";
 import { clearCsrfToken, primeCsrfToken } from "./client/api/csrf";
 import { KioskStreamPage } from "./client/components/KioskStreamPage";
+import { MainEventSwitcher } from "./client/components/MainEventSwitcher";
 import { appPages } from "./client/navigation/modules";
 import { buildRuntimeAppModules, useRuntimeModules } from "./client/modules/runtime";
 import { collectPages, menuPages, resolvePage, type NavContext, type NavPage, type PageHero } from "./client/navigation/registry";
@@ -22,6 +23,7 @@ const defaultSettings: AppSettings = {
   projectTemplate: "lan_party",
   defaultNotificationsEnabled: true,
   eventAutoArchiveHours: 8,
+  maxRunningMainEvents: 10,
   publicRegistrationEnabled: false,
   shellStartTitle: "",
   shellStartDescription: "",
@@ -339,6 +341,7 @@ function AppShell({
           <span>{displayAppName}</span>
         </a>
         <div className="topbar-end">
+          {currentUser ? <MainEventSwitcher currentUser={currentUser} onUserChange={setCurrentUser} /> : null}
           <nav className="nav-links" aria-label={t("main.nav.regions")}>
             {menu.map((page) => (
               <a
