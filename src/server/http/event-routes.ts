@@ -10,6 +10,7 @@ import { appSettings, gameEvents, participations, users } from "../db/schema";
 import { deriveEventStatus, eventInputSchema, shouldAutoArchive } from "../domain/events";
 import { acceptsRounds, withMainEventLabel } from "../domain/main-events";
 import { findBindingForTitle, getBinding } from "../domain/gameservers/bindings";
+import { isServerOffered } from "../domain/gameservers/event-servers";
 import { canCreateEvent, canCreateEventSomewhere, canManageEvent, type UserRole } from "../domain/users";
 import {
   sendPushToEnabledUsers,
@@ -346,21 +347,29 @@ export function createEventRouter(context: DatabaseContext) {
       return;
     }
 
-    // Phase 15: Bindung explizit (auch null) oder automatisch über den normalisierten Titel.
-    let serverBindingId: string | null;
-    if (parsed.data.serverBindingId === undefined) {
-      serverBindingId = findBindingForTitle(context, parsed.data.gameTitle)?.id ?? null;
-    } else if (parsed.data.serverBindingId !== null && !getBinding(context, parsed.data.serverBindingId)) {
-      response.status(400).json({ error: "binding_nicht_gefunden" });
-      return;
-    } else {
-      serverBindingId = parsed.data.serverBindingId;
-    }
-
     const mainEvent = resolveMainEventId(context, actor, parsed.data.mainEventId);
     if (!mainEvent.ok) {
       response.status(mainEvent.status).json({ error: mainEvent.error });
       return;
+    }
+
+    // Phase 15: Bindung explizit (auch null) oder automatisch über den normalisierten Titel.
+    // 0037: nur Server, die das Event anbietet (ohne Auswahl am Event: alle).
+    let serverBindingId: string | null;
+    if (parsed.data.serverBindingId === undefined) {
+      const found = findBindingForTitle(context, parsed.data.gameTitle);
+      serverBindingId = found && isServerOffered(context, mainEvent.mainEventId, found.id) ? found.id : null;
+    } else if (parsed.data.serverBindingId !== null && !getBinding(context, parsed.data.serverBindingId)) {
+      response.status(400).json({ error: "binding_nicht_gefunden" });
+      return;
+    } else if (
+      parsed.data.serverBindingId !== null &&
+      !isServerOffered(context, mainEvent.mainEventId, parsed.data.serverBindingId)
+    ) {
+      response.status(400).json({ error: "server_nicht_im_event" });
+      return;
+    } else {
+      serverBindingId = parsed.data.serverBindingId;
     }
     // Wer Runden nur für ein Event anlegen darf, legt sie nur dort an.
     if (!canCreateEvent(context, actor, mainEvent.mainEventId)) {
@@ -497,6 +506,20 @@ export function createEventRouter(context: DatabaseContext) {
         return;
       }
       mainEventId = resolved.mainEventId;
+    }
+
+    // 0037: Server muss zum (neuen) Event passen; automatisch zugeordnete fallen sonst weg.
+    // Unveränderte Zuordnungen bleiben, auch wenn die Auswahl am Event später enger wurde.
+    const bindingTouched =
+      parsed.data.serverBindingId !== undefined ||
+      mainEventId !== (event.mainEventId ?? null) ||
+      serverBindingId !== (event.serverBindingId ?? null);
+    if (bindingTouched && serverBindingId && !isServerOffered(context, mainEventId, serverBindingId)) {
+      if (parsed.data.serverBindingId) {
+        response.status(400).json({ error: "server_nicht_im_event" });
+        return;
+      }
+      serverBindingId = null;
     }
 
     context.db

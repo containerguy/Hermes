@@ -99,9 +99,6 @@ export function EventBoard({
     };
   }, [bindingFormVisible, currentUser?.id]);
 
-  const matchedBinding = bindings.find(
-    (binding) => binding.gameTitleNorm === normalizeGameTitle(eventDraft.gameTitle)
-  );
 
   async function loadEvents() {
     if (!currentUser) {
@@ -507,6 +504,14 @@ export function EventBoard({
       : openMainEvents.some((entry) => entry.id === draftMainEventId)
         ? draftMainEventId
         : "";
+
+  // Gameserver zum Spiel, sofern das gewählte Event ihn anbietet (ohne Auswahl am Event: alle).
+  const offeredServerIds = openMainEvents.find((entry) => entry.id === resolvedDraftMainEventId)?.serverBindingIds;
+  const matchedBinding = bindings.find(
+    (binding) =>
+      binding.gameTitleNorm === normalizeGameTitle(eventDraft.gameTitle) &&
+      (!offeredServerIds || offeredServerIds.length === 0 || offeredServerIds.includes(binding.id))
+  );
 
   if (!currentUser) {
     return (

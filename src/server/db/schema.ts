@@ -412,6 +412,21 @@ export const mainEventParticipants = sqliteTable(
   (table) => [uniqueIndex("main_event_participants_event_user_unique").on(table.mainEventId, table.userId)]
 );
 
+/** 0037: Gameserver, die ein Event anbietet; keine Zeile = alle Server. */
+export const mainEventServers = sqliteTable(
+  "main_event_servers",
+  {
+    mainEventId: text("main_event_id")
+      .notNull()
+      .references(() => mainEvents.id, { onDelete: "cascade" }),
+    bindingId: text("binding_id")
+      .notNull()
+      .references(() => gameServerBindings.id, { onDelete: "cascade" }),
+    createdAt: text("created_at").notNull()
+  },
+  (table) => [primaryKey({ columns: [table.mainEventId, table.bindingId] })]
+);
+
 export const gameEvents = sqliteTable("game_events", {
   id: text("id").primaryKey(),
   /** 0025: zugeordnetes Event (null = keinem Event zugeordnet). */

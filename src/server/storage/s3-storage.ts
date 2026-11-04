@@ -74,6 +74,8 @@ export const restorableTables = [
   "main_events",
   "main_event_participants",
   "main_event_invites",
+  // 0037: angebotene Gameserver je Event (nach Events und Bindungen)
+  "main_event_servers",
   // Rechte und Rollen: Vergaben verweisen auf Benutzer, Events, Rollen und Rechte
   "permissions",
   "roles",

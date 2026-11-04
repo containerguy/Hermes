@@ -1,6 +1,11 @@
 import React, { FormEvent, useEffect, useState } from "react";
 import type { MainEvent } from "../types/core";
-import { MainEventInfosEditor, MainEventParticipantList, MainEventRegistrationEditor } from "./MainEventRegistration";
+import {
+  MainEventInfosEditor,
+  MainEventParticipantList,
+  MainEventRegistrationEditor,
+  MainEventServersEditor
+} from "./MainEventRegistration";
 import { eventShareText, MainEventBroadcast, whatsappShareUrl } from "./MainEventBroadcast";
 import { requestJson } from "../api/request";
 import { getErrorMessage } from "../errors/errors";
@@ -206,6 +211,17 @@ export function MainEventsPanel({
     );
   }
 
+  async function saveServers(mainEvent: MainEvent, bindingIds: string[]) {
+    await run(
+      () =>
+        requestJson<{ mainEvent: MainEvent }>(`/api/main-events/${mainEvent.id}/servers`, {
+          method: "PUT",
+          body: JSON.stringify({ bindingIds })
+        }),
+      "mainEvents.msg.servers"
+    );
+  }
+
   /** Text zum eigenen Anmeldestatus; Nachrücker sehen ihren Platz in der Liste. */
   function participationText(mainEvent: MainEvent) {
     switch (mainEvent.myParticipation) {
@@ -400,6 +416,14 @@ export function MainEventsPanel({
                   mainEvent={mainEvent}
                   busy={busy}
                   onSave={(infosMarkdown) => saveInfos(mainEvent, infosMarkdown)}
+                />
+              ) : null}
+              {manages(mainEvent.id) && mainEvent.status !== "ended" ? (
+                <MainEventServersEditor
+                  key={`${mainEvent.id}-servers-${(mainEvent.serverBindingIds ?? []).join(",")}`}
+                  mainEvent={mainEvent}
+                  busy={busy}
+                  onSave={(bindingIds) => saveServers(mainEvent, bindingIds)}
                 />
               ) : null}
               {manages(mainEvent.id) ? <MainEventParticipantList mainEvent={mainEvent} /> : null}

@@ -335,6 +335,8 @@ export type MainEvent = {
   description: string | null;
   /** Infos zum Event (Markdown), zusätzlich zu den allgemeinen Infos. */
   infosMarkdown?: string | null;
+  /** Gameserver (Bindungs-IDs), die das Event anbietet; leer = alle. */
+  serverBindingIds?: string[];
   status: "planned" | "running" | "ended";
   /** Private Events sehen nur Eingeladene sowie Manager und Admins. */
   visibility: "public" | "private";
