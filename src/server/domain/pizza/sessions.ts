@@ -16,15 +16,28 @@ export class PizzaSessionError extends AppError {
   }
 }
 
-/** Aktuelle (nicht archivierte) Bestellrunde — die jüngste ohne `archivedAt`. */
-export function getActiveSession(context: DatabaseContext) {
+/**
+ * Aktuelle (nicht archivierte) Bestellrunde eines Events — die jüngste ohne `archivedAt`.
+ * `mainEventId` null = die Runde ohne Event. Jedes Event hat seine eigene aktuelle Runde.
+ */
+export function getActiveSession(context: DatabaseContext, mainEventId: string | null = null) {
   return context.db
     .select()
     .from(pizzaSessions)
-    .where(isNull(pizzaSessions.archivedAt))
+    .where(
+      and(
+        isNull(pizzaSessions.archivedAt),
+        mainEventId ? eq(pizzaSessions.mainEventId, mainEventId) : isNull(pizzaSessions.mainEventId)
+      )
+    )
     .orderBy(desc(pizzaSessions.createdAt))
     .limit(1)
     .all()[0];
+}
+
+/** Alle aktuellen (nicht archivierten) Runden, je Event und ohne Event. */
+export function listActiveSessions(context: DatabaseContext) {
+  return context.db.select().from(pizzaSessions).where(isNull(pizzaSessions.archivedAt)).all();
 }
 
 export function getSessionById(context: DatabaseContext, sessionId: string) {
@@ -55,9 +68,10 @@ function markArchived(context: DatabaseContext, sessionId: string, actor: { id: 
  */
 export function getOrCreateDraftSession(
   context: DatabaseContext,
-  actor: { id: string } | null = null
+  actor: { id: string } | null = null,
+  mainEventId: string | null = null
 ) {
-  const existing = getActiveSession(context);
+  const existing = getActiveSession(context, mainEventId);
   if (existing && existing.state !== "delivered") return existing;
   if (existing) markArchived(context, existing.id, actor);
 
@@ -67,6 +81,7 @@ export function getOrCreateDraftSession(
     .insert(pizzaSessions)
     .values({
       id,
+      mainEventId,
       state: "draft",
       createdAt: now,
       updatedAt: now
@@ -79,24 +94,29 @@ export function transitionSession(
   context: DatabaseContext,
   transition: PizzaSessionTransition,
   actor: { id: string },
-  label?: string | null
+  label?: string | null,
+  mainEventId: string | null = null
 ) {
   // Transaktion: scheitert der Übergang, bleiben Archivierung und neue Entwurfsrunde aus.
-  return context.sqlite.transaction(() => applyTransition(context, transition, actor, label))();
+  return context.sqlite.transaction(() => applyTransition(context, transition, actor, label, mainEventId))();
 }
 
 function applyTransition(
   context: DatabaseContext,
   transition: PizzaSessionTransition,
   actor: { id: string },
-  label?: string | null
+  label: string | null | undefined,
+  mainEventId: string | null
 ) {
   if (transition === "open" && countActiveItems(context) === 0) {
     throw new PizzaLifecycleError("menu_empty", "Mindestens ein aktiver Menüeintrag erforderlich");
   }
   // Nur „open“ beginnt eine neue Runde. Ein zweites „deliver“ (Doppelklick) auf eine gelieferte
   // Runde darf sie nicht archivieren und keinen leeren Entwurf anlegen.
-  const session = transition === "open" ? getOrCreateDraftSession(context, actor) : getActiveSession(context);
+  const session =
+    transition === "open"
+      ? getOrCreateDraftSession(context, actor, mainEventId)
+      : getActiveSession(context, mainEventId);
   if (!session) {
     throw new PizzaLifecycleError("invalid_transition", `Übergang ${transition} ohne aktive Runde nicht erlaubt`);
   }
@@ -157,6 +177,8 @@ export interface ArchivedPizzaSessionSummary {
   id: string;
   state: string;
   label: string | null;
+  /** Event der Runde (null = ohne Event). */
+  mainEventId: string | null;
   createdAt: string;
   openedAt: string | null;
   deliveredAt: string | null;
@@ -200,6 +222,7 @@ export function listArchivedSessions(
       id: row.id,
       state: row.state,
       label: row.label,
+      mainEventId: row.mainEventId,
       createdAt: row.createdAt,
       openedAt: row.openedAt,
       deliveredAt: row.deliveredAt,

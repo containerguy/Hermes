@@ -673,6 +673,8 @@ export const pizzaSessions = sqliteTable(
     state: text("state", { enum: ["draft", "open", "locked", "delivered"] })
       .notNull()
       .default("draft"),
+    /** 0036: Event der Bestellrunde (null = Runde ohne Event). */
+    mainEventId: text("main_event_id").references(() => mainEvents.id, { onDelete: "set null" }),
     label: text("label"),
     openedAt: text("opened_at"),
     openedByUserId: text("opened_by_user_id").references(() => users.id, { onDelete: "set null" }),

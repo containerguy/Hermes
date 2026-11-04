@@ -12,15 +12,31 @@ import type {
 
 export type PizzaRemovalResult = "deleted" | "deactivated";
 
+/**
+ * Bestellrunden-Bereich der Pizza-Seite: Event-ID, `null` = Runde ohne Event,
+ * `undefined` = Server nimmt das aktuelle Event des Benutzers.
+ */
+let pizzaScope: string | null | undefined;
+
+export function setPizzaScope(mainEventId: string | null | undefined) {
+  pizzaScope = mainEventId;
+}
+
+/** Query-Parameter für die Bestellrunde des gewählten Bereichs. */
+export function pizzaScopeQuery(prefix: "?" | "&" = "?") {
+  if (pizzaScope === undefined) return "";
+  return `${prefix}mainEventId=${encodeURIComponent(pizzaScope ?? "none")}`;
+}
+
 export async function fetchPizzaState(): Promise<PizzaPanelState> {
-  return requestJson<PizzaPanelState>(`/api/pizza/state`);
+  return requestJson<PizzaPanelState>(`/api/pizza/state${pizzaScopeQuery()}`);
 }
 
 export async function transitionPizzaSession(
   transition: PizzaSessionTransition,
   label?: string | null
 ) {
-  return requestJson<{ session: unknown }>(`/api/pizza/transitions`, {
+  return requestJson<{ session: unknown }>(`/api/pizza/transitions${pizzaScopeQuery()}`, {
     method: "POST",
     body: JSON.stringify({ transition, ...(label !== undefined ? { label } : {}) })
   });
@@ -32,7 +48,7 @@ export async function addPizzaLine(input: {
   customNote?: string | null;
   extraIds?: string[];
 }) {
-  return requestJson<{ lineId: string; orderId: string }>(`/api/pizza/lines`, {
+  return requestJson<{ lineId: string; orderId: string }>(`/api/pizza/lines${pizzaScopeQuery()}`, {
     method: "POST",
     body: JSON.stringify({
       variantId: input.variantId,
@@ -67,7 +83,7 @@ export async function markPizzaPayment(orderId: string, method: "paypal" | "cash
 }
 
 export async function choosePizzaPaymentMethod(method: PizzaPaymentMethod) {
-  await requestJson<void>(`/api/pizza/orders/mine/payment-method`, {
+  await requestJson<void>(`/api/pizza/orders/mine/payment-method${pizzaScopeQuery()}`, {
     method: "POST",
     body: JSON.stringify({ method })
   });
