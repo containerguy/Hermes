@@ -2,7 +2,8 @@ import React, { FormEvent, RefObject, useEffect, useState } from "react";
 import { requestJson } from "../api/request";
 import type { BulkImportFormat, BulkImportResult, MainEvent, User } from "../types/core";
 import { useI18n } from "../i18n/I18nContext";
-import { AdminRoleEditor, AdminUserPermissions, type PermissionCatalog } from "./AdminPanelPermissions";
+import { AdminRoleEditor, type PermissionCatalog } from "./AdminPanelPermissions";
+import { AdminUserTable } from "./AdminUserTable";
 
 interface NewUserDraft {
   username: string;
@@ -77,15 +78,6 @@ export function AdminPanelUsers({
       .then((result) => setOpenEvents((result?.mainEvents ?? []).filter((entry) => entry.status !== "ended")))
       .catch(() => undefined);
   }, []);
-  // Filter nach dem Event, über das sich jemand registriert hat (Name, bleibt auch nach Löschen des Events).
-  const [eventFilter, setEventFilter] = useState("");
-  const registrationEvents = Array.from(
-    new Set(users.map((user) => user.registeredViaMainEventName).filter((name): name is string => Boolean(name)))
-  ).sort((left, right) => left.localeCompare(right));
-  if (eventFilter && !registrationEvents.includes(eventFilter)) {
-    registrationEvents.push(eventFilter);
-  }
-  const visibleUsers = eventFilter ? users.filter((user) => user.registeredViaMainEventName === eventFilter) : users;
 
   return (
     <>
@@ -282,19 +274,6 @@ export function AdminPanelUsers({
             <button type="submit">{t("admin.user.create")}</button>
           </form>
 
-          {registrationEvents.length > 0 || eventFilter ? (
-            <label className="admin-user-filter">
-              {t("admin.user.filterEvent")}
-              <select value={eventFilter} onChange={(event) => setEventFilter(event.target.value)}>
-                <option value="">{t("admin.user.filterAll")}</option>
-                {registrationEvents.map((name) => (
-                  <option key={name} value={name}>
-                    {name}
-                  </option>
-                ))}
-              </select>
-            </label>
-          ) : null}
           {catalog ? (
             <AdminRoleEditor
               catalog={catalog}
@@ -303,49 +282,16 @@ export function AdminPanelUsers({
               onSaved={onPermissionMessage}
             />
           ) : null}
-          <div className="admin-list" aria-label={t("admin.user.listAria")}>
-            {visibleUsers.map((user) => (
-              <div className="admin-list-row" key={user.id}>
-                <div>
-                  <strong>{user.username}</strong>
-                  <span>{user.email}</span>
-                  {user.registeredViaMainEventName ? (
-                    <span className="muted">
-                      {t("admin.user.registeredVia", { name: user.registeredViaMainEventName })}
-                    </span>
-                  ) : null}
-                </div>
-                <select
-                  value={user.role}
-                  onChange={(event) => onUpdateRole(user.id, event.target.value as User["role"])}
-                >
-                  <option value="user">{t("admin.role.user")}</option>
-                  <option value="organizer">{t("admin.role.organizer")}</option>
-                  <option value="manager">{t("admin.role.manager")}</option>
-                  <option value="admin">{t("admin.role.admin")}</option>
-                </select>
-                <button
-                  type="button"
-                  className="secondary danger"
-                  onClick={() => onDeleteUser(user)}
-                  disabled={user.id === currentUser?.id}
-                >
-                  {t("admin.user.delete")}
-                </button>
-                {catalog ? (
-                  <AdminUserPermissions
-                    // Neu aufbauen, wenn sich Vergaben von außen ändern (z. B. nach dem Neuladen).
-                    key={`${user.id}-${user.role}-${(user.grants ?? []).map((grant) => grant.id).join(",")}`}
-                    user={user}
-                    catalog={catalog}
-                    openEvents={openEvents}
-                    onError={onPermissionError}
-                    onSaved={onPermissionMessage}
-                  />
-                ) : null}
-              </div>
-            ))}
-          </div>
+          <AdminUserTable
+            users={users}
+            currentUser={currentUser}
+            catalog={catalog}
+            openEvents={openEvents}
+            onUpdateRole={onUpdateRole}
+            onDeleteUser={onDeleteUser}
+            onPermissionMessage={onPermissionMessage}
+            onPermissionError={onPermissionError}
+          />
         </>
       ) : null}
     </>
