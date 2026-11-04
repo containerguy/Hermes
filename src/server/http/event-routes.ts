@@ -13,6 +13,7 @@ import { findBindingForTitle, getBinding } from "../domain/gameservers/bindings"
 import { canCreateEvent, canCreateEventSomewhere, canManageEvent, type UserRole } from "../domain/users";
 import {
   sendPushToEnabledUsers,
+  sendPushToEventParticipants,
   sendPushToMainEventParticipants,
   sendPushToOperators,
   type PushPayload
@@ -21,7 +22,8 @@ import { broadcastEventsChanged } from "../realtime/event-bus";
 import {
   canSeeMainEvent,
   getMainEvent,
-  getRunningMainEvent,
+  getRunningMainEvents,
+  findParticipation,
   hiddenMainEventIds,
   joinMainEventIfUndecided
 } from "./main-event-routes";
@@ -88,8 +90,16 @@ function resolveMainEventId(
   requested: string | null | undefined
 ): MainEventResolution {
   if (requested === undefined) {
-    const running = getRunningMainEvent(context);
-    return { ok: true, mainEventId: running && canSeeMainEvent(context, viewer, running) ? running.id : null };
+    // Ohne Angabe: das einzige laufende Event; laufen mehrere, das einzige, bei dem der Anleger dabei ist.
+    const running = getRunningMainEvents(context).filter((entry) => canSeeMainEvent(context, viewer, entry));
+    if (running.length <= 1) {
+      return { ok: true, mainEventId: running[0]?.id ?? null };
+    }
+    const joined = running.filter((entry) => findParticipation(context, entry.id, viewer.id)?.status === "joined");
+    if (joined.length === 1) {
+      return { ok: true, mainEventId: joined[0].id };
+    }
+    return { ok: false, status: 409, error: "event_angeben" };
   }
   if (requested === null) {
     return { ok: true, mainEventId: null };
@@ -108,11 +118,21 @@ function mainEventName(context: DatabaseContext, mainEventId: string | null | un
   return mainEventId ? (getMainEvent(context, mainEventId)?.name ?? null) : null;
 }
 
-/** Runden eines Events benachrichtigen nur dessen Teilnehmer, Runden ohne Event alle. */
-function sendPushForRound(context: DatabaseContext, mainEventId: string | null | undefined, payload: PushPayload) {
-  return mainEventId
-    ? sendPushToMainEventParticipants(context, mainEventId, payload)
-    : sendPushToEnabledUsers(context, payload);
+/**
+ * Runden eines Events benachrichtigen dessen Teilnehmer. Runden ohne Event benachrichtigen
+ * nur ihre eigenen Mitspieler, alle anderen nur auf ausdrücklichen Wunsch (notifyAll beim Anlegen).
+ */
+function sendPushForRound(
+  context: DatabaseContext,
+  round: { mainEventId: string | null | undefined; roundId: string; notifyAll?: boolean },
+  payload: PushPayload
+) {
+  if (round.mainEventId) {
+    return sendPushToMainEventParticipants(context, round.mainEventId, payload);
+  }
+  return round.notifyAll
+    ? sendPushToEnabledUsers(context, payload)
+    : sendPushToEventParticipants(context, round.roundId, payload);
 }
 
 function isSqliteBusyOrLocked(error: unknown) {
@@ -386,7 +406,7 @@ export function createEventRouter(context: DatabaseContext) {
       }
     });
     broadcastEventsChanged("event_created");
-    void sendPushForRound(context, mainEvent.mainEventId, {
+    void sendPushForRound(context, { mainEventId: mainEvent.mainEventId, roundId: id, notifyAll: parsed.data.notifyAll }, {
       title: withMainEventLabel("Neue Runde", mainEventName(context, mainEvent.mainEventId)),
       body: `${actor.username}: ${parsed.data.gameTitle}`,
       url: "/#events",
@@ -705,7 +725,7 @@ export function createEventRouter(context: DatabaseContext) {
     });
     broadcastEventsChanged("participation_updated");
     if (previousStatus !== nextStatus && updated) {
-      void sendPushForRound(context, updated.mainEventId, {
+      void sendPushForRound(context, { mainEventId: updated.mainEventId, roundId: updated.id }, {
         title: withMainEventLabel("Runde aktualisiert", mainEventName(context, updated.mainEventId)),
         body:
           nextStatus === "ready"
@@ -757,7 +777,7 @@ export function createEventRouter(context: DatabaseContext) {
       summary: `${actor.username} hat ${event.gameTitle} storniert.`
     });
     broadcastEventsChanged("event_cancelled");
-    void sendPushForRound(context, event.mainEventId, {
+    void sendPushForRound(context, { mainEventId: event.mainEventId, roundId: event.id }, {
       title: withMainEventLabel("Runde storniert", mainEventName(context, event.mainEventId)),
       body: `${event.gameTitle} wurde storniert.`,
       url: "/#events",
@@ -805,7 +825,7 @@ export function createEventRouter(context: DatabaseContext) {
       summary: `${actor.username} hat ${event.gameTitle} archiviert.`
     });
     broadcastEventsChanged("event_archived");
-    void sendPushForRound(context, event.mainEventId, {
+    void sendPushForRound(context, { mainEventId: event.mainEventId, roundId: event.id }, {
       title: withMainEventLabel("Runde archiviert", mainEventName(context, event.mainEventId)),
       body: `${event.gameTitle} wurde archiviert.`,
       url: "/#events",

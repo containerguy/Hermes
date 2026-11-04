@@ -28,6 +28,8 @@ const settingsObjectSchema = z.object({
   projectTemplate: projectTemplateSchema,
   defaultNotificationsEnabled: z.boolean(),
   eventAutoArchiveHours: z.number().int().min(1).max(72),
+  /** Höchstzahl gleichzeitig laufender Events (LAN-Party, Turniertag). */
+  maxRunningMainEvents: z.number().int().min(1).max(100),
   publicRegistrationEnabled: z.boolean(),
   /** Leer = eingebaute Start-Hero-Überschrift aus dem Client */
   shellStartTitle: z.string().max(240),
@@ -213,6 +215,7 @@ export const defaultSettings: MatchdeskSettings = {
   projectTemplate: "lan_party",
   defaultNotificationsEnabled: true,
   eventAutoArchiveHours: 8,
+  maxRunningMainEvents: 10,
   publicRegistrationEnabled: false,
   shellStartTitle: "",
   shellStartDescription: "",

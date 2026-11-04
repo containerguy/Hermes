@@ -16,6 +16,7 @@ const settings: AppSettings = {
   projectTemplate: "lan_party",
   defaultNotificationsEnabled: true,
   eventAutoArchiveHours: 8,
+  maxRunningMainEvents: 10,
   publicRegistrationEnabled: false,
   shellStartTitle: "",
   shellStartDescription: "",

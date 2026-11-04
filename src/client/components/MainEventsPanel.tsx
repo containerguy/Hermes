@@ -237,8 +237,7 @@ export function MainEventsPanel({
     }
   }
 
-  const running = mainEvents.find((entry) => entry.status === "running");
-  // Laufendes zuerst, dann geplante, beendete zuletzt — innerhalb gleicher Reihenfolge wie vom Server.
+  // Laufende zuerst, dann geplante, beendete zuletzt — innerhalb gleicher Reihenfolge wie vom Server.
   const statusOrder: Record<MainEvent["status"], number> = { running: 0, planned: 1, ended: 2 };
   const sorted = [...mainEvents].sort((a, b) => statusOrder[a.status] - statusOrder[b.status]);
 
@@ -407,7 +406,7 @@ export function MainEventsPanel({
                   <>
                     <button
                       type="button"
-                      disabled={busy || Boolean(running)}
+                      disabled={busy}
                       onClick={() => changeStatus(mainEvent, "start")}
                     >
                       {t("mainEvents.action.start")}

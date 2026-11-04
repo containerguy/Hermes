@@ -253,6 +253,8 @@ paths:
           $ref: "#/components/responses/Unauthorized"
         "403":
           $ref: "#/components/responses/Forbidden"
+        "409":
+          description: Mehrere Events laufen, mainEventId angeben (event_angeben), oder Event beendet (hauptevent_beendet)
 
   /api/events/{id}:
     patch:
@@ -381,7 +383,7 @@ paths:
         "200":
           description: OK
         "409":
-          description: Nicht geplant (hauptevent_nicht_geplant) oder anderes Event läuft (anderes_hauptevent_laeuft)
+          description: Nicht geplant (hauptevent_nicht_geplant) oder Obergrenze gleichzeitig laufender Events erreicht (zu_viele_laufende_events, mit limit)
 
   /api/main-events/{id}/participation:
     post:
@@ -1195,7 +1197,12 @@ components:
         mainEventId:
           type: string
           nullable: true
-          description: Event der Runde; fehlt das Feld, gilt das laufende Event, null = keinem Event
+          description: >-
+            Event der Runde; null = keinem Event. Fehlt das Feld, gilt das einzige laufende Event,
+            bei mehreren das einzige laufende, bei dem der Anleger dabei ist; sonst 409 event_angeben.
+        notifyAll:
+          type: boolean
+          description: Nur für Runden ohne Event. true benachrichtigt alle; Standard sind nur die Mitspieler der Runde.
         minPlayers:
           type: integer
         maxPlayers:
