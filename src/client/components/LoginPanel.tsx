@@ -22,6 +22,7 @@ import { PushNotificationsSection } from "./PushNotificationsSection";
 import { RegisterStep } from "./RegisterStep";
 import { SessionsSection } from "./SessionsSection";
 import { getPushSupport, urlBase64ToUint8Array } from "../lib/push-support";
+import { EventInfoChannels } from "./EventInfoChannels";
 
 type LoginDevice = { name: string; recognized: boolean };
 
@@ -652,6 +653,7 @@ export function LoginPanel({
             onEnable={() => void enableNotifications()}
             onDisable={() => void disableNotifications()}
           />
+          <EventInfoChannels />
           </>
         ) : null}
         {show("geraete") ? (

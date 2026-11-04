@@ -345,6 +345,8 @@ export type MainEvent = {
   /** Plätze, null = unbegrenzt. */
   maxParticipants: number | null;
   registrationDeadline: string | null;
+  /** 0031: geplante Erinnerungen (7 Tage, 1 Tag, Anmeldeschluss) an/aus. */
+  remindersEnabled?: boolean;
   /** Anmeldeschluss vorbei (nur für geplante Events). */
   registrationClosed: boolean;
   myParticipation: MainEventParticipation | null;

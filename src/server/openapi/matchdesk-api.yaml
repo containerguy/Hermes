@@ -540,6 +540,129 @@ paths:
         "204":
           description: OK
 
+  /api/notifications/channels:
+    get:
+      tags: [notifications]
+      summary: Kanalwahl für Event-Infos
+      description: >-
+        Alle Kanäle (eingebaut mail und push, dazu Kanäle aus Modulen) mit `enabled` (Wahl oder Vorgabe)
+        und `available` (Kanal erreicht den Benutzer). `unsubscribed` = über den Abmeldelink abbestellt.
+      responses:
+        "200":
+          description: OK
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+
+  /api/notifications/channels/{id}:
+    put:
+      tags: [notifications]
+      summary: Kanal ein- oder ausschalten
+      description: "Body: `{ enabled }`. Einschalten hebt eine Abmeldung über den Link auf."
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: OK, liefert die Kanalwahl
+        "404":
+          description: kanal_unbekannt
+
+  /api/notifications/unsubscribe/{token}:
+    get:
+      tags: [notifications]
+      summary: Abmeldelink (Bestätigungsseite, ohne Anmeldung)
+      parameters:
+        - name: token
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: HTML-Seite mit Knopf
+    post:
+      tags: [notifications]
+      summary: Von Event-Infos abmelden (auch RFC-8058-Ein-Klick)
+      parameters:
+        - name: token
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: HTML-Bestätigung
+        "404":
+          description: Link ungültig
+
+  /api/notifications/calendar-feed:
+    get:
+      tags: [notifications]
+      summary: Pfad des persönlichen Kalender-Links
+      responses:
+        "200":
+          description: "`{ path }`, abrufbar ohne Anmeldung"
+
+  /api/notifications/calendar-feed/renew:
+    post:
+      tags: [notifications]
+      summary: Neuen Kalender-Link erzeugen (alter wird ungültig)
+      responses:
+        "200":
+          description: "`{ path }`"
+
+  /api/notifications/calendar/{file}:
+    get:
+      tags: [notifications]
+      summary: Persönlicher Kalender (iCalendar)
+      description: Events, bei denen der Benutzer zugesagt hat, interessiert ist oder nachrückt.
+      parameters:
+        - name: file
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: text/calendar
+        "404":
+          description: kalender_nicht_gefunden
+
+  /api/main-events/{id}/broadcasts:
+    get:
+      tags: [main-events]
+      summary: Bisherige Rundnachrichten mit Zustellung je Kanal
+      responses:
+        "200":
+          description: OK
+    post:
+      tags: [main-events]
+      summary: Rundnachricht an Teilnehmer
+      description: >-
+        Body: `{ subject, body, audience }` mit audience aus joined, interested, waitlisted, declined,
+        no_response. Versand im Hintergrund über die Kanäle, die jede Person gewählt hat.
+        Recht `main_events.manage` (global oder für das Event).
+      responses:
+        "202":
+          description: Angenommen, `broadcast.recipientCount`
+        "400":
+          description: ungueltige_rundnachricht
+        "409":
+          description: rundnachricht_ohne_empfaenger
+
+  /api/main-events/{id}/calendar.ics:
+    get:
+      tags: [main-events]
+      summary: Kalendereintrag des Events
+      responses:
+        "200":
+          description: text/calendar
+        "409":
+          description: hauptevent_ohne_termin
+
   /api/admin/rbac:
     get:
       tags: [admin]

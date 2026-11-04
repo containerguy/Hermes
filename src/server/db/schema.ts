@@ -28,6 +28,8 @@ export const users = sqliteTable(
       (): AnySQLiteColumn => inviteCodes.id,
       { onDelete: "set null" }
     ),
+    /** 0031: von allen Event-Infos abgemeldet (Abmeldelink); Login-Mails kommen weiter. */
+    eventInfoUnsubscribedAt: text("event_info_unsubscribed_at"),
     deletedAt: text("deleted_at"),
     createdAt: text("created_at").notNull(),
     updatedAt: text("updated_at").notNull()
@@ -224,6 +226,8 @@ export const mainEvents = sqliteTable(
     maxParticipants: integer("max_participants"),
     /** 0027: Anmeldeschluss (null = keiner); gilt nur, solange das Event geplant ist. */
     registrationDeadline: text("registration_deadline"),
+    /** 0031: geplante Erinnerungen an Teilnehmer verschicken. */
+    remindersEnabled: integer("reminders_enabled", { mode: "boolean" }).notNull().default(true),
     startedAt: text("started_at"),
     startedByUserId: text("started_by_user_id").references(() => users.id, { onDelete: "set null" }),
     endedAt: text("ended_at"),
@@ -306,6 +310,83 @@ export const userGrants = sqliteTable("user_grants", {
   grantedByUserId: text("granted_by_user_id").references(() => users.id, { onDelete: "set null" }),
   createdAt: text("created_at").notNull(),
   revokedAt: text("revoked_at")
+});
+
+/** 0031: Kanalwahl pro Benutzer für Event-Infos; fehlt die Zeile, gilt die Vorgabe des Kanals. */
+export const notificationChannelPreferences = sqliteTable(
+  "notification_channel_preferences",
+  {
+    userId: text("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    channelId: text("channel_id").notNull(),
+    enabled: integer("enabled", { mode: "boolean" }).notNull(),
+    updatedAt: text("updated_at").notNull()
+  },
+  (table) => [primaryKey({ columns: [table.userId, table.channelId] })]
+);
+
+/** 0031: persönlicher Abmeldelink für Event-Infos. */
+export const notificationUnsubscribeTokens = sqliteTable("notification_unsubscribe_tokens", {
+  token: text("token").primaryKey(),
+  userId: text("user_id")
+    .notNull()
+    .references(() => users.id, { onDelete: "cascade" }),
+  createdAt: text("created_at").notNull()
+});
+
+/** 0031: Rundnachricht an Teilnehmer eines Events. */
+export const mainEventBroadcasts = sqliteTable("main_event_broadcasts", {
+  id: text("id").primaryKey(),
+  mainEventId: text("main_event_id")
+    .notNull()
+    .references(() => mainEvents.id, { onDelete: "cascade" }),
+  authorUserId: text("author_user_id").references(() => users.id, { onDelete: "set null" }),
+  subject: text("subject").notNull(),
+  body: text("body").notNull(),
+  audience: text("audience").notNull(),
+  recipientCount: integer("recipient_count").notNull().default(0),
+  createdAt: text("created_at").notNull()
+});
+
+export const mainEventBroadcastDeliveries = sqliteTable(
+  "main_event_broadcast_deliveries",
+  {
+    broadcastId: text("broadcast_id")
+      .notNull()
+      .references(() => mainEventBroadcasts.id, { onDelete: "cascade" }),
+    userId: text("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    channelId: text("channel_id").notNull(),
+    status: text("status", { enum: ["sent", "failed", "skipped"] }).notNull(),
+    error: text("error"),
+    createdAt: text("created_at").notNull()
+  },
+  (table) => [primaryKey({ columns: [table.broadcastId, table.userId, table.channelId] })]
+);
+
+/** 0031: welche Erinnerung für ein Event schon verschickt wurde. */
+export const mainEventRemindersSent = sqliteTable(
+  "main_event_reminders_sent",
+  {
+    mainEventId: text("main_event_id")
+      .notNull()
+      .references(() => mainEvents.id, { onDelete: "cascade" }),
+    kind: text("kind", { enum: ["start_7d", "start_1d", "deadline_1d"] }).notNull(),
+    sentAt: text("sent_at").notNull(),
+    recipientCount: integer("recipient_count").notNull().default(0)
+  },
+  (table) => [primaryKey({ columns: [table.mainEventId, table.kind] })]
+);
+
+/** 0031: persönlicher Kalender-Link. */
+export const calendarFeedTokens = sqliteTable("calendar_feed_tokens", {
+  token: text("token").primaryKey(),
+  userId: text("user_id")
+    .notNull()
+    .references(() => users.id, { onDelete: "cascade" }),
+  createdAt: text("created_at").notNull()
 });
 
 export const mainEventParticipants = sqliteTable(

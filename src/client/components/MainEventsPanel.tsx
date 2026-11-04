@@ -1,6 +1,7 @@
 import React, { FormEvent, useEffect, useState } from "react";
 import type { MainEvent } from "../types/core";
 import { MainEventParticipantList, MainEventRegistrationEditor } from "./MainEventRegistration";
+import { eventShareText, MainEventBroadcast, whatsappShareUrl } from "./MainEventBroadcast";
 import { requestJson } from "../api/request";
 import { getErrorMessage } from "../errors/errors";
 import { useI18n } from "../i18n/I18nContext";
@@ -182,7 +183,7 @@ export function MainEventsPanel({
 
   async function saveRegistration(
     mainEvent: MainEvent,
-    changes: { maxParticipants: number | null; registrationDeadline: string | null }
+    changes: { maxParticipants: number | null; registrationDeadline: string | null; remindersEnabled: boolean }
   ) {
     await run(
       () =>
@@ -377,13 +378,29 @@ export function MainEventsPanel({
               ) : null}
               {manages(mainEvent.id) && mainEvent.status !== "ended" ? (
                 <MainEventRegistrationEditor
-                  key={`${mainEvent.id}-${mainEvent.maxParticipants}-${mainEvent.registrationDeadline}`}
+                  key={`${mainEvent.id}-${mainEvent.maxParticipants}-${mainEvent.registrationDeadline}-${mainEvent.remindersEnabled}`}
                   mainEvent={mainEvent}
                   busy={busy}
                   onSave={(changes) => saveRegistration(mainEvent, changes)}
                 />
               ) : null}
               {manages(mainEvent.id) ? <MainEventParticipantList mainEvent={mainEvent} /> : null}
+              {manages(mainEvent.id) ? <MainEventBroadcast mainEvent={mainEvent} /> : null}
+              {mainEvent.plannedStartAt && mainEvent.status !== "ended" ? (
+                <a className="button-link secondary calendar-download" href={`/api/main-events/${mainEvent.id}/calendar.ics`} download>
+                  {t("mainEvents.calendarDownload")}
+                </a>
+              ) : null}
+              {mainEvent.status !== "ended" ? (
+                <a
+                  className="button-link secondary whatsapp-share"
+                  href={whatsappShareUrl(eventShareText(mainEvent, planned || null))}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                >
+                  {t("mainEvents.shareWhatsapp")}
+                </a>
+              ) : null}
               {manages(mainEvent.id) ? (
               <div className="action-row">
                 {mainEvent.status === "planned" ? (

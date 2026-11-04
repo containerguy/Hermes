@@ -3138,3 +3138,57 @@ dd {
 .admin-role-editor {
   margin-bottom: 12px;
 }
+
+/* Rundnachricht an Event-Teilnehmer und Kanalwahl im Profil */
+.main-event-broadcast {
+  margin-top: 0.5rem;
+}
+.main-event-broadcast summary {
+  cursor: pointer;
+}
+.main-event-broadcast form {
+  margin-top: 0.5rem;
+}
+.main-event-broadcast fieldset {
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 8px 12px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 16px;
+}
+.main-event-broadcast textarea {
+  width: 100%;
+  min-height: 7rem;
+  resize: vertical;
+}
+.main-event-broadcast-history ul {
+  margin: 0.2rem 0 0.6rem;
+  padding-left: 1.2rem;
+}
+.whatsapp-share {
+  display: inline-block;
+  margin-top: 0.5rem;
+}
+.event-info-channel-list {
+  display: grid;
+  gap: 8px;
+}
+.event-info-channel-list label,
+.main-event-broadcast fieldset label {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+.calendar-download {
+  display: inline-block;
+  margin: 0.5rem 0.5rem 0 0;
+}
+.event-info-calendar {
+  display: grid;
+  gap: 8px;
+  margin-top: 12px;
+}
+.event-info-calendar input {
+  width: 100%;
+}
