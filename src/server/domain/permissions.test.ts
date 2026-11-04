@@ -181,8 +181,17 @@ describe("Modulrechte", () => {
 
   it("Standardrolle user gibt das Recht jedem Benutzer", () => {
     const user = addUser("user");
-    registerModulePermissions(context, "pizza2", [{ key: "pizza2.order", label: "Bestellen", defaultRoles: ["user"] }]);
+    const organizer = addUser("organizer");
+    const manager = addUser("manager");
+    registerModulePermissions(context, "pizza2", [
+      { key: "pizza2.order", label: "Bestellen", defaultRoles: ["user"] },
+      { key: "pizza2.manage", label: "Verwalten", defaultRoles: ["organizer"] }
+    ]);
     expect(can(context, user, "pizza2.order")).toBe(true);
+    expect(can(context, organizer, "pizza2.order")).toBe(true);
+    expect(can(context, manager, "pizza2.order")).toBe(true);
+    expect(can(context, user, "pizza2.manage")).toBe(false);
+    expect(can(context, manager, "pizza2.manage")).toBe(true);
   });
 
   it("lehnt Schlüssel ohne Modul-Präfix ab", () => {

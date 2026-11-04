@@ -143,6 +143,8 @@ export function userIdsWithPermission(
     .map((user) => user.id);
 }
 
+const BUILTIN_ROLE_ORDER = ["user", "organizer", "manager"] as const;
+
 export type ModulePermissionDefinition = {
   key: string;
   label: string;
@@ -179,7 +181,12 @@ export function registerModulePermissions(
       if (inserted.changes === 0) {
         continue;
       }
-      for (const roleKey of definition.defaultRoles ?? []) {
+      // Die mitgelieferten Rollen bauen aufeinander auf: was "user" bekommt, bekommen auch
+      // Organisator und Manager (Admin hat ohnehin alles).
+      const expanded = new Set(
+        (definition.defaultRoles ?? []).flatMap((roleKey) => BUILTIN_ROLE_ORDER.slice(BUILTIN_ROLE_ORDER.indexOf(roleKey)))
+      );
+      for (const roleKey of expanded) {
         const role = context.db.select({ id: roles.id }).from(roles).where(eq(roles.key, roleKey)).get();
         if (role) {
           context.db
