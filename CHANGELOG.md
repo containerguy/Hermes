@@ -4,6 +4,115 @@ Versions are annotated tags `vX.Y.Z` on `main`. Each entry mirrors the
 `chore(release): vX.Y.Z` commit that bumps `package.json`,
 `package-lock.json`, and `src/server/openapi/hermes-api.yaml`.
 
+## v0.20.0 — Matchdesk: modules, roles and rights, event preparation, parallel events (2026-11-04)
+
+Hermes is now called **Matchdesk** (German UI: **Mitspielzentrale**). A few
+features are still planned before v1.0.
+
+### Upgrade note
+
+- Migrations `0027` to `0039` run automatically on start (event
+  registration, invite codes, RBAC, modules, notifications, parallel events,
+  event infos/servers, pizza per event, and the move of pizza and "now
+  playing" into modules). Take a backup before updating, as for every
+  migration. Restores need a snapshot with the same migration state.
+- Image: the pipeline publishes `ghcr.io/containerguy/matchdesk`. Until
+  v1.0 the same image is also published as `ghcr.io/containerguy/hermes`.
+  Switch the deployment to the new name when convenient.
+- Environment: `MATCHDESK_*` is read first, `HERMES_*` still works until
+  v1.0 (the log names old and conflicting variables, never their values).
+  When switching, copy the **same values**, especially
+  `DEVICE_KEY_SECRET`, `CSRF_SECRET` and `PAIR_TOKEN_SECRET`, otherwise
+  logins and devices become invalid.
+- Cookies, CSRF header and browser storage move to `matchdesk_*` names
+  automatically; nobody is logged out. An existing `hermes.sqlite` in the
+  data folder keeps being used; nothing is renamed on disk. Compose service
+  and volume keep the name `hermes`.
+- Pizza and "now playing" are modules now. On first start the core installs
+  and enables them from the bundled packages (`pizza-1.0.0`,
+  `presence-1.0.0`, no internet needed) if the old feature switches were on,
+  and moves their settings. Tables and data stay (presence tables are
+  renamed to `presence_*`). Old paths `/api/pizza`, `/api/presence/*`,
+  `#pizza` and `#playing` are redirected for this version, so older Windows
+  agents keep reporting.
+- The official module source `containerguy/matchdesk-modules` is
+  preconfigured. Downloaded modules live under `/data/modules/` in the data
+  volume.
+- Dependencies: unused `pdfkit` removed from the core (the pizza module
+  bundles it).
+
+### Navigation and layout
+
+- Menu navigation instead of one long page: Rounds, Events, Infos, Admin
+  and a profile menu (`#login/<section>`); mobile tab bar; the header sticks
+  and collapses on scroll. Modules add their own menu entries
+  (`#m/<id>/…`).
+- Admin and profile use a sidebar. Admin → Operations is split into
+  subpages with a save bar for unsaved changes. The user table has search
+  and filters; the audit log is a table with search, filters and paging
+  (view-only entries are no longer logged). Profile, modules and page
+  headers are more compact.
+
+### Login
+
+- Sign in with username or email, case-insensitive (an exact match wins,
+  ambiguous legacy accounts are rejected neutrally). Login emails include the
+  username. No account enumeration.
+
+### Event preparation
+
+- Registration: "interested" besides "in"/"not in", seat limit with an
+  automatic waiting list (people move up on cancellations and get a push),
+  registration deadline, participant overview with CSV export.
+- Invite code per event; registration via code is recorded on the user.
+- Notification hub: everyone picks channels in the profile (email and push
+  built in, modules add more, e.g. SMS and Telegram). Every email has an
+  unsubscribe link (RFC 8058). Managers send messages to participants by
+  status and share events via WhatsApp link. Reminders 7 days and 1 day
+  before start and before the deadline, confirmation email with `.ics`,
+  calendar download and a personal calendar link.
+
+### Roles and rights
+
+- Rights and roles (RBAC): roles and single rights per user, globally or per
+  event; event grants end with the event. Custom roles with editable rights.
+  `/api/auth/me` returns the effective rights. Modules register their own
+  rights.
+
+### Parallel events
+
+- Several events can run at once (limit `maxRunningMainEvents`, default 10,
+  in Admin → Operations). New rounds without an event land in the only
+  running event, or in the one the creator joined; otherwise the event must
+  be chosen.
+- Rounds without an event notify only their players unless "notify
+  everyone" is ticked.
+- Rounds are grouped by event, with a global event switcher.
+- Per event: infos (Markdown, shown on the Infos page), pizza order round
+  (`pizza.manage` grantable per event), kiosk (`kioskMainEventId` or
+  `&event=`; without a choice all running public events) and offered game
+  servers (`PUT /api/main-events/:id/servers`).
+
+### Modules
+
+- Modules install at runtime from module sources (Git repos with
+  `matchdesk-source.json`) without a new image or restart: preview and
+  confirm, enable/disable, update with manifest diff, uninstall with export.
+  Checksums (sha256) and the API version are verified; third-party sources
+  are clearly marked and need confirmation. Modules get their own
+  migrations (table prefix enforced), settings, rights, notification
+  channels, profile sections and start-page notices. Everything is audited.
+- Published modules: Pizza, "now playing" (with Windows agent), SMS,
+  Telegram, polls, event extras.
+
+### Now playing and game accounts
+
+- The Windows agent reports running games ("now playing").
+- Game accounts: the agent takes over the signed-in Steam account
+  automatically (disable with `-no-account`); EA, BattleTag, Epic and
+  Ubisoft are maintained in the profile. Participants' accounts are listed
+  with Steam profile and friend links.
+
 ## v0.16.0 — Events with start and end, participation, private events; log out all other users (2026-10-24)
 
 ### Upgrade note
