@@ -12,10 +12,7 @@ import { createMainEventRouter } from "./http/main-event-routes";
 import { createPushRouter } from "./http/push-routes";
 import { createRealtimeRouter } from "./http/realtime-routes";
 import { createKioskRouter } from "./http/kiosk-routes";
-import { createPizzaRouter } from "./http/pizza-routes";
 import { createAmpIntegrationRouter } from "./http/amp-routes";
-import { createPresenceRouter } from "./http/presence-routes";
-import { createPresenceStore } from "./domain/presence/game-presence";
 import { startAmpStatusService, stopAmpStatusService } from "./integrations/amp/amp-status";
 import { startAmpAutomation, stopAmpAutomation } from "./integrations/amp/amp-automation";
 import { createDb } from "./db/client";
@@ -33,6 +30,7 @@ import {
 import { getReleaseInfo } from "./version-info";
 import { createModuleManager, type ModuleManagerOptions } from "./modules/manager";
 import { createModuleAdminRouter, createPublicModulesRouter } from "./modules/routes";
+import { runBundledTransitions } from "./modules/bundled";
 
 export type CreateMatchdeskAppOptions = {
   modules?: ModuleManagerOptions;
@@ -44,6 +42,7 @@ export async function createMatchdeskApp(options: CreateMatchdeskAppOptions = {}
   runMigrations(context.sqlite);
   const modules = createModuleManager(context, options.modules);
   await modules.init();
+  await runBundledTransitions(context, modules);
 
   const app = express();
   app.disable("x-powered-by");
@@ -123,11 +122,24 @@ export async function createMatchdeskApp(options: CreateMatchdeskAppOptions = {}
   app.use("/api/notifications", createNotificationRouter(context));
   app.use("/api/realtime", createRealtimeRouter(context));
   app.use("/api/kiosk", createKioskRouter(context));
-  app.use("/api/pizza", createPizzaRouter(context));
   app.use("/api/integrations/amp", createAmpIntegrationRouter(context));
-  const presenceStore = createPresenceStore();
-  app.use("/api/presence", createPresenceRouter(context, presenceStore));
   app.use("/api/modules", createPublicModulesRouter(context, modules));
+  // Übergang für eine Version: Pizza war bis 0.16 unter /api/pizza eingebaut. Die alten Pfade werden
+  // intern auf das Modul umgeschrieben (keine HTTP-Weiterleitung, damit POST-Bodies erhalten bleiben).
+  // Ebenso „Spielt gerade“ unter /api/presence (ältere Windows-Agenten melden noch dorthin).
+  app.use((request, _response, next) => {
+    for (const [legacy, moduleId] of [
+      ["/api/pizza", "pizza"],
+      ["/api/presence", "presence"]
+    ] as const) {
+      const rest = request.url.slice(legacy.length);
+      if (request.url.startsWith(legacy) && (rest === "" || rest.startsWith("/") || rest.startsWith("?"))) {
+        request.url = `/api/m/${moduleId}${rest}`;
+        break;
+      }
+    }
+    next();
+  });
   app.use("/api/m/:moduleId", modules.dispatch);
   app.get("/modules/:moduleId/:version/*file", modules.serveClientFile);
 
@@ -141,13 +153,6 @@ export async function createMatchdeskApp(options: CreateMatchdeskAppOptions = {}
   const statusInterval = setInterval(() => {
     if (refreshEventStatuses(context)) {
       broadcastEventsChanged("status_refreshed");
-    }
-    // „Spielt gerade“: Agent meldet sich nicht mehr (PC aus, Agent beendet) → Eintrag verschwindet.
-    // Abgeschaltet: nichts aufheben, damit beim Wiedereinschalten keine alten Einträge auftauchen.
-    if (readSettings(context).featuresGamePresenceEnabled) {
-      presenceStore.sweep();
-    } else {
-      presenceStore.clearAll();
     }
   }, 30_000);
 

@@ -64,9 +64,6 @@ let snapshotTimer: NodeJS.Timeout | undefined;
 
 export const restorableTables = [
   "users",
-  // Spielkonten hängen nur am Benutzer
-  "user_game_accounts",
-  "user_game_account_prefs",
   "login_challenges",
   "devices",
   "sessions",
@@ -93,17 +90,6 @@ export const restorableTables = [
   "calendar_feed_tokens",
   "game_events",
   "participations",
-  // Pizza in FK-Reihenfolge: Kategorien → Menü → Varianten, Extras → Zuordnung,
-  // Runden → Bestellungen → Positionen (→ Varianten) → Positions-Extras (→ Extras)
-  "pizza_menu_categories",
-  "pizza_menu_items",
-  "pizza_menu_variants",
-  "pizza_menu_extras",
-  "pizza_menu_extra_categories",
-  "pizza_sessions",
-  "pizza_orders",
-  "pizza_order_lines",
-  "pizza_order_line_extras",
   "app_settings",
   "audit_logs",
   "invite_codes",

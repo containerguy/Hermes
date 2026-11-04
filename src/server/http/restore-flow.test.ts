@@ -37,12 +37,14 @@ vi.mock("@aws-sdk/client-s3", async (importOriginal) => {
 const { CSRF_HEADER } = await import("../auth/csrf");
 const { bootstrapAdmin } = await import("../db/bootstrap-admin");
 const { createMatchdeskApp } = await import("../app");
+const { bundledModulesDir } = await import("../modules/bundled");
 
 type Agent = ReturnType<typeof request.agent>;
 type Actor = { agent: Agent; csrf: string };
 
 let started: Awaited<ReturnType<typeof createMatchdeskApp>> | undefined;
 let databasePath: string;
+let modulesDir: string;
 
 async function actorFor(username: string): Promise<Actor> {
   const agent = request.agent(started!.app);
@@ -76,12 +78,14 @@ describe("Admin-Restore aus S3", () => {
     delete process.env.MATCHDESK_VAPID_PUBLIC_KEY;
     delete process.env.MATCHDESK_VAPID_PRIVATE_KEY;
     await bootstrapAdmin();
-    started = await createMatchdeskApp();
+    modulesDir = fs.mkdtempSync(path.join(os.tmpdir(), "matchdesk-modules-"));
+    started = await createMatchdeskApp({ modules: { modulesDir } });
   }, 60_000);
 
   afterEach(async () => {
     await started?.close();
     started = undefined;
+    fs.rmSync(modulesDir, { recursive: true, force: true });
     for (const name of [
       "MATCHDESK_STORAGE_BACKEND",
       "MATCHDESK_S3_BUCKET",
@@ -99,12 +103,8 @@ describe("Admin-Restore aus S3", () => {
 
   it("stellt Pizza-Daten über die echte Route wieder her", async () => {
     const admin = await actorFor("hauptadmin");
-    const settings = await admin.agent.get("/api/admin/settings").expect(200);
-    await admin.agent
-      .put("/api/admin/settings")
-      .set(CSRF_HEADER, admin.csrf)
-      .send({ ...settings.body.settings, featuresPizzaEnabled: true })
-      .expect(200);
+    // Pizza ist seit 0.17 ein Modul: aus dem eingebauten Startpaket installieren.
+    await started!.modules.installBundled(fs.readFileSync(path.join(bundledModulesDir(), "pizza-1.0.0.tgz")));
 
     await post(admin, "/api/pizza/transitions", { transition: "open", label: "Backup-Runde" }).expect(200);
     await post(admin, "/api/pizza/lines", { variantId: "v-003-30", qty: 2 }).expect(201);

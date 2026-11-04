@@ -11,7 +11,6 @@ export const CORE_PERMISSIONS = [
   "rounds.manage",
   "main_events.manage",
   "notifications.operator",
-  "pizza.manage",
   "servers.view",
   "servers.manage",
   "servers.bind",

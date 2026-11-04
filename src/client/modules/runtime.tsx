@@ -131,12 +131,15 @@ export function ModuleSlot({
   locale,
   pick,
   fallback,
+  quiet = false,
   render
 }: {
   info: RuntimeModuleInfo;
   locale: string;
   pick: (definition: ModuleClientDefinition) => React.ComponentType<never> | undefined;
   fallback?: React.ReactNode;
+  /** Nichts anzeigen, solange geladen wird oder wenn das Laden scheitert (für Hinweise). */
+  quiet?: boolean;
   render: (Component: React.ComponentType<never>) => React.ReactNode;
 }) {
   const [state, setState] = useState<{ definition?: ModuleClientDefinition; error?: string }>({});
@@ -150,6 +153,7 @@ export function ModuleSlot({
     };
   }, [info.clientUrl, locale]);
 
+  if (state.error && quiet) return null;
   if (state.error) {
     return (
       <section className="notice" role="alert">
@@ -158,10 +162,49 @@ export function ModuleSlot({
       </section>
     );
   }
-  if (!state.definition) return <p className="muted">…</p>;
+  if (!state.definition) return quiet ? null : <p className="muted">…</p>;
   const Component = pick(state.definition);
   if (!Component) return <>{fallback ?? null}</>;
   return <ModuleErrorBoundary moduleId={info.id}>{render(Component)}</ModuleErrorBoundary>;
+}
+
+/** Hinweise aktiver Module oben auf der Startseite (Manifest `startNotice`). */
+export function ModuleNotices({ modules, locale, user }: { modules: RuntimeModuleInfo[]; locale: string; user: User }) {
+  return (
+    <>
+      {modules
+        .filter((info) => info.startNotice && info.clientUrl)
+        .map((info) => (
+          <ModuleSlot
+            key={info.id}
+            info={info}
+            locale={locale}
+            quiet
+            pick={(definition) => definition.Notice as React.ComponentType<never> | undefined}
+            render={(Notice) => {
+              const Component = Notice as unknown as React.ComponentType<import("./types").ModuleNoticeProps>;
+              return <Component user={user} />;
+            }}
+          />
+        ))}
+    </>
+  );
+}
+
+/** Profilbereich eines Moduls (`#login/m-<id>`). */
+export function ModuleProfileSection({ info, locale, user }: { info: RuntimeModuleInfo; locale: string; user: User }) {
+  return (
+    <ModuleSlot
+      info={info}
+      locale={locale}
+      pick={(definition) => definition.Profile as React.ComponentType<never> | undefined}
+      fallback={<p className="muted">Dieses Modul hat keinen Profilbereich.</p>}
+      render={(Profile) => {
+        const Component = Profile as unknown as React.ComponentType<import("./types").ModuleProfileProps>;
+        return <Component user={user} />;
+      }}
+    />
+  );
 }
 
 /** Hash einer Modulseite: #m/<id> oder #m/<id>/<pfad>. */
@@ -205,7 +248,7 @@ export function buildRuntimeAppModules(infos: RuntimeModuleInfo[], locale: strin
 }
 
 /** Lädt die Liste der aktiven Module, sobald sich die Anmeldung ändert. */
-export function useRuntimeModules(currentUser: User | null) {
+export function useRuntimeModules(currentUser: User | null, locale?: string) {
   const [modules, setModules] = useState<RuntimeModuleInfo[]>([]);
   const [reloadToken, setReloadToken] = useState(0);
   useEffect(() => {
@@ -214,13 +257,14 @@ export function useRuntimeModules(currentUser: User | null) {
       return;
     }
     let cancelled = false;
-    requestJson<{ modules: RuntimeModuleInfo[] }>("/api/modules")
+    // Menü- und Profiltexte in der Sprache der Oberfläche (die Benutzer-Einstellung kann leer sein).
+    requestJson<{ modules: RuntimeModuleInfo[] }>(locale ? `/api/modules?locale=${encodeURIComponent(locale)}` : "/api/modules")
       .then((result) => !cancelled && setModules(result.modules ?? []))
       .catch(() => !cancelled && setModules([]));
     return () => {
       cancelled = true;
     };
-  }, [currentUser?.id, currentUser?.role, reloadToken]);
+  }, [currentUser?.id, currentUser?.role, reloadToken, locale]);
 
   useEffect(() => {
     const reload = () => setReloadToken((value) => value + 1);

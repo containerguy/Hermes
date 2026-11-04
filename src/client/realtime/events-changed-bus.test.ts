@@ -1,6 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
 import {
-  isPizzaReason,
   parseEventsChangedReason,
   publishEventsChanged,
   subscribeEventsChanged
@@ -31,11 +30,5 @@ describe("events-changed-bus", () => {
     expect(parseEventsChangedReason('{"at":"x"}')).toBeNull();
     expect(parseEventsChangedReason("kein json")).toBeNull();
     expect(parseEventsChangedReason(undefined)).toBeNull();
-  });
-
-  it("erkennt pizza-relevante Gründe", () => {
-    expect(isPizzaReason("pizza_menu_changed")).toBe(true);
-    expect(isPizzaReason(null)).toBe(true);
-    expect(isPizzaReason("event_created")).toBe(false);
   });
 });

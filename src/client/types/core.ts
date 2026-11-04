@@ -99,18 +99,6 @@ export type AppSettings = {
   kioskStreamSecret: string;
   /** Kiosk zeigt nur dieses Event (leer = alle laufenden Events gruppiert). */
   kioskMainEventId: string;
-  /** Pizzabestellung als optionales Feature; Standard `false` (Admin opt-in). */
-  featuresPizzaEnabled: boolean;
-  /** „Spielt gerade“ (Windows-Agent meldet laufende Spiele); Standard `false`. */
-  featuresGamePresenceEnabled: boolean;
-  /** PayPal-Handle (paypal.me/<handle>) für die Pizzabestellungs-Kassenliste. */
-  pizzaPaypalHandle: string;
-  /** Anzeigename für PayPal-Empfänger im Anteilsbildschirm. */
-  pizzaPaypalName: string;
-  /** Bargeld-Empfänger-Hinweis im Anteilsbildschirm. */
-  pizzaCashRecipient: string;
-  /** Angebotene Bezahlarten; PayPal zusätzlich nur mit gesetztem Handle. */
-  pizzaPaymentMethods: "cash_and_paypal" | "cash_only" | "paypal_only";
   /** CubeCoders AMP: Instanzen beim Event-Anlegen auswählbar (serverseitig konfiguriert). */
   ampIntegrationEnabled: boolean;
   /** Basis-URL des AMP-Controllers ohne /API, z. B. https://amp-ctl.lanparty.example */
@@ -222,12 +210,6 @@ export type PublicAppSettings = Pick<
   | "defaultLocale"
   | "kioskStreamEnabled"
   | "kioskStreamPath"
-  | "featuresPizzaEnabled"
-  | "featuresGamePresenceEnabled"
-  | "pizzaPaypalHandle"
-  | "pizzaPaypalName"
-  | "pizzaCashRecipient"
-  | "pizzaPaymentMethods"
   | "ampIntegrationEnabled"
 >;
 

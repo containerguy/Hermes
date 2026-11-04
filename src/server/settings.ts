@@ -69,28 +69,6 @@ const settingsObjectSchema = z.object({
   /** Kiosk zeigt nur dieses Event (leer = alle laufenden Events gruppiert); `&event=` in der URL hat Vorrang. */
   kioskMainEventId: z.string().max(64),
   /**
-   * Pizzabestellung als optionales Feature.
-   * Standard `false`: Modul nicht aktiv, Routen liefern 404, UI bleibt verborgen.
-   * Admin muss das Feature explizit aktivieren.
-   */
-  featuresPizzaEnabled: z.boolean(),
-  /**
-   * „Spielt gerade“: Spieler-PCs melden über den Windows-Agenten (tools/game-agent), welches
-   * Spiel läuft. Standard `false`: Routen liefern 404, Menüpunkt bleibt verborgen.
-   */
-  featuresGamePresenceEnabled: z.boolean(),
-  /** PayPal-Handle für Pizzabestellungs-Kassenliste (paypal.me/<handle>). Leer = kein Link. */
-  pizzaPaypalHandle: z.string().trim().max(80),
-  /** Anzeigename für PayPal-Empfänger in Kassenliste. Leer = kein Hinweis. */
-  pizzaPaypalName: z.string().trim().max(120),
-  /** Bargeld-Empfänger Hinweis in Kassenliste. Leer = kein Hinweis. */
-  pizzaCashRecipient: z.string().trim().max(120),
-  /**
-   * Angebotene Bezahlarten für die Pizzabestellung. PayPal wird nur angeboten, wenn zusätzlich
-   * ein PayPal-Handle gesetzt ist; bleibt nichts übrig, gilt Bargeld.
-   */
-  pizzaPaymentMethods: z.enum(["cash_and_paypal", "cash_only", "paypal_only"]),
-  /**
    * CubeCoders AMP: Gameserver-Modul. Zugangsdaten und CA kommen ausschließlich aus der Umgebung
    * (MATCHDESK_AMP_USERNAME, MATCHDESK_AMP_PASSWORD, MATCHDESK_AMP_CA_FILE), nie aus app_settings.
    */
@@ -171,12 +149,6 @@ export type PublicMatchdeskSettings = Pick<
   | "defaultLocale"
   | "kioskStreamEnabled"
   | "kioskStreamPath"
-  | "featuresPizzaEnabled"
-  | "featuresGamePresenceEnabled"
-  | "pizzaPaypalHandle"
-  | "pizzaPaypalName"
-  | "pizzaCashRecipient"
-  | "pizzaPaymentMethods"
   | "ampIntegrationEnabled"
 >;
 
@@ -201,12 +173,6 @@ export function pickPublicSettings(full: MatchdeskSettings): PublicMatchdeskSett
     defaultLocale: full.defaultLocale,
     kioskStreamEnabled: full.kioskStreamEnabled,
     kioskStreamPath: full.kioskStreamPath,
-    featuresPizzaEnabled: full.featuresPizzaEnabled,
-    featuresGamePresenceEnabled: full.featuresGamePresenceEnabled,
-    pizzaPaypalHandle: full.pizzaPaypalHandle,
-    pizzaPaypalName: full.pizzaPaypalName,
-    pizzaCashRecipient: full.pizzaCashRecipient,
-    pizzaPaymentMethods: full.pizzaPaymentMethods,
     ampIntegrationEnabled: full.ampIntegrationEnabled
   };
 }
@@ -237,12 +203,6 @@ export const defaultSettings: MatchdeskSettings = {
   kioskStreamPath: "stream",
   kioskStreamSecret: "",
   kioskMainEventId: "",
-  featuresPizzaEnabled: false,
-  featuresGamePresenceEnabled: false,
-  pizzaPaypalHandle: "",
-  pizzaPaypalName: "",
-  pizzaCashRecipient: "",
-  pizzaPaymentMethods: "cash_and_paypal",
   ampIntegrationEnabled: false,
   ampBaseUrl: "",
   ampAutoStartOnReady: false,

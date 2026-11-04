@@ -1,57 +1,23 @@
-import fs from "node:fs";
-import { randomUUID } from "node:crypto";
-import os from "node:os";
-import path from "node:path";
 import request from "supertest";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { CSRF_HEADER } from "../auth/csrf";
-import { bootstrapAdmin } from "../db/bootstrap-admin";
 import { createMatchdeskApp } from "../app";
+import { startPizzaTestEnv, type PizzaTestEnv } from "./pizza-test-helpers";
 
 type StartedApp = Awaited<ReturnType<typeof createMatchdeskApp>>;
 type Agent = ReturnType<typeof request.agent>;
-
-let started: StartedApp | undefined;
-let databasePath: string;
-
-async function login(agent: Agent, username: string) {
-  await agent.post("/api/auth/request-code").send({ username }).expect(202);
-  const response = await agent
-    .post("/api/auth/verify-code")
-    .send({ username, code: "123456", deviceName: "test" })
-    .expect(200);
-  return response.body.user as { id: string; role: string };
-}
-
-async function fetchCsrf(agent: Agent) {
-  const response = await agent.get("/api/auth/csrf").expect(200);
-  return response.body.token as string;
-}
-
 type Actor = { agent: Agent; csrf: string; id: string };
 
-async function actorFor(username: string): Promise<Actor> {
-  const agent = request.agent(started!.app);
-  const user = await login(agent, username);
-  return { agent, csrf: await fetchCsrf(agent), id: user.id };
-}
+let started: StartedApp | undefined;
 
-async function updateSettings(admin: Actor, patch: Record<string, unknown>) {
-  const current = await admin.agent.get("/api/admin/settings").expect(200);
+/** Pizza-Einstellungen liegen seit 0.17 in den Modul-Einstellungen. */
+async function updatePizzaSettings(admin: Actor, patch: Record<string, unknown>) {
+  const current = await admin.agent.get("/api/admin/modules/pizza/settings").expect(200);
   await admin.agent
-    .put("/api/admin/settings")
+    .put("/api/admin/modules/pizza/settings")
     .set(CSRF_HEADER, admin.csrf)
-    .send({ ...current.body.settings, ...patch })
+    .send({ settings: { ...current.body.settings, ...patch } })
     .expect(200);
-}
-
-async function createUser(admin: Actor, username: string, role: string) {
-  await admin.agent
-    .post("/api/admin/users")
-    .set(CSRF_HEADER, admin.csrf)
-    .send({ username, email: `${username}@example.test`, role })
-    .expect(201);
-  return actorFor(username);
 }
 
 function post(actor: Actor, url: string, body: unknown = {}) {
@@ -69,37 +35,17 @@ describe("Pizza-Verwaltung ab manager", () => {
   let organizer: Actor;
   let guest: Actor;
 
-  beforeEach(async () => {
-    databasePath = path.join(os.tmpdir(), `matchdesk-test-${randomUUID()}.sqlite`);
-    process.env.MATCHDESK_DB_PATH = databasePath;
-    process.env.MATCHDESK_ADMIN_PHONE = "+491701234567";
-    process.env.MATCHDESK_ADMIN_USERNAME = "hauptadmin";
-    process.env.MATCHDESK_ADMIN_EMAIL = "hauptadmin@example.test";
-    process.env.MATCHDESK_MAIL_MODE = "console";
-    process.env.MATCHDESK_DEV_LOGIN_CODE = "123456";
-    delete process.env.MATCHDESK_STORAGE_BACKEND;
-    delete process.env.MATCHDESK_VAPID_PUBLIC_KEY;
-    delete process.env.MATCHDESK_VAPID_PRIVATE_KEY;
-    await bootstrapAdmin();
-    started = await createMatchdeskApp();
+  let env: PizzaTestEnv;
 
-    admin = await actorFor("hauptadmin");
-    await updateSettings(admin, {
-      featuresPizzaEnabled: true,
-      pizzaPaypalHandle: "lanpizza",
-      pizzaPaymentMethods: "cash_and_paypal"
-    });
-    manager = await createUser(admin, "pizzachef", "manager");
-    organizer = await createUser(admin, "orga", "organizer");
-    guest = await createUser(admin, "gast", "user");
+  beforeEach(async () => {
+    env = await startPizzaTestEnv();
+    started = env.started;
+    ({ admin, manager, organizer, guest } = env);
   }, 60_000);
 
   afterEach(async () => {
-    await started?.close();
+    await env?.close();
     started = undefined;
-    for (const suffix of ["", "-wal", "-shm"]) {
-      fs.rmSync(`${databasePath}${suffix}`, { force: true });
-    }
   });
 
   it("erlaubt Menüpflege und Archiv nur ab manager", async () => {
@@ -346,7 +292,7 @@ describe("Pizza-Verwaltung ab manager", () => {
     await post(guest, "/api/pizza/orders/mine/payment-method", { method: "bitcoin" }).expect(400);
 
     // Nur Bargeld: PayPal nicht mehr wählbar, neue Bestellungen sind vorausgewählt
-    await updateSettings(admin, { pizzaPaymentMethods: "cash_only" });
+    await updatePizzaSettings(admin, { paymentMethods: "cash_only" });
     current = await state(manager);
     expect(current.paymentMethods).toEqual(["cash"]);
     await post(guest, "/api/pizza/orders/mine/payment-method", { method: "paypal" }).expect(400);
@@ -355,7 +301,7 @@ describe("Pizza-Verwaltung ab manager", () => {
     expect(current.myOrder.paymentMethod).toBe("cash");
 
     // Ohne PayPal-Handle wird PayPal auch bei "beides" nicht angeboten
-    await updateSettings(admin, { pizzaPaymentMethods: "cash_and_paypal", pizzaPaypalHandle: "" });
+    await updatePizzaSettings(admin, { paymentMethods: "cash_and_paypal", paypalHandle: "" });
     current = await state(guest);
     expect(current.paymentMethods).toEqual(["cash"]);
 
@@ -392,16 +338,23 @@ describe("Pizza-Verwaltung ab manager", () => {
     expect((await state(guest)).myOrder.paymentMethod).toBe("cash");
     expect(changed.body).toEqual({ paymentMode: "cash_only", paymentMethods: ["cash"] });
     const after = (await admin.agent.get("/api/admin/settings").expect(200)).body.settings;
-    expect(after).toEqual({ ...before, pizzaPaymentMethods: "cash_only" });
+    expect(after).toEqual(before);
+    const pizzaSettings = (await admin.agent.get("/api/admin/modules/pizza/settings").expect(200)).body.settings;
+    expect(pizzaSettings.paymentMethods).toBe("cash_only");
     expect((await state(guest)).paymentMethods).toEqual(["cash"]);
 
     // Admin-Einstellungen bleiben für manager gesperrt
     await manager.agent.put("/api/admin/settings").set(CSRF_HEADER, manager.csrf).send(after).expect(403);
+    await manager.agent
+      .put("/api/admin/modules/pizza/settings")
+      .set(CSRF_HEADER, manager.csrf)
+      .send({ settings: pizzaSettings })
+      .expect(403);
 
     const audit = await admin.agent.get("/api/admin/audit-log").expect(200);
     const entry = (audit.body.auditLogs as Array<{ action: string; metadata: unknown }>).find(
       (log) => log.action === "pizza.payment_mode"
     );
-    expect(entry?.metadata).toEqual({ from: "cash_and_paypal", to: "cash_only" });
+    expect(entry?.metadata).toMatchObject({ from: "cash_and_paypal", to: "cash_only" });
   });
 });

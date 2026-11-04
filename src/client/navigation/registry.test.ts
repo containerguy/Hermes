@@ -4,8 +4,6 @@ import { appPages } from "./modules";
 import { menuPages, parseHash, resolvePage, type NavContext } from "./registry";
 
 const settings = {
-  featuresPizzaEnabled: false,
-  featuresGamePresenceEnabled: false,
   infosEnabled: false,
   shellStartTitle: "",
   shellStartDescription: ""
@@ -26,12 +24,12 @@ describe("navigation registry", () => {
     expect(parseHash("")).toEqual({ head: "", subPath: "" });
   });
 
-  it("orders the menu as Runden, Events, Pizza, Infos, Admin", () => {
+  it("orders the menu as Runden, Events, Infos, Admin", () => {
     const admin = ctx({
       currentUser: user("admin"),
-      settings: { ...settings, featuresPizzaEnabled: true, infosEnabled: true }
+      settings: { ...settings, infosEnabled: true }
     });
-    expect(menuPages(appPages, admin).map((page) => page.id)).toEqual(["events", "main-events", "pizza", "infos", "admin"]);
+    expect(menuPages(appPages, admin).map((page) => page.id)).toEqual(["events", "main-events", "infos", "admin"]);
   });
 
   it("hides modules that are switched off and admin for non-admins", () => {
@@ -43,8 +41,6 @@ describe("navigation registry", () => {
     expect(resolvePage(appPages, ctx(), "#pizza").page.id).toBe("events");
     expect(resolvePage(appPages, ctx(), "#gibtsnicht").page.id).toBe("events");
     expect(resolvePage(appPages, ctx(), "#manager").page.id).toBe("events");
-    const withPizza = ctx({ settings: { ...settings, featuresPizzaEnabled: true } });
-    expect(resolvePage(appPages, withPizza, "#pizza").page.id).toBe("pizza");
   });
 
   it("keeps the sub path for admin and profile sections", () => {
@@ -67,6 +63,30 @@ describe("navigation registry", () => {
       "geraete",
       "tokens"
     ]);
+  });
+
+  it("puts profile sections of active modules right after the account section", () => {
+    const t = ((key: string) => key) as never;
+    const profilePage = appPages.find((page) => page.id === "login")!;
+    const presence = {
+      id: "presence",
+      version: "1.0.0",
+      name: "Spielt gerade",
+      clientUrl: "/modules/presence/1.0.0/client.mjs",
+      adminPage: false,
+      profile: { label: "Spielkonten", order: 10 },
+      startNotice: true,
+      permissions: [],
+      menu: [],
+      i18n: { de: {}, en: {} }
+    };
+    const entries = profilePage.subnav!(t, ctx({ runtimeModules: [presence] }));
+    expect(entries.map((entry) => entry.slug)).toEqual(["konto", "m-presence", "benachrichtigungen", "geraete", "tokens"]);
+    expect(entries[1].label).toBe("Spielkonten");
+    // Ohne Client-Teil gibt es keinen Profilbereich.
+    expect(profilePage.subnav!(t, ctx({ runtimeModules: [{ ...presence, clientUrl: null }] })).map((entry) => entry.slug)).not.toContain(
+      "m-presence"
+    );
   });
 
   it("resolves module pages with multi-part hashes, longest match first", () => {
