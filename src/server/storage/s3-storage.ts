@@ -574,9 +574,78 @@ function readColumns(db: Database.Database, table: string) {
     .map((row) => (row as { name: string }).name);
 }
 
+function readModuleMigrationRows(db: Database.Database) {
+  return db
+    .prepare("SELECT name, applied_at FROM schema_migrations WHERE name LIKE '%/%'")
+    .all() as Array<{ name: string; applied_at: string }>;
+}
+
+/**
+ * Daten installierter Module: Tabellen laut Manifest und Einstellungen kommen aus dem Snapshot,
+ * wenn er sie mit denselben Spalten hat; sonst bleiben die Live-Daten stehen.
+ */
+function restoreModuleData(
+  sqlite: Database.Database,
+  attachedName: string,
+  liveModuleMigrations: Array<{ name: string; applied_at: string }>
+) {
+  const insertMigration = sqlite.prepare("INSERT OR REPLACE INTO schema_migrations (name, applied_at) VALUES (?, ?)");
+  sqlite.prepare("DELETE FROM schema_migrations WHERE name LIKE '%/%'").run();
+  for (const row of liveModuleMigrations) insertMigration.run(row.name, row.applied_at);
+
+  const liveTables = new Set(listTableNames(sqlite));
+  if (!liveTables.has("modules")) return;
+  const snapshotTables = new Set(
+    (sqlite.prepare(`SELECT name FROM ${quoteIdentifier(attachedName)}.sqlite_master WHERE type = 'table'`).all() as Array<{
+      name: string;
+    }>).map((row) => row.name)
+  );
+  const modules = sqlite.prepare("SELECT id, manifest_json FROM modules").all() as Array<{ id: string; manifest_json: string }>;
+  for (const module of modules) {
+    let tables: string[] = [];
+    try {
+      const parsed = JSON.parse(module.manifest_json) as { tables?: unknown };
+      tables = Array.isArray(parsed.tables) ? parsed.tables.filter((table): table is string => typeof table === "string") : [];
+    } catch {
+      tables = [];
+    }
+    for (const table of tables) {
+      if (!table.startsWith(`${module.id}_`) || !liveTables.has(table) || !snapshotTables.has(table)) continue;
+      const liveColumns = readColumns(sqlite, table);
+      const snapshotColumns = sqlite
+        .prepare("SELECT name FROM pragma_table_info(?, ?) ORDER BY cid")
+        .all(table, attachedName)
+        .map((row) => (row as { name: string }).name);
+      if (liveColumns.join(",") !== snapshotColumns.join(",")) {
+        console.warn(`[Matchdesk] Restore: Tabelle ${table} hat im Snapshot andere Spalten und bleibt unverändert.`);
+        continue;
+      }
+      const quotedTable = quoteIdentifier(table);
+      const quotedColumns = liveColumns.map(quoteIdentifier).join(", ");
+      sqlite.exec(`DELETE FROM ${quotedTable};`);
+      sqlite.exec(
+        `INSERT INTO ${quotedTable} (${quotedColumns}) SELECT ${quotedColumns} FROM ${quoteIdentifier(attachedName)}.${quotedTable};`
+      );
+    }
+    if (snapshotTables.has("module_settings")) {
+      const snapshotSettings = sqlite
+        .prepare(`SELECT value_json, updated_at FROM ${quoteIdentifier(attachedName)}.module_settings WHERE module_id = ?`)
+        .get(module.id) as { value_json: string; updated_at: string } | undefined;
+      if (snapshotSettings) {
+        sqlite
+          .prepare(
+            "INSERT INTO module_settings (module_id, value_json, updated_at) VALUES (?, ?, ?) ON CONFLICT(module_id) DO UPDATE SET value_json = excluded.value_json, updated_at = excluded.updated_at"
+          )
+          .run(module.id, snapshotSettings.value_json, snapshotSettings.updated_at);
+      }
+    }
+  }
+}
+
 function readLatestMigration(db: Database.Database) {
   const row = db
-    .prepare("SELECT name FROM schema_migrations ORDER BY name DESC LIMIT 1")
+    // Nur Kern-Migrationen: Modul-Migrationen (`<modul>/<datei>`) hängen davon ab, welche Module installiert sind.
+    .prepare("SELECT name FROM schema_migrations WHERE name NOT LIKE '%/%' ORDER BY name DESC LIMIT 1")
     .get() as { name?: string } | undefined;
   return row?.name ?? null;
 }
@@ -855,6 +924,9 @@ export async function restoreDatabaseSnapshotIntoLive(sqlite: Database.Database)
     try {
       sqlite.pragma("foreign_keys = OFF");
       sqlite.transaction(() => {
+        // Installierte Module bleiben, wie sie live sind (ihre Dateien liegen im Volume). Ihre
+        // Migrationsstände merken wir uns, weil schema_migrations gleich aus dem Snapshot kommt.
+        const liveModuleMigrations = readModuleMigrationRows(sqlite);
         for (const table of restorableTables) {
           const quotedTable = quoteIdentifier(table);
           const sourceTable = `${quoteIdentifier(attachedName)}.${quotedTable}`;
@@ -865,6 +937,7 @@ export async function restoreDatabaseSnapshotIntoLive(sqlite: Database.Database)
             `INSERT INTO ${quotedTable} (${quotedColumns}) SELECT ${quotedColumns} FROM ${sourceTable};`
           );
         }
+        restoreModuleData(sqlite, attachedName, liveModuleMigrations);
       })();
 
       sqlite.pragma("foreign_keys = ON");

@@ -3006,3 +3006,63 @@ dd {
   margin: 0.2rem 0 0.6rem;
   padding-left: 1.2rem;
 }
+
+/* Admin › Module */
+.admin-modules {
+  display: grid;
+  gap: 12px;
+}
+.module-row,
+.module-source {
+  flex-wrap: wrap;
+}
+.module-state,
+.module-trust {
+  display: inline-block;
+  width: fit-content;
+  justify-self: start;
+  margin-left: 6px;
+  padding: 1px 8px;
+  border-radius: 999px;
+  font-size: 0.8rem;
+  font-weight: 700;
+  background: rgba(0, 0, 0, 0.07);
+}
+.module-state--enabled {
+  background: #dff5e8;
+  color: var(--green);
+}
+.module-state--error,
+.module-trust--third_party {
+  background: #ffe2e7;
+  color: var(--rose);
+}
+.module-available {
+  flex-basis: 100%;
+  display: grid;
+  gap: 6px;
+  margin: 8px 0 0;
+  padding-left: 18px;
+}
+.module-manifest {
+  display: grid;
+  grid-template-columns: max-content 1fr;
+  gap: 4px 12px;
+  margin: 0;
+}
+.module-manifest dt {
+  font-weight: 700;
+}
+.module-manifest dd {
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+.module-updates ul {
+  margin: 6px 0 0;
+  padding-left: 18px;
+}
+@media (max-width: 560px) {
+  .module-manifest {
+    grid-template-columns: 1fr;
+  }
+}

@@ -48,6 +48,8 @@ export const deMessages = {
   "main.admin.nav.security": "Sicherheit",
   "main.admin.nav.invites": "Invites",
   "main.admin.nav.audit": "Audit",
+  "main.admin.nav.modules": "Module",
+  "main.nav.modules": "Module",
   "main.hero.session": "Session",
   "main.hero.guest": "Gast",
   "main.hero.role": "Rolle",

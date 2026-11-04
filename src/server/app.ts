@@ -26,11 +26,19 @@ import {
   scheduleDatabaseSnapshot
 } from "./storage/s3-storage";
 import { getReleaseInfo } from "./version-info";
+import { createModuleManager, type ModuleManagerOptions } from "./modules/manager";
+import { createModuleAdminRouter, createPublicModulesRouter } from "./modules/routes";
 
-export async function createMatchdeskApp() {
+export type CreateMatchdeskAppOptions = {
+  modules?: ModuleManagerOptions;
+};
+
+export async function createMatchdeskApp(options: CreateMatchdeskAppOptions = {}) {
   await restoreDatabaseFromStorageIfNeeded();
   const context = createDb();
   runMigrations(context.sqlite);
+  const modules = createModuleManager(context, options.modules);
+  await modules.init();
 
   const app = express();
   app.disable("x-powered-by");
@@ -102,6 +110,7 @@ export async function createMatchdeskApp() {
   });
 
   app.use("/api/auth", createAuthRouter(context));
+  app.use("/api/admin/modules", createModuleAdminRouter(context, modules));
   app.use("/api/admin", createAdminRouter(context));
   app.use("/api/events", createEventRouter(context));
   app.use("/api/main-events", createMainEventRouter(context));
@@ -110,6 +119,9 @@ export async function createMatchdeskApp() {
   app.use("/api/kiosk", createKioskRouter(context));
   app.use("/api/pizza", createPizzaRouter(context));
   app.use("/api/integrations/amp", createAmpIntegrationRouter(context));
+  app.use("/api/modules", createPublicModulesRouter(context, modules));
+  app.use("/api/m/:moduleId", modules.dispatch);
+  app.get("/modules/:moduleId/:version/*file", modules.serveClientFile);
 
   const statusInterval = setInterval(() => {
     if (refreshEventStatuses(context)) {
@@ -138,8 +150,10 @@ export async function createMatchdeskApp() {
 
   return {
     app,
+    modules,
     close: async () => {
       clearInterval(statusInterval);
+      await modules.close();
       stopAmpAutomation();
       stopAmpStatusService();
       await flushDatabaseSnapshot(context.sqlite);
