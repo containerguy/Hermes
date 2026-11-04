@@ -114,6 +114,14 @@ export function resolvePage(pages: NavPage[], ctx: NavContext, rawHash: string):
   const { head, subPath } = parseHash(rawHash);
   const enabled = pages.filter((page) => isPageEnabled(page, ctx));
   const fallback = enabled[0] ?? pages[0];
+  // Seiten mit mehrteiligem Hash (Module: `m/<id>/<pfad>`): längster passender Hash gewinnt.
+  const fullPath = subPath ? `${head}/${subPath}` : head;
+  const nested = enabled
+    .filter((page) => page.hash.includes("/") && (fullPath === page.hash || fullPath.startsWith(`${page.hash}/`)))
+    .sort((a, b) => b.hash.length - a.hash.length)[0];
+  if (nested) {
+    return { page: nested, subPath: fullPath.slice(nested.hash.length + 1) };
+  }
   const match = enabled.find((page) => page.hash === head || page.aliases?.includes(head));
   if (!match) {
     return { page: fallback, subPath: "" };

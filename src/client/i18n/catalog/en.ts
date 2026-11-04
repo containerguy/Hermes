@@ -50,6 +50,8 @@ export const enMessages: { [K in keyof typeof deMessages]: string } = {
   "main.admin.nav.security": "Security",
   "main.admin.nav.invites": "Invites",
   "main.admin.nav.audit": "Audit",
+  "main.admin.nav.modules": "Modules",
+  "main.nav.modules": "Modules",
   "main.hero.session": "Session",
   "main.hero.guest": "Guest",
   "main.hero.role": "Role",

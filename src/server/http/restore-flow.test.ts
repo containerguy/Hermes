@@ -128,4 +128,77 @@ describe("Admin-Restore aus S3", () => {
     expect(after.session.label).toBe("Backup-Runde");
     expect(after.myOrder.lines.map((line: { id: string; qty: number }) => [line.id, line.qty])).toEqual([[lineId, 2]]);
   }, 60_000);
+
+  it("stellt Daten installierter Module wieder her und lässt das Modul laufen", async () => {
+    const { createTarGz } = await import("../modules/tar");
+    const { sha256 } = await import("../modules/source-fetch");
+    const pkg = createTarGz([
+      {
+        path: "manifest.json",
+        data: JSON.stringify({
+          id: "notiz",
+          name: "Notiz",
+          version: "1.0.0",
+          matchdeskApi: 1,
+          server: "server.mjs",
+          tables: ["notiz_items"],
+          settings: { type: "object", properties: { titel: { type: "string", default: "A" } } }
+        })
+      },
+      {
+        path: "server.mjs",
+        data: `export function register(ctx) {
+          ctx.router.get("/items", (_q, r) => r.json({ items: ctx.db.prepare("SELECT id FROM notiz_items ORDER BY id").all().map((x) => x.id) }));
+          ctx.router.post("/items", (q, r) => { if (!ctx.requireWrite(q, r)) return; ctx.db.prepare("INSERT INTO notiz_items (id) VALUES (?)").run(q.body.id); r.status(201).json({}); });
+          ctx.router.delete("/items/:id", (q, r) => { if (!ctx.requireWrite(q, r)) return; ctx.db.prepare("DELETE FROM notiz_items WHERE id = ?").run(q.params.id); r.status(204).end(); });
+        }`
+      },
+      { path: "migrations/0001_init.sql", data: "CREATE TABLE notiz_items (id TEXT PRIMARY KEY);" }
+    ]);
+    const hosted = new Map<string, Buffer>([
+      ["https://notiz.example.test/notiz-1.0.0.tgz", pkg],
+      [
+        "https://notiz.example.test/matchdesk-source.json",
+        Buffer.from(
+          JSON.stringify({
+            matchdeskSource: 1,
+            modules: [{ id: "notiz", name: "Notiz", versions: [{ version: "1.0.0", matchdeskApi: 1, url: "notiz-1.0.0.tgz", sha256: sha256(pkg) }] }]
+          })
+        )
+      ]
+    ]);
+    await started?.close();
+    started = await createMatchdeskApp({
+      modules: {
+        modulesDir: `${databasePath}-modules`,
+        fetch: async (url) => {
+          const body = hosted.get(url);
+          return { ok: Boolean(body), status: body ? 200 : 404, arrayBuffer: async () => new Uint8Array(body ?? []).buffer };
+        }
+      }
+    });
+    const admin = await actorFor("hauptadmin");
+    const source = await post(admin, "/api/admin/modules/sources", { name: "Notiz", url: "https://notiz.example.test" }).expect(200);
+    await post(admin, "/api/admin/modules/install", { sourceId: source.body.source.id, moduleId: "notiz", confirm: true }).expect(200);
+    await post(admin, "/api/admin/modules/notiz/enable").expect(200);
+    await post(admin, "/api/m/notiz/items", { id: "eins" }).expect(201);
+
+    await post(admin, "/api/admin/backup").expect(200);
+    const backup = Buffer.from(bucketObjects.get("hermes.sqlite")!);
+    await admin.agent.delete("/api/m/notiz/items/eins").set(CSRF_HEADER, admin.csrf).expect(204);
+    await admin.agent
+      .put("/api/admin/modules/notiz/settings")
+      .set(CSRF_HEADER, admin.csrf)
+      .send({ settings: { titel: "B" } })
+      .expect(200);
+
+    bucketObjects.set("hermes.sqlite", backup);
+    const restored = await post(admin, "/api/admin/restore");
+    expect(restored.status, JSON.stringify(restored.body)).toBe(200);
+    expect((await admin.agent.get("/api/m/notiz/items").expect(200)).body.items).toEqual(["eins"]);
+    expect((await admin.agent.get("/api/admin/modules/notiz/settings").expect(200)).body.settings).toEqual({ titel: "A" });
+    const status = (await admin.agent.get("/api/admin/modules/notiz").expect(200)).body.module;
+    expect(status).toEqual(expect.objectContaining({ state: "enabled", running: true }));
+    fs.rmSync(`${databasePath}-modules`, { recursive: true, force: true });
+  }, 60_000);
 });
