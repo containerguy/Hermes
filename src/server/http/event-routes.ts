@@ -2,7 +2,7 @@ import { and, eq, inArray, isNull, sql } from "drizzle-orm";
 import { Router } from "express";
 import { randomUUID } from "node:crypto";
 import { z } from "zod";
-import { requireUser } from "../auth/current-user";
+import { currentMainEventIdOf, requireUser } from "../auth/current-user";
 import { enforceApiTokenWriteAccess } from "../auth/matchdesk-auth";
 import { tryWriteAuditLog, writeAuditLog } from "../audit-log";
 import type { DatabaseContext } from "../db/client";
@@ -90,7 +90,18 @@ function resolveMainEventId(
   requested: string | null | undefined
 ): MainEventResolution {
   if (requested === undefined) {
-    // Ohne Angabe: das einzige laufende Event; laufen mehrere, das einzige, bei dem der Anleger dabei ist.
+    // Ohne Angabe: zuerst das gewählte aktuelle Event des Anlegers (globaler Umschalter) …
+    const currentId = currentMainEventIdOf(
+      context,
+      context.db.select({ currentMainEventId: users.currentMainEventId }).from(users).where(eq(users.id, viewer.id)).get() ?? {
+        currentMainEventId: null
+      }
+    );
+    const current = currentId ? getMainEvent(context, currentId) : undefined;
+    if (current && canSeeMainEvent(context, viewer, current) && acceptsRounds(current.status)) {
+      return { ok: true, mainEventId: current.id };
+    }
+    // … sonst das einzige laufende Event; laufen mehrere, das einzige, bei dem der Anleger dabei ist.
     const running = getRunningMainEvents(context).filter((entry) => canSeeMainEvent(context, viewer, entry));
     if (running.length <= 1) {
       return { ok: true, mainEventId: running[0]?.id ?? null };

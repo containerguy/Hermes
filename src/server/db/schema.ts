@@ -30,6 +30,10 @@ export const users = sqliteTable(
     ),
     /** 0031: von allen Event-Infos abgemeldet (Abmeldelink); Login-Mails kommen weiter. */
     eventInfoUnsubscribedAt: text("event_info_unsubscribed_at"),
+    /** 0034: gewähltes aktuelles Event (globaler Umschalter); NULL = alle Events. */
+    currentMainEventId: text("current_main_event_id").references((): AnySQLiteColumn => mainEvents.id, {
+      onDelete: "set null"
+    }),
     deletedAt: text("deleted_at"),
     createdAt: text("created_at").notNull(),
     updatedAt: text("updated_at").notNull()

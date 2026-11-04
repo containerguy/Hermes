@@ -244,6 +244,54 @@ describe("events with start and end (main events)", () => {
     expect(explicit.body.event.mainEventId).toBe(lan.id);
   });
 
+  it("stores the current event per user and uses it for new rounds", async () => {
+    const { adminAgent, managerAgent } = await createManagerAndLogin();
+    const lan = await createMainEvent(managerAgent, "LAN Herbst");
+    const cup = await createMainEvent(managerAgent, "Turnier");
+    await action(managerAgent, lan.id, "start");
+    await action(managerAgent, cup.id, "start");
+
+    const userAgent = await createUser(adminAgent, "spieler");
+    const userCsrf = await fetchCsrf(userAgent);
+    const chosen = await userAgent
+      .put("/api/main-events/current")
+      .set(CSRF_HEADER, userCsrf)
+      .send({ mainEventId: cup.id })
+      .expect(200);
+    expect(chosen.body.user.currentMainEventId).toBe(cup.id);
+    expect((await userAgent.get("/api/auth/me").expect(200)).body.user.currentMainEventId).toBe(cup.id);
+
+    await userAgent
+      .put("/api/main-events/current")
+      .set(CSRF_HEADER, userCsrf)
+      .send({ mainEventId: "gibt-es-nicht" })
+      .expect(404);
+
+    const csrf = await fetchCsrf(managerAgent);
+    await managerAgent
+      .put("/api/main-events/current")
+      .set(CSRF_HEADER, csrf)
+      .send({ mainEventId: lan.id })
+      .expect(200);
+    const linked = await managerAgent.post("/api/events").send(round("Quake")).expect(201);
+    expect(linked.body.event.mainEventId).toBe(lan.id);
+
+    // Nach dem Ende gilt wieder „alle Events“.
+    await action(managerAgent, lan.id, "end");
+    expect((await managerAgent.get("/api/auth/me").expect(200)).body.user.currentMainEventId).toBeNull();
+    const ended = await managerAgent
+      .put("/api/main-events/current")
+      .set(CSRF_HEADER, await fetchCsrf(managerAgent))
+      .send({ mainEventId: lan.id });
+    expect(ended.status).toBe(409);
+
+    await managerAgent
+      .put("/api/main-events/current")
+      .set(CSRF_HEADER, await fetchCsrf(managerAgent))
+      .send({ mainEventId: null })
+      .expect(200);
+  });
+
   it("does not notify everyone about rounds without an event unless asked to", async () => {
     const { managerAgent } = await createManagerAndLogin();
 

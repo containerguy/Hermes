@@ -45,6 +45,8 @@ export function EventBoard({
   const [draftMainEventId, setDraftMainEventId] = useState<string>("auto");
   /** Runde ohne Event: trotzdem alle benachrichtigen (Standard: nur die Mitspieler der Runde). */
   const [notifyAll, setNotifyAll] = useState(false);
+  /** Eingeklappte Gruppen der Rundenübersicht (Event-IDs bzw. "none"). */
+  const [collapsedGroups, setCollapsedGroups] = useState<string[]>([]);
   const [eventDraft, setEventDraft] = useState({
     gameTitle: "",
     startMode: "scheduled" as "now" | "scheduled",
@@ -460,9 +462,14 @@ export function EventBoard({
         ? joinedRunningMainEvents[0]
         : undefined;
   const openMainEvents = mainEvents.filter((entry) => entry.status !== "ended");
+  // Globaler Umschalter im Seitenkopf: gewähltes aktuelles Event (nur solange es nicht beendet ist).
+  const currentMainEvent = openMainEvents.find((entry) => entry.id === currentUser?.currentMainEventId);
+  /** Event für Hinweis und Teilnahme-Knopf in der Werkzeugleiste: das aktuelle, sonst das eindeutig laufende. */
+  const toolbarMainEvent =
+    currentMainEvent?.status === "running" ? currentMainEvent : currentMainEvent ? undefined : runningMainEvent;
   const resolvedFilter =
     mainEventFilter === "auto"
-      ? (runningMainEvent?.id ?? "all")
+      ? (currentMainEvent?.id ?? "all")
       : mainEventFilter !== "all" && mainEventFilter !== "none" && !mainEvents.some((entry) => entry.id === mainEventFilter)
         ? "all"
         : mainEventFilter;
@@ -472,9 +479,31 @@ export function EventBoard({
       : events.filter((event) =>
           resolvedFilter === "none" ? event.mainEventId === null : event.mainEventId === resolvedFilter
         );
+  // Ohne Filter auf ein Event: Runden nach Event gruppiert (laufende, dann geplante, dann beendete, zuletzt ohne Event).
+  const groupOrder: Record<MainEvent["status"], number> = { running: 0, planned: 1, ended: 2 };
+  const roundGroups: Array<{ key: string; mainEvent: MainEvent | null; rounds: GameEvent[] }> =
+    resolvedFilter === "all"
+      ? [
+          ...[...mainEvents]
+            .sort((a, b) => groupOrder[a.status] - groupOrder[b.status])
+            .map((entry) => ({
+              key: entry.id,
+              mainEvent: entry,
+              rounds: visibleEvents.filter((event) => event.mainEventId === entry.id)
+            }))
+            .filter((group) => group.rounds.length > 0 || group.mainEvent.status !== "ended"),
+          {
+            key: "none",
+            mainEvent: null,
+            rounds: visibleEvents.filter(
+              (event) => !event.mainEventId || !mainEvents.some((entry) => entry.id === event.mainEventId)
+            )
+          }
+        ]
+      : [];
   const resolvedDraftMainEventId =
     draftMainEventId === "auto"
-      ? (runningMainEvent?.id ?? (runningMainEvents.length > 1 ? CHOOSE_MAIN_EVENT : ""))
+      ? (currentMainEvent?.id ?? runningMainEvent?.id ?? (runningMainEvents.length > 1 ? CHOOSE_MAIN_EVENT : ""))
       : openMainEvents.some((entry) => entry.id === draftMainEventId)
         ? draftMainEventId
         : "";
@@ -665,20 +694,62 @@ export function EventBoard({
     </form>
   );
 
+  function renderRound(event: GameEvent) {
+    return (
+      <EventCard
+                  key={event.id}
+                  event={event}
+                  markSrc={markSrc}
+                  compact={compactTouchShell}
+                  expanded={expandedEventId === event.id}
+                  canManage={canManage(event)}
+                  canSoftDelete={canSoftDelete(event)}
+                  joinDisabled={isJoinDisabled(event)}
+                  editedStartsAt={editedStartsAt[event.id]}
+                  onToggleExpand={() => {
+                    setExpandedEventId(expandedEventId === event.id ? null : event.id);
+                    setCreateFlowOpen(false);
+                  }}
+                  onEditedStartsAtChange={(value) =>
+                    setEditedStartsAt({ ...editedStartsAt, [event.id]: value })
+                  }
+                  onJoin={() => setParticipation(event.id, "joined")}
+                  onDecline={() => setParticipation(event.id, "declined")}
+                  onUpdateStart={() => updateStart(event.id)}
+                  onArchive={() => changeEventStatus(event.id, "archive")}
+                  onCancel={() => changeEventStatus(event.id, "cancel")}
+                  onSoftDelete={() => softDeleteEvent(event.id)}
+                  server={serverBindingFor(event)}
+                />
+    );
+  }
+
+  /** „Runde hier anlegen“ in einer Gruppe: Event vorwählen und das Formular öffnen. */
+  function startRoundIn(mainEventId: string) {
+    setDraftMainEventId(mainEventId);
+    setCreateFlowOpen(true);
+    setExpandedEventId(null);
+    window.setTimeout(() => {
+      const input = document.querySelector<HTMLInputElement>("form.event-form input");
+      input?.scrollIntoView?.({ block: "center" });
+      input?.focus();
+    }, 0);
+  }
+
   const boardToolbar = (
     <div className="board-toolbar">
       <div>
         <span className={`live-state live-${liveState}`}>{liveStateLabel}</span>
-        {runningMainEvent ? (
+        {toolbarMainEvent ? (
           <span className="toolbar-hint board-main-event">
-            {t("mainEvents.running", { name: runningMainEvent.name })}
+            {t("mainEvents.running", { name: toolbarMainEvent.name })}
           </span>
         ) : null}
-        {runningMainEvent ? (
+        {toolbarMainEvent ? (
           <span className="toolbar-hint board-participation">
-            {runningMainEvent.myParticipation === "joined"
+            {toolbarMainEvent.myParticipation === "joined"
               ? t("mainEvents.participation.joined")
-              : runningMainEvent.myParticipation === "declined"
+              : toolbarMainEvent.myParticipation === "declined"
                 ? t("mainEvents.participation.declined")
                 : null}
             <button
@@ -686,12 +757,12 @@ export function EventBoard({
               className="secondary"
               onClick={() =>
                 setMainEventParticipation(
-                  runningMainEvent.id,
-                  runningMainEvent.myParticipation === "joined" ? "declined" : "joined"
+                  toolbarMainEvent.id,
+                  toolbarMainEvent.myParticipation === "joined" ? "declined" : "joined"
                 )
               }
             >
-              {runningMainEvent.myParticipation === "joined"
+              {toolbarMainEvent.myParticipation === "joined"
                 ? t("mainEvents.participation.decline")
                 : t("mainEvents.participation.join")}
             </button>
@@ -766,33 +837,62 @@ export function EventBoard({
           <div
             className={`event-list event-list--expandable${compactTouchShell ? " event-list--compact" : ""}`}
           >
-            {visibleEvents.map((event) => (
-              <EventCard
-                key={event.id}
-                event={event}
-                markSrc={markSrc}
-                compact={compactTouchShell}
-                expanded={expandedEventId === event.id}
-                canManage={canManage(event)}
-                canSoftDelete={canSoftDelete(event)}
-                joinDisabled={isJoinDisabled(event)}
-                editedStartsAt={editedStartsAt[event.id]}
-                onToggleExpand={() => {
-                  setExpandedEventId(expandedEventId === event.id ? null : event.id);
-                  setCreateFlowOpen(false);
-                }}
-                onEditedStartsAtChange={(value) =>
-                  setEditedStartsAt({ ...editedStartsAt, [event.id]: value })
-                }
-                onJoin={() => setParticipation(event.id, "joined")}
-                onDecline={() => setParticipation(event.id, "declined")}
-                onUpdateStart={() => updateStart(event.id)}
-                onArchive={() => changeEventStatus(event.id, "archive")}
-                onCancel={() => changeEventStatus(event.id, "cancel")}
-                onSoftDelete={() => softDeleteEvent(event.id)}
-                server={serverBindingFor(event)}
-              />
-            ))}
+            {resolvedFilter === "all"
+              ? roundGroups
+                  .filter((group) => group.rounds.length > 0 || (group.mainEvent !== null && showCreateForm))
+                  .map((group) => {
+                    const collapsed = collapsedGroups.includes(group.key);
+                    const statusKey =
+                      group.mainEvent?.status === "running"
+                        ? "mainEvents.status.running"
+                        : group.mainEvent?.status === "planned"
+                          ? "mainEvents.status.planned"
+                          : group.mainEvent
+                            ? "mainEvents.status.ended"
+                            : null;
+                    return (
+                      <section
+                        key={group.key}
+                        className={`event-group event-group--${group.mainEvent?.status ?? "none"}`}
+                        aria-label={group.mainEvent?.name ?? t("events.group.none")}
+                      >
+                        <header className="event-group-head">
+                          <h3>{group.mainEvent?.name ?? t("events.group.none")}</h3>
+                          {statusKey ? <span className="event-group-status">{t(statusKey)}</span> : null}
+                          <span className="muted">
+                            {group.rounds.length === 1
+                              ? t("events.group.countOne")
+                              : t("events.group.count", { n: group.rounds.length })}
+                          </span>
+                          {showCreateForm && group.mainEvent?.status !== "ended" ? (
+                            <button
+                              type="button"
+                              className="secondary"
+                              onClick={() => startRoundIn(group.mainEvent?.id ?? "")}
+                            >
+                              {t("events.group.add")}
+                            </button>
+                          ) : null}
+                          <button
+                            type="button"
+                            className="secondary"
+                            aria-expanded={!collapsed}
+                            onClick={() =>
+                              setCollapsedGroups(
+                                collapsed
+                                  ? collapsedGroups.filter((key) => key !== group.key)
+                                  : [...collapsedGroups, group.key]
+                              )
+                            }
+                          >
+                            {collapsed ? t("events.group.expand") : t("events.group.collapse")}
+                          </button>
+                        </header>
+                        {collapsed ? null : group.rounds.map((event) => renderRound(event))}
+                      </section>
+                    );
+                  })
+              : visibleEvents.map((event) => renderRound(event))}
             {visibleEvents.length === 0 ? (
               compactTouchShell ? (
                 <div className="event-compact-empty event-card">
