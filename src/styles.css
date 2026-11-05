@@ -4224,12 +4224,18 @@ ul.device-list {
   background: rgba(0, 0, 0, 0.07);
 }
 
-/* „Mehr“-Menü für seltene Aktionen in Listenzeilen */
+/*
+ * „Mehr“-Menü für seltene Aktionen in Listenzeilen. Technisch ein <details>, aber kein
+ * aufklappbarer Abschnitt: Der Griff ist ein Knopf. Die Kartenregeln für <details>
+ * (Trennlinie, fette Überschrift, „›“) nehmen `.more-menu` deshalb aus.
+ */
 .more-menu {
   position: relative;
 }
 
 .more-menu > summary {
+  /* `gap` trennt Beschriftung und „▾“; im Flex-Kasten fällt das Leerzeichen dazwischen weg. */
+  gap: 4px;
   list-style: none;
   min-height: 38px;
   padding: 0 14px;
@@ -4332,6 +4338,7 @@ legend {
  * dieselbe Karte wie Admin und Profil; Bausteine darin (für Module stabil, siehe SDK-README):
  *   .empty-state   Leerzustand
  *   details        aufklappbarer Abschnitt (Trennlinie, fette Überschrift, Pfeil)
+ *   .more-menu     „Mehr“-Knopf mit Aktionsliste (bleibt ein Knopf, kein Abschnitt)
  *   .device-list / .device-row / .item-title / .item-sub / .device-actions   Listenzeilen
  *   .badge(--ok|--warn|--danger), .button-link(.secondary), button(.secondary|.danger)
  */
@@ -4361,12 +4368,12 @@ legend {
   text-align: center;
 }
 
-.page-card details {
+.page-card details:not(.more-menu) {
   border-top: 1px solid var(--line);
   padding-top: 12px;
 }
 
-.page-card details > summary,
+.page-card details:not(.more-menu) > summary,
 details.collapsible > summary {
   display: flex;
   align-items: center;
@@ -4377,12 +4384,12 @@ details.collapsible > summary {
   list-style: none;
 }
 
-.page-card details > summary::-webkit-details-marker,
+.page-card details:not(.more-menu) > summary::-webkit-details-marker,
 details.collapsible > summary::-webkit-details-marker {
   display: none;
 }
 
-.page-card details > summary::before,
+.page-card details:not(.more-menu) > summary::before,
 details.collapsible > summary::before {
   content: "›";
   display: inline-block;
@@ -4393,12 +4400,12 @@ details.collapsible > summary::before {
   transition: transform 120ms ease;
 }
 
-.page-card details[open] > summary::before,
+.page-card details[open]:not(.more-menu) > summary::before,
 details.collapsible[open] > summary::before {
   transform: rotate(90deg);
 }
 
-.page-card details[open] > summary {
+.page-card details[open]:not(.more-menu) > summary {
   margin-bottom: 8px;
 }
 
