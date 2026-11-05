@@ -130,6 +130,18 @@ export function createModuleAdminRouter(context: DatabaseContext, manager: Modul
     "/:moduleId/settings",
     handle(true, (actor, request) => ({ settings: manager.putSettings(actor, moduleParam(request), request.body?.settings ?? request.body) }))
   );
+  router.get(
+    "/:moduleId/secrets",
+    handle(false, (_actor, request) => manager.listSecrets(moduleParam(request)))
+  );
+  router.put(
+    "/:moduleId/secrets/:name",
+    handle(true, (actor, request) => manager.putSecret(actor, moduleParam(request), String(request.params.name), request.body?.value))
+  );
+  router.delete(
+    "/:moduleId/secrets/:name",
+    handle(true, (actor, request) => manager.deleteSecret(actor, moduleParam(request), String(request.params.name)))
+  );
 
   return router;
 }

@@ -123,7 +123,7 @@ export type ModuleContext = {
     canSee: (user: PermissionActor, mainEventId: string) => boolean;
     participantStatus: (mainEventId: string, userId: string) => ModuleParticipantStatus | null;
   };
-  /** Liest ein im Manifest unter `secrets` genanntes Geheimnis (MATCHDESK_<NAME>). */
+  /** Liest ein im Manifest unter `secrets` genanntes Geheimnis (MATCHDESK_<NAME> oder im Admin eingetragen). */
   env: (name: string) => string | undefined;
   /** better-sqlite3-Verbindung. Module schreiben nur in eigene Tabellen (Präfix = Kennung). */
   db: DatabaseContext["sqlite"];
@@ -163,6 +163,8 @@ export function createModuleContext(input: {
   manifest: ModuleManifest;
   handles: ModuleRuntimeHandles;
   getSettings: () => Record<string, unknown>;
+  /** Liest Zugangsdaten (Umgebung, sonst im Admin eingetragen); ohne nur aus der Umgebung. */
+  readSecret?: (name: string) => string | undefined;
   setSettings?: (values: Record<string, unknown>, actor: { id: string; username: string; role: string }) => Record<string, unknown>;
 }): ModuleContext {
   const { context, manifest, handles } = input;
@@ -233,7 +235,7 @@ export function createModuleContext(input: {
       if (!manifest.secrets.includes(name)) {
         throw new Error(`${prefix} Geheimnis ${name} ist nicht im Manifest angemeldet.`);
       }
-      return readEnv(name);
+      return input.readSecret ? input.readSecret(name) : readEnv(name);
     },
     db: context.sqlite,
     audit: (entry) =>

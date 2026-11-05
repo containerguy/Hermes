@@ -670,11 +670,121 @@ function Sources({
   );
 }
 
+type SecretStatus = {
+  name: string;
+  envName: string;
+  fromEnv: boolean;
+  stored: "stored" | "unreadable" | "missing";
+  updatedAt: string | null;
+};
+
+/** Zugangsdaten aus `secrets` im Manifest: nur Status anzeigen, Werte nur schreiben. */
+function ModuleSecrets({ moduleId, onChanged }: { moduleId: string; onChanged: () => void }) {
+  const { tx } = useTexts();
+  const [state, setState] = useState<{ defaultKey: boolean; secrets: SecretStatus[] } | null>(null);
+  const [values, setValues] = useState<Record<string, string>>({});
+  const [busy, setBusy] = useState(false);
+  const [message, setMessage] = useState<{ kind: "ok" | "error"; text: string } | null>(null);
+
+  useEffect(() => {
+    requestJson<{ defaultKey: boolean; secrets: SecretStatus[] }>(`/api/admin/modules/${moduleId}/secrets`)
+      .then(setState)
+      .catch((caught) => setMessage({ kind: "error", text: errorOf(caught) }));
+  }, [moduleId]);
+
+  async function run(name: string, method: "PUT" | "DELETE") {
+    setBusy(true);
+    setMessage(null);
+    try {
+      const result = await requestJson<{ defaultKey: boolean; secrets: SecretStatus[] }>(
+        `/api/admin/modules/${moduleId}/secrets/${encodeURIComponent(name)}`,
+        method === "PUT" ? { method, body: JSON.stringify({ value: values[name] ?? "" }) } : { method }
+      );
+      setState(result);
+      setValues((current) => ({ ...current, [name]: "" }));
+      setMessage({ kind: "ok", text: tx(method === "PUT" ? "secretSaved" : "secretRemoved") });
+      onChanged();
+    } catch (caught) {
+      setMessage({ kind: "error", text: errorOf(caught) });
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  function statusText(secret: SecretStatus) {
+    if (secret.fromEnv) return tx("secretFromEnv", { env: secret.envName });
+    if (secret.stored === "stored") return tx("secretStored");
+    if (secret.stored === "unreadable") return tx("secretUnreadable");
+    return tx("secretMissing");
+  }
+
+  return (
+    <>
+      <h3>{tx("secretsTitle")}</h3>
+      <p className="muted">{tx("secretsHelp")}</p>
+      {state?.defaultKey ? <p className="notice module-secret-warning">{tx("secretsDefaultKey")}</p> : null}
+      {message ? (
+        <p className={message.kind === "error" ? "error" : "notice"} role={message.kind === "error" ? "alert" : "status"}>
+          {message.text}
+        </p>
+      ) : null}
+      {state ? (
+        state.secrets.map((secret) => (
+          <form
+            key={secret.name}
+            className="admin-form module-secret"
+            onSubmit={(event) => {
+              event.preventDefault();
+              void run(secret.name, "PUT");
+            }}
+          >
+            <label>
+              <span>
+                <code>{secret.name}</code> ·{" "}
+                <span className={`badge ${secret.fromEnv || secret.stored === "stored" ? "badge--ok" : "badge--danger"}`}>{statusText(secret)}</span>
+              </span>
+              <input
+                type="password"
+                autoComplete="off"
+                spellCheck={false}
+                value={values[secret.name] ?? ""}
+                placeholder={tx("secretPlaceholder")}
+                onChange={(event) => setValues({ ...values, [secret.name]: event.target.value })}
+              />
+            </label>
+            <div className="module-secret-actions">
+              <button type="submit" disabled={busy || !(values[secret.name] ?? "").trim()}>
+                {secret.stored === "missing" ? tx("save") : tx("secretReplace")}
+              </button>
+              {secret.stored !== "missing" ? (
+                <button
+                  type="button"
+                  className="secondary"
+                  disabled={busy}
+                  onClick={() => {
+                    if (window.confirm(tx("secretRemoveConfirm", { name: secret.name }))) void run(secret.name, "DELETE");
+                  }}
+                >
+                  {tx("secretRemove")}
+                </button>
+              ) : null}
+            </div>
+          </form>
+        ))
+      ) : (
+        <p className="muted">…</p>
+      )}
+    </>
+  );
+}
+
 function ModuleDetail({ module, currentUser, onBack }: { module: InstalledModule; currentUser: User; onBack: () => void }) {
   const { tx, loc, locale } = useTexts();
   const [settings, setSettings] = useState<Record<string, unknown> | null>(null);
   const [draft, setDraft] = useState<Record<string, unknown>>({});
   const [message, setMessage] = useState<{ kind: "ok" | "error"; text: string } | null>(null);
+  // Neu zählen, wenn das Modul nach geänderten Zugangsdaten neu gestartet wurde (Admin-Ansicht neu laden).
+  const [adminKey, setAdminKey] = useState(0);
 
   const load = useCallback(() => {
     requestJson<{ settings: Record<string, unknown> }>(`/api/admin/modules/${module.id}/settings`)
@@ -764,10 +874,15 @@ function ModuleDetail({ module, currentUser, onBack }: { module: InstalledModule
         <p className="muted">…</p>
       )}
 
+      {module.manifest.secrets.length > 0 ? (
+        <ModuleSecrets moduleId={module.id} onChanged={() => setAdminKey((key) => key + 1)} />
+      ) : null}
+
       {module.adminPage && module.running && module.clientUrl && runtime ? (
         <>
           <h3>{tx("moduleAdmin")}</h3>
           <ModuleSlot
+            key={adminKey}
             info={runtimeInfo}
             locale={locale}
             pick={(definition) => definition.Admin as React.ComponentType<never> | undefined}

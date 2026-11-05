@@ -53,6 +53,10 @@ export function register(ctx) {
     try { ctx.env("NOT_DECLARED"); response.json({ leaked: true }); }
     catch { response.json({ leaked: false }); }
   });
+  ctx.router.get("/token", (_request, response) => {
+    try { response.json({ token: ctx.env("DEMO_TOKEN") ?? null }); }
+    catch { response.json({ token: "nicht-angemeldet" }); }
+  });
   ctx.router.get("/boom", () => { throw new Error("kaputt"); });
   ctx.router.post("/ohne-pruefung", (_request, response) => { response.json({ ok: true }); });
   ctx.notifications.registerChannel({
@@ -370,6 +374,72 @@ describe("Modulverwaltung", () => {
     expect(fs.existsSync(path.join(modulesDir, "demo"))).toBe(false);
     const catalogAfter = await admin.agent.get("/api/admin/rbac").expect(200);
     expect(catalogAfter.body.permissions.filter((entry: { moduleId: string | null }) => entry.moduleId === "demo")).toEqual([]);
+  });
+
+  it("nimmt Zugangsdaten im Admin entgegen, speichert sie verschlüsselt und startet das Modul neu", async () => {
+    publish([{ version: "1.0.0", pkg: buildPackage("1.0.0", { manifest: demoManifest("1.0.0", { secrets: ["DEMO_TOKEN"] }) }) }]);
+    delete process.env.MATCHDESK_DEMO_TOKEN;
+    process.env.MATCHDESK_DEVICE_KEY_SECRET = "test-device-key-secret";
+    try {
+      const app = await start();
+      const admin = await adminSession(app);
+      const sourceId = await addDemoSource(admin);
+      await installAndEnable(admin, sourceId);
+
+      const empty = await admin.agent.get("/api/admin/modules/demo/secrets").expect(200);
+      expect(empty.body).toEqual({
+        defaultKey: false,
+        secrets: [{ name: "DEMO_TOKEN", envName: "MATCHDESK_DEMO_TOKEN", fromEnv: false, stored: "missing", updatedAt: null }]
+      });
+      expect((await admin.agent.get("/api/m/demo/token").expect(200)).body.token).toBeNull();
+
+      // Nur angemeldete Namen, nur mit CSRF, nicht leer
+      await admin.agent.put("/api/admin/modules/demo/secrets/OTHER").set(CSRF_HEADER, admin.csrf).send({ value: "x" }).expect(404);
+      await admin.agent.put("/api/admin/modules/demo/secrets/DEMO_TOKEN").send({ value: "x" }).expect(403);
+      await admin.agent.put("/api/admin/modules/demo/secrets/DEMO_TOKEN").set(CSRF_HEADER, admin.csrf).send({ value: "  " }).expect(400);
+
+      const starts = (globalThis as { __demoStarts?: number }).__demoStarts ?? 0;
+      const saved = await admin.agent
+        .put("/api/admin/modules/demo/secrets/DEMO_TOKEN")
+        .set(CSRF_HEADER, admin.csrf)
+        .send({ value: " geheim-123 " })
+        .expect(200);
+      expect(saved.body.secrets[0]).toEqual(expect.objectContaining({ stored: "stored", fromEnv: false }));
+      expect(JSON.stringify(saved.body)).not.toContain("geheim-123");
+      expect((globalThis as { __demoStarts?: number }).__demoStarts).toBe(starts + 1);
+      expect((await admin.agent.get("/api/m/demo/token").expect(200)).body.token).toBe("geheim-123");
+
+      const context = createDb();
+      try {
+        const row = context.sqlite.prepare("SELECT value_enc FROM module_secrets WHERE module_id = 'demo'").get() as { value_enc: string };
+        expect(row.value_enc).toMatch(/^v1:/);
+        expect(row.value_enc).not.toContain("geheim");
+        const audit = context.sqlite.prepare("SELECT summary, metadata FROM audit_logs WHERE action = 'module.secret_updated'").all();
+        expect(audit).toHaveLength(1);
+        expect(JSON.stringify(audit)).not.toContain("geheim");
+      } finally {
+        context.sqlite.close();
+      }
+
+      // Umgebungsvariable hat Vorrang
+      process.env.MATCHDESK_DEMO_TOKEN = "aus-env";
+      expect((await admin.agent.get("/api/m/demo/token").expect(200)).body.token).toBe("aus-env");
+      expect((await admin.agent.get("/api/admin/modules/demo/secrets").expect(200)).body.secrets[0].fromEnv).toBe(true);
+      delete process.env.MATCHDESK_DEMO_TOKEN;
+
+      // Anderer Schlüssel: nicht mehr lesbar, statt Unsinn an das Modul zu geben
+      process.env.MATCHDESK_DEVICE_KEY_SECRET = "anderer-schluessel";
+      expect((await admin.agent.get("/api/admin/modules/demo/secrets").expect(200)).body.secrets[0].stored).toBe("unreadable");
+      expect((await admin.agent.get("/api/m/demo/token").expect(200)).body.token).toBeNull();
+      process.env.MATCHDESK_DEVICE_KEY_SECRET = "test-device-key-secret";
+
+      const removed = await admin.agent.delete("/api/admin/modules/demo/secrets/DEMO_TOKEN").set(CSRF_HEADER, admin.csrf).expect(200);
+      expect(removed.body.secrets[0].stored).toBe("missing");
+      expect((await admin.agent.get("/api/m/demo/token").expect(200)).body.token).toBeNull();
+    } finally {
+      delete process.env.MATCHDESK_DEVICE_KEY_SECRET;
+      delete process.env.MATCHDESK_DEMO_TOKEN;
+    }
   });
 
   it("meldet Benachrichtigungskanäle von Modulen an und beim Ausschalten wieder ab", async () => {

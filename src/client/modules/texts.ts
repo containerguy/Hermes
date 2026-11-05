@@ -79,7 +79,20 @@ const de = {
   back: "Zurück zur Übersicht",
   settingsSaved: "Einstellungen gespeichert.",
   noSettings: "Dieses Modul hat keine Einstellungen.",
-  moduleAdmin: "Verwaltung des Moduls"
+  moduleAdmin: "Verwaltung des Moduls",
+  secretsTitle: "Zugangsdaten",
+  secretsHelp: "Werte werden verschlüsselt gespeichert und nie wieder angezeigt. Eine gesetzte Umgebungsvariable hat Vorrang. Das Modul startet nach dem Speichern neu.",
+  secretsDefaultKey: "MATCHDESK_DEVICE_KEY_SECRET ist nicht gesetzt: Zugangsdaten werden nur mit dem Standard-Schlüssel verschlüsselt. Variable einmal fest setzen und danach nie ändern.",
+  secretFromEnv: "aus Umgebungsvariable {env}",
+  secretStored: "gespeichert",
+  secretUnreadable: "nicht lesbar (Schlüssel geändert?), bitte neu eintragen",
+  secretMissing: "fehlt",
+  secretPlaceholder: "Neuen Wert eintragen",
+  secretReplace: "Ersetzen",
+  secretRemove: "Entfernen",
+  secretRemoveConfirm: "Zugangsdaten {name} entfernen?",
+  secretSaved: "Zugangsdaten gespeichert.",
+  secretRemoved: "Zugangsdaten entfernt."
 };
 
 export type ModuleTextKey = keyof typeof de;
@@ -164,7 +177,20 @@ const en: Record<ModuleTextKey, string> = {
   back: "Back to overview",
   settingsSaved: "Settings saved.",
   noSettings: "This module has no settings.",
-  moduleAdmin: "Module administration"
+  moduleAdmin: "Module administration",
+  secretsTitle: "Credentials",
+  secretsHelp: "Values are stored encrypted and never shown again. An environment variable, if set, takes precedence. The module restarts after saving.",
+  secretsDefaultKey: "MATCHDESK_DEVICE_KEY_SECRET is not set: credentials are encrypted with the default key only. Set the variable once and never change it.",
+  secretFromEnv: "from environment variable {env}",
+  secretStored: "stored",
+  secretUnreadable: "unreadable (key changed?), please enter again",
+  secretMissing: "missing",
+  secretPlaceholder: "Enter new value",
+  secretReplace: "Replace",
+  secretRemove: "Remove",
+  secretRemoveConfirm: "Remove credential {name}?",
+  secretSaved: "Credential saved.",
+  secretRemoved: "Credential removed."
 };
 
 export function moduleText(locale: string, key: ModuleTextKey, vars?: Record<string, string | number>) {

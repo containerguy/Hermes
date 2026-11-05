@@ -37,6 +37,7 @@ import {
 } from "./source-fetch";
 import { PackageFormatError, readTarGz, type TarEntry } from "./tar";
 import { createModuleContext, type ModuleRuntimeHandles, type ModuleServerEntry } from "./module-context";
+import { decryptModuleSecret, encryptModuleSecret, moduleSecretKeyIsDefault } from "./secrets";
 
 export class ModuleError extends Error {
   constructor(
@@ -723,6 +724,7 @@ export function createModuleManager(context: DatabaseContext, options: ModuleMan
         manifest: module.manifest,
         handles,
         getSettings: () => getSettings(module.id),
+        readSecret: (name) => readSecret(module.id, name),
         setSettings: (values, actor) => putSettings(actor as ModuleActor, module.id, { ...getSettings(module.id), ...values })
       });
       try {
@@ -896,6 +898,7 @@ export function createModuleManager(context: DatabaseContext, options: ModuleMan
     }
     runModuleUninstall(sqlite, id, uninstallSql, module.manifest.tables);
     removeModulePermissions(context, id);
+    sqlite.prepare("DELETE FROM module_secrets WHERE module_id = ?").run(id);
     sqlite.prepare("DELETE FROM modules WHERE id = ?").run(id);
     fs.rmSync(path.join(modulesDir, id), { recursive: true, force: true });
     runtimeErrors.delete(id);
@@ -944,6 +947,87 @@ export function createModuleManager(context: DatabaseContext, options: ModuleMan
       keys: Object.keys(parsed.data as object)
     });
     return getSettings(id);
+  }
+
+  // ---------- Zugangsdaten ----------
+
+  const secretValueSchema = z.string().trim().min(1).max(4096);
+
+  function storedSecret(id: string, name: string) {
+    return sqlite.prepare("SELECT value_enc, updated_at FROM module_secrets WHERE module_id = ? AND name = ?").get(id, name) as
+      | { value_enc: string; updated_at: string }
+      | undefined;
+  }
+
+  /** Umgebungsvariable MATCHDESK_<NAME> zuerst, sonst der im Admin eingetragene Wert. */
+  function readSecret(id: string, name: string): string | undefined {
+    const fromEnv = readEnv(name);
+    if (fromEnv) return fromEnv;
+    const row = storedSecret(id, name);
+    return row ? (decryptModuleSecret(id, name, row.value_enc) ?? undefined) : undefined;
+  }
+
+  /** Nur Namen und Herkunft, nie Werte. */
+  function listSecrets(id: string) {
+    const module = requireModule(id);
+    return {
+      defaultKey: moduleSecretKeyIsDefault(),
+      secrets: module.manifest.secrets.map((name) => {
+        const row = storedSecret(id, name);
+        const stored = row ? (decryptModuleSecret(id, name, row.value_enc) === null ? "unreadable" : "stored") : "missing";
+        return {
+          name,
+          envName: `MATCHDESK_${name}`,
+          fromEnv: Boolean(readEnv(name)),
+          stored,
+          updatedAt: row?.updated_at ?? null
+        };
+      })
+    };
+  }
+
+  function requireSecretName(module: ModuleRow, name: string) {
+    if (!module.manifest.secrets.includes(name)) {
+      throw new ModuleError("geheimnis_unbekannt", 404, `Modul ${module.id} kennt keine Zugangsdaten ${name}.`);
+    }
+  }
+
+  /** Läuft das Modul, wird es neu gestartet, damit es die neuen Zugangsdaten sofort nutzt. */
+  async function restartIfRunning(id: string) {
+    if (!runtimes.has(id)) return;
+    await stopRuntime(id);
+    try {
+      await startRuntime(requireModule(id));
+    } catch (error) {
+      runtimeErrors.set(id, errorText(error));
+      sqlite.prepare("UPDATE modules SET last_error = ? WHERE id = ?").run(errorText(error), id);
+    }
+  }
+
+  async function putSecret(actor: ModuleActor, id: string, name: string, raw: unknown) {
+    const module = requireModule(id);
+    requireSecretName(module, name);
+    const parsed = secretValueSchema.safeParse(raw);
+    if (!parsed.success) throw new ModuleError("geheimnis_ungueltig", 400, "Wert fehlt oder ist zu lang (höchstens 4096 Zeichen).");
+    sqlite
+      .prepare(
+        "INSERT INTO module_secrets (module_id, name, value_enc, updated_at) VALUES (?, ?, ?, ?) ON CONFLICT(module_id, name) DO UPDATE SET value_enc = excluded.value_enc, updated_at = excluded.updated_at"
+      )
+      .run(id, name, encryptModuleSecret(id, name, parsed.data), nowIso());
+    audit(actor, "module.secret_updated", "module", id, `Zugangsdaten ${name} von Modul ${id} gesetzt`, { name });
+    await restartIfRunning(id);
+    return listSecrets(id);
+  }
+
+  async function deleteSecret(actor: ModuleActor, id: string, name: string) {
+    const module = requireModule(id);
+    requireSecretName(module, name);
+    const result = sqlite.prepare("DELETE FROM module_secrets WHERE module_id = ? AND name = ?").run(id, name);
+    if (result.changes > 0) {
+      audit(actor, "module.secret_deleted", "module", id, `Zugangsdaten ${name} von Modul ${id} entfernt`, { name });
+      await restartIfRunning(id);
+    }
+    return listSecrets(id);
   }
 
   // ---------- Laufzeit ----------
@@ -1126,6 +1210,9 @@ export function createModuleManager(context: DatabaseContext, options: ModuleMan
     exportData,
     getSettings,
     putSettings,
+    listSecrets,
+    putSecret,
+    deleteSecret,
     publicModules,
     dispatch,
     serveClientFile,
