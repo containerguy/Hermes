@@ -1,5 +1,6 @@
 import React, { FormEvent, useCallback, useEffect, useMemo, useState } from "react";
 import { requestJson } from "../api/request";
+import { MoreMenu } from "../components/MoreMenu";
 import { ApiError } from "../errors/errors";
 import { useI18n } from "../i18n/I18nContext";
 import type { User } from "../types/core";
@@ -281,11 +282,15 @@ export function AdminModules({ currentUser, subPath }: { currentUser: User; subP
         {data.modules.map((module) => (
           <li key={module.id} className="device-row module-row">
             <div>
-              <strong>{loc(module.name)}</strong> <code>{module.id}</code> {module.version}{" "}
-              <span className={`module-state module-state--${module.state}`}>{tx(`state_${module.state}`)}</span>
-              {module.state === "enabled" && !module.running ? <span className="module-state module-state--error">{tx("notRunning")}</span> : null}
-              <p className="muted">
-                {module.orphaned ? tx("orphaned") : module.source ? `${module.source.name} · ${tx(`trust_${module.source.trust}`)}` : ""}
+              <p className="item-title">
+                <strong>{loc(module.name)}</strong>
+                <span className="item-meta">{module.version}</span>
+                <span className={`badge ${module.state === "enabled" ? "badge--ok" : ""}`}>{tx(`state_${module.state}`)}</span>
+                {module.state === "enabled" && !module.running ? <span className="badge badge--danger">{tx("notRunning")}</span> : null}
+              </p>
+              <p className="item-sub">
+                <code>{module.id}</code>
+                {module.orphaned ? ` · ${tx("orphaned")}` : module.source ? ` · ${module.source.name}` : ""}
               </p>
               {module.error ? <p className="error">{module.error}</p> : null}
             </div>
@@ -299,22 +304,24 @@ export function AdminModules({ currentUser, subPath }: { currentUser: User; subP
                   {tx("enable")}
                 </button>
               )}
-              <a className="button-link" href={`#admin/module/${module.id}`}>
+              <a className="button-link secondary" href={`#admin/module/${module.id}`}>
                 {tx("settings")}
               </a>
-              {!module.orphaned ? (
-                <button type="button" className="secondary" disabled={busy} onClick={() => startUpdate(module.id)}>
-                  {tx("update")}
+              <MoreMenu label={tx("more")}>
+                {!module.orphaned ? (
+                  <button type="button" className="secondary" disabled={busy} onClick={() => startUpdate(module.id)}>
+                    {tx("update")}
+                  </button>
+                ) : null}
+                <button type="button" className="secondary" disabled={busy} onClick={() => downloadExport(module)}>
+                  {tx("export")}
                 </button>
-              ) : null}
-              <button type="button" className="secondary" disabled={busy} onClick={() => downloadExport(module)}>
-                {tx("export")}
-              </button>
-              {module.state !== "enabled" ? (
-                <button type="button" className="secondary danger" disabled={busy} onClick={() => uninstall(module)}>
-                  {tx("uninstall")}
-                </button>
-              ) : null}
+                {module.state !== "enabled" ? (
+                  <button type="button" className="secondary danger" disabled={busy} onClick={() => uninstall(module)}>
+                    {tx("uninstall")}
+                  </button>
+                ) : null}
+              </MoreMenu>
             </div>
           </li>
         ))}
@@ -481,7 +488,7 @@ function Sources({
 
   return (
     <>
-      <div className="admin-section-head">
+      <div className="section-title-row">
         <h3>{tx("sourcesTitle")}</h3>
         <button type="button" className="secondary" onClick={onRefreshUpdates}>
           {tx("checkUpdates")}
@@ -527,13 +534,16 @@ function Sources({
                 </div>
               ) : (
                 <div>
-                  <strong>{source.name}</strong> <span className={`module-trust module-trust--${source.trust}`}>{tx(`trust_${source.trust}`)}</span>
-                  <p className="muted">
+                  <p className="item-title">
+                    <strong>{source.name}</strong>
+                    <span className={`badge ${source.trust === "third_party" ? "badge--warn" : ""}`}>{tx(`trust_${source.trust}`)}</span>
+                  </p>
+                  <p className="item-sub">
                     <code>{source.url}</code> · {source.ref}
                     {source.tokenEnv ? ` · ${source.tokenEnv}` : ""}
                   </p>
                   {source.lastError ? <p className="error">{source.lastError}</p> : null}
-                  {active.length > 0 ? <p className="muted">{tx("sourceLocked", { modules: active.join(", ") })}</p> : null}
+                  {active.length > 0 ? <p className="item-sub">{tx("sourceLocked", { modules: active.join(", ") })}</p> : null}
                 </div>
               )}
               <div className="device-actions">
@@ -573,24 +583,32 @@ function Sources({
                 list.length === 0 ? (
                   <p className="muted">{tx("sourceEmpty")}</p>
                 ) : (
-                  <ul className="module-available">
+                  <ul className="device-list module-available">
                     {list.map((module) => (
-                      <li key={module.id}>
-                        <strong>{loc(module.name)}</strong> <code>{module.id}</code> {module.latestCompatible ?? tx("noCompatible")}
-                        {module.description ? <span className="muted"> · {loc(module.description)}</span> : null}{" "}
-                        {module.installed ? (
-                          module.updateAvailable ? (
-                            <button type="button" className="secondary" disabled={busy} onClick={() => onUpdate(module.id)}>
-                              {tx("updateTo", { version: module.latestCompatible ?? "" })}
+                      <li key={module.id} className="device-row">
+                        <div>
+                          <p className="item-title">
+                            <strong>{loc(module.name)}</strong>
+                            <span className="item-meta">{module.latestCompatible ?? tx("noCompatible")}</span>
+                            {module.installed ? (
+                              <span className="badge badge--ok">{tx("alreadyInstalled", { version: module.installed.version })}</span>
+                            ) : null}
+                          </p>
+                          {module.description ? <p className="item-sub">{loc(module.description)}</p> : null}
+                        </div>
+                        <div className="device-actions">
+                          {module.installed ? (
+                            module.updateAvailable ? (
+                              <button type="button" className="secondary" disabled={busy} onClick={() => onUpdate(module.id)}>
+                                {tx("updateTo", { version: module.latestCompatible ?? "" })}
+                              </button>
+                            ) : null
+                          ) : module.latestCompatible ? (
+                            <button type="button" className="secondary" disabled={busy} onClick={() => onInstall(source.id, module.id)}>
+                              {tx("install")}
                             </button>
-                          ) : (
-                            <span className="muted">{tx("alreadyInstalled", { version: module.installed.version })}</span>
-                          )
-                        ) : module.latestCompatible ? (
-                          <button type="button" disabled={busy} onClick={() => onInstall(source.id, module.id)}>
-                            {tx("install")}
-                          </button>
-                        ) : null}
+                          ) : null}
+                        </div>
                       </li>
                     ))}
                   </ul>

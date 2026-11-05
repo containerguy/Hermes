@@ -78,7 +78,7 @@ export function createHost(info: RuntimeModuleInfo, locale: string): ModuleClien
       return text;
     },
     api: (path, init) => requestJson(`/api/m/${info.id}${path.startsWith("/") ? path : `/${path}`}`, init),
-    onRealtime: (event, handler) => subscribe({ module: info.id, event, handler })
+    onRealtime: (event, handler) => subscribe({ module: info.id, event, handler }),
   };
 }
 
@@ -132,7 +132,7 @@ export function ModuleSlot({
   pick,
   fallback,
   quiet = false,
-  render
+  render,
 }: {
   info: RuntimeModuleInfo;
   locale: string;
@@ -224,26 +224,29 @@ export function buildRuntimeAppModules(infos: RuntimeModuleInfo[], locale: strin
         label: () => entry.label,
         icon: entry.icon ?? NAV_ICONS.module,
         inMenu: (ctx) => Boolean(ctx.currentUser),
-        hero: () => ({ eyebrow: info.name, title: entry.label, description: "" }),
+        // Kicker nur, wenn er etwas anderes sagt als der Titel (sonst steht „Spielt gerade“ doppelt da).
+        hero: () => ({ eyebrow: info.name === entry.label ? "" : info.name, title: entry.label, description: "" }),
         render: (ctx) =>
           ctx.currentUser ? (
-            <ModuleSlot
-              info={info}
-              locale={locale}
-              pick={(definition) => definition.Page as React.ComponentType<never> | undefined}
-              fallback={<p className="muted">Dieses Modul hat keine eigene Seite.</p>}
-              render={(Page) => {
-                const Component = Page as unknown as React.ComponentType<import("./types").ModulePageProps>;
-                return (
-                  <Component path={entry.path} subPath={ctx.subPath} user={ctx.currentUser as User} permissions={info.permissions} />
-                );
-              }}
-            />
+            <div className="page-card module-page">
+              <ModuleSlot
+                info={info}
+                locale={locale}
+                pick={(definition) => definition.Page as React.ComponentType<never> | undefined}
+                fallback={<p className="muted">Dieses Modul hat keine eigene Seite.</p>}
+                render={(Page) => {
+                  const Component = Page as unknown as React.ComponentType<import("./types").ModulePageProps>;
+                  return (
+                    <Component path={entry.path} subPath={ctx.subPath} user={ctx.currentUser as User} permissions={info.permissions} />
+                  );
+                }}
+              />
+            </div>
           ) : (
             <LoginRequired eyebrowKey="main.nav.modules" />
-          )
-      })
-    )
+          ),
+      }),
+    ),
   }));
 }
 

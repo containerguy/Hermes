@@ -25,7 +25,7 @@ export const deMessages = {
   "main.guest.body": "Dieser Bereich ist nur für angemeldete Teilnehmer sichtbar.",
   "main.guest.login": "Zum Login",
   "main.route.mainEvents.eyebrow": "Events",
-  "main.route.mainEvents.title": "LAN-Partys und Turniertage auf einen Blick.",
+  "main.route.mainEvents.title": "LAN-Partys und Turniertage auf einen Blick",
   "main.route.mainEvents.descriptionManager": "Lege Events an, starte und beende sie und lade bei privaten Events gezielt ein.",
   "mainEvents.ariaList": "Events",
   "mainEvents.participation.open": "Noch nicht entschieden",
@@ -68,24 +68,24 @@ export const deMessages = {
   "main.hero.loginOpen": "Login offen",
   "main.hero.statusAria": "Status",
   "main.route.events.eyebrow": "Spielrunden im Blick",
-  "main.route.events.title": "Von der Idee bis zum Server-Join an einem Ort.",
+  "main.route.events.title": "Von der Idee bis zum Server-Join an einem Ort",
   "main.route.events.description":
     "Sieh auf einen Blick, welche Runde tragfähig ist, und triff deine Wahl. Mit Manager- oder Adminrechten legst du neue Runden hier direkt an — ohne zweite Oberfläche.",
   "main.route.infos.eyebrow": "Orientierung",
-  "main.route.infos.title": "Informationen und Hinweise.",
+  "main.route.infos.title": "Informationen und Hinweise",
   "main.infos.guest.title": "Anmeldung erforderlich",
   "main.infos.guest.body": "Die Infos-Seite ist nur für angemeldete Teilnehmer sichtbar.",
   "main.infos.guest.login": "Zum Login",
   "main.route.login.eyebrow": "Mailcode statt Passwort",
-  "main.route.login.title": "Schnell anmelden und auf mehreren Geräten bereit sein.",
+  "main.route.login.title": "Schnell anmelden und auf mehreren Geräten bereit sein",
   "main.route.login.description":
     "Username eingeben, Einmalcode aus der Mail bestätigen und Smartphone sowie PC parallel mit derselben Session nutzen.",
   "main.route.admin.eyebrow": "Betrieb & Theme",
-  "main.route.admin.title": "Rollen, Einstellungen und Shell-Farben bleiben zentral verwaltet.",
+  "main.route.admin.title": "Rollen, Einstellungen und Shell-Farben bleiben zentral verwaltet",
   "main.route.admin.description":
     "Der Adminbereich hält Benutzer, Benachrichtigungen und die fünf backend-gespeisten Themefarben in einer gemeinsamen Konfiguration.",
   "main.route.profileLogin.eyebrow": "Profil & Geräte",
-  "main.route.profileLogin.title": "Deine Anmeldung, Geräte und Benachrichtigungen im Griff.",
+  "main.route.profileLogin.title": "Deine Anmeldung, Geräte und Benachrichtigungen im Griff",
   "main.route.profileLogin.description":
     "Verwalte deine aktive Session, Notification-Einstellungen und alle Geräte, die parallel mit deinem Account verbunden sind.",
   "main.stage.admin": "Admin Arbeitsbereich",
@@ -94,7 +94,7 @@ export const deMessages = {
   "loginPage.workspaceLogin": "Login Arbeitsbereich",
   "loginPage.asideAria": "Login Hinweise",
   "loginPage.asideEyebrow": "Mailcode",
-  "loginPage.asideTitle": "Ein Login, mehrere Geräte.",
+  "loginPage.asideTitle": "Ein Login, mehrere Geräte",
   "loginPage.asideBody":
     "Username eingeben, Code aus der E-Mail nutzen und Smartphone sowie PC parallel angemeldet lassen.",
 
@@ -164,7 +164,7 @@ export const deMessages = {
     "Zuerst bearbeitbare Daten und Push — danach Geräteliste und Pairing. Login, Rolle und E-Mail findest du unten in der Konto-Übersicht.",
   "loginProfile.profileSectionAria": "Profil bearbeiten",
   "loginProfile.profileEyebrow": "Profil",
-  "loginProfile.profileTitle": "Profil und E-Mail aktuell halten.",
+  "loginProfile.profileTitle": "Profil und E-Mail aktuell halten",
   "loginProfile.profileHelp":
     "Passe Anzeigename und Mailadresse hier an, damit Einmalcodes und Teilnehmerlisten auf allen Geräten konsistent bleiben.",
   "loginProfile.displayName": "Anzeigename (frei wählbar)",
@@ -198,7 +198,7 @@ export const deMessages = {
   "loginProfile.apiTokenLastUsed": "Zuletzt verwendet",
   "loginProfile.apiTokenCreated": "Angelegt",
   "loginProfile.notificationsEyebrow": "Notifications",
-  "loginProfile.notificationsTitle": "Push vor dem Match testen.",
+  "loginProfile.notificationsTitle": "Push vor dem Match testen",
   "loginProfile.installEyebrow": "Installation",
   "loginProfile.installTitle": "Mitspielzentrale wie eine App nutzen",
   "loginProfile.installPwaBody":
@@ -226,7 +226,7 @@ export const deMessages = {
   "loginProfile.notifyOn": "Notifications aktivieren",
   "loginProfile.notifyOff": "Deaktivieren",
   "loginProfile.devicesEyebrow": "Geräte",
-  "loginProfile.devicesTitle": "Angemeldete Geräte im Blick behalten.",
+  "loginProfile.devicesTitle": "Angemeldete Geräte im Blick behalten",
   "loginProfile.devicesHelp":
     "Benenne Sessions sinnvoll um, entferne alte Geräte und prüfe bei Bedarf, wo dein Account aktiv ist.",
   "loginProfile.devicesRefresh": "Aktualisieren",
@@ -238,10 +238,10 @@ export const deMessages = {
   "loginProfile.device.saveName": "Name speichern",
   "loginProfile.device.signOut": "Abmelden",
   "loginProfile.device.forget": "Dieses Gerät vergessen",
-  "loginProfile.devicesEmptyTitle": "Keine Geräte geladen.",
+  "loginProfile.devicesEmptyTitle": "Keine Geräte geladen",
   "loginProfile.devicesEmptyHint": "Aktualisieren lädt deine aktiven Sessions.",
   "loginProfile.pair.sectionAria": "Gerät hinzufügen",
-  "loginProfile.pair.titleConnect": "Weiteres Gerät verbinden.",
+  "loginProfile.pair.titleConnect": "Weiteres Gerät verbinden",
   "loginProfile.pair.helpConnect":
     "Erzeuge einen kurzlebigen Pairing-Link, um die Mitspielzentrale auf Smartphone, Tablet oder Zweit-PC ohne erneutes Tippen des Einmalcodes zu öffnen.",
   "loginProfile.pair.close": "Schließen",
@@ -249,7 +249,7 @@ export const deMessages = {
   "loginProfile.pair.validUntil": "Gültig bis",
   "loginProfile.unnamedDevice": "Unbenanntes Gerät",
   "loginProfile.pairEyebrow": "Pairing",
-  "loginProfile.pairTitle": "Weiteres Gerät ohne erneuten Mailcode hinzufügen.",
+  "loginProfile.pairTitle": "Weiteres Gerät ohne erneuten Mailcode hinzufügen",
   "loginProfile.pairHelp":
     "Erzeuge einen Code auf diesem Gerät und scanne ihn auf dem neuen Gerät. Der Code ist kurz gültig.",
   "loginProfile.pairNewCode": "Neuen Code erzeugen",
@@ -278,17 +278,17 @@ export const deMessages = {
 
   "infos.disabled.aria": "Infos nicht verfügbar",
   "infos.disabled.eyebrow": "Infos",
-  "infos.disabled.title": "Dieser Bereich ist deaktiviert.",
+  "infos.disabled.title": "Dieser Bereich ist deaktiviert",
   "infos.disabled.body": "Der Menüpunkt Infos wurde vom Betreiber ausgeblendet.",
   "infos.disabled.link": "Zur Startseite",
   "infos.empty.aria": "Infos",
-  "infos.empty.title": "Noch keine Inhalte.",
+  "infos.empty.title": "Noch keine Inhalte",
   "infos.empty.body": "Ein Admin kann Texte hier im Adminbereich unter „Infos“ hinterlegen.",
   "infos.page.aria": "Infos",
 
   "events.guest.aria": "Login Hinweis",
   "events.guest.eyebrow": "Login",
-  "events.guest.title": "Einloggen und aktuelle Runden prüfen.",
+  "events.guest.title": "Einloggen und aktuelle Runden prüfen",
   "events.guest.body":
     "Nach dem Login siehst du sofort, welche Runde startet, wer schon dabei ist und welche Server- oder Join-Hinweise hinterlegt wurden.",
   "events.guest.login": "Zum Login",
@@ -307,7 +307,7 @@ export const deMessages = {
   "events.minN": "Noch {n} Spieler bis zur Mindestzahl",
   "events.part.joined": "Du bist dabei",
   "events.part.declined": "Du hast abgesagt",
-  "events.empty.defaultTitle": "Noch keine Runden im Board.",
+  "events.empty.defaultTitle": "Noch keine Runden im Board",
   "events.empty.defaultBody":
     "Sobald ein Manager eine Runde vorbereitet, tauchen Spiel, Startfenster und Details hier auf.",
   "events.organizer": "Runde von",
@@ -332,7 +332,7 @@ export const deMessages = {
   "events.mode.scheduled": "Geplant",
   "events.form.aria": "Neue Runde anlegen",
   "events.form.eyebrow": "Neue Runde",
-  "events.form.title": "Spielrunde vorbereiten.",
+  "events.form.title": "Spielrunde vorbereiten",
   "events.form.intro":
     "Lege Spiel, Startfenster und optionale Details einmal sauber an, damit alle im Board dieselben Informationen sehen.",
   "events.form.game": "Spiel",
@@ -413,7 +413,7 @@ export const deMessages = {
   "events.board.aria": "Events",
   "mainEvents.aria": "Events verwalten",
   "mainEvents.eyebrow": "Events",
-  "mainEvents.title": "Events planen, starten und beenden.",
+  "mainEvents.title": "Events planen, starten und beenden",
   "mainEvents.intro":
     "Neue Runden und ihre Benachrichtigungen gehören automatisch zum laufenden Event. Es läuft immer höchstens ein Event; beim Beenden werden seine offenen Runden archiviert.",
   "mainEvents.status.planned": "geplant",
@@ -520,7 +520,7 @@ export const deMessages = {
   "events.count.one": "1 Runde im Board",
   "events.count.many": "{n} Runden im Board",
   "events.manager.denied.eyebrow": "Manager",
-  "events.manager.denied.title": "Keine Managerrechte.",
+  "events.manager.denied.title": "Keine Managerrechte",
   "events.manager.denied.body":
     "Neue Runden können Manager, Organisatoren und Admins anlegen. Als Spieler kannst du hier weiter bestehende Runden verfolgen.",
   "events.newCompact": "Neue Runde",
@@ -548,7 +548,7 @@ export const deMessages = {
   "events.cod4.copied": "Kopiert",
   "events.cod4.copyFailed": "Kopieren fehlgeschlagen — manuell auswählen und kopieren",
 
-  "admin.gate.title": "User, Manager und Einstellungen.",
+  "admin.gate.title": "User, Manager und Einstellungen",
   "admin.gate.body": "Der Adminbereich ist nach Admin-Login verfügbar.",
   "admin.gate.link": "Admin-Login öffnen",
   "admin.users.title": "Zugänge und Rechte",
@@ -556,7 +556,7 @@ export const deMessages = {
   "admin.transfer.title": "Benutzer exportieren und importieren",
   "admin.transfer.intro": "Alle aktiven Benutzer als JSON sichern, eine Export-Datei wieder einspielen oder neue Benutzer aus CSV oder JSON anlegen.",
   "admin.exportUsers.eyebrow": "Export / Import",
-  "admin.exportUsers.title": "Alle aktiven User als JSON.",
+  "admin.exportUsers.title": "Alle aktiven User als JSON",
   "admin.exportUsers.help":
     "Enthält dieselben Felder wie der JSON-Bulk-Import plus Benachrichtigungs-Präferenz. Bestehende User (gleicher Username oder E-Mail) blockieren den Import wie bei der Vorschau.",
   "admin.exportUsers.export": "User exportieren",
@@ -567,7 +567,7 @@ export const deMessages = {
   "admin.role.manager": "Manager",
   "admin.role.admin": "Admin",
   "admin.bulk.eyebrow": "Bulk Import",
-  "admin.bulk.title": "User aus CSV oder JSON importieren.",
+  "admin.bulk.title": "User aus CSV oder JSON importieren",
   "admin.bulk.intro":
     "Die Mitspielzentrale prüft jede Zeile serverseitig gegen denselben Admin-Contract wie Einzel-User. Vorschau zeigt blockierende Konflikte, Commit bleibt gesperrt bis der letzte Preview-Lauf sauber ist.",
   "admin.bulk.format": "Format",
@@ -718,7 +718,7 @@ export const deMessages = {
   "admin.settings.import": "Einstellungen importieren",
   "admin.settings.save": "Einstellungen speichern",
   "admin.storage.eyebrow": "Storage",
-  "admin.storage.title": "Backup und Restore.",
+  "admin.storage.title": "Backup und Restore",
   "admin.storage.intro1": "Backup schreibt den aktuellen SQLite-Snapshot nach S3. Restore ersetzt die aktiven Daten durch den Snapshot aus S3.",
   "admin.storage.intro2":
     "Nutze Restore nur bewusst zwischen Spielrunden und prüfe danach direkt Users, Events und die aktuelle Session.",
@@ -777,17 +777,17 @@ export const deMessages = {
   "admin.rate.allowlistNoLabel": "Ohne Label",
   "admin.rate.allowlistUpdated": "Aktualisiert:",
   "admin.rate.allowlistRemove": "Entfernen",
-  "admin.rate.title": "Sperren prüfen und aufheben.",
+  "admin.rate.title": "Sperren prüfen und aufheben",
   "admin.rate.noneActive": "Keine aktiven Sperren.",
   "admin.rate.noneHint": "Wenn Rate-Limits aktiv sind, erscheinen sie hier.",
   "admin.sessions.eyebrow": "Sitzungen",
-  "admin.sessions.title": "Alle anderen abmelden.",
+  "admin.sessions.title": "Alle anderen abmelden",
   "admin.sessions.intro":
     "Meldet alle Benutzer auf allen Geräten ab. Nur du bleibst angemeldet, auch auf deinen anderen Geräten. API-Tokens bleiben gültig.",
   "admin.sessions.revokeOthers": "Alle anderen abmelden",
   "admin.sessions.confirm": "Wirklich alle anderen Benutzer abmelden? Sie müssen sich danach mit einem neuen Login-Code anmelden.",
   "admin.sessions.done": "{users} Benutzer abgemeldet ({sessions} Sitzungen beendet).",
-  "admin.invites.title": "LAN-Party Invite-Codes.",
+  "admin.invites.title": "LAN-Party Invite-Codes",
   "admin.invites.help":
     "Wenn Felder leer bleiben, nutzt die Mitspielzentrale standardmäßig 300 Nutzungen und 30 Tage Laufzeit.",
   "admin.invites.sectionAria": "Invite-Codes",
@@ -892,7 +892,7 @@ export const deMessages = {
   "admin.audit.sectionAria": "Audit-Log",
   "admin.audit.intro":
     "Das Audit-Log hilft dir beim Nachvollziehen von Änderungen, wenn Invite-, User- oder Restore-Aktionen später geprüft werden müssen.",
-  "admin.audit.title": "Letzte Aktionen.",
+  "admin.audit.title": "Letzte Aktionen",
   "admin.audit.empty": "Noch keine Audit-Einträge.",
   "admin.audit.emptyHint": "Neue Aktionen erscheinen hier nach dem Speichern.",
   "admin.invites.empty": "Noch keine Invite-Codes.",

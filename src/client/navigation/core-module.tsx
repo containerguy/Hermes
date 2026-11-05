@@ -225,7 +225,11 @@ export function createCoreModule(moduleAdminSections: AdminNavEntry[]): AppModul
           const moduleSection =
             isAdministrator(ctx.currentUser) ? enabledModuleAdmin(ctx).find((entry) => entry.slug === slug) : undefined;
           if (moduleSection) {
-            return <section className="admin-stage">{moduleSection.render(ctx)}</section>;
+            return (
+              <section className="admin-stage">
+                <div className="admin-panel admin-panel--single admin-panel--module">{moduleSection.render(ctx)}</div>
+              </section>
+            );
           }
           const section = (coreAdminSections as string[]).includes(slug) ? (slug as AdminSection) : "users";
           return (
