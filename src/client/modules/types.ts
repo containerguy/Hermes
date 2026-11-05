@@ -40,7 +40,7 @@ export type ModuleClientHost = {
 export type ModulePageProps = {
   /** Menüpfad aus dem Manifest ("" = Startseite). */
   path: string;
-  /** Rest des Hashes hinter #m/<id>/<path>/ */
+  /** Rest des Hashes hinter #mitmachen/<id>/<path>/ */
   subPath: string;
   user: User;
   permissions: string[];

@@ -37,10 +37,10 @@ const permissionSchema = z.object({
 });
 
 const menuEntrySchema = z.object({
-  /** Unterpfad der Modulseite: `#m/<id>/<path>`; leer = Startseite des Moduls. */
+  /** Unterpfad der Modulseite: `#mitmachen/<id>/<path>`; leer = Startseite des Moduls. */
   path: z.string().regex(/^[a-z0-9-]{0,40}$/).default(""),
   label: localizedTextSchema,
-  /** SVG-Pfad (24×24) für die mobile Tab-Leiste. */
+  /** SVG-Pfad (24×24), reserviert für künftige Icon-Anzeigen. */
   icon: z.string().max(2000).optional(),
   order: z.number().int().min(0).max(1000).default(50),
   /** Nur sichtbar mit diesem Recht; fehlt es, sehen alle Angemeldeten den Eintrag. */

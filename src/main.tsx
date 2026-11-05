@@ -8,9 +8,8 @@ import { clearCsrfToken, primeCsrfToken } from "./client/api/csrf";
 import { KioskStreamPage } from "./client/components/KioskStreamPage";
 import { MainEventSwitcher } from "./client/components/MainEventSwitcher";
 import { appPages } from "./client/navigation/modules";
-import { buildRuntimeAppModules, useRuntimeModules } from "./client/modules/runtime";
+import { useRuntimeModules } from "./client/modules/runtime";
 import {
-  collectPages,
   menuPages,
   resolvePage,
   type NavContext,
@@ -335,16 +334,11 @@ function AppShell({
     () => ({ currentUser, settings: appSettings, runtimeModules, locale }),
     [currentUser, appSettings, runtimeModules, locale]
   );
-  // Kernseiten plus Menüpunkte der aktiven Laufzeit-Module (GET /api/modules).
-  const pages = useMemo(
-    () =>
-      runtimeModules.length === 0
-        ? appPages
-        : collectPages([{ id: "static", pages: appPages }, ...buildRuntimeAppModules(runtimeModules, locale)]),
-    [runtimeModules, locale]
-  );
-  const { page: activePage, subPath } = resolvePage(pages, navContext, rawHash);
-  const menu = menuPages(pages, navContext);
+  // Das Hauptmenü ist fest (Runden, Event, Mitmachen, Admin); aktive Module tragen ihre
+  // Menüpunkte nur noch über `ctx.runtimeModules` zur Sammelseite „Mitmachen" bei, siehe
+  // `createCoreModule`. Das Hauptmenü selbst ist dadurch unabhängig von der Zahl der Module.
+  const { page: activePage, subPath } = resolvePage(appPages, navContext, rawHash);
+  const menu = menuPages(appPages, navContext);
   const subnav = activePage.subnav?.(t, navContext) ?? [];
   const activeSubSlug = subPath.split("/")[0] || subnav[0]?.slug || "";
 
