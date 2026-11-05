@@ -4204,6 +4204,69 @@ ul.device-list {
   font-size: 0.82rem;
 }
 
+/*
+ * Auswahlzeile und Sammelleiste: eine Liste, in der mehrere Zeilen auf einmal bearbeitet werden.
+ * Markup:
+ *   <div class="bulk-bar"><strong>2 ausgewählt</strong> …Knöpfe…</div>
+ *   <ul class="device-list">
+ *     <li class="device-row device-row--selectable device-row--selected">
+ *       <input type="checkbox" aria-label="…" /> <div>…Infos…</div>
+ *       <div class="device-actions">…</div>
+ *     </li>
+ *   </ul>
+ * Das Kästchen braucht einen eigenen Namen (`aria-label`), weil die Zeile kein Label trägt.
+ */
+.device-row--selectable {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 10px 12px;
+}
+
+.device-row--selectable > input[type="checkbox"] {
+  width: 22px;
+  height: 22px;
+  cursor: pointer;
+}
+
+/* Gewählte Zeile: gleiche Form, nur deutlich hervorgehoben. */
+.device-row--selected {
+  border-color: var(--teal);
+  background: var(--surface-strong);
+}
+
+/* Sammelleiste über der Liste: Anzahl links, Aktionen rechts. */
+.bulk-bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 12px;
+  padding: 10px 12px;
+  border: 1px solid var(--teal);
+  border-radius: var(--radius-sm);
+  background: var(--surface-strong);
+}
+
+.bulk-bar > strong {
+  margin-right: auto;
+}
+
+.bulk-bar button,
+.bulk-bar .button-link {
+  width: auto;
+}
+
+/* Handy: die Zeilenaktionen bekommen eine eigene Zeile unter den Infos, kein Überlauf. */
+@media (max-width: 760px) {
+  .device-row--selectable {
+    grid-template-columns: auto minmax(0, 1fr);
+  }
+
+  .device-row--selectable > .device-actions {
+    grid-column: 1 / -1;
+  }
+}
+
 /* Module einer Quelle: eigene Zeilen unter der Quelle, gleiche Form wie installierte Module */
 .module-source > .module-available,
 .module-source > .error,
@@ -4333,6 +4396,8 @@ legend {
  *   .empty-state   Leerzustand
  *   details        aufklappbarer Abschnitt (Trennlinie, fette Überschrift, Pfeil)
  *   .device-list / .device-row / .item-title / .item-sub / .device-actions   Listenzeilen
+ *   .device-row--selectable / .device-row--selected   Zeile mit Auswahlkästchen
+ *   .bulk-bar   Sammelleiste über einer Liste („n ausgewählt" plus Aktionen)
  *   .badge(--ok|--warn|--danger), .button-link(.secondary), button(.secondary|.danger)
  */
 .page-card {
