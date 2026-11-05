@@ -4,6 +4,48 @@ Versions are annotated tags `vX.Y.Z` on `main`. Each entry mirrors the
 `chore(release): vX.Y.Z` commit that bumps `package.json`,
 `package-lock.json`, and `src/server/openapi/hermes-api.yaml`.
 
+## v0.21.0 — Module credentials in the admin, consistent UI, tool updates (2026-11-05)
+
+### Upgrade note
+
+- Migration `0040_module_secrets` runs automatically on start and creates
+  `module_secrets`. Take a backup before updating, as for every migration.
+  Restores need a snapshot with the same migration state; the new table is
+  part of the restore.
+- Module credentials are encrypted with a key derived from
+  `MATCHDESK_DEVICE_KEY_SECRET` (or `HERMES_DEVICE_KEY_SECRET`). Set it once
+  and never change it, otherwise stored credentials become unreadable and
+  must be entered again. Without it, a default key is used and the admin
+  page shows a warning.
+- Module updates to install afterwards (Admin → Modules shows them as
+  updates): extras, pizza and polls 1.0.1, telegram 1.0.2, sms 1.0.1,
+  presence 1.1.1 (tray agent with installer since 1.1.0).
+
+### Modules
+
+- Admin → Modules → <module> has a new **Credentials** section (e.g. the
+  Telegram bot token or SMS gateway keys): status per secret (environment,
+  stored, missing, unreadable), enter, replace or remove. Values are stored
+  encrypted (AES-256-GCM) and never shown again. A set environment variable
+  still takes precedence. A running module restarts after a change.
+
+### Interface
+
+- Shared building blocks across the app: one button style (also for
+  links), one badge style for states, one list-row layout with actions on
+  the right and rare actions under "More", styled empty states and
+  collapsible sections. Module pages sit in a card below the page header;
+  headings no longer end with a period.
+- Admin → Modules: installed and available modules use the same row
+  layout with at most three buttons per module; update, export and
+  uninstall are in the "More" menu.
+
+### Dependencies
+
+- Development tools updated (esbuild 0.28.2, vite 7.3.7, vitest 4.1.12,
+  tsx 4.23.15 and indirect packages). `npm audit` no longer reports
+  findings in development packages. The runtime image is unchanged.
+
 ## v0.20.0 — Matchdesk: modules, roles and rights, event preparation, parallel events (2026-11-04)
 
 Hermes is now called **Matchdesk** (German UI: **Mitspielzentrale**). A few
