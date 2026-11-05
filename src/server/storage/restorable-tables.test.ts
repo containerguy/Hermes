@@ -24,9 +24,10 @@ describe("restorable tables", () => {
     // Bewusst nicht wiederhergestellt: kurzlebige Anmelde-/Sperrdaten und der Zustand des Backups selbst.
     // user_api_tokens und rate_limit_allowlist fehlen schon länger im Restore (Stand PR #14).
     // Modulverwaltung: Installationsstand folgt den Dateien im Live-Volume; Moduldaten und
-    // Moduleinstellungen stellt restoreModuleData() je installiertem Modul wieder her.
+    // Moduleinstellungen und -zugangsdaten stellt restoreModuleData() je installiertem Modul wieder her.
     const notRestored = [
       "module_settings",
+      "module_secrets",
       "module_sources",
       "modules",
       "email_change_challenges",

@@ -4419,4 +4419,23 @@ details.collapsible[open] > summary::before {
   .page-card .action-row > .button-link {
     width: 100%;
   }
+/* Admin › Module › <Modul>: Zugangsdaten (nur schreiben, Status anzeigen) */
+.module-secret {
+  margin-bottom: 12px;
+}
+
+.module-secret-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.module-secret-actions button {
+  width: auto;
+  min-width: 140px;
+}
+
+.notice.module-secret-warning {
+  background: #fff4d6;
+  color: #8a5a00;
 }

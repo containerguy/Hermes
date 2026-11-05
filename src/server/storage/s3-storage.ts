@@ -642,6 +642,15 @@ function restoreModuleData(
           .run(module.id, snapshotSettings.value_json, snapshotSettings.updated_at);
       }
     }
+    if (snapshotTables.has("module_secrets") && liveTables.has("module_secrets")) {
+      const snapshotSecrets = sqlite
+        .prepare(`SELECT name, value_enc, updated_at FROM ${quoteIdentifier(attachedName)}.module_secrets WHERE module_id = ?`)
+        .all(module.id) as Array<{ name: string; value_enc: string; updated_at: string }>;
+      const upsert = sqlite.prepare(
+        "INSERT INTO module_secrets (module_id, name, value_enc, updated_at) VALUES (?, ?, ?, ?) ON CONFLICT(module_id, name) DO UPDATE SET value_enc = excluded.value_enc, updated_at = excluded.updated_at"
+      );
+      for (const row of snapshotSecrets) upsert.run(module.id, row.name, row.value_enc, row.updated_at);
+    }
   }
 }
 
