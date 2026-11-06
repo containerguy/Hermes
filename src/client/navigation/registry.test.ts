@@ -1,7 +1,21 @@
 import { describe, expect, it } from "vitest";
 import type { AppSettings, User } from "../types/core";
+import type { RuntimeModuleInfo } from "../modules/types";
 import { appPages } from "./modules";
 import { menuPages, parseHash, resolvePage, type NavContext } from "./registry";
+
+function moduleInfo(id: string, name: string, menu: RuntimeModuleInfo["menu"]): RuntimeModuleInfo {
+  return {
+    id,
+    version: "1.0.0",
+    name,
+    clientUrl: `/modules/${id}/1.0.0/client.mjs`,
+    adminPage: false,
+    permissions: [],
+    menu,
+    i18n: { de: {}, en: {} }
+  };
+}
 
 const settings = {
   infosEnabled: false,
@@ -89,15 +103,87 @@ describe("navigation registry", () => {
     );
   });
 
-  it("resolves module pages with multi-part hashes, longest match first", () => {
+  it("resolves pages with multi-part hashes, longest match first", () => {
+    // Präfix bewusst nicht „m" (reserviert als Alias der Sammelseite „Mitmachen", siehe unten).
     const base = appPages[0];
-    const moduleStart = { ...base, id: "m-demo", hash: "m/demo" };
-    const moduleAdmin = { ...base, id: "m-demo-verwaltung", hash: "m/demo/verwaltung" };
+    const moduleStart = { ...base, id: "x-demo", hash: "x/demo" };
+    const moduleAdmin = { ...base, id: "x-demo-verwaltung", hash: "x/demo/verwaltung" };
     const pages = [...appPages, moduleStart, moduleAdmin];
-    expect(resolvePage(pages, ctx(), "#m/demo")).toEqual({ page: moduleStart, subPath: "" });
-    expect(resolvePage(pages, ctx(), "#m/demo/liste/7")).toEqual({ page: moduleStart, subPath: "liste/7" });
-    expect(resolvePage(pages, ctx(), "#m/demo/verwaltung/x")).toEqual({ page: moduleAdmin, subPath: "x" });
-    expect(resolvePage(pages, ctx(), "#m/demox").page.id).toBe("events");
-    expect(resolvePage(pages, ctx(), "#m/andere").page.id).toBe("events");
+    expect(resolvePage(pages, ctx(), "#x/demo")).toEqual({ page: moduleStart, subPath: "" });
+    expect(resolvePage(pages, ctx(), "#x/demo/liste/7")).toEqual({ page: moduleStart, subPath: "liste/7" });
+    expect(resolvePage(pages, ctx(), "#x/demo/verwaltung/x")).toEqual({ page: moduleAdmin, subPath: "x" });
+    expect(resolvePage(pages, ctx(), "#x/demox").page.id).toBe("events");
+    expect(resolvePage(pages, ctx(), "#x/andere").page.id).toBe("events");
+  });
+
+  it("hat mit 7 aktiven Modulen genauso viele Hauptmenüpunkte wie mit 1 (B4: Hauptmenü unabhängig von der Zahl der Module)", () => {
+    const oneModule = [moduleInfo("mod-0", "Modul 0", [{ path: "", label: "Modul 0", icon: null, order: 50 }])];
+    const sevenModules = Array.from({ length: 7 }, (_, index) =>
+      moduleInfo(`mod-${index}`, `Modul ${index}`, [{ path: "", label: `Modul ${index}`, icon: null, order: 50 + index }])
+    );
+    const withOneModule = menuPages(appPages, ctx({ currentUser: user("admin"), runtimeModules: oneModule }));
+    const withSevenModules = menuPages(appPages, ctx({ currentUser: user("admin"), runtimeModules: sevenModules }));
+    expect(withSevenModules.length).toBe(withOneModule.length);
+    expect(withSevenModules.map((page) => page.id)).toEqual(withOneModule.map((page) => page.id));
+    // Mit 0 aktiven Modulen fehlt „Mitmachen" (siehe nächster Test) — ein Eintrag weniger als mit 1–7 Modulen.
+    expect(withOneModule.length).toBe(
+      menuPages(appPages, ctx({ currentUser: user("admin"), runtimeModules: [] })).length + 1
+    );
+  });
+
+  it("zeigt „Mitmachen“ nur im Menü, wenn mindestens ein Modul aktiv ist", () => {
+    expect(menuPages(appPages, ctx({ runtimeModules: [] })).map((page) => page.id)).not.toContain("mitmachen");
+    const presence = moduleInfo("presence", "Spielt gerade", [{ path: "", label: "Spielt gerade", icon: null, order: 25 }]);
+    expect(menuPages(appPages, ctx({ runtimeModules: [presence] })).map((page) => page.id)).toContain("mitmachen");
+  });
+
+  it("leitet alte #m/<id>-Links per Alias auf die Sammelseite „Mitmachen“ weiter", () => {
+    expect(resolvePage(appPages, ctx(), "#m/presence")).toMatchObject({ subPath: "presence" });
+    expect(resolvePage(appPages, ctx(), "#m/presence").page.id).toBe("mitmachen");
+    expect(resolvePage(appPages, ctx(), "#m/pizza/liste")).toMatchObject({ subPath: "pizza/liste" });
+  });
+
+  it("gruppiert Mitmachen-Unterseiten nach Modulnamen nur, wenn ein Modul mehrere Menüeinträge hat", () => {
+    const t = ((key: string) => key) as never;
+    const mitmachenPage = appPages.find((page) => page.id === "mitmachen")!;
+    const presence = moduleInfo("presence", "Spielt gerade", [{ path: "", label: "Spielt gerade", icon: null, order: 25 }]);
+    const demo = moduleInfo("demo", "Demo", [
+      { path: "", label: "Demo", icon: null, order: 40 },
+      { path: "liste", label: "Liste", icon: null, order: 41 }
+    ]);
+    expect(mitmachenPage.subnav!(t, ctx({ runtimeModules: [presence, demo] }))).toEqual([
+      { slug: "presence", label: "Spielt gerade", group: undefined },
+      { slug: "demo", label: "Demo", group: "Demo" },
+      { slug: "demo/liste", label: "Liste", group: "Demo" }
+    ]);
+    expect(mitmachenPage.subnav!(t, ctx({ currentUser: null, runtimeModules: [presence] }))).toEqual([]);
+  });
+
+  it("rendert für Gäste den Login-Hinweis und für Mitglieder die passende Modulseite", async () => {
+    const { LoginRequired } = await import("./LoginRequired");
+    const { ModuleMenuEntryPage } = await import("../modules/runtime");
+    const mitmachenPage = appPages.find((page) => page.id === "mitmachen")!;
+    const demo = moduleInfo("demo", "Demo", [
+      { path: "", label: "Demo", icon: null, order: 40 },
+      { path: "liste", label: "Liste", icon: null, order: 41 }
+    ]);
+    const renderCtx = {
+      setCurrentUser: () => {},
+      applySettings: () => {}
+    };
+
+    const guestResult = mitmachenPage.render({ ...ctx({ currentUser: null, runtimeModules: [demo] }), subPath: "demo", ...renderCtx }) as {
+      type: unknown;
+    };
+    expect(guestResult.type).toBe(LoginRequired);
+
+    const memberResult = mitmachenPage.render({
+      ...ctx({ runtimeModules: [demo] }),
+      subPath: "demo/liste",
+      ...renderCtx
+    }) as { type: unknown; props: { entry: { path: string }; subPath: string } };
+    expect(memberResult.type).toBe(ModuleMenuEntryPage);
+    expect(memberResult.props.entry.path).toBe("liste");
+    expect(memberResult.props.subPath).toBe("");
   });
 });

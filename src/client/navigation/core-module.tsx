@@ -6,7 +6,13 @@ import { InfosPage } from "../components/InfosPage";
 import { LoginPage } from "../components/LoginPage";
 import { MainEventPrompt } from "../components/MainEventPrompt";
 import { MainEventsPanel } from "../components/MainEventsPanel";
-import { ModuleNotices, ModuleProfileSection } from "../modules/runtime";
+import {
+  ModuleMenuEntryPage,
+  ModuleNotices,
+  ModuleProfileSection,
+  moduleMenuEntries,
+  resolveModuleMenuEntry
+} from "../modules/runtime";
 import { type ProfileSectionId, profileSectionIds } from "../components/LoginPanel";
 import { LoginRequired } from "./LoginRequired";
 import { NAV_ICONS } from "./icons";
@@ -160,6 +166,61 @@ export function createCoreModule(moduleAdminSections: AdminNavEntry[]): AppModul
           ) : (
             <LoginRequired eyebrowKey="main.nav.mainEvents" />
           )
+      },
+      {
+        // Sammelseite für alle Modulseiten (Befund B4): das Hauptmenü bleibt unabhängig von der
+        // Zahl der Module. Alte Modul-Links `#m/<id>` leiten über den Alias `m` hierher weiter.
+        id: "mitmachen",
+        hash: "mitmachen",
+        aliases: ["m"],
+        order: 30,
+        label: (t) => t("main.nav.mitmachen"),
+        icon: NAV_ICONS.module,
+        inMenu: (ctx) => Boolean(ctx.currentUser) && moduleMenuEntries(ctx.runtimeModules ?? []).length > 0,
+        hero: (t) => ({
+          eyebrow: t("main.route.mitmachen.eyebrow"),
+          title: t("main.route.mitmachen.title"),
+          description: ""
+        }),
+        subnavLabel: (t) => t("main.mitmachen.subnav"),
+        subnav: (t, ctx) => {
+          if (!ctx.currentUser) {
+            return [];
+          }
+          const entries = moduleMenuEntries(ctx.runtimeModules ?? []);
+          const entriesPerModule = new Map<string, number>();
+          for (const { info } of entries) {
+            entriesPerModule.set(info.id, (entriesPerModule.get(info.id) ?? 0) + 1);
+          }
+          // Gruppenüberschrift nur, wenn ein Modul mehr als einen Menüeintrag beisteuert (sonst
+          // stünde der Modulname doppelt da, siehe `presence`/`pizza` mit je einem Eintrag).
+          return entries.map(({ info, entry, slug }) => ({
+            slug,
+            label: entry.label,
+            group: (entriesPerModule.get(info.id) ?? 0) > 1 ? info.name : undefined
+          }));
+        },
+        render: (ctx) => {
+          if (!ctx.currentUser) {
+            return <LoginRequired eyebrowKey="main.nav.mitmachen" />;
+          }
+          const infos = ctx.runtimeModules ?? [];
+          const entries = moduleMenuEntries(infos);
+          const resolved =
+            resolveModuleMenuEntry(infos, ctx.subPath) ?? (entries[0] ? { match: entries[0], innerSubPath: "" } : undefined);
+          if (!resolved) {
+            return <p className="muted">Noch keine Module aktiv.</p>;
+          }
+          return (
+            <ModuleMenuEntryPage
+              info={resolved.match.info}
+              entry={resolved.match.entry}
+              locale={ctx.locale ?? "de"}
+              user={ctx.currentUser}
+              subPath={resolved.innerSubPath}
+            />
+          );
+        }
       },
       {
         id: "infos",

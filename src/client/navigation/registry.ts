@@ -6,10 +6,16 @@ import type { RuntimeModuleInfo } from "../modules/types";
 /**
  * Zentrale Menüliste der App.
  *
- * Jeder Bereich (Runden, Events, Infos, Admin …) und jedes Modul (z. B. Pizza) trägt hier
- * einen Menüpunkt ein. Ein Modul liefert ein `AppModule` mit seinen Menüpunkten; die Shell
- * baut daraus Hauptmenü, mobile Tab-Leiste und Routing. Ein Modul zu entfernen heißt, es aus
- * `appModules` zu streichen — die Shell selbst kennt keine Modulnamen.
+ * Jeder feste Bereich (Runden, Event, Mitmachen, Admin …) trägt hier einen Menüpunkt ein. Ein
+ * eingebautes Modul liefert ein `AppModule` mit seinen Menüpunkten; die Shell baut daraus
+ * Hauptmenü, mobile Tab-Leiste und Routing. Ein Modul zu entfernen heißt, es aus `appModules`
+ * zu streichen — die Shell selbst kennt keine Modulnamen.
+ *
+ * Laufzeit-Module (installiert über `GET /api/modules`, z. B. Pizza) bekommen dagegen **keinen**
+ * eigenen Hauptmenüpunkt: Ihre Menüeinträge erscheinen nur unter der festen Sammelseite
+ * „Mitmachen" (`id: "mitmachen"` in `createCoreModule`), damit die Zahl der Hauptmenüpunkte nicht
+ * von der Zahl der installierten Module abhängt (Befund B4). Siehe `moduleMenuEntries` und
+ * `resolveModuleMenuEntry` in `../modules/runtime`.
  */
 
 export type NavContext = {

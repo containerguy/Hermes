@@ -7,7 +7,6 @@ import { I18nProvider } from "../i18n/I18nContext";
 import { requestJson } from "../api/request";
 import type { User } from "../types/core";
 import { AdminModules } from "./AdminModules";
-import { buildRuntimeAppModules } from "./runtime";
 
 vi.mock("../api/request", () => ({ requestJson: vi.fn() }));
 
@@ -94,30 +93,5 @@ describe("Admin › Module", () => {
     const checkbox = container.querySelector(".module-confirm input[type=checkbox]") as HTMLInputElement;
     await act(async () => checkbox.click());
     expect(confirm.disabled).toBe(false);
-  });
-
-  it("baut Menüpunkte aktiver Module als #m/<id>/<pfad>", () => {
-    const [module] = buildRuntimeAppModules(
-      [
-        {
-          id: "demo",
-          version: "1.0.0",
-          name: "Demo",
-          clientUrl: "/modules/demo/1.0.0/client.mjs",
-          adminPage: false,
-          permissions: [],
-          menu: [
-            { path: "", label: "Demo", icon: null, order: 40 },
-            { path: "liste", label: "Liste", icon: null, order: 41 }
-          ],
-          i18n: { de: {}, en: {} }
-        }
-      ],
-      "de"
-    );
-    expect(module.pages?.map((page) => [page.id, page.hash, page.order])).toEqual([
-      ["m-demo", "m/demo", 40],
-      ["m-demo-liste", "m/demo/liste", 41]
-    ]);
   });
 });

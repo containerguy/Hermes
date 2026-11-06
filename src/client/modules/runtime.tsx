@@ -1,9 +1,6 @@
 import React, { useEffect, useState } from "react";
 import * as ReactDOM from "react-dom";
 import { requestJson } from "../api/request";
-import { LoginRequired } from "../navigation/LoginRequired";
-import { NAV_ICONS } from "../navigation/icons";
-import type { AppModule, NavPage } from "../navigation/registry";
 import type { User } from "../types/core";
 import type { ModuleClientDefinition, ModuleClientFactory, ModuleClientHost, RuntimeModuleInfo } from "./types";
 
@@ -207,47 +204,67 @@ export function ModuleProfileSection({ info, locale, user }: { info: RuntimeModu
   );
 }
 
-/** Hash einer Modulseite: #m/<id> oder #m/<id>/<pfad>. */
-export function moduleHash(id: string, path: string) {
-  return path ? `m/${id}/${path}` : `m/${id}`;
+/** Ein Menüeintrag eines aktiven Moduls, wie er auf der Sammelseite „Mitmachen" erscheint. */
+export type ModuleMenuEntry = {
+  info: RuntimeModuleInfo;
+  entry: RuntimeModuleInfo["menu"][number];
+  /** Slug unter `#mitmachen/<slug>`, z. B. `presence` oder `demo/liste`. */
+  slug: string;
+};
+
+/** Alle Menüeinträge aktiver Module, sortiert nach ihrer `order` für die Sammelseite „Mitmachen". */
+export function moduleMenuEntries(infos: RuntimeModuleInfo[]): ModuleMenuEntry[] {
+  return infos
+    .flatMap((info) =>
+      info.menu.map((entry) => ({ info, entry, slug: entry.path ? `${info.id}/${entry.path}` : info.id })),
+    )
+    .sort((a, b) => a.entry.order - b.entry.order || a.slug.localeCompare(b.slug));
 }
 
-/** Baut aus den aktiven Modulen Menüpunkte für die zentrale Menüliste. */
-export function buildRuntimeAppModules(infos: RuntimeModuleInfo[], locale: string): AppModule[] {
-  return infos.map((info) => ({
-    id: `runtime:${info.id}`,
-    pages: info.menu.map(
-      (entry): NavPage => ({
-        id: `m-${info.id}${entry.path ? `-${entry.path}` : ""}`,
-        hash: moduleHash(info.id, entry.path),
-        order: entry.order,
-        label: () => entry.label,
-        icon: entry.icon ?? NAV_ICONS.module,
-        inMenu: (ctx) => Boolean(ctx.currentUser),
-        // Kicker nur, wenn er etwas anderes sagt als der Titel (sonst steht „Spielt gerade“ doppelt da).
-        hero: () => ({ eyebrow: info.name === entry.label ? "" : info.name, title: entry.label, description: "" }),
-        render: (ctx) =>
-          ctx.currentUser ? (
-            <div className="page-card module-page">
-              <ModuleSlot
-                info={info}
-                locale={locale}
-                pick={(definition) => definition.Page as React.ComponentType<never> | undefined}
-                fallback={<p className="muted">Dieses Modul hat keine eigene Seite.</p>}
-                render={(Page) => {
-                  const Component = Page as unknown as React.ComponentType<import("./types").ModulePageProps>;
-                  return (
-                    <Component path={entry.path} subPath={ctx.subPath} user={ctx.currentUser as User} permissions={info.permissions} />
-                  );
-                }}
-              />
-            </div>
-          ) : (
-            <LoginRequired eyebrowKey="main.nav.modules" />
-          ),
-      }),
-    ),
-  }));
+/**
+ * Findet den Menüeintrag zu einem Unterpfad unter „Mitmachen" (`#mitmachen/<subPath>`). Wie bei
+ * `resolvePage` gewinnt der längste passende Slug, damit ein Modul eigene Unterseiten jenseits
+ * seiner registrierten Menüeinträge selbst weiterrouten kann.
+ */
+export function resolveModuleMenuEntry(
+  infos: RuntimeModuleInfo[],
+  subPath: string,
+): { match: ModuleMenuEntry; innerSubPath: string } | undefined {
+  const match = moduleMenuEntries(infos)
+    .filter((candidate) => subPath === candidate.slug || subPath.startsWith(`${candidate.slug}/`))
+    .sort((a, b) => b.slug.length - a.slug.length)[0];
+  if (!match) return undefined;
+  return { match, innerSubPath: subPath.slice(match.slug.length + 1) };
+}
+
+/** Seite eines Modul-Menüeintrags auf der Sammelseite „Mitmachen" (`#mitmachen/<slug>`). */
+export function ModuleMenuEntryPage({
+  info,
+  entry,
+  locale,
+  user,
+  subPath,
+}: {
+  info: RuntimeModuleInfo;
+  entry: RuntimeModuleInfo["menu"][number];
+  locale: string;
+  user: User;
+  subPath: string;
+}) {
+  return (
+    <div className="page-card module-page">
+      <ModuleSlot
+        info={info}
+        locale={locale}
+        pick={(definition) => definition.Page as React.ComponentType<never> | undefined}
+        fallback={<p className="muted">Dieses Modul hat keine eigene Seite.</p>}
+        render={(Page) => {
+          const Component = Page as unknown as React.ComponentType<import("./types").ModulePageProps>;
+          return <Component path={entry.path} subPath={subPath} user={user} permissions={info.permissions} />;
+        }}
+      />
+    </div>
+  );
 }
 
 /** Lädt die Liste der aktiven Module, sobald sich die Anmeldung ändert. */
