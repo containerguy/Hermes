@@ -316,6 +316,44 @@ describe("LoginPanel pairing redemption", () => {
   });
 });
 
+describe("LoginPanel Aktuelle-Anmeldung-Bestätigung (HCI-126, B.neu-3)", () => {
+  it('zeigt die role=region-Sektion "Aktuelle Anmeldung" nach dem Login, egal welche Profil-Unterseite aktiv ist', async () => {
+    const { requestJson } = await import("../api/request");
+    const requestJsonMock = requestJson as unknown as ReturnType<typeof vi.fn>;
+
+    requestJsonMock.mockImplementation(async (path: string) => {
+      if (path === "/api/auth/sessions") {
+        return { sessions: [] };
+      }
+      if (path === "/api/auth/api-tokens") {
+        return { apiTokens: [] };
+      }
+      return {};
+    });
+
+    // `profileSection` ist undefined auf dem Desktop (Seitenleiste + Inhalt zusammen) und auf dem
+    // Handy immer gesetzt (core-module.tsx routet `#login/<slug>`, Standard „konto"). Die
+    // Bestätigung muss in jedem Fall vorhanden sein.
+    for (const profileSection of [undefined, "konto", "benachrichtigungen", "geraete", "tokens"] as const) {
+      const rendered = await renderIntoDocument(
+        <LoginPanel
+          currentUser={redeemedUser}
+          settings={defaultSettings}
+          profileSection={profileSection}
+          onLoggedIn={vi.fn()}
+          onLoggedOut={vi.fn()}
+          onUserUpdated={vi.fn()}
+        />
+      );
+
+      const region = rendered.container.querySelector('[role="region"][aria-label="Aktuelle Anmeldung"]');
+      expect(region).toBeTruthy();
+
+      await rendered.cleanup();
+    }
+  });
+});
+
 describe("LoginPanel device persistence", () => {
   it("hides the device-name field when this browser is already known for the user", async () => {
     const { requestJson } = await import("../api/request");
