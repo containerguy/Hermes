@@ -47,6 +47,8 @@ export function EventBoard({
   const [notifyAll, setNotifyAll] = useState(false);
   /** Eingeklappte Gruppen der Rundenübersicht (Event-IDs bzw. "none"). */
   const [collapsedGroups, setCollapsedGroups] = useState<string[]>([]);
+  /** P3 (HCI-110): für die Mehrfachauswahl angehakte Runden (nur für Orga/Admin). */
+  const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [eventDraft, setEventDraft] = useState({
     gameTitle: "",
     startMode: "scheduled" as "now" | "scheduled",
@@ -147,6 +149,23 @@ export function EventBoard({
       setExpandedEventId(null);
     }
   }, [events, expandedEventId]);
+
+  // P3 (HCI-110): Die Auswahl übersteht Echtzeit-Updates (SSE `events_changed`); wir behalten nur
+  // Runden, die noch da und weiterhin beendbar sind (aktiv + Recht), damit die Anzahl stimmt.
+  useEffect(() => {
+    setSelectedIds((previous) => {
+      const next = previous.filter((id) => {
+        const event = events.find((entry) => entry.id === id);
+        return Boolean(
+          event &&
+            event.status !== "archived" &&
+            event.status !== "cancelled" &&
+            canBulkManage(event)
+        );
+      });
+      return next.length === previous.length ? previous : next;
+    });
+  }, [events]);
 
   useEffect(() => {
     if (!currentUser) {
@@ -391,6 +410,61 @@ export function EventBoard({
     return (
       currentUser?.id === event.createdByUserId || hasPermission(currentUser, "rounds.manage", event.mainEventId)
     );
+  }
+
+  /**
+   * P3 (HCI-110): Wer darf die Zeile anhaken? Nur mit dem Recht `rounds.manage` (global oder fürs
+   * Event) – bewusst enger als `canManage`, das auch der Ersteller einer Runde hätte.
+   */
+  function canBulkManage(event: GameEvent) {
+    return (
+      (event.status !== "archived" && event.status !== "cancelled") &&
+      hasPermission(currentUser, "rounds.manage", event.mainEventId)
+    );
+  }
+
+  function toggleSelected(eventId: string) {
+    setSelectedIds((previous) =>
+      previous.includes(eventId)
+        ? previous.filter((id) => id !== eventId)
+        : [...previous, eventId]
+    );
+  }
+
+  async function runBulkAction(action: "archive" | "cancel") {
+    setError("");
+    setMessage("");
+
+    const ids = selectedIds.filter((id) => events.some((event) => event.id === id));
+    if (ids.length === 0) {
+      return;
+    }
+
+    const confirmed = window.confirm(
+      action === "archive"
+        ? t("events.confirm.bulkArchive", { n: ids.length })
+        : t("events.confirm.bulkCancel", { n: ids.length })
+    );
+    if (!confirmed) {
+      return;
+    }
+
+    try {
+      const result = await requestJson<{ updated: string[]; skipped: Array<{ id: string; reason: string }> }>(
+        "/api/events/bulk",
+        { method: "POST", body: JSON.stringify({ action, ids }) }
+      );
+      setSelectedIds([]);
+      await loadEvents();
+      const done = result.updated.length;
+      setMessage(
+        action === "archive"
+          ? t("events.msg.bulkArchived", { n: done })
+          : t("events.msg.bulkCancelled", { n: done })
+      );
+    } catch (caught) {
+      setError(getErrorMessage(caught, locale));
+    }
   }
 
   function canSoftDelete(event: GameEvent) {
@@ -708,6 +782,9 @@ export function EventBoard({
                   canManage={canManage(event)}
                   canSoftDelete={canSoftDelete(event)}
                   joinDisabled={isJoinDisabled(event)}
+                  selectable={canBulkManage(event)}
+                  selected={selectedIds.includes(event.id)}
+                  onToggleSelected={() => toggleSelected(event.id)}
                   editedStartsAt={editedStartsAt[event.id]}
                   onToggleExpand={() => {
                     setExpandedEventId(expandedEventId === event.id ? null : event.id);
@@ -837,6 +914,24 @@ export function EventBoard({
       ) : null}
       {!managerCreateOverlay ? (
         <>
+          {selectedIds.length > 0 ? (
+            <div className="bulk-bar" role="group" aria-label={t("events.bulk.aria")}>
+              <strong>
+                {selectedIds.length === 1
+                  ? t("events.bulk.countOne")
+                  : t("events.bulk.count", { n: selectedIds.length })}
+              </strong>
+              <button type="button" className="secondary" onClick={() => runBulkAction("archive")}>
+                {t("events.bulk.archive")}
+              </button>
+              <button type="button" className="secondary danger" onClick={() => runBulkAction("cancel")}>
+                {t("events.bulk.cancel")}
+              </button>
+              <button type="button" className="secondary" onClick={() => setSelectedIds([])}>
+                {t("events.bulk.clear")}
+              </button>
+            </div>
+          ) : null}
           <div className="event-list">
             {resolvedFilter === "all"
               ? roundGroups

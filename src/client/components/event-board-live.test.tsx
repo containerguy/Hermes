@@ -198,3 +198,104 @@ describe("EventBoard – Zeilenaktionen im Runden-Board (HCI-109)", () => {
     await rendered.cleanup();
   });
 });
+
+describe("EventBoard – Mehrfachauswahl im Runden-Board (HCI-110)", () => {
+  const manager = { ...user, id: "u-mgr", role: "manager" } as unknown as User;
+
+  it("Kästchen nur für Orga; Sammelleiste ab einer Auswahl; Archivieren als eine Anfrage", async () => {
+    const posted: Array<{ url: string; body: unknown }> = [];
+    requestMock.mockImplementation(async (url: string, options?: RequestInit) => {
+      if (url === "/api/events") {
+        return { events: [gameEvent({ id: "e-1" }), gameEvent({ id: "e-2", gameTitle: "Zweite" })] };
+      }
+      if (url === "/api/events/bulk" && options?.method === "POST") {
+        posted.push({ url, body: options.body ? JSON.parse(String(options.body)) : null });
+        return { updated: ["e-1", "e-2"], skipped: [] };
+      }
+      throw new Error(`unerwarteter Aufruf ${url} ${options?.method ?? "GET"}`);
+    });
+    const confirmSpy = vi.spyOn(window, "confirm").mockReturnValue(true);
+
+    const rendered = await renderBoard(manager);
+
+    // Noch keine Auswahl → keine Sammelleiste.
+    expect(rendered.container.querySelector(".bulk-bar")).toBeNull();
+
+    const checkboxes = Array.from(
+      rendered.container.querySelectorAll("li.device-row input[type='checkbox']")
+    ) as HTMLInputElement[];
+    expect(checkboxes).toHaveLength(2);
+
+    await act(async () => {
+      checkboxes[0].click();
+      checkboxes[1].click();
+      await flush();
+    });
+
+    const bulkBar = rendered.container.querySelector(".bulk-bar");
+    expect(bulkBar).toBeTruthy();
+    expect(bulkBar!.querySelector("strong")!.textContent).toBe("2 ausgewählt");
+
+    const archiveButton = Array.from(bulkBar!.querySelectorAll("button")).find(
+      (button) => button.textContent === "Archivieren"
+    ) as HTMLButtonElement | undefined;
+    expect(archiveButton).toBeTruthy();
+
+    await act(async () => {
+      archiveButton!.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+      await flush();
+    });
+
+    expect(confirmSpy).toHaveBeenCalledWith("2 Runden wirklich archivieren?");
+    expect(posted).toEqual([{ url: "/api/events/bulk", body: { action: "archive", ids: ["e-1", "e-2"] } }]);
+
+    confirmSpy.mockRestore();
+    await rendered.cleanup();
+  });
+
+  it("die Auswahl übersteht ein Echtzeit-Update (events_changed)", async () => {
+    requestMock.mockImplementation(async (url: string) =>
+      url === "/api/events" ? { events: [gameEvent({ id: "e-1" }), gameEvent({ id: "e-2" })] } : undefined
+    );
+
+    const rendered = await renderBoard(manager);
+    const checkboxes = Array.from(
+      rendered.container.querySelectorAll("li.device-row input[type='checkbox']")
+    ) as HTMLInputElement[];
+
+    await act(async () => {
+      checkboxes[0].click();
+      await flush();
+    });
+    expect(rendered.container.querySelector(".bulk-bar strong")!.textContent).toBe("1 ausgewählt");
+
+    // Echtzeit-Update: Board lädt neu (gleiche, weiter aktive Runden) – die Auswahl bleibt bestehen.
+    const source = CapturingEventSource.instances[0];
+    await act(async () => {
+      source.onopen?.();
+      source.emit("events_changed", { reason: "participation_updated", at: "2026-11-06T18:00:00.000Z" });
+      await flush();
+    });
+
+    expect(rendered.container.querySelector(".bulk-bar strong")!.textContent).toBe("1 ausgewählt");
+    const checkboxAfter = rendered.container.querySelector(
+      "li.device-row input[type='checkbox']"
+    ) as HTMLInputElement;
+    expect(checkboxAfter.checked).toBe(true);
+
+    await rendered.cleanup();
+  });
+
+  it("ein einfacher Spieler bekommt keine Kästchen", async () => {
+    requestMock.mockImplementation(async (url: string) =>
+      url === "/api/events" ? { events: [gameEvent({ id: "e-1" })] } : undefined
+    );
+
+    const rendered = await renderBoard(user);
+    expect(rendered.container.querySelector("li.device-row")).toBeTruthy();
+    expect(rendered.container.querySelector("li.device-row input[type='checkbox']")).toBeNull();
+    expect(rendered.container.querySelector(".bulk-bar")).toBeNull();
+
+    await rendered.cleanup();
+  });
+});

@@ -20,6 +20,10 @@ interface EventCardProps {
   canManage: boolean;
   canSoftDelete: boolean;
   joinDisabled: boolean;
+  /** P3 (HCI-110): Zeile trägt ein Auswahlkästchen für die Mehrfachauswahl (nur mit `rounds.manage`). */
+  selectable: boolean;
+  selected: boolean;
+  onToggleSelected: () => void;
   editedStartsAt: string | undefined;
   onToggleExpand: () => void;
   onEditedStartsAtChange: (value: string) => void;
@@ -45,6 +49,9 @@ export function EventCard({
   canManage,
   canSoftDelete,
   joinDisabled,
+  selectable,
+  selected,
+  onToggleSelected,
   editedStartsAt,
   onToggleExpand,
   onEditedStartsAtChange,
@@ -124,7 +131,19 @@ export function EventCard({
   const participationDisabled = !isJoined && joinDisabled;
 
   return (
-    <li className="device-row event-row">
+    <li
+      className={`device-row event-row${selectable ? " device-row--selectable" : ""}${
+        selectable && selected ? " device-row--selected" : ""
+      }`}
+    >
+      {selectable ? (
+        <input
+          type="checkbox"
+          checked={selected}
+          onChange={onToggleSelected}
+          aria-label={t("events.bulk.selectRound", { title: event.gameTitle })}
+        />
+      ) : null}
       <div>
         <p className="item-title">
           <strong>{event.gameTitle}</strong>
@@ -194,6 +213,9 @@ export function EventCard({
           id={panelId}
           role="region"
           aria-labelledby={detailsTriggerId}
+          // In einer Auswahlzeile (.device-row--selectable) ist die Zeile ein 3-Spalten-Raster;
+          // das Detailpanel muss über alle Spalten laufen, sonst landet es in der schmalen Kästchenspalte.
+          style={selectable ? { gridColumn: "1 / -1" } : undefined}
         >
           <EventRowDetails
             event={event}
