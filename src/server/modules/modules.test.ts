@@ -59,6 +59,10 @@ export function register(ctx) {
   });
   ctx.router.get("/boom", () => { throw new Error("kaputt"); });
   ctx.router.post("/ohne-pruefung", (_request, response) => { response.json({ ok: true }); });
+  ctx.router.post("/roh", (request, response) => {
+    const raw = ctx.rawBody(request);
+    response.json({ body: request.body, raw: raw ? raw.toString("utf8") : null });
+  });
   ctx.notifications.registerChannel({
     id: "demo",
     label: { de: "Demo-Kanal", en: "Demo channel" },
@@ -478,6 +482,21 @@ describe("Modulverwaltung", () => {
     } finally {
       context.sqlite.close();
     }
+  });
+
+  it("gibt Modulen den rohen JSON-Body ihrer Anfragen, dem Kern nicht", async () => {
+    publish([{ version: "1.0.0", pkg: buildPackage("1.0.0") }]);
+    const app = await start();
+    const admin = await adminSession(app);
+    const sourceId = await addDemoSource(admin);
+    await installAndEnable(admin, sourceId);
+
+    // Ohne Anmeldung wie ein Webhook; die Bytes kommen unverändert an (Abstände, Escapes, Reihenfolge).
+    const raw = '{ "z":1,"a" : "\\u00e4" }';
+    const response = await request(app.app).post("/api/m/demo/roh").set("Content-Type", "application/json").send(raw).expect(200);
+    expect(response.body).toEqual({ body: { z: 1, a: "ä" }, raw });
+    // Kern-Routen parsen JSON wie bisher (Anmeldung per JSON-Body).
+    await request(app.app).post("/api/auth/request-code").set("Content-Type", "application/json").send('{ "username" : "hauptadmin" }').expect(202);
   });
 
   it("lehnt Pakete mit falscher Prüfsumme, falscher Schnittstelle oder fremden Tabellen ab", async () => {

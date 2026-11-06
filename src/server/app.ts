@@ -31,6 +31,7 @@ import { getReleaseInfo } from "./version-info";
 import { createModuleManager, type ModuleManagerOptions } from "./modules/manager";
 import { createModuleAdminRouter, createPublicModulesRouter } from "./modules/routes";
 import { runBundledTransitions } from "./modules/bundled";
+import { createJsonBodyParser } from "./http/raw-body";
 
 export type CreateMatchdeskAppOptions = {
   modules?: ModuleManagerOptions;
@@ -46,7 +47,7 @@ export async function createMatchdeskApp(options: CreateMatchdeskAppOptions = {}
 
   const app = express();
   app.disable("x-powered-by");
-  app.use(express.json({ limit: "1mb" }));
+  app.use(createJsonBodyParser());
   app.use(cookieParser());
   app.use(matchdeskAuthMiddleware(context));
   mountApiDocs(app);
