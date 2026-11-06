@@ -8,6 +8,7 @@ import { and, eq } from "drizzle-orm";
 import { canSeeMainEvent } from "../http/main-event-routes";
 import { scopedEventIds, type PermissionKey } from "../domain/permissions";
 import { requireCsrf } from "../auth/csrf";
+import { getRawBody } from "../http/raw-body";
 import { enforceApiTokenWriteAccess } from "../auth/matchdesk-auth";
 import {
   sendPushToEnabledUsers,
@@ -106,6 +107,12 @@ export type ModuleContext = {
   currentUser: (request: Request) => ModuleUser | undefined;
   /** Prüft CSRF und Schreibrecht des API-Tokens; antwortet selbst mit 401/403 und gibt dann false zurück. */
   requireWrite: (request: Request, response: import("express").Response) => boolean;
+  /**
+   * Unveränderter JSON-Body der Anfrage (z. B. für Webhook-Signaturen). Gesetzt nur für Anfragen
+   * unter /api/m/<id> mit JSON-Body; sonst undefined. Kerne bis einschließlich 0.21.0 haben die
+   * Funktion nicht – Module prüfen deshalb `typeof ctx.rawBody === "function"`.
+   */
+  rawBody: (request: Request) => Buffer | undefined;
   can: (user: PermissionActor, key: string, options?: CanOptions) => boolean;
   /** Events, für die der Benutzer `key` nur per Event-Vergabe hat (ohne globale Vergabe). */
   scopedEventIds: (user: PermissionActor, key: string) => string[];
@@ -185,6 +192,7 @@ export function createModuleContext(input: {
       return user ? publicUser(user) : undefined;
     },
     requireWrite: (request, response) => requireCsrf(context, request, response) && enforceApiTokenWriteAccess(request, response),
+    rawBody: (request) => getRawBody(request),
     can: (user, key, options) => can(context, user, key, options),
     scopedEventIds: (user, key) => {
       if (!user || !key.startsWith(`${id}.`)) return [];

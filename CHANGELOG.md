@@ -4,6 +4,19 @@ Versions are annotated tags `vX.Y.Z` on `main`. Each entry mirrors the
 `chore(release): vX.Y.Z` commit that bumps `package.json`,
 `package-lock.json`, and `src/server/openapi/hermes-api.yaml`.
 
+## Unreleased
+
+### Modules
+
+- Module routes under `/api/m/<id>` now get the unchanged JSON request body:
+  `ctx.rawBody(request)` returns it as a `Buffer` (otherwise `undefined`).
+  Modules need it to verify webhook signatures (e.g. `X-Hub-Signature-256`
+  from Meta for the planned WhatsApp module). The core keeps the raw body
+  only for `/api/m/*`; JSON parsing and the 1 MB limit are unchanged
+  everywhere. The module API stays at version 1 (additive change); modules
+  that use `ctx.rawBody` must check that it exists, since cores up to and
+  including v0.21.0 do not have it.
+
 ## v0.21.0 — Module credentials in the admin, consistent UI, tool updates (2026-11-05)
 
 ### Upgrade note
