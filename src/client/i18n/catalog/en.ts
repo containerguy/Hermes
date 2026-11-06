@@ -513,7 +513,7 @@ export const enMessages: { [K in keyof typeof deMessages]: string } = {
   "events.filter.label": "Event",
   "events.filter.all": "All rounds",
   "events.filter.none": "Without event",
-  "events.form.mainEvent": "Event",
+  "events.form.mainEvent": "Belongs to",
   "events.form.mainEventNone": "No event",
   "events.form.mainEventChoose": "Please choose an event",
   "events.form.notifyAll": "Notify everyone (otherwise only players of this round)",
