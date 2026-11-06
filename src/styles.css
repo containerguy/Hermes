@@ -2826,7 +2826,6 @@ dd {
 .main-event-overview {
   margin-top: 0.5rem;
 }
-.main-event-registration summary,
 .main-event-overview summary {
   cursor: pointer;
 }
@@ -2958,9 +2957,6 @@ dd {
 /* Rundnachricht an Event-Teilnehmer und Kanalwahl im Profil */
 .main-event-broadcast {
   margin-top: 0.5rem;
-}
-.main-event-broadcast summary {
-  cursor: pointer;
 }
 .main-event-broadcast form {
   margin-top: 0.5rem;
@@ -4132,6 +4128,8 @@ legend {
   text-align: center;
 }
 
+/* R5 (HCI-124): Hinter details steht nie eine Hauptaktion einer Seite, nur Zusatzinformation.
+   Die Hauptaktion ist die, die in der Spalte "Häufigste Aktion" von HCI-103 Abschnitt 2 steht. */
 .page-card details {
   border-top: 1px solid var(--line);
   padding-top: 12px;

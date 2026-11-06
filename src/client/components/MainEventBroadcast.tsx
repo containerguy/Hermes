@@ -1,4 +1,4 @@
-import React, { FormEvent, useState } from "react";
+import React, { FormEvent, useEffect, useState } from "react";
 import { requestJson } from "../api/request";
 import { getErrorMessage } from "../errors/errors";
 import { useI18n } from "../i18n/I18nContext";
@@ -54,6 +54,11 @@ export function MainEventBroadcast({ mainEvent }: { mainEvent: MainEvent }) {
     }
   }
 
+  useEffect(() => {
+    void loadHistory();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [mainEvent.id]);
+
   function toggleAudience(entry: Audience) {
     const next = new Set(audience);
     if (next.has(entry)) {
@@ -88,15 +93,8 @@ export function MainEventBroadcast({ mainEvent }: { mainEvent: MainEvent }) {
   const shareText = [`${mainEvent.name}: ${subject}`.trim(), body, eventLink()].filter(Boolean).join("\n\n");
 
   return (
-    <details
-      className="main-event-broadcast"
-      onToggle={(event) => {
-        if ((event.currentTarget as HTMLDetailsElement).open && history === null) {
-          void loadHistory();
-        }
-      }}
-    >
-      <summary>{t("broadcast.toggle")}</summary>
+    <div className="main-event-broadcast">
+      <h3>{t("broadcast.toggle")}</h3>
       <form className="event-form" onSubmit={send} aria-label={t("broadcast.toggle")}>
         <label>
           {t("broadcast.subject")}
@@ -158,6 +156,6 @@ export function MainEventBroadcast({ mainEvent }: { mainEvent: MainEvent }) {
           </ul>
         </div>
       ) : null}
-    </details>
+    </div>
   );
 }
