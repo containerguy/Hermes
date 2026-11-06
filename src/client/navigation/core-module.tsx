@@ -168,6 +168,31 @@ export function createCoreModule(moduleAdminSections: AdminNavEntry[]): AppModul
           )
       },
       {
+        // Unterseite von „Event" (kein eigener Hauptmenüpunkt, siehe Befund B4/P6): erreichbar
+        // nur über `#main-events/infos`; `#infos` leitet dorthin weiter (normalizeLegacyHash).
+        id: "infos",
+        hash: "main-events/infos",
+        order: 25,
+        label: (t) => t("main.nav.infos"),
+        icon: NAV_ICONS.infos,
+        inMenu: () => false,
+        hero: (t) => ({
+          eyebrow: t("main.route.infos.eyebrow"),
+          title: t("main.route.infos.title"),
+          description: ""
+        }),
+        render: (ctx) =>
+          ctx.currentUser ? (
+            <InfosPage
+              markdown={ctx.settings.infosMarkdown}
+              enabled={ctx.settings.infosEnabled}
+              currentMainEventId={ctx.currentUser.currentMainEventId ?? null}
+            />
+          ) : (
+            <LoginRequired eyebrowKey="main.route.infos.eyebrow" />
+          )
+      },
+      {
         // Sammelseite für alle Modulseiten (Befund B4): das Hauptmenü bleibt unabhängig von der
         // Zahl der Module. Alte Modul-Links `#m/<id>` leiten über den Alias `m` hierher weiter.
         id: "mitmachen",
@@ -221,29 +246,6 @@ export function createCoreModule(moduleAdminSections: AdminNavEntry[]): AppModul
             />
           );
         }
-      },
-      {
-        id: "infos",
-        hash: "infos",
-        order: 80,
-        label: (t) => t("main.nav.infos"),
-        icon: NAV_ICONS.infos,
-        inMenu: (ctx) => Boolean(ctx.currentUser) && ctx.settings.infosEnabled,
-        hero: (t) => ({
-          eyebrow: t("main.route.infos.eyebrow"),
-          title: t("main.route.infos.title"),
-          description: ""
-        }),
-        render: (ctx) =>
-          ctx.currentUser ? (
-            <InfosPage
-              markdown={ctx.settings.infosMarkdown}
-              enabled={ctx.settings.infosEnabled}
-              currentMainEventId={ctx.currentUser.currentMainEventId ?? null}
-            />
-          ) : (
-            <LoginRequired eyebrowKey="main.route.infos.eyebrow" />
-          )
       },
       {
         id: "admin",

@@ -84,6 +84,9 @@ function normalizeLegacyHash(rawHash: string): string {
   if (legacy) return `#admin/${legacy[1]}${legacy[2]}`;
   const moved = rawHash.match(/^#(pizza|playing)(\/.*)?$/);
   if (moved) return `#m/${moved[1] === "playing" ? "presence" : moved[1]}${moved[2] ?? ""}`;
+  // „Infos" ist Unterseite von „Event" (kein eigener Hauptmenüpunkt mehr, siehe HCI-114).
+  const movedInfos = rawHash.match(/^#infos(\/.*)?$/);
+  if (movedInfos) return `#main-events/infos${movedInfos[1] ?? ""}`;
   // Spielkonten liegen jetzt im Profilbereich des Moduls.
   return rawHash.replace(/^#login\/spielkonten\b/, "#login/m-presence");
 }

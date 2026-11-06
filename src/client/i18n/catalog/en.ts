@@ -758,10 +758,10 @@ export const enMessages: { [K in keyof typeof deMessages]: string } = {
   "admin.design.manager": "Manager",
   "admin.design.admin": "Admin",
   "admin.design.surface": "Background",
-  "admin.infos.title": "Info page and menu item",
+  "admin.infos.title": "Info page (sub-page of “Event”)",
   "admin.infos.help":
-    "Content appears under #infos for all visitors once the menu item is active. Markdown is rendered safely (headings with #, ##, lists with -, links with [text](URL)).",
-  "admin.infos.menuCheck": "Show “Infos” in the main navigation",
+    "Content appears under #main-events/infos for all visitors once this text is active. Markdown is rendered safely (headings with #, ##, lists with -, links with [text](URL)).",
+  "admin.infos.menuCheck": "Show the general info text",
   "admin.infos.markdownLabel": "Content (Markdown)",
   "admin.infos.markdownAria": "Infos page Markdown",
   "admin.infos.markdownPlaceholder": "## Welcome\n\n- First item\n- [Website](https://example.org)",

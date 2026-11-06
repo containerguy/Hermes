@@ -80,7 +80,7 @@ export type AppSettings = {
   themeManagerColor: string;
   themeAdminColor: string;
   themeSurfaceColor: string;
-  /** Menüpunkt „Infos“ (#infos) sichtbar */
+  /** Allgemeiner Infotext unter #main-events/infos sichtbar (Unterseite von „Event“) */
   infosEnabled: boolean;
   /** Markdown-Inhalt der Infos-Seite (Überschriften, Listen, Links) */
   infosMarkdown: string;
