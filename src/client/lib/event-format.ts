@@ -22,12 +22,20 @@ export function getEventStatusClass(event: GameEvent) {
   return event.status;
 }
 
-export function isSameLocalCalendarDay(a: Date, b: Date): boolean {
-  return (
-    a.getFullYear() === b.getFullYear() &&
-    a.getMonth() === b.getMonth() &&
-    a.getDate() === b.getDate()
-  );
+/** Badge-Farbe für den Status einer Runde (einheitliches Badge-System, siehe styles.css). */
+export function getEventStatusBadgeModifier(event: GameEvent): string {
+  switch (getEventStatusClass(event)) {
+    case "open":
+    case "ready":
+      return "badge--ok";
+    case "running":
+    case "full":
+      return "badge--warn";
+    case "cancelled":
+      return "badge--danger";
+    default:
+      return "";
+  }
 }
 
 export function capacityPercent(event: GameEvent): number {

@@ -704,8 +704,6 @@ export function EventBoard({
       <EventCard
                   key={event.id}
                   event={event}
-                  markSrc={markSrc}
-                  compact={compactTouchShell}
                   expanded={expandedEventId === event.id}
                   canManage={canManage(event)}
                   canSoftDelete={canSoftDelete(event)}
@@ -800,7 +798,7 @@ export function EventBoard({
   );
 
   const managerCreateOverlay = showCreateForm && compactTouchShell && createFlowOpen;
-  const boardClassName = `event-board ${mode === "manager" ? "manager-board" : "events-board"} event-board--expandable${compactTouchShell ? " event-board--compact" : ""}`;
+  const boardClassName = `event-board ${mode === "manager" ? "manager-board" : "events-board"}${compactTouchShell ? " event-board--compact" : ""}`;
 
   return (
     <section className={boardClassName} aria-label={t("events.board.aria")}>
@@ -839,9 +837,7 @@ export function EventBoard({
       ) : null}
       {!managerCreateOverlay ? (
         <>
-          <div
-            className={`event-list event-list--expandable${compactTouchShell ? " event-list--compact" : ""}`}
-          >
+          <div className="event-list">
             {resolvedFilter === "all"
               ? roundGroups
                   .filter((group) => group.rounds.length > 0 || (group.mainEvent !== null && showCreateForm))
@@ -893,11 +889,15 @@ export function EventBoard({
                             {collapsed ? t("events.group.expand") : t("events.group.collapse")}
                           </button>
                         </header>
-                        {collapsed ? null : group.rounds.map((event) => renderRound(event))}
+                        {collapsed ? null : (
+                          <ul className="device-list">{group.rounds.map((event) => renderRound(event))}</ul>
+                        )}
                       </section>
                     );
                   })
-              : visibleEvents.map((event) => renderRound(event))}
+              : (
+                  <ul className="device-list">{visibleEvents.map((event) => renderRound(event))}</ul>
+                )}
             {visibleEvents.length === 0 ? (
               compactTouchShell ? (
                 <div className="event-compact-empty event-card">

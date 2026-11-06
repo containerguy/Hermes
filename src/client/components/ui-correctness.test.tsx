@@ -62,7 +62,7 @@ afterEach(() => {
 });
 
 describe("ui correctness structure contracts", () => {
-  it("EventBoard exposes stable action-row/manage-row hooks", async () => {
+  it("EventBoard exposes stable device-row action hooks", async () => {
     vi.useFakeTimers();
     stubEventSource();
 
@@ -108,29 +108,37 @@ describe("ui correctness structure contracts", () => {
 
     expect(rendered.container.textContent).toContain("1 Runde im Board");
 
-    const expandTile = rendered.container.querySelector(".event-compact-tile") as HTMLButtonElement | null;
-    expect(expandTile).toBeTruthy();
+    const row = rendered.container.querySelector("li.device-row") as HTMLLIElement | null;
+    expect(row).toBeTruthy();
+    expect(row?.tagName).toBe("LI");
+
+    // Zeilenaktionen sind ohne Aufklappen erreichbar (HCI-109): Dabei und Archivieren sitzen
+    // direkt in `.device-actions`, keine verschachtelten Knöpfe mehr.
+    const rowActions = row?.querySelector(".device-actions");
+    expect(rowActions).toBeTruthy();
+    expect(rowActions?.textContent).toContain("Dabei");
+    expect(rowActions?.textContent).toContain("Archivieren");
+    expect(row?.textContent).toContain("Runde von");
+    expect(row?.textContent).toContain("manager");
+
+    const detailsButton = Array.from(row?.querySelectorAll("button") ?? []).find(
+      (button) => button.textContent === "Details & Server"
+    ) as HTMLButtonElement | undefined;
+    expect(detailsButton).toBeTruthy();
     await act(async () => {
-      expandTile!.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+      detailsButton!.dispatchEvent(new MouseEvent("click", { bubbles: true }));
       await flushMicrotasks();
     });
 
     expect(rendered.container.textContent).toContain("Noch keine Details hinterlegt");
     expect(rendered.container.querySelector(".event-capacity-track")).toBeTruthy();
-    expect(rendered.container.textContent).toContain("Runde von");
-    expect(rendered.container.textContent).toContain("manager");
 
-    const actionRow = rendered.container.querySelector(".action-row");
-    expect(actionRow).toBeTruthy();
-    expect(actionRow?.textContent).toContain("Dabei");
-    expect(actionRow?.textContent).toContain("Nicht dabei");
-
-    const manageRow = rendered.container.querySelector(".manage-row");
-    expect(manageRow).toBeTruthy();
-    expect(manageRow?.querySelector('input[type="datetime-local"]')).toBeTruthy();
-    expect(manageRow?.textContent).toContain("Start speichern");
-    expect(manageRow?.textContent).toContain("Archivieren");
-    expect(manageRow?.textContent).toContain("Stornieren");
+    const fieldActionRow = rendered.container.querySelector(".field-action-row");
+    expect(fieldActionRow).toBeTruthy();
+    expect(fieldActionRow?.querySelector('input[type="datetime-local"]')).toBeTruthy();
+    expect(fieldActionRow?.textContent).toContain("Start speichern");
+    expect(rowActions?.textContent).toContain("Mehr");
+    expect(row?.textContent).toContain("Absagen");
 
     await rendered.cleanup();
     vi.runOnlyPendingTimers();

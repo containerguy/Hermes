@@ -5,17 +5,17 @@ import type { MessageKey } from "../i18n/catalog/index";
 import { Cod4KeyGenerator } from "../cod4/Cod4KeyGenerator";
 import { isCod4Game } from "../cod4/isCod4Game";
 import { ServerPanel, type ServerPanelBinding } from "../gameservers/ServerPanel";
+import { MoreMenu } from "./MoreMenu";
 import {
   capacityPercent,
+  getEventStatusBadgeModifier,
   getEventStatusClass,
-  isSameLocalCalendarDay,
   toDatetimeLocal
 } from "../lib/event-format";
 
 interface EventCardProps {
   event: GameEvent;
-  markSrc: string;
-  compact: boolean;
+  /** Steuert, ob das Panel „Details & Server“ unter der Zeile aufgeklappt ist. */
   expanded: boolean;
   canManage: boolean;
   canSoftDelete: boolean;
@@ -33,10 +33,14 @@ interface EventCardProps {
   server?: ServerPanelBinding;
 }
 
+/**
+ * Zeile im Runden-Board (`.device-list` / `.device-row`). Beitreten/Doch-nicht und – für Orga –
+ * Archivieren sitzen direkt in der Zeile; seltene Aktionen (Details & Server, Startzeit ändern,
+ * Absagen) stecken hinter „Mehr“. Die Zeile ist bewusst kein `<button>` mehr (HCI-109): sie trägt
+ * mehrere eigenständige Bedienelemente, und ein Knopf im Knopf ist nicht zulässig.
+ */
 export function EventCard({
   event,
-  markSrc,
-  compact,
   expanded,
   canManage,
   canSoftDelete,
@@ -77,22 +81,6 @@ export function EventCard({
     return t(labels[event.status]);
   }
 
-  function formatStartForCompactOverview(iso: string): string {
-    const start = new Date(iso);
-    const now = new Date();
-    const timeOnly = new Intl.DateTimeFormat(dateTag, { hour: "2-digit", minute: "2-digit" });
-    if (isSameLocalCalendarDay(start, now)) {
-      return timeOnly.format(start);
-    }
-    return new Intl.DateTimeFormat(dateTag, {
-      day: "2-digit",
-      month: "2-digit",
-      year: "numeric",
-      hour: "2-digit",
-      minute: "2-digit"
-    }).format(start);
-  }
-
   function formatStartRelative(iso: string): string {
     const startMs = new Date(iso).getTime();
     const diffSec = Math.round((startMs - Date.now()) / 1000);
@@ -123,178 +111,139 @@ export function EventCard({
     return t("events.minN", { n: gap });
   }
 
-  function myParticipationLabel(): string | null {
-    if (event.myParticipation === "joined") {
-      return t("events.part.joined");
-    }
-    if (event.myParticipation === "declined") {
-      return t("events.part.declined");
-    }
-    return null;
-  }
-
+  const isActive = event.status !== "archived" && event.status !== "cancelled";
+  const isJoined = event.myParticipation === "joined";
+  const isDeclined = event.myParticipation === "declined";
   const statusLabel = getEventStatusLabel();
-  const statusClass = getEventStatusClass(event);
-  const pct = capacityPercent(event);
-  const panelId = `event-expand-${event.id}`;
-  const compactStartLabel = formatStartForCompactOverview(event.startsAt);
-  const which = expanded ? t("events.tile.collapse") : t("events.tile.expand");
-  const tileAriaLabel = compact
-    ? t("events.tile.aria", {
-        title: event.gameTitle,
-        start: compactStartLabel,
-        status: statusLabel,
-        which
-      })
-    : t("events.tile.ariaNoStart", {
-        title: event.gameTitle,
-        status: statusLabel,
-        which
-      });
+  const badgeModifier = getEventStatusBadgeModifier(event);
+  const panelId = `event-details-${event.id}`;
+  const detailsTriggerId = `event-details-trigger-${event.id}`;
+
+  const participationLabel = isJoined ? t("events.action.decline") : t("events.action.join");
+  const participationHandler = isJoined ? onDecline : onJoin;
+  const participationDisabled = !isJoined && joinDisabled;
 
   return (
-    <div className="event-expandable" key={event.id}>
-      <button
-        type="button"
-        className={`event-compact-tile event-tile-${statusClass}`}
-        aria-expanded={expanded}
-        aria-controls={panelId}
-        id={`event-tile-${event.id}`}
-        onClick={onToggleExpand}
-        aria-label={tileAriaLabel}
-      >
-        <img src={markSrc} alt="" className="event-compact-icon" width={36} height={36} />
-        <div className="event-compact-tile-body">
-          <span className="event-compact-title">{event.gameTitle}</span>
-          {compact ? (
-            <time className="event-compact-start" dateTime={event.startsAt}>
-              {compactStartLabel}
-            </time>
+    <li className="device-row event-row">
+      <div>
+        <p className="item-title">
+          <strong>{event.gameTitle}</strong>
+          <span className={`badge${badgeModifier ? ` ${badgeModifier}` : ""}`}>{statusLabel}</span>
+          {isJoined ? <span className="badge badge--ok">{t("events.part.joined")}</span> : null}
+          {isDeclined ? <span className="badge">{t("events.part.declined")}</span> : null}
+        </p>
+        <p className="item-sub">
+          {formatStartRelative(event.startsAt)} ·{" "}
+          {t("events.capacity.players", { joined: event.joinedCount, max: event.maxPlayers })} ·{" "}
+          {t("events.organizer")} {event.createdByUsername}
+        </p>
+      </div>
+      <div className="device-actions">
+        {isActive ? (
+          <button
+            type="button"
+            className={`participation-btn${isJoined ? " participation-btn--joined" : ""}`}
+            onClick={participationHandler}
+            disabled={participationDisabled}
+          >
+            {participationLabel}
+          </button>
+        ) : null}
+        {canManage && isActive ? (
+          <button type="button" className="secondary" onClick={onArchive}>
+            {t("events.action.archive")}
+          </button>
+        ) : null}
+        {canSoftDelete && !isActive ? (
+          <button type="button" className="secondary danger" onClick={onSoftDelete}>
+            {t("events.action.delete")}
+          </button>
+        ) : null}
+        <MoreMenu label={t("events.action.more")}>
+          <button
+            type="button"
+            className="secondary"
+            id={detailsTriggerId}
+            aria-expanded={expanded}
+            aria-controls={panelId}
+            onClick={onToggleExpand}
+          >
+            {t("events.action.details")}
+          </button>
+          {canManage && isActive ? (
+            <button
+              type="button"
+              className="secondary"
+              aria-expanded={expanded}
+              aria-controls={panelId}
+              onClick={onToggleExpand}
+            >
+              {t("events.action.editStart")}
+            </button>
           ) : null}
-          <div className="event-compact-track" aria-hidden="true">
-            <div className="event-compact-fill" style={{ width: `${pct}%` }} />
-          </div>
-          <div className="event-compact-meta">
-            <span className="event-compact-count">
-              {event.joinedCount}/{event.maxPlayers}
-            </span>
-            <span className={`status-pill status-${statusClass}`}>{statusLabel}</span>
-          </div>
-        </div>
-        <span className="event-compact-chevron" aria-hidden="true">
-          {expanded ? "▼" : "▶"}
-        </span>
-      </button>
+          {canManage && isActive ? (
+            <button type="button" className="secondary danger" onClick={onCancel}>
+              {t("events.action.cancel")}
+            </button>
+          ) : null}
+        </MoreMenu>
+      </div>
       {expanded ? (
         <div
-          className="event-expanded-panel"
+          className="event-row-details"
           id={panelId}
           role="region"
-          aria-labelledby={`event-tile-${event.id}`}
-          aria-label={t("events.panel.details", { title: event.gameTitle })}
+          aria-labelledby={detailsTriggerId}
         >
-          <article
-            className={`event-card event-${statusClass} event-card--expanded-follow`}
-          >
-            <div className="event-header event-header--expanded-follow">
-              <div>
-                <p className="eyebrow">
-                  {event.startMode === "now"
-                    ? t("events.mode.now")
-                    : t("events.mode.scheduled")}
-                  {event.mainEventName ? ` · ${event.mainEventName}` : null}
-                </p>
-                <h2>{event.gameTitle}</h2>
-              </div>
-              <span className={`status-pill status-${statusClass}`}>{statusLabel}</span>
-            </div>
-            <ExpandedContent
-              event={event}
-              t={t}
-              dateTag={dateTag}
-              selfStatusLabel={myParticipationLabel()}
-              gapHint={minPlayersGapHint()}
-              startRelative={formatStartRelative(event.startsAt)}
-              canManage={canManage}
-              canSoftDelete={canSoftDelete}
-              joinDisabled={joinDisabled}
-              editedStartsAt={editedStartsAt}
-              onEditedStartsAtChange={onEditedStartsAtChange}
-              onJoin={onJoin}
-              onDecline={onDecline}
-              onUpdateStart={onUpdateStart}
-              onArchive={onArchive}
-              onCancel={onCancel}
-              onSoftDelete={onSoftDelete}
-              server={server}
-            />
-          </article>
+          <EventRowDetails
+            event={event}
+            t={t}
+            dateTag={dateTag}
+            gapHint={minPlayersGapHint()}
+            canManage={canManage}
+            isActive={isActive}
+            editedStartsAt={editedStartsAt}
+            onEditedStartsAtChange={onEditedStartsAtChange}
+            onUpdateStart={onUpdateStart}
+            server={server}
+          />
         </div>
       ) : null}
-    </div>
+    </li>
   );
 }
 
-interface ExpandedContentProps {
+interface EventRowDetailsProps {
   event: GameEvent;
   t: ReturnType<typeof useI18n>["t"];
   dateTag: string;
-  selfStatusLabel: string | null;
   gapHint: string | null;
-  startRelative: string;
   canManage: boolean;
-  canSoftDelete: boolean;
-  joinDisabled: boolean;
+  isActive: boolean;
   editedStartsAt: string | undefined;
   onEditedStartsAtChange: (value: string) => void;
-  onJoin: () => void;
-  onDecline: () => void;
   onUpdateStart: () => void;
-  onArchive: () => void;
-  onCancel: () => void;
-  onSoftDelete: () => void;
   server?: ServerPanelBinding;
 }
 
-function ExpandedContent({
+/** Inhalt von „Details & Server“: Belegung, Kennzahlen, Verbindung, Server – und bei Orga die Startzeit. */
+function EventRowDetails({
   event,
   t,
   dateTag,
-  selfStatusLabel,
   gapHint,
-  startRelative,
   canManage,
-  canSoftDelete,
-  joinDisabled,
+  isActive,
   editedStartsAt,
   onEditedStartsAtChange,
-  onJoin,
-  onDecline,
   onUpdateStart,
-  onArchive,
-  onCancel,
-  onSoftDelete,
   server
-}: ExpandedContentProps) {
+}: EventRowDetailsProps) {
   const startAbsolute = new Date(event.startsAt).toLocaleString(dateTag);
   const pct = capacityPercent(event);
-  const isActive = event.status !== "archived" && event.status !== "cancelled";
 
   return (
     <>
-      {selfStatusLabel && event.myParticipation ? (
-        <p className={`event-self-status event-self-${event.myParticipation}`} role="status">
-          {selfStatusLabel}
-        </p>
-      ) : null}
-      <div className="event-meta-row">
-        <span className="event-organizer">
-          {t("events.organizer")} <strong>{event.createdByUsername}</strong>
-        </span>
-        <time className="event-relative-start" dateTime={event.startsAt} title={startAbsolute}>
-          {startRelative}
-        </time>
-      </div>
       <div className="event-capacity-block">
         <div
           className="event-capacity-track"
@@ -324,7 +273,23 @@ function ExpandedContent({
         <div>
           <dt>{t("events.meta.startLocal")}</dt>
           <dd>
-            <time dateTime={event.startsAt}>{startAbsolute}</time>
+            {canManage && isActive ? (
+              <div className="field-action-row">
+                <label>
+                  {t("events.meta.editStartLabel")}
+                  <input
+                    type="datetime-local"
+                    value={editedStartsAt ?? toDatetimeLocal(event.startsAt)}
+                    onChange={(change) => onEditedStartsAtChange(change.target.value)}
+                  />
+                </label>
+                <button type="button" className="secondary" onClick={onUpdateStart}>
+                  {t("events.action.saveStart")}
+                </button>
+              </div>
+            ) : (
+              <time dateTime={event.startsAt}>{startAbsolute}</time>
+            )}
           </dd>
         </div>
       </dl>
@@ -340,51 +305,6 @@ function ExpandedContent({
       )}
       {server ? <ServerPanel {...server} /> : null}
       {isCod4Game(event.gameTitle) ? <Cod4KeyGenerator /> : null}
-      {isActive ? (
-        <div className="action-row">
-          <button
-            type="button"
-            className={`participation-btn${event.myParticipation === "joined" ? " participation-btn--joined" : ""}`}
-            onClick={onJoin}
-            disabled={joinDisabled}
-          >
-            {t("events.action.join")}
-          </button>
-          <button
-            type="button"
-            className={`participation-btn${event.myParticipation === "declined" ? " participation-btn--declined" : ""}`}
-            onClick={onDecline}
-            disabled={event.myParticipation === "declined"}
-          >
-            {t("events.action.decline")}
-          </button>
-        </div>
-      ) : null}
-      {canManage && isActive ? (
-        <div className="manage-row">
-          <input
-            type="datetime-local"
-            value={editedStartsAt ?? toDatetimeLocal(event.startsAt)}
-            onChange={(change) => onEditedStartsAtChange(change.target.value)}
-          />
-          <button type="button" className="secondary" onClick={onUpdateStart}>
-            {t("events.action.saveStart")}
-          </button>
-          <button type="button" className="secondary" onClick={onArchive}>
-            {t("events.action.archive")}
-          </button>
-          <button type="button" className="secondary" onClick={onCancel}>
-            {t("events.action.cancel")}
-          </button>
-        </div>
-      ) : null}
-      {canSoftDelete ? (
-        <div className="action-row">
-          <button type="button" className="secondary danger" onClick={onSoftDelete}>
-            {t("events.action.delete")}
-          </button>
-        </div>
-      ) : null}
     </>
   );
 }
