@@ -99,6 +99,17 @@ function setInputValue(input: HTMLInputElement | HTMLSelectElement, value: strin
   input.dispatchEvent(new Event("change", { bubbles: true }));
 }
 
+/** Das Rundenformular steckt hinter dem Knopf „Neue Runde“, auf jeder Breite. */
+async function openCreateForm(container: HTMLElement) {
+  const open = Array.from(container.querySelectorAll("button")).find(
+    (button) => button.textContent === "Neue Runde"
+  ) as HTMLButtonElement;
+  await act(async () => {
+    open.click();
+    await flush();
+  });
+}
+
 afterEach(() => {
   vi.clearAllMocks();
 });
@@ -109,6 +120,7 @@ describe("EventBoard – Server-Bindung im Formular (Phase 15-03)", () => {
     const rendered = await render(
       <EventBoard currentUser={manager} mode="manager" gameCatalog={["Minecraft", "Factorio"]} ampIntegrationEnabled />
     );
+    await openCreateForm(rendered.container);
 
     const select = rendered.container.querySelector("form.event-form select") as HTMLSelectElement;
     expect(select).toBeTruthy();
@@ -137,6 +149,7 @@ describe("EventBoard – Server-Bindung im Formular (Phase 15-03)", () => {
     const rendered = await render(
       <EventBoard currentUser={manager} mode="manager" gameCatalog={["Minecraft"]} ampIntegrationEnabled />
     );
+    await openCreateForm(rendered.container);
     const select = rendered.container.querySelector("form.event-form select") as HTMLSelectElement;
     await act(async () => {
       setInputValue(select, "Minecraft");
