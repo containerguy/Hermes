@@ -30,8 +30,8 @@ export function MainEventRegistrationEditor({
   const [reminders, setReminders] = useState(mainEvent.remindersEnabled !== false);
 
   return (
-    <details className="main-event-registration">
-      <summary>{t("mainEvents.registration.toggle")}</summary>
+    <div className="main-event-registration">
+      <h3>{t("mainEvents.registration.toggle")}</h3>
       <form
         className="form-grid"
         onSubmit={(event) => {
@@ -65,7 +65,7 @@ export function MainEventRegistrationEditor({
           {t("mainEvents.registration.save")}
         </button>
       </form>
-    </details>
+    </div>
   );
 }
 

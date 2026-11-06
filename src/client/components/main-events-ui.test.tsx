@@ -64,8 +64,13 @@ async function render(element: React.ReactElement) {
   };
 }
 
-function setInputValue(input: HTMLInputElement | HTMLSelectElement, value: string) {
-  const proto = input instanceof HTMLSelectElement ? HTMLSelectElement.prototype : HTMLInputElement.prototype;
+function setInputValue(input: HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement, value: string) {
+  const proto =
+    input instanceof HTMLSelectElement
+      ? HTMLSelectElement.prototype
+      : input instanceof HTMLTextAreaElement
+        ? HTMLTextAreaElement.prototype
+        : HTMLInputElement.prototype;
   const setter = Object.getOwnPropertyDescriptor(proto, "value")!.set!;
   setter.call(input, value);
   input.dispatchEvent(new Event("input", { bubbles: true }));
@@ -557,7 +562,9 @@ describe("Events mit Start und Ende – Oberfläche", () => {
     });
     const rendered = await render(<MainEventsPanel />);
 
-    const editor = rendered.container.querySelector(".main-event-registration") as HTMLDetailsElement;
+    const editor = rendered.container.querySelector(".main-event-registration") as HTMLElement;
+    // R5 (HCI-124): Anmeldung ist die häufigste Aktion der Seite und darf nicht hinter <details> stecken.
+    expect(editor.tagName).not.toBe("DETAILS");
     const seats = editor.querySelector('input[type="number"]') as HTMLInputElement;
     await act(async () => {
       setInputValue(seats, "12");
@@ -581,6 +588,42 @@ describe("Events mit Start und Ende – Oberfläche", () => {
     expect(text).toContain("1. Bert B. (bert)");
     expect(text).toContain("Noch keine Antwort (1)");
     expect(overview.querySelector("a")!.getAttribute("href")).toBe("/api/main-events/m-1/participants.csv");
+    await rendered.cleanup();
+  });
+
+  it("lets managers send a broadcast without expanding anything first", async () => {
+    const posted: Array<Record<string, unknown>> = [];
+    requestMock.mockImplementation(async (url: string, options?: RequestInit) => {
+      if (options?.method === "POST" && url.endsWith("/broadcasts")) {
+        posted.push(JSON.parse(String(options.body)) as Record<string, unknown>);
+        return { broadcast: { id: "b-1", recipientCount: 3 } };
+      }
+      if (url.endsWith("/broadcasts")) return { broadcasts: [] };
+      if (url === "/api/main-events/m-1/participants") {
+        return { participants: [], noResponse: [] };
+      }
+      if (url === "/api/main-events") return { mainEvents: [mainEvent({ status: "planned" })] };
+      throw new Error(`unexpected ${url}`);
+    });
+    const rendered = await render(<MainEventsPanel />);
+
+    const broadcast = rendered.container.querySelector(".main-event-broadcast") as HTMLElement;
+    // R5 (HCI-124): Rundnachricht ist laut Abnahmekriterium ohne Aufklappen erreichbar.
+    expect(broadcast.tagName).not.toBe("DETAILS");
+    const subject = broadcast.querySelector("input") as HTMLInputElement;
+    const body = broadcast.querySelector("textarea") as HTMLTextAreaElement;
+    await act(async () => {
+      setInputValue(subject, "LAN startet bald");
+      setInputValue(body, "Bringt Headsets mit.");
+      await flush();
+    });
+    await act(async () => {
+      (broadcast.querySelector("form") as HTMLFormElement).requestSubmit();
+      await flush();
+    });
+    expect(posted).toEqual([
+      { subject: "LAN startet bald", body: "Bringt Headsets mit.", audience: ["joined", "interested", "waitlisted"] }
+    ]);
     await rendered.cleanup();
   });
 });
