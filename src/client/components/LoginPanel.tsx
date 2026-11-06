@@ -592,7 +592,7 @@ export function LoginPanel({
   if (currentUser) {
     const show = (section: ProfileSectionId) => !profileSection || profileSection === section;
     return (
-      <section className="login-panel" id="login" aria-label={t("loginProfile.sectionAria")}>
+      <section className="login-panel" id="login" role="region" aria-label={t("loginProfile.sectionAria")}>
         {profileSection ? null : (
           <header className="login-panel-intro">
             <p className="eyebrow">{t("loginProfile.introEyebrow")}</p>

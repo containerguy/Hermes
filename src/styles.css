@@ -3132,6 +3132,20 @@ dd {
     font-weight: 800;
     text-decoration: none;
   }
+
+  /*
+   * Profil/Login: anders als Admin nicht per Tippen zwischen Liste und Inhalt wechseln (B.neu-3) –
+   * sonst fehlt die Bestätigung „Aktuelle Anmeldung" direkt nach dem Login auf dem Handy, weil
+   * `#login` ohne Unterpfad als Index gilt und `.side-content` dann ausgeblendet wäre.
+   */
+  .page-login .side-layout:not(.side-layout--index) .side-nav,
+  .page-login .side-layout--index .side-content {
+    display: grid;
+  }
+
+  .page-login .side-back {
+    display: none;
+  }
 }
 
 /* Benutzer anlegen: auf breiten Bildschirmen eine Zeile über der Liste. */
