@@ -512,7 +512,7 @@ export const deMessages = {
   "events.filter.label": "Event",
   "events.filter.all": "Alle Runden",
   "events.filter.none": "Ohne Event",
-  "events.form.mainEvent": "Event",
+  "events.form.mainEvent": "Gehört zu",
   "events.form.mainEventNone": "Kein Event",
   "events.form.mainEventChoose": "Bitte Event wählen",
   "events.form.notifyAll": "Alle benachrichtigen (sonst nur die Mitspieler dieser Runde)",
