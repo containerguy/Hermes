@@ -247,5 +247,41 @@ describe("ui correctness structure contracts", () => {
 
     await rendered.cleanup();
   });
+
+  // HCI-122: Leerzustände benutzen den gemeinsamen Baustein `.empty-state` und bauen sich
+  // keine eigene Karte. Module bekommen dieselbe Regel in der SDK-README genannt.
+  it("EventBoard zeigt den leeren Board-Zustand als .empty-state, nicht als Rundenkarte", async () => {
+    vi.useFakeTimers();
+    stubEventSource();
+
+    const { requestJson } = await import("../api/request");
+    const requestJsonMock = requestJson as unknown as ReturnType<typeof vi.fn>;
+    requestJsonMock.mockImplementation(async (path: string) => {
+      if (path === "/api/events") {
+        return { events: [] };
+      }
+      return {};
+    });
+
+    const currentUser: User = {
+      id: "u_user",
+      phoneNumber: "+4900000002",
+      username: "spieler",
+      displayName: "Spieler",
+      email: "s@example.test",
+      role: "user",
+      notificationsEnabled: true
+    };
+
+    const rendered = await renderIntoDocument(<EventBoard currentUser={currentUser} mode="events" />);
+
+    const empty = rendered.container.querySelector(".event-list > .empty-state");
+    expect(empty).toBeTruthy();
+    expect(empty?.querySelector("strong")?.textContent).toBe("Noch keine Runden im Board");
+    expect(rendered.container.querySelector(".event-list .event-card")).toBeNull();
+    expect(rendered.container.querySelector(".event-compact-empty")).toBeNull();
+
+    await rendered.cleanup();
+  });
 });
 

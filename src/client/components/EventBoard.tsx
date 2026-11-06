@@ -899,19 +899,10 @@ export function EventBoard({
                   <ul className="device-list">{visibleEvents.map((event) => renderRound(event))}</ul>
                 )}
             {visibleEvents.length === 0 ? (
-              compactTouchShell ? (
-                <div className="event-compact-empty event-card">
-                  <p className="eyebrow">{t("events.empty.eyebrow")}</p>
-                  <h2>{resolvedEmptyTitle}</h2>
-                  <p className="muted">{resolvedEmptyBody}</p>
-                </div>
-              ) : (
-                <article className="event-card">
-                  <p className="eyebrow">{t("events.empty.eyebrow")}</p>
-                  <h2>{resolvedEmptyTitle}</h2>
-                  <p className="muted">{resolvedEmptyBody}</p>
-                </article>
-              )
+              <div className="empty-state">
+                <strong>{resolvedEmptyTitle}</strong>
+                <span>{resolvedEmptyBody}</span>
+              </div>
             ) : null}
           </div>
           {showCreateForm && !compactTouchShell ? newEventForm : null}

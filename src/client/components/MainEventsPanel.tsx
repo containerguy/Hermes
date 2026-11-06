@@ -359,23 +359,26 @@ export function MainEventsPanel({
               {manages(mainEvent.id) && mainEvent.visibility === "private" && mainEvent.status !== "ended" ? (
                 <div className="main-event-invites">
                   <p className="muted">{t("mainEvents.invites.title")}</p>
-                  <ul>
-                    {(mainEvent.invites ?? []).map((entry) => (
-                      <li key={entry.userId}>
-                        {entry.username}
-                        <button
-                          type="button"
-                          className="secondary"
-                          disabled={busy}
-                          aria-label={t("mainEvents.invites.removeAria", { name: entry.username })}
-                          onClick={() => uninvite(mainEvent, entry.userId)}
-                        >
-                          ✕
-                        </button>
-                      </li>
-                    ))}
-                    {(mainEvent.invites ?? []).length === 0 ? <li className="muted">{t("mainEvents.invites.empty")}</li> : null}
-                  </ul>
+                  {(mainEvent.invites ?? []).length === 0 ? (
+                    <p className="empty-state">{t("mainEvents.invites.empty")}</p>
+                  ) : (
+                    <ul>
+                      {(mainEvent.invites ?? []).map((entry) => (
+                        <li key={entry.userId}>
+                          {entry.username}
+                          <button
+                            type="button"
+                            className="secondary"
+                            disabled={busy}
+                            aria-label={t("mainEvents.invites.removeAria", { name: entry.username })}
+                            onClick={() => uninvite(mainEvent, entry.userId)}
+                          >
+                            ✕
+                          </button>
+                        </li>
+                      ))}
+                    </ul>
+                  )}
                   <div className="main-event-invite-form">
                     <select
                       aria-label={t("mainEvents.invites.pick")}
@@ -491,8 +494,8 @@ export function MainEventsPanel({
             </li>
           );
         })}
-        {mainEvents.length === 0 ? <li className="muted">{t("mainEvents.empty")}</li> : null}
       </ul>
+      {mainEvents.length === 0 ? <p className="empty-state">{t("mainEvents.empty")}</p> : null}
       {canManage ? (
       <details className="main-events-create">
       <summary>{t("mainEvents.form.toggle")}</summary>

@@ -71,7 +71,7 @@ export function ApiTokensSection({
       ) : null}
 
       {(apiTokens ?? []).length === 0 ? (
-        <p className="muted">{t("loginProfile.apiTokenListEmpty")}</p>
+        <p className="empty-state">{t("loginProfile.apiTokenListEmpty")}</p>
       ) : (
         <ul className="account-list api-token-list">
           {(apiTokens ?? []).map((token) => (

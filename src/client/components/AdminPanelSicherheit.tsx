@@ -77,10 +77,10 @@ export function AdminPanelSicherheit({
           </article>
         ))}
         {activeRateLimits.length === 0 ? (
-          <article className="device-row">
+          <div className="empty-state">
             <strong>{t("admin.rate.noneActive")}</strong>
             <span>{t("admin.rate.noneHint")}</span>
-          </article>
+          </div>
         ) : null}
       </div>
 
@@ -138,10 +138,10 @@ export function AdminPanelSicherheit({
           </article>
         ))}
         {rateLimitAllowlist.length === 0 ? (
-          <article className="device-row">
+          <div className="empty-state">
             <strong>{t("admin.allowlist.empty")}</strong>
             <span>{t("admin.allowlist.emptyHint")}</span>
-          </article>
+          </div>
         ) : null}
       </div>
 
