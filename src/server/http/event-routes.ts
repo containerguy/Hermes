@@ -772,6 +772,103 @@ export function createEventRouter(context: DatabaseContext) {
     response.json({ event: updated ? serializeEvent(context, updated, actor.id) : undefined });
   });
 
+  // P3 (HCI-110): Orga/Admin beenden mehrere Runden mit einer Bestätigung. Ein Audit-Eintrag je
+  // Runde, eine einzige Board-Benachrichtigung am Ende. Einzeln nicht beendbare Runden (fehlendes
+  // Recht, bereits beendet, nicht sichtbar) werden übersprungen und in `skipped` gemeldet.
+  router.post("/bulk", (request, response) => {
+    const actor = requireUser(context, request);
+
+    if (!actor) {
+      response.status(403).json({ error: "verboten" });
+      return;
+    }
+
+    const parsed = z
+      .object({
+        action: z.enum(["archive", "cancel"]),
+        ids: z.array(z.string().min(1).max(64)).min(1).max(100)
+      })
+      .safeParse(request.body);
+
+    if (!parsed.success) {
+      response.status(400).json({ error: "ungueltige_auswahl" });
+      return;
+    }
+
+    const { action } = parsed.data;
+    const ids = Array.from(new Set(parsed.data.ids));
+    const updated: string[] = [];
+    const skipped: Array<{ id: string; reason: string }> = [];
+
+    for (const id of ids) {
+      const event = context.db.select().from(gameEvents).where(eq(gameEvents.id, id)).get();
+
+      if (!event || event.deletedAt || isHiddenRound(context, actor, event)) {
+        skipped.push({ id, reason: "event_nicht_gefunden" });
+        continue;
+      }
+
+      if (!canManageEvent(context, actor, event)) {
+        skipped.push({ id, reason: "verboten" });
+        continue;
+      }
+
+      if (event.status === "archived" || event.status === "cancelled") {
+        skipped.push({ id, reason: "bereits_beendet" });
+        continue;
+      }
+
+      const timestamp = nowIso();
+      if (action === "archive") {
+        context.db
+          .update(gameEvents)
+          .set({ status: "archived", archivedByUserId: actor.id, archivedAt: timestamp, updatedAt: timestamp })
+          .where(eq(gameEvents.id, event.id))
+          .run();
+        writeAuditLog(context, {
+          actor,
+          action: "event.archive",
+          entityType: "event",
+          entityId: event.id,
+          summary: `${actor.username} hat ${event.gameTitle} archiviert.`
+        });
+        void sendPushForRound(context, { mainEventId: event.mainEventId, roundId: event.id }, {
+          title: withMainEventLabel("Runde archiviert", mainEventName(context, event.mainEventId)),
+          body: `${event.gameTitle} wurde archiviert.`,
+          url: "/#events",
+          vibrate: [120]
+        });
+      } else {
+        context.db
+          .update(gameEvents)
+          .set({ status: "cancelled", cancelledByUserId: actor.id, cancelledAt: timestamp, updatedAt: timestamp })
+          .where(eq(gameEvents.id, event.id))
+          .run();
+        writeAuditLog(context, {
+          actor,
+          action: "event.cancel",
+          entityType: "event",
+          entityId: event.id,
+          summary: `${actor.username} hat ${event.gameTitle} storniert.`
+        });
+        void sendPushForRound(context, { mainEventId: event.mainEventId, roundId: event.id }, {
+          title: withMainEventLabel("Runde storniert", mainEventName(context, event.mainEventId)),
+          body: `${event.gameTitle} wurde storniert.`,
+          url: "/#events",
+          vibrate: [260, 90, 120]
+        });
+      }
+
+      updated.push(event.id);
+    }
+
+    if (updated.length > 0) {
+      broadcastEventsChanged(action === "archive" ? "event_archived" : "event_cancelled");
+    }
+
+    response.json({ updated, skipped });
+  });
+
   router.post("/:id/cancel", (request, response) => {
     const actor = requireUser(context, request);
     const event = context.db.select().from(gameEvents).where(eq(gameEvents.id, request.params.id)).get();
