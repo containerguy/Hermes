@@ -77,6 +77,17 @@ function setInputValue(input: HTMLInputElement | HTMLSelectElement | HTMLTextAre
   input.dispatchEvent(new Event("change", { bubbles: true }));
 }
 
+/** Das Rundenformular steckt hinter dem Knopf „Neue Runde“, auf jeder Breite. */
+async function openCreateForm(container: HTMLElement) {
+  const open = Array.from(container.querySelectorAll("button")).find(
+    (button) => button.textContent === "Neue Runde"
+  ) as HTMLButtonElement;
+  await act(async () => {
+    open.click();
+    await flush();
+  });
+}
+
 afterEach(() => {
   vi.clearAllMocks();
 });
@@ -190,6 +201,7 @@ describe("Events mit Start und Ende – Oberfläche", () => {
     const rendered = await render(
       <EventBoard currentUser={{ ...manager, currentMainEventId: "m-2" }} mode="manager" />
     );
+    await openCreateForm(rendered.container);
     const mainEventSelect = Array.from(rendered.container.querySelectorAll("form.event-form select")).find((select) =>
       Array.from((select as HTMLSelectElement).options).some((option) => option.value === "m-2")
     ) as HTMLSelectElement;
@@ -233,9 +245,10 @@ describe("Events mit Start und Ende – Oberfläche", () => {
   it("preselects the running event and sends null for 'Kein Event'", async () => {
     const posted = installRequests([mainEvent({})]);
     const rendered = await render(<EventBoard currentUser={manager} mode="manager" />);
+    await openCreateForm(rendered.container);
 
-    const title = rendered.container.querySelector("form.event-form input") as HTMLInputElement;
-    const form = rendered.container.querySelector("form.event-form") as HTMLFormElement;
+    let title = rendered.container.querySelector("form.event-form input") as HTMLInputElement;
+    let form = rendered.container.querySelector("form.event-form") as HTMLFormElement;
     await act(async () => {
       setInputValue(title, "Quake");
       await flush();
@@ -247,6 +260,10 @@ describe("Events mit Start und Ende – Oberfläche", () => {
     expect(posted.at(-1)?.body).toMatchObject({ gameTitle: "Quake", mainEventId: "m-1" });
     expect(posted.at(-1)?.body).not.toHaveProperty("notifyAll");
 
+    // Nach dem Anlegen schließt sich die Karte wieder; für die nächste Runde erneut öffnen.
+    await openCreateForm(rendered.container);
+    title = rendered.container.querySelector("form.event-form input") as HTMLInputElement;
+    form = rendered.container.querySelector("form.event-form") as HTMLFormElement;
     const mainEventSelect = Array.from(rendered.container.querySelectorAll("form.event-form select")).find((select) =>
       Array.from((select as HTMLSelectElement).options).some((option) => option.value === "m-1")
     ) as HTMLSelectElement;
@@ -262,6 +279,9 @@ describe("Events mit Start und Ende – Oberfläche", () => {
     });
     expect(posted.at(-1)?.body).toMatchObject({ gameTitle: "Solo", mainEventId: null, notifyAll: false });
 
+    await openCreateForm(rendered.container);
+    title = rendered.container.querySelector("form.event-form input") as HTMLInputElement;
+    form = rendered.container.querySelector("form.event-form") as HTMLFormElement;
     const notifyAll = Array.from(rendered.container.querySelectorAll("form.event-form label")).find((label) =>
       label.textContent?.includes("Alle benachrichtigen")
     )?.querySelector("input") as HTMLInputElement;
@@ -281,6 +301,7 @@ describe("Events mit Start und Ende – Oberfläche", () => {
   it("makes you choose the event when several run and you joined none or several", async () => {
     const posted = installRequests([mainEvent({}), mainEvent({ id: "m-2", name: "Turnier" })]);
     const rendered = await render(<EventBoard currentUser={manager} mode="manager" />);
+    await openCreateForm(rendered.container);
 
     const title = rendered.container.querySelector("form.event-form input") as HTMLInputElement;
     const form = rendered.container.querySelector("form.event-form") as HTMLFormElement;
@@ -315,6 +336,7 @@ describe("Events mit Start und Ende – Oberfläche", () => {
   it("preselects the one running event you joined", async () => {
     installRequests([mainEvent({}), mainEvent({ id: "m-2", name: "Turnier", myParticipation: "joined" })]);
     const rendered = await render(<EventBoard currentUser={manager} mode="manager" />);
+    await openCreateForm(rendered.container);
     const mainEventSelect = Array.from(rendered.container.querySelectorAll("form.event-form select")).find((select) =>
       Array.from((select as HTMLSelectElement).options).some((option) => option.value === "m-2")
     ) as HTMLSelectElement;

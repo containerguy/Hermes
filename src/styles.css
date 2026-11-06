@@ -558,32 +558,6 @@ h2 {
   gap: 16px;
 }
 
-.manager-board {
-  grid-template-columns: minmax(0, 1fr) minmax(280px, 400px);
-  align-items: start;
-}
-
-.manager-board .board-toolbar,
-.manager-board .notice,
-.manager-board .error,
-.manager-board .access-panel {
-  grid-column: 1 / -1;
-}
-
-.manager-board .event-list {
-  grid-column: 1;
-}
-
-.manager-board .event-form {
-  grid-column: 2;
-  position: sticky;
-  top: 92px;
-}
-
-.event-board--compact.manager-board {
-  grid-template-columns: 1fr;
-}
-
 .event-row-details {
   flex-basis: 100%;
   width: 100%;
@@ -1522,7 +1496,6 @@ dd {
 
   .page-hero,
   .auth-layout,
-  .manager-board,
   .admin-panel {
     grid-template-columns: 1fr;
   }
@@ -1536,16 +1509,10 @@ dd {
     padding-top: 18px;
   }
 
-  .manager-board .event-form,
-  .manager-board .event-list,
   .admin-list,
   .admin-ops,
   .invite-panel {
     grid-column: 1;
-  }
-
-  .manager-board .event-form {
-    position: static;
   }
 
   .admin-list {

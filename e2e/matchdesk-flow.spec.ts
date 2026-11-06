@@ -139,6 +139,7 @@ test("admin creates users, manager creates an event, user joins", async ({ page 
   await login(page, "manager");
   await page.goto(`${baseUrl}/#manager`);
 
+  await page.getByRole("button", { name: "Neue Runde" }).click();
   const eventForm = page.locator("form.event-form");
   await eventForm.getByRole("textbox", { name: "Spieltitel" }).fill("Browser Game");
   await eventForm.locator("select").first().selectOption("scheduled");
@@ -166,6 +167,7 @@ test("Rundenzeile: Dabei direkt und Archivieren mit Bestätigung (390×844 und 1
   await logout(page);
   await login(page, "zeilenmanager");
   await page.goto(`${baseUrl}/#manager`);
+  await page.getByRole("button", { name: "Neue Runde" }).click();
   const eventForm = page.locator("form.event-form");
   await eventForm.getByRole("textbox", { name: "Spieltitel" }).fill("Zeilentest");
   await eventForm.locator("select").first().selectOption("scheduled");
@@ -274,6 +276,7 @@ test("gameserver: admin binds Minecraft, manager's event shows the server panel,
   await logout(page);
   await login(page, "srvmanager");
   await page.goto(`${baseUrl}/#manager`);
+  await page.getByRole("button", { name: "Neue Runde" }).click();
   const eventForm = page.locator("form.event-form");
   await eventForm.getByRole("textbox", { name: "Spieltitel" }).fill("Minecraft");
   await expect(eventForm.getByText("Server für „Minecraft“")).toBeVisible();
