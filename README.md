@@ -392,6 +392,10 @@ npm run test:e2e
 
 Falls Chromium wegen fehlender Systembibliotheken nicht startet, müssen die Playwright OS-Abhängigkeiten auf dem Host installiert werden.
 
+## Release
+
+Versionen, Tags, GitHub-Releases und `CHANGELOG.md` erzeugt release-please über einen Release-PR. Voraussetzung sind PR-Titel nach Conventional Commits (`feat: …`, `fix: …`). Ablauf und Konvention: [`building.md`, Abschnitt Release](building.md#release).
+
 ## Release-Checklist (Operator)
 
 - HTTP-API verstanden: bei Bedarf **`/api/docs`** für Operatoren/Integratoren bereitstellen; Tokens nur über vertrauenswürdige Kanäle verteilen

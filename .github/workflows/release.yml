@@ -1,0 +1,50 @@
+name: Release
+
+# release-please pflegt auf main einen Release-PR „chore(release): vX.Y.Z“
+# (Versions-Bump, CHANGELOG.md). Wird er gemergt, legt derselbe Lauf Tag und
+# GitHub-Release an und baut das Docker-Image für den Tag. Der Tag kommt per
+# GITHUB_TOKEN und löst deshalb den `v*`-Trigger von docker-image.yml nicht aus.
+
+on:
+  push:
+    branches:
+      - main
+
+permissions: {}
+
+concurrency:
+  group: release-please
+  cancel-in-progress: false
+
+jobs:
+  release-please:
+    name: Release PR / Release
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      pull-requests: write
+      # Labels „autorelease: pending/tagged“ am Release-PR; ohne sie findet
+      # release-please den gemergten Release-PR nicht wieder.
+      issues: write
+    outputs:
+      release_created: ${{ steps.release.outputs.release_created }}
+      tag_name: ${{ steps.release.outputs.tag_name }}
+    steps:
+      - name: release-please
+        id: release
+        uses: googleapis/release-please-action@45996ed1f6d02564a971a2fa1b5860e934307cf7 # v5.0.0
+        with:
+          config-file: release-please-config.json
+          manifest-file: .release-please-manifest.json
+
+  docker:
+    name: Docker image for release
+    needs:
+      - release-please
+    if: needs.release-please.outputs.release_created == 'true'
+    permissions:
+      contents: read
+      packages: write
+    uses: ./.github/workflows/docker-image.yml
+    with:
+      tag: ${{ needs.release-please.outputs.tag_name }}

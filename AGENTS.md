@@ -143,6 +143,12 @@ The current product is a brownfield TypeScript/React/Express app with SQLite as 
 - Main scripts in `package.json`:
 <!-- GSD:conventions-end -->
 
+## Commit And Release Conventions
+- PR titles must follow Conventional Commits: `<type>(<scope>)?!?: <Text>`. The prefix is English, the text may be German, e.g. `feat(events): Infos wird Unterseite von Event`. The `PR Title` workflow (`.github/workflows/pr-title.yml`) fails otherwise.
+- Merge PRs as **squash**, so the checked PR title becomes the commit on `main`. release-please (`.github/workflows/release.yml`) derives the version and `CHANGELOG.md` from these commits.
+- Types: `feat` → minor, `fix`/`perf`/`deps` → patch, `feat!` or footer `BREAKING CHANGE: …` → minor until 1.0.0. `docs`, `refactor`, `build`, `ci`, `test`, `style`, `chore` do not trigger a release on their own.
+- Do not bump versions or edit released `CHANGELOG.md` entries by hand; release-please does that in its release PR `chore(release): vX.Y.Z`. Details in `building.md`, section "Release".
+
 <!-- GSD:architecture-start source:ARCHITECTURE.md -->
 ## Architecture
 

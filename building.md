@@ -145,8 +145,10 @@ Tags:
 
 - `latest` für `main`
 - Branch-Tag für Branch-Builds
-- Git-Tag für Releases wie `v0.1.0`
+- Git-Tag für Releases wie `v0.1.0`, bei Releases aus `release.yml` zusätzlich `X.Y` (z. B. `0.22`)
 - `sha-<commit>` für jeden gepushten Commit
+
+Dieselbe Workflow-Datei ist per `workflow_call` aufrufbar (Eingabe `tag`). Darüber baut `release.yml` das Image für einen neuen Release-Tag, siehe [Release](#release).
 
 Das Repository muss für GitHub Packages Schreibzugriff über `GITHUB_TOKEN` erlauben. Die Workflow-Datei setzt dafür:
 
@@ -154,6 +156,58 @@ Das Repository muss für GitHub Packages Schreibzugriff über `GITHUB_TOKEN` erl
 permissions:
   contents: read
   packages: write
+```
+
+## Release
+
+Releases entstehen automatisch mit [release-please](https://github.com/googleapis/release-please) (`.github/workflows/release.yml`). Konfiguration: `release-please-config.json` und `.release-please-manifest.json` (zuletzt veröffentlichte Version).
+
+### Ablauf
+
+1. Feature- und Fix-PRs werden per **Squash** auf `main` gemergt. Ihr PR-Titel ist damit der Commit auf `main`.
+2. Nach jedem Push auf `main` pflegt release-please einen offenen Release-PR `chore(release): vX.Y.Z`. Er enthält den Versions-Bump in `package.json`, `package-lock.json` und `src/server/openapi/matchdesk-api.yaml` (Zeile mit `# x-release-please-version`) sowie den neuen Eintrag oben in `CHANGELOG.md`.
+3. Der Repo-Owner merged den Release-PR. Derselbe Workflow legt dann Tag `vX.Y.Z` und GitHub-Release (Notes = Changelog-Eintrag) an und ruft `docker-image.yml` mit dem Tag auf. Das Image erscheint als `vX.Y.Z`, `X.Y` und `latest` in GHCR.
+
+Es wird nie direkt auf `main` gepusht. Handgesetzte Tags `v*` bauen wie bisher über den Tag-Trigger von `docker-image.yml`.
+
+### Commit-Konvention
+
+PR-Titel folgen [Conventional Commits](https://www.conventionalcommits.org/): `<type>(<scope>)?!?: <Text>`. Der Prefix ist englisch, der Text darf deutsch sein. Der Workflow `pr-title.yml` prüft das bei jedem PR.
+
+| Typ | Wirkung vor 1.0 |
+|---|---|
+| `feat` | minor (0.21.0 → 0.22.0), Abschnitt „Features“ |
+| `fix`, `perf`, `deps` | patch (0.22.0 → 0.22.1) |
+| `feat!:` oder Footer `BREAKING CHANGE: …` | minor bis 1.0.0, eigener Abschnitt mit dem Footer-Text |
+| `docs`, `refactor`, `build`, `ci`, `test`, `style`, `chore` | kein Release, nicht im Changelog |
+
+Beispiele: `feat(events): Infos wird Unterseite von Event`, `fix(login): Code nach Ablauf neu anfordern`, `build(deps): Bump vite`.
+
+Steuerung:
+
+- **1.0.0 oder andere Zielversion:** Footer `Release-As: 1.0.0` im Commit (beim Squash-Merge in die Commit-Beschreibung).
+- **Falscher Titel nach dem Merge:** In der Beschreibung des gemergten PRs einen Block ergänzen; release-please nimmt beim nächsten Lauf diesen Text statt des Commits:
+
+  ```text
+  BEGIN_COMMIT_OVERRIDE
+  feat(events): richtiger Titel
+  END_COMMIT_OVERRIDE
+  ```
+
+- **Upgrade-Notes:** entweder als Footer `BREAKING CHANGE: …` im Feature-PR oder als letzter Commit auf dem Release-PR-Branch (Block „Upgrade note“ im neuen Changelog-Eintrag). Ein weiterer Merge auf `main` baut den Release-PR neu, die Ergänzung muss dann wiederholt werden.
+
+### Voraussetzungen im Repo
+
+- Settings → Actions → General → Workflow permissions: **„Allow GitHub Actions to create and approve pull requests“** eingeschaltet, sonst kann release-please keinen Release-PR anlegen.
+- Empfohlen: Settings → General → Pull Requests nur „Allow squash merging“ mit Titel „Pull request title“.
+- Kein Secret nötig: Alle Jobs nutzen `GITHUB_TOKEN` mit Rechten pro Job (`release-please`: `contents`, `pull-requests`, `issues` write; Docker: `contents` read, `packages` write; PR-Titel-Check: keine).
+- Folge von `GITHUB_TOKEN`: Auf dem Release-PR selbst läuft keine CI. Er enthält nur Version und Changelog; der Code ist auf `main` schon geprüft.
+
+### Lokal prüfen
+
+```bash
+npx release-please release-pr --dry-run --token="$GITHUB_TOKEN" \
+  --repo-url=containerguy/Matchdesk --target-branch=main
 ```
 
 ## Docker Compose Starten
