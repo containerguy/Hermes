@@ -1,0 +1,33 @@
+name: PR Title
+
+# Der PR-Titel wird beim Squash-Merge zum Commit auf main. release-please
+# leitet daraus Versionsstufe und Changelog ab, deshalb muss er dem Schema
+# `<type>(<scope>)?!?: <Text>` folgen (siehe building.md, Abschnitt Release).
+
+on:
+  pull_request:
+    types:
+      - opened
+      - edited
+      - reopened
+      - synchronize
+
+permissions: {}
+
+jobs:
+  conventional-title:
+    name: Conventional Commit title
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check PR title
+        env:
+          TITLE: ${{ github.event.pull_request.title }}
+        run: |
+          pattern='^(feat|fix|perf|deps|revert|docs|refactor|build|ci|test|style|chore)(\([A-Za-z0-9._/-]+\))?!?: .+'
+          if printf '%s' "$TITLE" | grep -Eq "$pattern"; then
+            echo "OK: $TITLE"
+            exit 0
+          fi
+          echo "::error title=PR-Titel::Der Titel folgt nicht Conventional Commits: '$TITLE'"
+          echo "Beispiele: 'feat(events): Infos wird Unterseite von Event', 'fix: Login-Code abgelaufen', 'feat!: …' für Breaking Changes."
+          exit 1

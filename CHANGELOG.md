@@ -1,8 +1,10 @@
 # Matchdesk Changelog (formerly Hermes)
 
-Versions are annotated tags `vX.Y.Z` on `main`. Each entry mirrors the
-`chore(release): vX.Y.Z` commit that bumps `package.json`,
-`package-lock.json`, and `src/server/openapi/hermes-api.yaml`.
+Versions are tags `vX.Y.Z` on `main`. Since v0.22.0, release-please writes
+each entry from the Conventional Commits on `main` in its release PR
+`chore(release): vX.Y.Z`, which also bumps `package.json`,
+`package-lock.json`, and `src/server/openapi/matchdesk-api.yaml` (see
+`building.md`, section "Release"). Entries up to v0.21.0 were written by hand.
 
 ## v0.21.0 — Module credentials in the admin, consistent UI, tool updates (2026-11-05)
 
