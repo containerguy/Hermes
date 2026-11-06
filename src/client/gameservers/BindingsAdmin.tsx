@@ -278,7 +278,7 @@ export function BindingsAdmin({ gameCatalog }: BindingsAdminProps) {
         </>
       ) : null}
       {!ampLoading && !ampError && openSuggestions.length === 0 ? (
-        <p className="muted">{t("admin.amp.suggestions.none")}</p>
+        <p className="empty-state">{t("admin.amp.suggestions.none")}</p>
       ) : null}
       {openSuggestions.length > 0 ? (
         <>
@@ -354,7 +354,7 @@ export function BindingsAdmin({ gameCatalog }: BindingsAdminProps) {
 
       <h3>{t("admin.amp.bindings.existing")}</h3>
       {bindings.length === 0 ? (
-        <p className="muted">{t("admin.amp.bindings.empty")}</p>
+        <p className="empty-state">{t("admin.amp.bindings.empty")}</p>
       ) : (
         <table className="admin-table">
           <thead>

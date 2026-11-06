@@ -222,10 +222,10 @@ export function AdminPanelInvites({
           </article>
         ))}
         {inviteCodes.length === 0 ? (
-          <article className="invite-row">
+          <div className="empty-state">
             <strong>{t("admin.invites.empty")}</strong>
             <span>{t("admin.invites.emptyHint")}</span>
-          </article>
+          </div>
         ) : null}
       </div>
     </section>

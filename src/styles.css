@@ -603,10 +603,6 @@ h2 {
   width: 100%;
 }
 
-.event-compact-empty {
-  grid-column: 1 / -1;
-}
-
 .event-overlay-panel {
   position: fixed;
   inset: 0;
@@ -1438,6 +1434,13 @@ dd {
 .invite-list {
   display: grid;
   gap: 10px;
+}
+
+/* Eine Liste ohne Einträge belegt keinen Platz — daneben steht dann der .empty-state. */
+.device-list:empty,
+.invite-list:empty,
+.main-events-list:empty {
+  display: none;
 }
 
 .device-row,
@@ -3304,11 +3307,6 @@ button.data-table__sort.active {
   margin-left: 6px;
 }
 
-.data-table__empty {
-  margin: 0;
-  padding: 16px;
-}
-
 /* Handy: jede Zeile als kompakte Karte mit Beschriftung pro Feld */
 @media (max-width: 760px) {
   .data-table__scroll {
@@ -4119,13 +4117,26 @@ legend {
   min-width: 0;
 }
 
+/*
+ * Leerzustand einer Liste, Tabelle oder Sammlung. Ersetzt die Zeilen, nicht die Karte drumherum:
+ * ein Leerzustand bekommt nie eine eigene Karte und nie eigenes Markup. Zwei Formen:
+ *   <p class="empty-state">Noch keine Invite-Codes.</p>
+ *   <div class="empty-state"><strong>Titel</strong><span>Was als Nächstes hilft.</span></div>
+ * Für ganze Seiten ohne Inhalt (Bereich abgeschaltet, keine Rechte) bleibt .access-panel zustaendig.
+ */
 .empty-state {
+  display: grid;
+  gap: 4px;
   margin: 0;
   padding: 18px;
   border: 1px dashed var(--line);
   border-radius: var(--radius);
   color: var(--muted);
   text-align: center;
+}
+
+.empty-state > strong {
+  color: var(--ink);
 }
 
 /* R5 (HCI-124): Hinter details steht nie eine Hauptaktion einer Seite, nur Zusatzinformation.

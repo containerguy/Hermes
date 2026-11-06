@@ -140,47 +140,53 @@ export function AdminPanelAudit({ dateTag, onError }: AdminPanelAuditProps) {
         </p>
       </div>
 
-      <div className="data-table__scroll audit-list">
-        <table className="data-table audit-table">
-          <thead>
-            <tr>
-              <th scope="col">{t("admin.audit.colSummary")}</th>
-              <th scope="col">{t("admin.audit.colTime")}</th>
-              <th scope="col">{t("admin.audit.colActor")}</th>
-              <th scope="col">{t("admin.audit.colAction")}</th>
-            </tr>
-          </thead>
-          <tbody>
-            {entries.map((entry) => (
-              <tr key={entry.id}>
-                <td className="data-table__primary">
-                  <strong>{entry.summary}</strong>
-                  {entry.metadata ? (
-                    <details className="audit-table__details">
-                      <summary>{t("admin.audit.details")}</summary>
-                      <pre>{JSON.stringify(entry.metadata, null, 2)}</pre>
-                    </details>
-                  ) : null}
-                </td>
-                <td data-label={t("admin.audit.colTime")} className="audit-table__time">
-                  <time dateTime={entry.createdAt}>{new Date(entry.createdAt).toLocaleString(dateTag)}</time>
-                </td>
-                <td data-label={t("admin.audit.colActor")}>
-                  {entry.actorUsername ?? <span className="muted">{t("admin.audit.actorSystem")}</span>}
-                </td>
-                <td data-label={t("admin.audit.colAction")}>
-                  <code className="audit-table__action">{entry.action}</code>
-                </td>
+      {entries.length === 0 && !loading ? (
+        filtersActive ? (
+          <p className="empty-state">{t("admin.audit.emptyFiltered")}</p>
+        ) : (
+          <div className="empty-state">
+            <strong>{t("admin.audit.empty")}</strong>
+            <span>{t("admin.audit.emptyHint")}</span>
+          </div>
+        )
+      ) : (
+        <div className="data-table__scroll audit-list">
+          <table className="data-table audit-table">
+            <thead>
+              <tr>
+                <th scope="col">{t("admin.audit.colSummary")}</th>
+                <th scope="col">{t("admin.audit.colTime")}</th>
+                <th scope="col">{t("admin.audit.colActor")}</th>
+                <th scope="col">{t("admin.audit.colAction")}</th>
               </tr>
-            ))}
-          </tbody>
-        </table>
-        {entries.length === 0 && !loading ? (
-          <p className="muted data-table__empty">
-            {filtersActive ? t("admin.audit.emptyFiltered") : `${t("admin.audit.empty")} ${t("admin.audit.emptyHint")}`}
-          </p>
-        ) : null}
-      </div>
+            </thead>
+            <tbody>
+              {entries.map((entry) => (
+                <tr key={entry.id}>
+                  <td className="data-table__primary">
+                    <strong>{entry.summary}</strong>
+                    {entry.metadata ? (
+                      <details className="audit-table__details">
+                        <summary>{t("admin.audit.details")}</summary>
+                        <pre>{JSON.stringify(entry.metadata, null, 2)}</pre>
+                      </details>
+                    ) : null}
+                  </td>
+                  <td data-label={t("admin.audit.colTime")} className="audit-table__time">
+                    <time dateTime={entry.createdAt}>{new Date(entry.createdAt).toLocaleString(dateTag)}</time>
+                  </td>
+                  <td data-label={t("admin.audit.colActor")}>
+                    {entry.actorUsername ?? <span className="muted">{t("admin.audit.actorSystem")}</span>}
+                  </td>
+                  <td data-label={t("admin.audit.colAction")}>
+                    <code className="audit-table__action">{entry.action}</code>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
 
       {pageCount > 1 ? (
         <nav className="data-pager" aria-label={t("admin.audit.pagerAria")}>

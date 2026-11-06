@@ -169,7 +169,7 @@ export function AdminUserPermissions({
 
       <p className="muted">{t("admin.perm.active")}</p>
       {grants.length === 0 ? (
-        <p className="muted">{t("admin.perm.none")}</p>
+        <p className="empty-state">{t("admin.perm.none")}</p>
       ) : (
         <ul className="admin-grant-list">
           {grants.map((grant) => (

@@ -165,85 +165,88 @@ export function AdminUserTable({
         </p>
       </div>
 
-      <div className="data-table__scroll">
-        <table className="data-table">
-          <thead>
-            <tr>
-              <SortHeader column="name" label={t("admin.userTable.colName")} />
-              <SortHeader column="role" label={t("admin.userTable.colRole")} />
-              <SortHeader column="grants" label={t("admin.userTable.colGrants")} />
-              <th scope="col">{t("admin.userTable.colEvent")}</th>
-              <th scope="col">
-                <span className="visually-hidden">{t("admin.userTable.colActions")}</span>
-              </th>
-            </tr>
-          </thead>
-          <tbody>
-            {visibleUsers.map((user) => {
-              const grantCount = grantsOf(user).length;
-              const isSelf = user.id === currentUser?.id;
-              return (
-                <tr key={user.id} className={panelUserId === user.id ? "is-selected" : undefined}>
-                  <td className="data-table__primary">
-                    <strong>{user.username}</strong>
-                    <span className="data-table__sub">
-                      {user.displayName && user.displayName !== user.username ? `${user.displayName} · ` : ""}
-                      {user.email}
-                    </span>
-                  </td>
-                  <td data-label={t("admin.userTable.colRole")}>
-                    <select
-                      value={user.role}
-                      onChange={(event) => onUpdateRole(user.id, event.target.value as User["role"])}
-                      aria-label={t("admin.userTable.roleOf", { name: user.username })}
+      {visibleUsers.length === 0 ? (
+        <p className="empty-state">{t("admin.userTable.empty")}</p>
+      ) : (
+        <div className="data-table__scroll">
+          <table className="data-table">
+            <thead>
+              <tr>
+                <SortHeader column="name" label={t("admin.userTable.colName")} />
+                <SortHeader column="role" label={t("admin.userTable.colRole")} />
+                <SortHeader column="grants" label={t("admin.userTable.colGrants")} />
+                <th scope="col">{t("admin.userTable.colEvent")}</th>
+                <th scope="col">
+                  <span className="visually-hidden">{t("admin.userTable.colActions")}</span>
+                </th>
+              </tr>
+            </thead>
+            <tbody>
+              {visibleUsers.map((user) => {
+                const grantCount = grantsOf(user).length;
+                const isSelf = user.id === currentUser?.id;
+                return (
+                  <tr key={user.id} className={panelUserId === user.id ? "is-selected" : undefined}>
+                    <td className="data-table__primary">
+                      <strong>{user.username}</strong>
+                      <span className="data-table__sub">
+                        {user.displayName && user.displayName !== user.username ? `${user.displayName} · ` : ""}
+                        {user.email}
+                      </span>
+                    </td>
+                    <td data-label={t("admin.userTable.colRole")}>
+                      <select
+                        value={user.role}
+                        onChange={(event) => onUpdateRole(user.id, event.target.value as User["role"])}
+                        aria-label={t("admin.userTable.roleOf", { name: user.username })}
+                      >
+                        <option value="user">{t("admin.role.user")}</option>
+                        <option value="organizer">{t("admin.role.organizer")}</option>
+                        <option value="manager">{t("admin.role.manager")}</option>
+                        <option value="admin">{t("admin.role.admin")}</option>
+                      </select>
+                    </td>
+                    <td data-label={t("admin.userTable.colGrants")} className={grantCount > 0 ? undefined : "is-empty"}>
+                      {grantCount > 0 ? (
+                        <span className="pill">{t("admin.userTable.grantCount", { count: grantCount })}</span>
+                      ) : (
+                        <span className="muted">–</span>
+                      )}
+                    </td>
+                    <td
+                      data-label={t("admin.userTable.colEvent")}
+                      className={user.registeredViaMainEventName ? undefined : "is-empty"}
                     >
-                      <option value="user">{t("admin.role.user")}</option>
-                      <option value="organizer">{t("admin.role.organizer")}</option>
-                      <option value="manager">{t("admin.role.manager")}</option>
-                      <option value="admin">{t("admin.role.admin")}</option>
-                    </select>
-                  </td>
-                  <td data-label={t("admin.userTable.colGrants")} className={grantCount > 0 ? undefined : "is-empty"}>
-                    {grantCount > 0 ? (
-                      <span className="pill">{t("admin.userTable.grantCount", { count: grantCount })}</span>
-                    ) : (
-                      <span className="muted">–</span>
-                    )}
-                  </td>
-                  <td
-                    data-label={t("admin.userTable.colEvent")}
-                    className={user.registeredViaMainEventName ? undefined : "is-empty"}
-                  >
-                    {user.registeredViaMainEventName ?? <span className="muted">–</span>}
-                  </td>
-                  <td className="data-table__actions">
-                    {catalog ? (
+                      {user.registeredViaMainEventName ?? <span className="muted">–</span>}
+                    </td>
+                    <td className="data-table__actions">
+                      {catalog ? (
+                        <button
+                          type="button"
+                          className="secondary"
+                          onClick={() => setPanelUserId(user.id)}
+                          aria-label={t("admin.userTable.editRightsOf", { name: user.username })}
+                        >
+                          {t("admin.userTable.editRights")}
+                        </button>
+                      ) : null}
                       <button
                         type="button"
-                        className="secondary"
-                        onClick={() => setPanelUserId(user.id)}
-                        aria-label={t("admin.userTable.editRightsOf", { name: user.username })}
+                        className="secondary danger"
+                        onClick={() => onDeleteUser(user)}
+                        disabled={isSelf}
+                        aria-label={t("admin.userTable.deleteOf", { name: user.username })}
                       >
-                        {t("admin.userTable.editRights")}
+                        {t("admin.user.delete")}
                       </button>
-                    ) : null}
-                    <button
-                      type="button"
-                      className="secondary danger"
-                      onClick={() => onDeleteUser(user)}
-                      disabled={isSelf}
-                      aria-label={t("admin.userTable.deleteOf", { name: user.username })}
-                    >
-                      {t("admin.user.delete")}
-                    </button>
-                  </td>
-                </tr>
-              );
-            })}
-          </tbody>
-        </table>
-        {visibleUsers.length === 0 ? <p className="muted data-table__empty">{t("admin.userTable.empty")}</p> : null}
-      </div>
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+      )}
 
       {panelUser && catalog ? (
         <SidePanel

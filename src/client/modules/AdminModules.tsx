@@ -277,7 +277,7 @@ export function AdminModules({ currentUser, subPath }: { currentUser: User; subP
       ) : null}
 
       <h3>{tx("installedTitle")}</h3>
-      {data.modules.length === 0 ? <p className="muted">{tx("noneInstalled")}</p> : null}
+      {data.modules.length === 0 ? <p className="empty-state">{tx("noneInstalled")}</p> : null}
       <ul className="device-list module-list">
         {data.modules.map((module) => (
           <li key={module.id} className="device-row module-row">
@@ -581,7 +581,7 @@ function Sources({
               {typeof list === "string" ? <p className="error">{list}</p> : null}
               {Array.isArray(list) ? (
                 list.length === 0 ? (
-                  <p className="muted">{tx("sourceEmpty")}</p>
+                  <p className="empty-state">{tx("sourceEmpty")}</p>
                 ) : (
                   <ul className="device-list module-available">
                     {list.map((module) => (
@@ -862,7 +862,7 @@ function ModuleDetail({ module, currentUser, onBack }: { module: InstalledModule
 
       <h3>{tx("settings")}</h3>
       {properties.length === 0 ? (
-        <p className="muted">{tx("noSettings")}</p>
+        <p className="empty-state">{tx("noSettings")}</p>
       ) : settings ? (
         <form className="admin-form" onSubmit={save}>
           {properties.map(([key, schema]) => (

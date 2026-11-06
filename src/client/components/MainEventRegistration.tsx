@@ -112,7 +112,7 @@ export function MainEventParticipantList({ mainEvent }: { mainEvent: MainEvent }
       {error ? <p className="error">{error}</p> : null}
       {overview ? (
         <div className="main-event-overview-body">
-          {overview.participants.length === 0 ? <p className="muted">{t("mainEvents.overview.empty")}</p> : null}
+          {overview.participants.length === 0 ? <p className="empty-state">{t("mainEvents.overview.empty")}</p> : null}
           {overviewGroups.map((group) => {
             const people = overview.participants.filter((person) => person.status === group.status);
             if (people.length === 0) {

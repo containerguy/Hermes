@@ -95,10 +95,10 @@ export function SessionsSection({
           </article>
         ))}
         {sessions.length === 0 ? (
-          <article className="device-row">
+          <div className="empty-state">
             <strong>{t("loginProfile.devicesEmptyTitle")}</strong>
             <span>{t("loginProfile.devicesEmptyHint")}</span>
-          </article>
+          </div>
         ) : null}
       </div>
     </section>
