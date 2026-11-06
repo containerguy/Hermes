@@ -7,7 +7,7 @@ import { EventBoard } from "./EventBoard";
 import { I18nProvider } from "../i18n/I18nContext";
 import { requestJson } from "../api/request";
 import { subscribeEventsChanged } from "../realtime/events-changed-bus";
-import type { User } from "../types/core";
+import type { GameEvent, User } from "../types/core";
 
 vi.mock("../api/request", () => ({ requestJson: vi.fn() }));
 vi.mock("../lib/BrandingContext", () => ({ useBrandIconSrc: () => "/icon.svg" }));
@@ -39,6 +39,51 @@ const user = { id: "u1", username: "gast", role: "user", locale: "de" } as unkno
 
 async function flush() {
   for (let index = 0; index < 5; index += 1) await Promise.resolve();
+}
+
+function gameEvent(overrides: Partial<GameEvent> = {}): GameEvent {
+  return {
+    id: "e-1",
+    mainEventId: null,
+    mainEventName: null,
+    gameTitle: "Zeilentest",
+    startMode: "scheduled",
+    startsAt: new Date(Date.now() + 3_600_000).toISOString(),
+    minPlayers: 2,
+    maxPlayers: 8,
+    details: null,
+    serverBindingId: null,
+    status: "open",
+    createdByUserId: "u-mgr",
+    createdByUsername: "mgr",
+    joinedCount: 0,
+    myParticipation: null,
+    ...overrides
+  };
+}
+
+async function renderBoard(currentUser: User) {
+  const container = document.createElement("div");
+  document.body.appendChild(container);
+  const root = createRoot(container);
+  await act(async () => {
+    root.render(
+      <I18nProvider locale="de">
+        <EventBoard currentUser={currentUser} mode="events" />
+      </I18nProvider>
+    );
+    await flush();
+  });
+  return {
+    container,
+    cleanup: async () => {
+      await act(async () => {
+        root.unmount();
+        await flush();
+      });
+      container.remove();
+    }
+  };
 }
 
 afterEach(() => {
@@ -84,5 +129,72 @@ describe("EventBoard – events_changed an den Bus", () => {
       root.unmount();
       await flush();
     });
+  });
+});
+
+describe("EventBoard – Zeilenaktionen im Runden-Board (HCI-109)", () => {
+  it(`„Dabei" ist ein Klick ohne Aufklappen der Zeile`, async () => {
+    const posted: Array<{ url: string; body: unknown }> = [];
+    requestMock.mockImplementation(async (url: string, options?: RequestInit) => {
+      if (url === "/api/events") return { events: [gameEvent()] };
+      if (url === "/api/events/e-1/participation" && options?.method === "POST") {
+        posted.push({ url, body: options.body ? JSON.parse(String(options.body)) : null });
+        return { event: gameEvent({ myParticipation: "joined", joinedCount: 1 }) };
+      }
+      throw new Error(`unerwarteter Aufruf ${url} ${options?.method ?? "GET"}`);
+    });
+
+    const rendered = await renderBoard(user);
+    const row = rendered.container.querySelector("li.device-row") as HTMLLIElement;
+    expect(row).toBeTruthy();
+
+    // Die Zeile selbst ist kein <button> mehr (HCI-109): Beitreten hängt an einem eigenständigen
+    // Knopf in `.device-actions`, ganz ohne ein vorheriges Aufklappen der Zeile.
+    expect(rendered.container.querySelector(".event-row-details")).toBeNull();
+    const joinButton = Array.from(row.querySelectorAll(".device-actions button")).find(
+      (button) => button.textContent === "Dabei"
+    ) as HTMLButtonElement | undefined;
+    expect(joinButton).toBeTruthy();
+
+    await act(async () => {
+      joinButton!.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+      await flush();
+    });
+
+    expect(posted).toEqual([{ url: "/api/events/e-1/participation", body: { status: "joined" } }]);
+    await rendered.cleanup();
+  });
+
+  it(`„Archivieren" fragt erst eine Bestätigung ab (Aktion + Bestätigung = 2 Klicks)`, async () => {
+    const posted: string[] = [];
+    requestMock.mockImplementation(async (url: string, options?: RequestInit) => {
+      if (url === "/api/events") return { events: [gameEvent()] };
+      if (url === "/api/events/e-1/archive" && options?.method === "POST") {
+        posted.push(url);
+        return { event: gameEvent({ status: "archived" }) };
+      }
+      throw new Error(`unerwarteter Aufruf ${url} ${options?.method ?? "GET"}`);
+    });
+
+    const confirmSpy = vi.spyOn(window, "confirm").mockReturnValue(true);
+    const manager = { ...user, id: "u-mgr", role: "manager" } as unknown as User;
+    const rendered = await renderBoard(manager);
+
+    const row = rendered.container.querySelector("li.device-row") as HTMLLIElement;
+    const archiveButton = Array.from(row.querySelectorAll(".device-actions button")).find(
+      (button) => button.textContent === "Archivieren"
+    ) as HTMLButtonElement | undefined;
+    expect(archiveButton).toBeTruthy();
+
+    await act(async () => {
+      archiveButton!.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+      await flush();
+    });
+
+    expect(confirmSpy).toHaveBeenCalledWith("Runde wirklich archivieren?");
+    expect(posted).toEqual(["/api/events/e-1/archive"]);
+
+    confirmSpy.mockRestore();
+    await rendered.cleanup();
   });
 });

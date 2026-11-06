@@ -56,7 +56,9 @@ const MINECRAFT_INSTANCE_ID = (
   .find((instance) => instance.InstanceName === "Minecraft01")!.InstanceID;
 
 async function logout(page: Page) {
-  await page.goto(`${baseUrl}/#login`);
+  // Auf dem Handy zeigt `#login` nur die Bereichsliste; das Konto (mit „Logout") liegt unter
+  // `#login/konto` – das funktioniert unabhängig von der Breite.
+  await page.goto(`${baseUrl}/#login/konto`);
   await page.getByRole("button", { name: "Logout" }).click();
 }
 
@@ -150,9 +152,49 @@ test("admin creates users, manager creates an event, user joins", async ({ page 
   await page.getByRole("button", { name: "Logout" }).click();
   await login(page, "spieler");
   await page.goto(`${baseUrl}/#events`);
-  await page.getByRole("button", { name: /Details aufklappen/ }).click();
+  // Beitreten ist eine Zeilenaktion: ein Klick, kein Aufklappen nötig (HCI-109).
   await page.getByRole("button", { name: "Dabei", exact: true }).click();
   await expect(page.getByText("1 / 2")).toBeVisible();
+});
+
+test("Rundenzeile: Dabei direkt und Archivieren mit Bestätigung (390×844 und 1440×900)", async ({ page }) => {
+  await page.goto(baseUrl);
+  await login(page, "hauptadmin");
+  await createUserAsAdmin(page, "zeilenmanager", "manager");
+  await createUserAsAdmin(page, "zeilenspieler", "user");
+
+  await logout(page);
+  await login(page, "zeilenmanager");
+  await page.goto(`${baseUrl}/#manager`);
+  const eventForm = page.locator("form.event-form");
+  await eventForm.getByRole("textbox", { name: "Spieltitel" }).fill("Zeilentest");
+  await eventForm.locator("select").first().selectOption("scheduled");
+  await eventForm.getByLabel("Startzeit").fill("2027-06-01T19:00");
+  await eventForm.getByLabel("Min").fill("1");
+  await eventForm.getByLabel("Max").fill("4");
+  await eventForm.getByRole("button", { name: "Runde anlegen" }).click();
+  await expect(page.getByText("Zeilentest")).toBeVisible();
+
+  // 390×844: „Dabei" ist ein Klick, kein Aufklappen, ohne Scrollen sichtbar.
+  await page.setViewportSize({ width: 390, height: 844 });
+  await logout(page);
+  await login(page, "zeilenspieler");
+  await page.goto(`${baseUrl}/#events`);
+  const playerRow = page.locator("li.device-row", { hasText: "Zeilentest" });
+  const joinButton = playerRow.getByRole("button", { name: "Dabei", exact: true });
+  await expect(joinButton).toBeInViewport();
+  await joinButton.click();
+  await expect(playerRow.getByRole("button", { name: "Doch nicht", exact: true })).toBeVisible();
+
+  // 1440×900: Archivieren ist eine Zeilenaktion mit Bestätigung (Aktion + Bestätigung = 2 Klicks).
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await logout(page);
+  await login(page, "zeilenmanager");
+  await page.goto(`${baseUrl}/#manager`);
+  const managerRow = page.locator("li.device-row", { hasText: "Zeilentest" });
+  page.once("dialog", (dialog) => dialog.accept());
+  await managerRow.getByRole("button", { name: "Archivieren", exact: true }).click();
+  await expect(managerRow.getByText("archiviert")).toBeVisible();
 });
 
 test("responsive shell and profile guidance regions stay visible", async ({ page }) => {
@@ -245,7 +287,9 @@ test("gameserver: admin binds Minecraft, manager's event shows the server panel,
   // Status holen (sofortiger Poll im Server); Minecraft01 steht in der Fixture auf Stopped
   await page.request.get(`${baseUrl}/api/integrations/amp/status?refresh=1`);
   await page.goto(`${baseUrl}/#events`);
-  await page.getByRole("button", { name: /^Minecraft, .*Details aufklappen/ }).click();
+  const managerRow = page.locator("li.device-row", { hasText: "Minecraft" });
+  await managerRow.getByRole("button", { name: "Mehr" }).click();
+  await managerRow.getByRole("button", { name: "Details & Server" }).click();
   const managerPanel = page.getByRole("region", { name: "Gameserver" }).first();
   await expect(managerPanel).toBeVisible();
   await expect(managerPanel.getByText("Server aus")).toBeVisible();
@@ -255,7 +299,9 @@ test("gameserver: admin binds Minecraft, manager's event shows the server panel,
   await logout(page);
   await login(page, "srvspieler");
   await page.goto(`${baseUrl}/#events`);
-  await page.getByRole("button", { name: /^Minecraft, .*Details aufklappen/ }).click();
+  const playerRow = page.locator("li.device-row", { hasText: "Minecraft" });
+  await playerRow.getByRole("button", { name: "Mehr" }).click();
+  await playerRow.getByRole("button", { name: "Details & Server" }).click();
   const playerPanel = page.getByRole("region", { name: "Gameserver" }).first();
   await expect(playerPanel).toBeVisible();
   await expect(playerPanel.getByText("Server aus")).toBeVisible();
