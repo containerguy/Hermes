@@ -147,6 +147,19 @@ afterEach(() => {
 });
 
 describe("Events mit Start und Ende – Oberfläche", () => {
+  it("shows the Infos entry point only when the admin enabled the general info text", async () => {
+    installRequests([mainEvent({})]);
+    const withLink = await render(<MainEventsPanel showInfosLink />);
+    const link = withLink.container.querySelector('a[href="#main-events/infos"]');
+    expect(link?.textContent).toBe("Informationen und Hinweise");
+    await withLink.cleanup();
+
+    installRequests([mainEvent({})]);
+    const withoutLink = await render(<MainEventsPanel />);
+    expect(withoutLink.container.querySelector('a[href="#main-events/infos"]')).toBeNull();
+    await withoutLink.cleanup();
+  });
+
   it("groups rounds by event and narrows to the current event from the global switcher", async () => {
     installRequests([mainEvent({})]);
     const rendered = await render(<EventBoard currentUser={manager} mode="events" />);

@@ -386,7 +386,9 @@ function AppShell({
   }
 
   function isActive(page: NavPage) {
-    return activePage.id === page.id;
+    // Unterseiten ohne eigenen Menüpunkt (z. B. „Infos" unter „Event") halten den Menüpunkt
+    // ihrer übergeordneten Seite aktiv, erkennbar am mehrteiligen Hash-Präfix.
+    return activePage.id === page.id || activePage.hash.startsWith(`${page.hash}/`);
   }
 
   const pageContent = activePage.render({

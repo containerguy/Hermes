@@ -419,6 +419,7 @@ export const deMessages = {
   "mainEvents.title": "Events planen, starten und beenden",
   "mainEvents.intro":
     "Neue Runden und ihre Benachrichtigungen gehören automatisch zum laufenden Event. Es läuft immer höchstens ein Event; beim Beenden werden seine offenen Runden archiviert.",
+  "mainEvents.infosLink": "Informationen und Hinweise",
   "mainEvents.status.planned": "geplant",
   "mainEvents.status.running": "läuft",
   "mainEvents.status.ended": "beendet",

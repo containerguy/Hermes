@@ -420,6 +420,7 @@ export const enMessages: { [K in keyof typeof deMessages]: string } = {
   "mainEvents.title": "Plan, start and end events",
   "mainEvents.intro":
     "New rounds and their notifications automatically belong to the running event. At most one event runs at a time; ending it archives its open rounds.",
+  "mainEvents.infosLink": "Information and notes",
   "mainEvents.status.planned": "planned",
   "mainEvents.status.running": "running",
   "mainEvents.status.ended": "ended",
