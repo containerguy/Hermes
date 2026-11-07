@@ -84,6 +84,9 @@ function normalizeLegacyHash(rawHash: string): string {
   if (legacy) return `#admin/${legacy[1]}${legacy[2]}`;
   const moved = rawHash.match(/^#(pizza|playing)(\/.*)?$/);
   if (moved) return `#m/${moved[1] === "playing" ? "presence" : moved[1]}${moved[2] ?? ""}`;
+  // „Infos" ist Unterseite von „Event" (kein eigener Hauptmenüpunkt mehr, siehe HCI-114).
+  const movedInfos = rawHash.match(/^#infos(\/.*)?$/);
+  if (movedInfos) return `#main-events/infos${movedInfos[1] ?? ""}`;
   // Spielkonten liegen jetzt im Profilbereich des Moduls.
   return rawHash.replace(/^#login\/spielkonten\b/, "#login/m-presence");
 }
@@ -383,7 +386,9 @@ function AppShell({
   }
 
   function isActive(page: NavPage) {
-    return activePage.id === page.id;
+    // Unterseiten ohne eigenen Menüpunkt (z. B. „Infos" unter „Event") halten den Menüpunkt
+    // ihrer übergeordneten Seite aktiv, erkennbar am mehrteiligen Hash-Präfix.
+    return activePage.id === page.id || activePage.hash.startsWith(`${page.hash}/`);
   }
 
   const pageContent = activePage.render({

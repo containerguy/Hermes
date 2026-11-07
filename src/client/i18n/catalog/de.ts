@@ -419,6 +419,7 @@ export const deMessages = {
   "mainEvents.title": "Events planen, starten und beenden",
   "mainEvents.intro":
     "Neue Runden und ihre Benachrichtigungen gehören automatisch zum laufenden Event. Es läuft immer höchstens ein Event; beim Beenden werden seine offenen Runden archiviert.",
+  "mainEvents.infosLink": "Informationen und Hinweise",
   "mainEvents.status.planned": "geplant",
   "mainEvents.status.running": "läuft",
   "mainEvents.status.ended": "beendet",
@@ -756,10 +757,10 @@ export const deMessages = {
   "admin.design.manager": "Managerfarbe",
   "admin.design.admin": "Adminfarbe",
   "admin.design.surface": "Hintergrund",
-  "admin.infos.title": "Infoseite und Menüpunkt",
+  "admin.infos.title": "Infoseite (Unterseite von „Event“)",
   "admin.infos.help":
-    "Der Inhalt erscheint unter #infos für alle Besucher, sobald der Menüpunkt aktiv ist. Markdown wird sicher gerendert (Überschriften mit #, ##, Listen mit -, Links mit [Text](URL)).",
-  "admin.infos.menuCheck": "Menüpunkt „Infos“ in der Hauptnavigation anzeigen",
+    "Der Inhalt erscheint unter #main-events/infos für alle Besucher, sobald dieser Text aktiv ist. Markdown wird sicher gerendert (Überschriften mit #, ##, Listen mit -, Links mit [Text](URL)).",
+  "admin.infos.menuCheck": "Allgemeinen Infotext anzeigen",
   "admin.infos.markdownLabel": "Inhalt (Markdown)",
   "admin.infos.markdownAria": "Infos-Seite Markdown",
   "admin.infos.markdownPlaceholder": "## Willkommen\n\n- Punkt eins\n- [Website](https://example.org)",

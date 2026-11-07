@@ -118,7 +118,7 @@ export function InfosPage({
       <section className="access-panel" aria-label="Infos nicht verfügbar">
         <p className="eyebrow">Infos</p>
         <h2>Dieser Bereich ist deaktiviert.</h2>
-        <p className="muted">Der Menüpunkt Infos wurde vom Betreiber ausgeblendet.</p>
+        <p className="muted">Die Infos wurden vom Betreiber ausgeblendet.</p>
         <a className="text-link" href="#events">
           Zur Startseite
         </a>

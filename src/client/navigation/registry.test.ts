@@ -38,12 +38,19 @@ describe("navigation registry", () => {
     expect(parseHash("")).toEqual({ head: "", subPath: "" });
   });
 
-  it("orders the menu as Runden, Events, Infos, Admin", () => {
+  it("orders the menu as Runden, Events, Admin without a separate Infos entry", () => {
     const admin = ctx({
       currentUser: user("admin"),
       settings: { ...settings, infosEnabled: true }
     });
-    expect(menuPages(appPages, admin).map((page) => page.id)).toEqual(["events", "main-events", "infos", "admin"]);
+    expect(menuPages(appPages, admin).map((page) => page.id)).toEqual(["events", "main-events", "admin"]);
+  });
+
+  it("redirects #infos to the Event sub-page, unaffected by infosEnabled", () => {
+    expect(resolvePage(appPages, ctx(), "#main-events/infos").page.id).toBe("infos");
+    expect(resolvePage(appPages, ctx({ settings: { ...settings, infosEnabled: true } }), "#main-events/infos").page.id).toBe(
+      "infos"
+    );
   });
 
   it("hides modules that are switched off and admin for non-admins", () => {

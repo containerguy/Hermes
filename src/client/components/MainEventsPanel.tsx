@@ -43,12 +43,15 @@ const emptyDraft = {
  */
 export function MainEventsPanel({
   canManage = true,
-  canManageEvent
+  canManageEvent,
+  showInfosLink = false
 }: {
   /** Globales Recht: Events anlegen und alle verwalten. */
   canManage?: boolean;
   /** Recht für ein einzelnes Event (auch per Event-Vergabe). */
   canManageEvent?: (mainEventId: string) => boolean;
+  /** Link zur Unterseite „Infos" zeigen (Admin hat den allgemeinen Infotext eingeschaltet). */
+  showInfosLink?: boolean;
 }) {
   const manages = (mainEventId: string) => canManage || Boolean(canManageEvent?.(mainEventId));
   const { t, locale } = useI18n();
@@ -271,6 +274,11 @@ export function MainEventsPanel({
   return (
     <section className="main-events-panel" aria-label={canManage ? t("mainEvents.aria") : t("mainEvents.ariaList")}>
       {canManage ? <p className="muted">{t("mainEvents.intro")}</p> : null}
+      {showInfosLink ? (
+        <a className="text-link main-events-infos-link" href="#main-events/infos">
+          {t("mainEvents.infosLink")}
+        </a>
+      ) : null}
       {message ? <p className="notice">{message}</p> : null}
       {error ? <p className="error">{error}</p> : null}
       <ul className="main-events-list">
