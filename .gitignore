@@ -34,9 +34,6 @@ pnpm-debug.log*
 .idea/
 .vscode/
 
-# ── GSD baseline (auto-generated) ──
-.gsd
-.gsd-id
 .bg-shell/
 Thumbs.db
 *.swp

@@ -1,4 +1,7 @@
-<!-- GSD:project-start source:PROJECT.md -->
+Stand: Oktober 2026 (Codebase-Analyse). Teile sind überholt, z. B. ist das Frontend inzwischen in `src/client/` aufgeteilt.
+
+Ausführliche Codebase-Analyse (Stand 10/2026, inkl. CONCERNS, TESTING, INTEGRATIONS, STRUCTURE) in der Git-Historie: `git show db3aa62cbd906a1913d90257ad9915d6e8158056:.planning/codebase/CONCERNS.md`
+
 ## Project
 
 **Matchdesk** (Mitspielzentrale, formerly Matchdesk)
@@ -19,9 +22,7 @@ The current product is a brownfield TypeScript/React/Express app with SQLite as 
 - **Participation model**: Only `dabei` and `nicht dabei`; no waitlist.
 - **Compatibility**: Smartphone and PC browsers must both be usable; push quality depends on PWA/secure-context limitations.
 - **Security**: Credentials and secrets must remain in env vars or local ignored files, never planning docs.
-<!-- GSD:project-end -->
 
-<!-- GSD:stack-start source:codebase/STACK.md -->
 ## Technology Stack
 
 ## Runtime And Language
@@ -81,9 +82,7 @@ The current product is a brownfield TypeScript/React/Express app with SQLite as 
 - Health endpoint: `/api/health` is implemented in `src/server/app.ts` and used by the Docker `HEALTHCHECK`.
 - Container registry: `.github/workflows/docker-image.yml` publishes `ghcr.io/containerguy/matchdesk` (and, until v1.0, `ghcr.io/containerguy/hermes`) on pushes to `main`, version tags, and manual dispatch; pull requests build without pushing.
 - Operational caveat: `README.md` and `building.md` state S3 is snapshot storage, not a locking backend for multiple simultaneous writers.
-<!-- GSD:stack-end -->
 
-<!-- GSD:conventions-start source:CONVENTIONS.md -->
 ## Conventions
 
 ## Project Shape
@@ -141,9 +140,7 @@ The current product is a brownfield TypeScript/React/Express app with SQLite as 
 - Tests set disposable environment variables directly and use temporary SQLite files under `os.tmpdir()`.
 ## Build And Script Conventions
 - Main scripts in `package.json`:
-<!-- GSD:conventions-end -->
 
-<!-- GSD:architecture-start source:ARCHITECTURE.md -->
 ## Architecture
 
 ## Overview
@@ -241,32 +238,14 @@ The current product is a brownfield TypeScript/React/Express app with SQLite as 
 - SQLite plus file-level S3 snapshots imply a single-writer/simple-deployment model. Multi-instance deployments need a different persistence strategy or strict writer coordination.
 - Settings and theme values are runtime database state, so UI changes should account for server-provided CSS custom property values.
 - Session IDs are stored directly as session primary keys and cookie tokens. Treat database and cookie access as sensitive even though token values are not logged in these docs.
-<!-- GSD:architecture-end -->
 
-<!-- GSD:skills-start source:skills/ -->
-## Project Skills
+## Arbeitsweise
 
-No project skills found. Add skills to any of: `.claude/skills/`, `.agents/skills/`, `.cursor/skills/`, or `.github/skills/` with a `SKILL.md` index file.
-<!-- GSD:skills-end -->
-
-<!-- GSD:workflow-start source:GSD defaults -->
-## GSD Workflow Enforcement
-
-Before using Edit, Write, or other file-changing tools, start work through a GSD command so planning artifacts and execution context stay in sync.
-
-Use these entry points:
-- `/gsd-quick` for small fixes, doc updates, and ad-hoc tasks
-- `/gsd-debug` for investigation and bug fixing
-- `/gsd-execute-phase` for planned phase work
-
-Do not make direct repo edits outside a GSD workflow unless the user explicitly asks to bypass it.
-<!-- GSD:workflow-end -->
-
-
-
-<!-- GSD:profile-start -->
-## Developer Profile
-
-> Profile not yet configured. Run `/gsd-profile-user` to generate your developer profile.
-> This section is managed by `generate-claude-profile` -- do not edit manually.
-<!-- GSD:profile-end -->
+1. Aufgaben kommen aus Paperclip (Issues HCI-…). Arbeit nur auf Branches, Änderungen per Pull Request gegen `main`.
+2. **Ein Merge nach `main` baut das Docker-Image und rollt Produktion aus** (`.github/workflows/docker-image.yml`). Deshalb gilt die Merge-Regel.
+3. Pflichtprüfungen vor dem PR: `npm test`, `npm run build`, `npx playwright test`.
+4. Review: Code-Reviewer und Abnahme-Pruefer prüfen jeden PR. Bei Auth, Secrets, Netz, Containern oder externen Diensten zusätzlich der Security-Reviewer.
+5. Merge-Regel Matchdesk (René, 06.11.2026): Der umsetzende Agent mergt selbst (Squash, Branch löschen), wenn **alle fünf** Bedingungen erfüllt sind: (1) CI grün und keine Konflikte mit `main`; (2) Code-Reviewer bestanden, schriftlich; (3) Abnahme-Pruefer bestanden gegen die Abnahmekriterien der Aufgabe; (4) Aufgabe gehört zu einem von René freigegebenen Plan und der PR bleibt in ihrem Zuschnitt; (5) keine Änderung an Secrets, Zugangsdaten, Deployment, Infrastruktur, Datenmigrationen mit Verlustrisiko oder Lizenz. Sonst Sammelkarte an René.
+6. Release-relevante Änderungen bekommen einen Eintrag in `CHANGELOG.md`. UI-Texte gehören in `src/client/i18n/catalog/de.ts` und `en.ts`.
+7. Produktive Instanz und Datenbank nicht anfassen; AMP-Instanzen mit Spielern nie stoppen.
+8. Keine Betriebsinfos, Hosts, IPs oder Zugangsdaten im Repo. Betriebsdoku und ADR-0004 liegen **nicht im Repo**, sondern im Familien-Wiki (Outline) auf der Seite „Hermes (Mitspielzentrale)“ unter „IT & Netz › GitHub-Repositories“.
